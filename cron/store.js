@@ -3,12 +3,13 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getCronStorePath } from '../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const DEFAULT_STORE_PATH = join(__dirname, 'jobs.json');
+const DEFAULT_STORE_PATH = getCronStorePath();
 
 /**
  * @typedef {Object} CronScheduleCron
