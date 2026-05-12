@@ -148,9 +148,16 @@ function getDaemonUptimeSeconds() {
 
 // ---- API key auth (optional) ----
 // Set COWCODE_API_KEY in ~/.cowcode/.env to require Bearer token on all /api/* routes.
+// Auth is enforced for remote access (e.g. Tailscale *.ts.net) but skipped for local dashboard use.
 const API_KEY = process.env.COWCODE_API_KEY || '';
 if (API_KEY) {
   app.use('/api', (req, res, next) => {
+    const host = req.headers.host || '';
+    // Local dashboard access (not via Tailscale) does not require auth
+    if (!host.includes('.ts.net')) {
+      next();
+      return;
+    }
     const auth = req.headers['authorization'] || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (token !== API_KEY) {
