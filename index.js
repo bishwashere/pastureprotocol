@@ -1308,7 +1308,7 @@ async function main() {
       }
 
       if (userSentVoice && userText) {
-        userText += '\n\n[The user sent a voice message. Reply using the speech skill with action reply_as_voice so your reply is sent as a voice message.]';
+        userText += '\n\n[The user sent a voice message. Reply using the speech skill with action reply_as_voice so your reply is sent as a voice message. Keep your reply conversational and spoken-word friendly: summarize, answer, or respond naturally. Do NOT read out file names, folder names, long paths, or raw file contents unless the user explicitly asks for them.]';
       }
 
       console.log('[incoming]', userText.slice(0, 60) + (userText.length > 60 ? '…' : ''));

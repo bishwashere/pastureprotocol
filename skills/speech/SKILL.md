@@ -33,6 +33,16 @@ Call **run_skill** with **skill: "speech"**. Set **command** or **arguments.acti
 
 When the user sends a **voice message**, the bot transcribes it with Whisper and feeds the text to the LLM. The system adds a hint so you reply using **reply_as_voice**; your reply is then sent as a voice message. So voice always goes through the speech skill: transcribe for input, **reply_as_voice** for the reply.
 
+### Voice reply content rules
+
+Voice replies must be **spoken-word friendly**. The listener hears the reply as audio, so:
+
+- **Summarize and respond conversationally** — give the gist, answer the question, or reply naturally
+- **Do NOT read out** file names, folder names, long paths, or raw file/code contents
+- **Do NOT recite** directory listings, config keys, or technical metadata
+- Only mention specific file names or paths if the user **explicitly asked** for them (e.g. "what's the exact file name?")
+- When referencing files or code, describe what they do in plain language instead
+
 ## Tool schema
 
 ```tool-schema
