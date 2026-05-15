@@ -1,0 +1,36 @@
+---
+description: Core dev workflow: issue triage log paths and mandatory test suite enforcement
+alwaysApply: true
+---
+
+# Dev Workflow Rules
+
+## 1. Issue Reporting — Always Check Logs First
+
+When the user reports a bug, error, or unexpected behavior, **before responding**, inspect the following log paths:
+
+- `~/.cowcode/daemon.log` — main runtime output (`$COWCODE_STATE_DIR/daemon.log` if the env var is set)
+- `~/.cowcode/daemon.err` — daemon stderr / crash output (`$COWCODE_STATE_DIR/daemon.err` if the env var is set)
+- `pm2 logs cowcode` — Windows / pm2-managed process logs
+
+Use `tail -n 100 ~/.cowcode/daemon.log` or `tail -n 100 ~/.cowcode/daemon.err` to surface recent entries. Quote the relevant log lines in your reply so the user can see exactly what was captured.
+
+## 2. Adding or Editing a Feature — Tests Are Mandatory
+
+Whenever a feature is added or an existing one is modified:
+
+1. **Find the relevant test** in `scripts/test/` (pattern: `test-<feature>.js` or `test-<feature>-e2e.js`).
+2. **If a test exists**, run it:
+   ```
+   pnpm run test:<feature-name>
+   ```
+   Full suite fallback: `pnpm run test:all`
+3. **If no test exists**, create one under `scripts/test/test-<feature-name>.js` before finishing the change.
+4. **Always present a results table** to the user after running:
+
+| Test | Question / Scenario | Result |
+|------|---------------------|--------|
+| `test-agent.js` | Does the agent respond correctly? | ✅ Pass |
+| `test-browser.js` | Can the browser executor open a page? | ❌ Fail — `Error: ...` |
+
+Never mark a feature done without showing this table.

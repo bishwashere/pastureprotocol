@@ -455,6 +455,59 @@
       justify-content: center;
     }
     #chat-send.chat-btn-stop:hover { filter: brightness(1.08); }
+    .chat-toolbar-btn {
+      margin-top: 0;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+    }
+    .chat-toolbar-btn:hover { color: var(--text); border-color: var(--muted); filter: none; }
+    .chat-history-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      max-height: 18rem;
+      overflow-y: auto;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .chat-history-panel.open { display: block; }
+    .chat-history-empty { padding: 0.75rem 1rem; font-size: 0.82rem; color: var(--muted); font-style: italic; }
+    .chat-history-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.9rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    .chat-history-item:hover { background: var(--bg); }
+    .chat-history-item:last-child { border-bottom: none; }
+    .chat-history-item-text { flex: 1; min-width: 0; }
+    .chat-history-item-title { font-size: 0.82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-history-item-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+    .chat-history-delete {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.2rem 0.35rem;
+      font-size: 0.78rem;
+      margin-top: 0;
+      border-radius: 3px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .chat-history-item:hover .chat-history-delete { opacity: 1; }
+    .chat-history-delete:hover { color: var(--red); background: rgba(239,68,68,0.1); filter: none; }
   </style>
 </head>
 <body>
@@ -474,9 +527,12 @@
 
   <div id="page-chat" class="page active">
     <div class="chat-layout card" style="padding:0;">
-      <div class="chat-toolbar">
+      <div class="chat-toolbar" style="position:relative;">
         <span class="skill-meta" style="margin:0;">Agent</span>
         <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
+        <button type="button" id="chat-new-btn" class="chat-toolbar-btn" title="Start a new conversation">New</button>
+        <button type="button" id="chat-history-btn" class="chat-toolbar-btn" title="Browse past conversations">History</button>
+        <div id="chat-history-panel" class="chat-history-panel"></div>
       </div>
       <div id="chat-messages" class="chat-messages">
         <div id="chat-messages-inner" class="chat-messages-inner"></div>
@@ -1757,12 +1813,130 @@
       }
     });
 
+    // ── Chat session persistence ──────────────────────────────────────────
+    var SESSIONS_KEY = 'cowcode_chat_sessions_v1';
+    var MAX_SESSIONS = 20;
+
+    function loadAllSessions() {
+      try { return JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]'); } catch (_) { return []; }
+    }
+    function saveAllSessions(arr) {
+      try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(arr)); } catch (_) {}
+    }
+    function getSessionsForAgent(agentId) {
+      return loadAllSessions().filter(function (s) { return s.agentId === agentId; });
+    }
+    function upsertSession(session) {
+      var all = loadAllSessions();
+      var idx = all.findIndex(function (s) { return s.id === session.id; });
+      if (idx >= 0) { all[idx] = session; } else { all.unshift(session); }
+      all.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+      saveAllSessions(all.slice(0, MAX_SESSIONS));
+    }
+    function deleteSessionById(id) {
+      saveAllSessions(loadAllSessions().filter(function (s) { return s.id !== id; }));
+    }
+    function formatSessionTime(ts) {
+      if (!ts) return '';
+      var d = new Date(ts), now = new Date();
+      var diff = Math.floor((now - d) / 1000);
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
     var selectedChatAgentId = 'main';
     var chatMessages = [];
     var chatMessagesByAgent = {};
     var chatLoading = false;
     var chatStreamActive = false;
     var chatAbortController = null;
+    var currentSessionId = null;
+
+    function newSessionId() { return 'cs-' + Date.now(); }
+
+    function saveCurrentSession() {
+      if (!currentSessionId) return;
+      var msgs = chatMessagesByAgent[selectedChatAgentId] || [];
+      var userMsgs = msgs.filter(function (m) { return m.role === 'user'; });
+      if (!userMsgs.length) return;
+      var title = userMsgs[0].content.length > 72 ? userMsgs[0].content.slice(0, 72) + '…' : userMsgs[0].content;
+      upsertSession({ id: currentSessionId, agentId: selectedChatAgentId, title: title, messages: msgs, updatedAt: Date.now() });
+    }
+
+    function renderHistoryPanel() {
+      var panel = document.getElementById('chat-history-panel');
+      if (!panel) return;
+      var sessions = getSessionsForAgent(selectedChatAgentId);
+      if (!sessions.length) {
+        panel.innerHTML = '<div class="chat-history-empty">No history yet for this agent.</div>';
+        return;
+      }
+      panel.innerHTML = sessions.map(function (s) {
+        var sid = escapeHtml(s.id);
+        var title = escapeHtml(s.title || '(no title)');
+        var ago = escapeHtml(formatSessionTime(s.updatedAt));
+        var count = s.messages ? Math.floor(s.messages.filter(function (m) { return m.role === 'user'; }).length) : 0;
+        return '<div class="chat-history-item" data-sid="' + sid + '">' +
+          '<div class="chat-history-item-text">' +
+            '<div class="chat-history-item-title">' + title + '</div>' +
+            '<div class="chat-history-item-meta">' + count + ' message' + (count !== 1 ? 's' : '') + ' · ' + ago + '</div>' +
+          '</div>' +
+          '<button type="button" class="chat-history-delete" data-del="' + sid + '" title="Delete">✕</button>' +
+        '</div>';
+      }).join('');
+      panel.querySelectorAll('.chat-history-item').forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          if (e.target.closest('.chat-history-delete')) return;
+          var sid = item.getAttribute('data-sid');
+          restoreSession(sid);
+          closeChatHistory();
+        });
+      });
+      panel.querySelectorAll('.chat-history-delete').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var sid = btn.getAttribute('data-del');
+          deleteSessionById(sid);
+          if (currentSessionId === sid) {
+            currentSessionId = newSessionId();
+            chatMessages = [];
+            chatMessagesByAgent[selectedChatAgentId] = [];
+            renderChatMessages();
+          }
+          renderHistoryPanel();
+        });
+      });
+    }
+
+    function restoreSession(sid) {
+      var all = loadAllSessions();
+      var session = all.find(function (s) { return s.id === sid; });
+      if (!session) return;
+      saveCurrentSession();
+      currentSessionId = session.id;
+      chatMessages = (session.messages || []).slice();
+      chatMessagesByAgent[selectedChatAgentId] = chatMessages;
+      renderChatMessages();
+    }
+
+    function openChatHistory() {
+      renderHistoryPanel();
+      var panel = document.getElementById('chat-history-panel');
+      if (panel) panel.classList.add('open');
+    }
+    function closeChatHistory() {
+      var panel = document.getElementById('chat-history-panel');
+      if (panel) panel.classList.remove('open');
+    }
+    function toggleChatHistory() {
+      var panel = document.getElementById('chat-history-panel');
+      if (!panel) return;
+      if (panel.classList.contains('open')) { closeChatHistory(); } else { openChatHistory(); }
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
     function syncChatSendButton() {
       var btn = document.getElementById('chat-send');
@@ -1781,8 +1955,23 @@
     }
 
     function setChatAgent(agentId) {
+      saveCurrentSession();
       selectedChatAgentId = agentId || 'main';
-      chatMessages = chatMessagesByAgent[selectedChatAgentId] || [];
+      if (chatMessagesByAgent[selectedChatAgentId]) {
+        chatMessages = chatMessagesByAgent[selectedChatAgentId];
+        // keep currentSessionId as-is if we already have in-memory messages for this agent
+      } else {
+        // try to restore the most recent session for this agent
+        var recent = getSessionsForAgent(selectedChatAgentId);
+        if (recent.length) {
+          currentSessionId = recent[0].id;
+          chatMessages = (recent[0].messages || []).slice();
+        } else {
+          currentSessionId = newSessionId();
+          chatMessages = [];
+        }
+        chatMessagesByAgent[selectedChatAgentId] = chatMessages;
+      }
       renderChatMessages();
     }
 
@@ -1965,6 +2154,7 @@
         chatLoading = false;
         syncChatSendButton();
         renderChatMessages();
+        saveCurrentSession();
       }
     }
 
@@ -1980,6 +2170,26 @@
     });
     document.getElementById('chat-agent-select').addEventListener('change', function (e) {
       setChatAgent((e.target && e.target.value) || 'main');
+    });
+    document.getElementById('chat-new-btn').addEventListener('click', function () {
+      closeChatHistory();
+      saveCurrentSession();
+      currentSessionId = newSessionId();
+      chatMessages = [];
+      chatMessagesByAgent[selectedChatAgentId] = [];
+      renderChatMessages();
+      document.getElementById('chat-input').focus();
+    });
+    document.getElementById('chat-history-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleChatHistory();
+    });
+    document.addEventListener('click', function (e) {
+      var panel = document.getElementById('chat-history-panel');
+      var btn = document.getElementById('chat-history-btn');
+      if (panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) {
+        closeChatHistory();
+      }
     });
 
     fetchStatus();

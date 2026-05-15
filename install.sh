@@ -61,7 +61,7 @@ if ! command -v cowcode >/dev/null 2>&1; then
   add_path_to "${ZDOTDIR:-$HOME}/.zprofile"
   add_path_to "$HOME/.bashrc"
   add_path_to "$HOME/.profile"
-  [ "$ADDED_PATH" = 1 ] && echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: cowcode moo start)"
+  [ "$ADDED_PATH" = 1 ] && echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: cowcode start)"
 fi
 echo ""
 
@@ -88,18 +88,18 @@ else
   # Start daemon in background (no new terminal); user can close this window.
   export PATH="$BIN_DIR:$PATH"
   export COWCODE_INSTALL_DIR="$INSTALL_DIR"
-  if "$BIN_DIR/cowcode" moo start; then
+  if "$BIN_DIR/cowcode" start; then
     echo "  ► Bot is running in the background. You can close this terminal."
     echo "  ► To see logs: cowcode logs"
   else
-    echo "  To start the bot later:  cowcode moo start"
+    echo "  To start the bot later:  cowcode start"
   fi
   echo ""
   exit 0
 fi
 echo ""
 echo "  ------------------------------------------------"
-echo "  To start the bot:  cowcode moo start"
+echo "  To start the bot:  cowcode start"
 echo "  (or from this folder:  npm start)"
 echo ""
 

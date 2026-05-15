@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
 
-// Log to daemon.log so "tail -f" shows when the process actually started (after cowcode moo start/restart)
+// Log to daemon.log so "tail -f" shows when the process actually started (after cowcode start/restart)
 console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] cowCode daemon started`);
 
 import * as Baileys from '@whiskeysockets/baileys';
@@ -234,7 +234,7 @@ async function runAuthOnly(opts = {}) {
           console.log('Please send a message to your own number to get started.');
         } else {
           console.log('[connection] connection successful');
-          console.log('Linked. You can Ctrl+C and run cowcode moo start.');
+          console.log('Linked. You can Ctrl+C and run cowcode start.');
         }
         resolve(sock);
         return;
@@ -438,8 +438,17 @@ async function main() {
 
   // Agent logic: getSkillContext() called on every run; compact list in tool; full doc injected when a skill is called.
 
-  /** Tide: one follow-up per "round". When we reply to a private chat, we schedule a single follow-up after silenceCooldownMinutes. If the user replies before then, the timer is cleared and a new one set after our next reply. If they don't reply, we send one follow-up and do not message again until they reply. */
+  /**
+   * Tide: per-JID follow-up state.
+   * Maps jid → { dueMs } where dueMs is when the next follow-up conversation check is due.
+   * A global interval fires frequently for the polling health check; it also runs follow-ups for
+   * JIDs whose dueMs has elapsed. This decouples the health-check cadence from the cooldown period.
+   */
   const tideTimerByJid = new Map();
+  /** JIDs currently being processed by runTideForJid — prevents concurrent runs for the same JID. */
+  const tideRunningJids = new Set();
+  /** Handle for the global Tide interval. */
+  let tideGlobalInterval = null;
   function getTideConfig() {
     try {
       const raw = readFileSync(getConfigPath(), 'utf8');
@@ -448,7 +457,6 @@ async function main() {
     return {};
   }
   async function runTideForJid(tideJid) {
-    tideTimerByJid.delete(tideJid);
     const tideJidShort = String(tideJid).slice(0, 20) + (String(tideJid).length > 20 ? '…' : '');
     let config = getTideConfig();
     const tide = config.tide || {};
@@ -556,39 +564,23 @@ async function main() {
         }
       }
     }
-    // Heartbeat re-schedule: keep the watchdog cycle alive even when no message was sent.
-    // If the user responded during this cycle, scheduleTideFollowUp already set a fresh
-    // timer — don't override it. Otherwise re-queue for the next health check.
-    if (!tideTimerByJid.has(tideJid)) {
-      scheduleTideFollowUp(tideJid);
-    }
+    // Reset the per-JID cooldown so the next follow-up fires after another full cooldown period.
+    scheduleTideFollowUp(tideJid);
   }
   function scheduleTideFollowUp(jid) {
-    console.log('[tide] scheduleTideFollowUp called for', String(jid).slice(0, 24));
     const config = getTideConfig();
     const tide = config.tide || {};
-    if (!tide.enabled) {
-      console.log('[tide] Skipped (tide.enabled is false in config)');
-      return;
-    }
-    const inactiveStart = tide.inactiveStart && String(tide.inactiveStart).trim();
-    const inactiveEnd = tide.inactiveEnd && String(tide.inactiveEnd).trim();
-    if (inactiveStart && inactiveEnd && isInTideInactiveWindow(inactiveStart, inactiveEnd)) return;
+    if (!tide.enabled) return;
     const cooldownMinutes = Math.max(1, Number(tide.silenceCooldownMinutes) || 30);
-    const existing = tideTimerByJid.get(jid);
-    if (existing?.timeoutId) clearTimeout(existing.timeoutId);
+    const dueMs = Date.now() + cooldownMinutes * 60 * 1000;
     const jidShort = String(jid).slice(0, 20) + (String(jid).length > 20 ? '…' : '');
-    if (existing?.timeoutId) {
-      console.log('[tide] Timer reset for', jidShort, '— follow-up in', cooldownMinutes, 'min');
+    const isReset = tideTimerByJid.has(jid);
+    tideTimerByJid.set(jid, { dueMs });
+    if (isReset) {
+      console.log('[tide] Timer reset for', jidShort, '— follow-up due in', cooldownMinutes, 'min');
     } else {
       console.log('[tide] Scheduled follow-up for', jidShort, 'in', cooldownMinutes, 'min');
     }
-    const timeoutId = setTimeout(() => {
-      tideTimerByJid.delete(jid);
-      console.log('[tide] Sending follow-up to', jidShort);
-      runTideForJid(jid).catch((e) => console.error('[tide]', getErrorMessageForLog(e)));
-    }, cooldownMinutes * 60 * 1000);
-    tideTimerByJid.set(jid, { timeoutId });
   }
   function startTide(sockRef, selfJidRef) {
     console.log('[tide] startTide() called');
@@ -599,13 +591,42 @@ async function main() {
       return;
     }
     const cooldownMinutes = Math.max(1, Number(tide.silenceCooldownMinutes) || 30);
-    console.log('[tide] Enabled. One follow-up per private reply after', cooldownMinutes, 'min of no reply.');
+    // healthCheckMinutes controls how often Tide wakes up to run the polling watchdog and check
+    // for due follow-ups. It must be <= silenceCooldownMinutes to catch due JIDs on time.
+    const healthCheckMinutes = Math.min(
+      Math.max(1, Number(tide.healthCheckMinutes) || 2),
+      cooldownMinutes
+    );
+    console.log('[tide] Enabled. Follow-up cooldown:', cooldownMinutes, 'min. Health-check interval:', healthCheckMinutes, 'min.');
+    if (tideGlobalInterval) clearInterval(tideGlobalInterval);
+    tideGlobalInterval = setInterval(() => {
+      // 1. Always run the Telegram polling watchdog, independent of any active conversation.
+      if (telegramBot) {
+        ensurePollingAlive(telegramBot).catch((e) =>
+          console.error('[tide] polling health check error:', getErrorMessageForLog(e))
+        );
+      }
+      // 2. Fire conversation follow-ups for any JID whose cooldown has elapsed.
+      const now = Date.now();
+      for (const [jid, entry] of tideTimerByJid) {
+        if (now >= entry.dueMs && !tideRunningJids.has(jid)) {
+          const jidShort = String(jid).slice(0, 20) + (String(jid).length > 20 ? '…' : '');
+          console.log('[tide] Follow-up due for', jidShort);
+          tideRunningJids.add(jid);
+          runTideForJid(jid)
+            .catch((e) => console.error('[tide]', getErrorMessageForLog(e)))
+            .finally(() => tideRunningJids.delete(jid));
+        }
+      }
+    }, healthCheckMinutes * 60 * 1000);
   }
   function stopTide() {
-    for (const [, entry] of tideTimerByJid) {
-      if (entry?.timeoutId) clearTimeout(entry.timeoutId);
+    if (tideGlobalInterval) {
+      clearInterval(tideGlobalInterval);
+      tideGlobalInterval = null;
     }
     tideTimerByJid.clear();
+    tideRunningJids.clear();
     console.log('[tide] Stopped.');
   }
 

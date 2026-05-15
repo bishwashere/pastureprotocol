@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * CLI entry: auth, moo start/stop/status/restart, update, and skill add/install.
- * Usage: cowcode auth | cowcode moo start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode update [--force]
+ * CLI entry: auth, start/stop/status/restart, update, and skill add/install.
+ * Usage: cowcode auth | cowcode start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -20,7 +20,7 @@ const args = process.argv.slice(2);
 const sub = args[0];
 const isForceUpdate = args.slice(1).some((a) => a === '--force' || a === '-f');
 
-/** After a successful update: restart moo and run dashboard, with clear logging. */
+/** After a successful update: restart the daemon and run dashboard, with clear logging. */
 function runPostUpdateRestartAndDashboard() {
   console.log('');
   console.log('  Restarting bot and starting dashboard...');
@@ -32,12 +32,12 @@ function runPostUpdateRestartAndDashboard() {
       cwd: INSTALL_DIR,
     });
     if (restartResult.status === 0) {
-      console.log('  ✓ Restarted moo.');
+      console.log('  ✓ Restarted.');
     } else {
-      console.error('  ✗ Moo restart had issues. You can run: cowcode moo restart');
+      console.error('  ✗ Restart had issues. You can run: cowcode restart');
     }
   } else {
-    console.log('  (moo script not found; run cowcode moo start if needed)');
+    console.log('  (daemon script not found; run cowcode start if needed)');
   }
   const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
   if (existsSync(serverPath)) {
@@ -57,12 +57,7 @@ function runPostUpdateRestartAndDashboard() {
   console.log('');
 }
 
-if (sub === 'moo') {
-  const action = args[1];
-  if (!action || !['start', 'stop', 'status', 'restart'].includes(action)) {
-    console.log('Usage: cowcode moo start | stop | status | restart');
-    process.exit(action ? 1 : 0);
-  }
+function runDaemonAction(action) {
   const script = join(INSTALL_DIR, 'scripts', 'daemon.sh');
   if (!existsSync(script)) {
     console.error('cowCode: installation incomplete or corrupted.');
@@ -76,6 +71,10 @@ if (sub === 'moo') {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
+}
+
+if (['start', 'stop', 'status', 'restart'].includes(sub)) {
+  runDaemonAction(sub);
 } else if (sub === 'dashboard') {
   (async () => {
     const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
@@ -201,7 +200,7 @@ if (sub === 'moo') {
     child.on('close', (code) => process.exit(code ?? 0));
   } else {
     if (!existsSync(logPath)) {
-      console.error('cowCode: no log file yet. Start the bot with: cowcode moo start');
+      console.error('cowCode: no log file yet. Start the bot with: cowcode start');
       process.exit(1);
     }
     const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
@@ -395,10 +394,10 @@ if (sub === 'moo') {
           if (restartResult.status === 0) {
             console.log('  ✓ Bot restarted.');
           } else {
-            console.error('  ✗ Auto-restart failed. Run: cowcode moo restart');
+            console.error('  ✗ Auto-restart failed. Run: cowcode restart');
           }
         } else {
-          console.log('Restart skipped (daemon script not found). Run: cowcode moo restart');
+          console.log('Restart skipped (daemon script not found). Run: cowcode restart');
         }
       } catch (err) {
         console.error('cowCode: skills install failed.', err?.message || err);
@@ -413,7 +412,7 @@ if (sub === 'moo') {
     process.exit((sub === 'add' || skillSub === 'install') ? 1 : 0);
   }
 } else {
-  console.log('Usage: cowcode moo start | stop | status | restart');
+  console.log('Usage: cowcode start | stop | status | restart');
   console.log('       cowcode logs');
   console.log('       cowcode dashboard');
   console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');

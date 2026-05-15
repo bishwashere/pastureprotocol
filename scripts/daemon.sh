@@ -3,7 +3,7 @@
 # Uses COWCODE_INSTALL_DIR (set by cli.js). State dir: ~/.cowcode or COWCODE_STATE_DIR.
 
 set -e
-ACTION="${1:?Usage: cowcode moo start|stop|status|restart}"
+ACTION="${1:?Usage: cowcode start|stop|status|restart}"
 INSTALL_DIR="${COWCODE_INSTALL_DIR:-.}"
 STATE_DIR="${COWCODE_STATE_DIR:-$HOME/.cowcode}"
 # Resolve INSTALL_DIR to absolute path
@@ -26,7 +26,7 @@ RUN_WITH_ENV="$INSTALL_DIR/scripts/run-with-env.sh"
 
 # Append a control line to daemon.log so "tail -f daemon.log" shows start/stop/restart
 daemon_log() {
-  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] cowcode moo $ACTION" >> "$STATE_DIR/daemon.log" 2>/dev/null || true
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] cowcode $ACTION" >> "$STATE_DIR/daemon.log" 2>/dev/null || true
 }
 
 # macOS launchd
@@ -172,7 +172,7 @@ case "$OS" in
         daemon_log
         ;;
       *)
-        echo "Usage: cowcode moo start|stop|status|restart"
+        echo "Usage: cowcode start|stop|status|restart"
         ;;
     esac
     exit 0
@@ -218,7 +218,7 @@ case "$OS" in
         daemon_log
         echo "  (tail $STATE_DIR/daemon.log to see 'cowCode daemon started' when the bot is up)"
         ;;
-      *) echo "Usage: cowcode moo start|stop|status|restart"; exit 1 ;;
+      *) echo "Usage: cowcode start|stop|status|restart"; exit 1 ;;
     esac
     ;;
   Linux*)
@@ -245,7 +245,7 @@ case "$OS" in
         echo "Daemon restarted."
         daemon_log
         ;;
-      *) echo "Usage: cowcode moo start|stop|status|restart"; exit 1 ;;
+      *) echo "Usage: cowcode start|stop|status|restart"; exit 1 ;;
     esac
     ;;
   *)

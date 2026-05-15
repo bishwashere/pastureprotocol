@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.
 
 | 2️⃣ Start the Bot | 3️⃣ Dashboard | 4️⃣ Other commands |
 |----------------------------------------|--------------|-------------------|
-| <code>cowcode moo start</code> | <code>cowcode dashboard</code>  | <code>cowcode logs</code> - view bot logs<br><code>cowcode update</code> - latest version<br><code>cowcode uninstall</code> - remove cowCode |
+| <code>cowcode start</code> | <code>cowcode dashboard</code>  | <code>cowcode logs</code> - view bot logs<br><code>cowcode update</code> - latest version<br><code>cowcode uninstall</code> - remove cowCode |
 | You can close the terminal. It keeps running. | Open dashboard | Other utility commands are here |
 
 ---

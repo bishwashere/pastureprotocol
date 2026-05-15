@@ -806,7 +806,7 @@ async function main() {
   section('Starting cowCode');
   if (telegramOnly) {
     console.log('  Running in Telegram-only mode. Message your bot on Telegram to chat.');
-    console.log('  To add WhatsApp later: cowcode auth  then  cowcode moo start');
+    console.log('  To add WhatsApp later: cowcode auth  then  cowcode start');
   } else {
     console.log('  If this is your first time with WhatsApp, you\'ll see a QR code — scan it.');
     console.log('  Then send a message to your own number to start chatting.');
@@ -828,7 +828,7 @@ async function main() {
   child.on('close', (code) => {
     console.log('');
     console.log('  ------------------------------------------------');
-    console.log('  To start the bot:  cowcode moo start');
+    console.log('  To start the bot:  cowcode start');
     console.log('  (or from this folder:  npm start)');
     console.log('');
     process.exit(code ?? 0);

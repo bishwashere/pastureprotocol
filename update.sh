@@ -101,7 +101,7 @@ if [ -n "$NOW_VER" ]; then
 else
   echo "  ✓ Update complete."
 fi
-echo "  Start the bot:  cowcode moo start"
-echo "  If already running, restart to use new version:  cowcode moo restart"
+echo "  Start the bot:  cowcode start"
+echo "  If already running, restart to use new version:  cowcode restart"
 echo "  (Config and skills are preserved; no fresh install needed.)"
 echo ""
