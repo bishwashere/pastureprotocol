@@ -12,7 +12,7 @@
 import { writeSync } from 'fs';
 import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/paths.js';
 import dotenv from 'dotenv';
-import { getSkillContext, getEnabledSkillIds } from '../skills/loader.js';
+import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
 import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
@@ -82,9 +82,10 @@ async function main() {
   };
   // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
   const enabledSkillIds = getEnabledSkillIds({ agentId });
+  const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
   // Step 2: intent planner — one small LLM call before loading any tool schemas.
   const intentPlan = enabledSkillIds.length > 0
-    ? await planIntent({ userText: message, availableSkillIds: enabledSkillIds, agentId })
+    ? await planIntent({ userText: message, availableSkillIds: enabledSkillIds, availableSkillSummaries: enabledSkillSummaries, agentId })
     : null;
   if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
   // Step 3: load tool schemas based on what the planner returned.

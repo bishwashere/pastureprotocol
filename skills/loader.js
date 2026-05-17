@@ -225,6 +225,30 @@ export function getEnabledSkillIds(options = {}) {
 }
 
 /**
+ * Return enabled skill IDs paired with their one-line description from SKILL.md frontmatter.
+ * Slightly more expensive than getEnabledSkillIds (reads SKILL.md per skill) but still cheap
+ * compared to loading full tool schemas. Feed this to the intent planner so it can route by
+ * meaning rather than just skill names.
+ *
+ * @param {{ groupJid?: string, agentId?: string }} [options]
+ * @returns {Array<{ id: string, description: string }>}
+ */
+export function getEnabledSkillSummaries(options = {}) {
+  const ids = getEnabledSkillIds(options);
+  return ids.map((id) => {
+    const mdPath = getSkillMdPath(id);
+    if (!mdPath) return { id, description: id };
+    try {
+      const skillMd = readFileSync(mdPath, 'utf8').trim();
+      const { description } = parseCompactFromSkillMd(skillMd, id);
+      return { id, description };
+    } catch {
+      return { id, description: id };
+    }
+  });
+}
+
+/**
  * Load skill folders (SKILL.md with optional YAML front matter and optional tool-schema block).
  * If a skill defines a tool-schema in the same SKILL.md, one tool per action is built (explicit parameters).
  * Otherwise the skill is exposed via the single run_skill tool. No separate JS for actions.

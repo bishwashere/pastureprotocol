@@ -33,7 +33,7 @@ import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSyn
 import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
-import { getSkillsEnabled, getSkillContext, getEnabledSkillIds, DEFAULT_ENABLED } from './skills/loader.js';
+import { getSkillsEnabled, getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries, DEFAULT_ENABLED } from './skills/loader.js';
 import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText, ensurePollingAlive } from './lib/telegram.js';
 import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/pending-telegram.js';
@@ -795,9 +795,10 @@ async function main() {
     // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
     const groupJidForSkills = isGroupJid ? jid : undefined;
     const enabledSkillIds = getEnabledSkillIds({ groupJid: groupJidForSkills, agentId });
+    const enabledSkillSummaries = getEnabledSkillSummaries({ groupJid: groupJidForSkills, agentId });
     // Step 2: intent planner — one small LLM call before loading any tool schemas.
     const intentPlan = enabledSkillIds.length > 0
-      ? await planIntent({ userText: text, availableSkillIds: enabledSkillIds, agentId })
+      ? await planIntent({ userText: text, availableSkillIds: enabledSkillIds, availableSkillSummaries: enabledSkillSummaries, agentId })
       : null;
     if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
     // Step 3: load tool schemas based on what the planner returned.
