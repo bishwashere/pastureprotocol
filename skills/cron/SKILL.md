@@ -12,11 +12,11 @@ Manage reminders and scheduled messages: **one-shot** (at a specific time) or **
 
 ## Commands (name is command)
 
-- **list** — Use when the user asks to list, see, or count reminders ("how many crons?", "list my reminders", "what's scheduled?"). Call once only. Do not also call add. No other fields needed.
+- **list** — Use when the user asks to list, see, count, or check for reminders ("how many crons?", "list my reminders", "what's scheduled?", "do I have any reminders?"). Call once only. Do not also call add. No other fields needed. **Always reply with the full list of reminders** (one-time and recurring), even if the user only asked "do I have any?" or "are there any?" — never reply with only a count like "you have 7 reminders". If there are none, say so explicitly. **Never include raw cron expressions** (e.g. `0 8 * * 1`) in the reply — always convert to human-readable form (e.g. "Every Monday at 8:00 AM"). Use the stored human-readable message and the schedule kind (at/cron) to produce a natural description.
 - **add** — When the user's **intent** is to CREATE or SET a reminder, or to have something **checked repeatedly** or **get notified when something happens** (e.g. status change, arrival, result). Treat that intent as a request to create a job; do not ask for confirmation before adding. Set **arguments.job** with **message** (what to check or remind) and **schedule**:
   - **One-shot:** `{ "kind": "at", "at": "<future ISO 8601>" }`. Always use an exact full ISO 8601 timestamp (e.g. 2026-02-19T08:00:00.000Z). Schedules are saved and run at that exact time. For "in 1 hour" or "tomorrow 8am" compute the exact datetime and pass it as ISO 8601.
   - **Recurring (cron):** `{ "kind": "cron", "expr": "<cron expression>", "tz": "optional IANA timezone" }`. Use the **expr** values below for common setups. Never invent message text. **If the user does not specify how often to check,** use a sensible default (e.g. every 10 minutes: `*/10 * * * *`), create the job, then say they can change the interval or remove it later.
-- **remove** — When the user asks to cancel a reminder. Set **arguments.jobId** (from a previous list result).
+- **remove** — When the user asks to cancel a reminder. Set **arguments.jobId** (from a previous list result). **When the user refers to a reminder by position** (e.g. "remove reminder number 3", "delete the third one"): call `list` first to get the numbered list (1-indexed from top), find the job at that exact position across the full combined list (one-time + recurring in the order shown), then call `remove` with that job's id. Confirm what was removed by name and position.
 
 You can pass the command at the top level (`command: "list"`) or inside arguments (`arguments.action: "list"`). Never omit the command/action.
 
@@ -39,6 +39,7 @@ Optional **tz** for timezone (e.g. `"America/New_York"`). Example job for "every
 ## Notes
 
 - **Intent over wording:** Recognize the intent to have something checked repeatedly or to be notified when something happens; create the recurring job with a default interval if the user did not specify one. Prefer acting (add with sensible defaults) over asking for interval or cutoff first.
+- **Confirmation reply for recurring jobs:** When confirming a recurring reminder was added, write a natural confirmation in plain English (e.g. "I'll remind you every 5 minutes", "Daily reminder set for 9 AM", "Every Monday at 8 AM reminder created"). Do **not** expose raw cron expressions, tool-call JSON, or internal arguments in the user-facing reply.
 - For multiple new reminders in one message, call run_skill(cron, add) once per reminder with different job.message and job.schedule.
 - For "every one minute for the next three minutes" use three one-shot **at** times. For "every 5 minutes" or "every morning" use **cron** with the **expr** above.
 
