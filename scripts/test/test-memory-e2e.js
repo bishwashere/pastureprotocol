@@ -189,7 +189,19 @@ function runE2E(userMessage, opts = {}) {
 function getLatestChatLog(workspaceDir) {
   const chatLogDir = join(workspaceDir, 'chat-log');
   if (!existsSync(chatLogDir)) return null;
+  // Check top-level date-based files first, then per-JID private/ subdirectory.
   const names = readdirSync(chatLogDir).filter((n) => n.endsWith('.jsonl'));
+  const privateDir = join(chatLogDir, 'private');
+  if (existsSync(privateDir)) {
+    const privateNames = readdirSync(privateDir).filter((n) => n.endsWith('.jsonl'));
+    if (privateNames.length > 0) {
+      privateNames.sort();
+      const path = join(privateDir, privateNames[privateNames.length - 1]);
+      const content = readFileSync(path, 'utf8');
+      const lines = content.split('\n').filter((l) => l.trim());
+      if (lines.length > 0) return { path, lines };
+    }
+  }
   if (names.length === 0) return null;
   names.sort();
   const path = join(chatLogDir, names[names.length - 1]);

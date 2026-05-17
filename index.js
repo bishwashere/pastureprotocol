@@ -988,6 +988,7 @@ async function main() {
               );
               if (process.argv.includes('--test')) await indexPromise;
             }
+            appendExchange(getWorkspaceDir(), exchange);
           }
         }
         console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
