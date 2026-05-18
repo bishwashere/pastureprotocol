@@ -118,6 +118,15 @@ function loadConfig(options = {}) {
         priority,
       };
     });
+    // Drop cloud models whose API key resolved to nothing — don't attempt and fail with 401.
+    models = models.filter((m) => {
+      if (m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '') return true;
+      // Local providers (lmstudio, ollama) legitimately need no key.
+      const isLocal = m.baseUrl && /127\.0\.0\.1|localhost/i.test(m.baseUrl);
+      if (isLocal) return true;
+      console.log('[LLM] skipping model (no API key):', m.model || m.baseUrl);
+      return false;
+    });
     // When any model has priority, try it first regardless of position in config.
     const priorityIndex = models.findIndex((m) => m.priority);
     if (priorityIndex >= 0) {
