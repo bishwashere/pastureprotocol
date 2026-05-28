@@ -21,6 +21,12 @@ import { DEFAULT_ENABLED } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
 import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent } from '../lib/agent-config.js';
 import {
+  getTideChecklistFromConfig,
+  normalizeChecklistConfig,
+  readLastChecklistRun,
+  runTideChecklist,
+} from '../lib/tide-checklist.js';
+import {
   listProjects, getProject, createProject, updateProject, deleteProject,
   getProjectGraph, createUpdate, editUpdate, deleteUpdate,
   createBranch, deleteBranch,
@@ -645,6 +651,68 @@ app.put('/api/config', (req, res) => {
     }
     saveConfig(body);
     res.json(body);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Tide checklist ----
+
+app.get('/api/tide/checklist', (_req, res) => {
+  try {
+    const config = loadConfig();
+    const tide = config.tide || {};
+    res.json({
+      tideEnabled: !!tide.enabled,
+      checklist: getTideChecklistFromConfig(config),
+      lastRun: readLastChecklistRun(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tide/checklist', (req, res) => {
+  try {
+    const body = req.body || {};
+    const config = loadConfig();
+    config.tide = config.tide && typeof config.tide === 'object' ? config.tide : {};
+    const current = normalizeChecklistConfig(config.tide);
+    if (body.enabled !== undefined) current.enabled = !!body.enabled;
+    if (body.triggers && typeof body.triggers === 'object') {
+      current.triggers = { ...current.triggers, ...body.triggers };
+    }
+    if (Array.isArray(body.items)) {
+      current.items = body.items.map((it) => ({
+        id: String(it.id || '').trim() || 'check',
+        label: String(it.label || 'Check').trim(),
+        enabled: it.enabled !== false,
+        type: String(it.type || 'shell'),
+        command: it.command,
+        url: it.url,
+        path: it.path,
+        builtin: it.builtin,
+        expectStatus: it.expectStatus,
+        timeoutMs: it.timeoutMs,
+      }));
+    }
+    config.tide.checklist = current;
+    if (body.tideEnabled !== undefined) config.tide.enabled = !!body.tideEnabled;
+    saveConfig(config);
+    res.json({
+      tideEnabled: !!config.tide.enabled,
+      checklist: getTideChecklistFromConfig(config),
+      lastRun: readLastChecklistRun(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tide/checklist/run', async (_req, res) => {
+  try {
+    const summary = await runTideChecklist({ manual: true, trigger: 'manual' });
+    res.json({ summary, lastRun: readLastChecklistRun() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

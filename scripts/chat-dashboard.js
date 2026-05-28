@@ -18,6 +18,8 @@ import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
 import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
+import { ensureChatSession } from '../lib/chat-session.js';
+import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
 import { getOwnerLogJid } from '../lib/owner-config.js';
 import { getMemoryConfig } from '../lib/memory-config.js';
 import { indexChatExchange } from '../lib/memory-index.js';
@@ -67,9 +69,13 @@ async function main() {
   // their own AI. Use the unified owner log jid so this conversation shares the
   // same chat-log file and memory index as the owner's Telegram/WhatsApp DMs.
   const dashboardJid = getOwnerLogJid();
+  const { sessionId, rotated: sessionRotated } = ensureChatSession(dashboardJid, { userText: message });
+  if (sessionRotated) {
+    process.stderr.write(`[chat-dashboard] new session ${sessionId}\n`);
+  }
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
-  const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES);
+  const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);
 
   const noop = () => {};
   const ctx = {
@@ -102,7 +108,10 @@ async function main() {
   const toolNames = toolsToUse.map((t) => t?.function?.name).filter(Boolean);
   const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir);
   const planBlock = intentPlanToSystemBlock(intentPlan);
-  const systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
+  let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
+  if (sessionRotated) {
+    systemPrompt += buildSessionBootstrapContext(workspaceDir).block;
+  }
 
   try {
     const { textToSend } = await runAgentTurn({
@@ -124,21 +133,14 @@ async function main() {
       assistant: reply,
       timestampMs: Date.now(),
       jid: dashboardJid,
+      sessionId,
     };
-    // Always file-log so readLastPrivateExchanges works on the next turn.
-    try {
-      appendExchange(workspaceDir, exchange);
-    } catch (logErr) {
-      try {
-        process.stderr.write(`[chat-dashboard] chat-log append failed: ${logErr?.message || logErr}\n`);
-      } catch (_) {}
-    }
-    // Also index into vector memory when configured, so "remember what we said"
-    // works across surfaces — same behavior as Telegram private DMs.
     try {
       const memoryConfig = getMemoryConfig();
       if (memoryConfig) {
         await indexChatExchange(memoryConfig, exchange);
+      } else {
+        appendExchange(workspaceDir, exchange);
       }
     } catch (memErr) {
       try {

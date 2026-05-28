@@ -234,7 +234,8 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
     "silenceCooldownMinutes": 30,  // minutes of silence before sending a follow-up
     "jid": "",                     // target JID/chat ID; auto-detected if empty
     "inactiveStart": "23:00",      // quiet hours start (local time)
-    "inactiveEnd": "06:00"         // quiet hours end (local time)
+    "inactiveEnd": "06:00",        // quiet hours end (local time)
+    "checklist": { "enabled": false, "triggers": { "onRestart": true, "onCycle": true, "onFollowUp": false }, "items": [] }
   }
 }
 ```
@@ -443,6 +444,15 @@ Semantic memory is stored in a SQLite database with the [`sqlite-vec`](https://g
 
 Chat history is written to plain text files in `~/.cowcode/workspace/` so you can search them with any text tool. Private and group chats are stored separately.
 
+### Chat sessions (backend)
+
+LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group). Full logs still append to the same JSONL files with a `sessionId` field.
+
+- **Daily reset** — New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
+- **Manual reset** — Say e.g. `start a new session`, `new session`, or `/new-session` (no special reply text; context simply clears).
+- **State file** — `~/.cowcode/chat-sessions/state.json`
+- **Bootstrap (not in session history)** — On each **new session** and every **Tide** follow-up, the model receives `MEMORY.md` plus today and yesterday’s daily markdown logs (`workspace/memory/YYYY-MM-DD.md`) read from disk. Chat session history stays scoped to the current session only.
+
 ---
 
 ## Tide (follow-up after silence)
@@ -463,6 +473,41 @@ Tide sends a single AI-composed follow-up message when a conversation goes quiet
 ```
 
 Tide never sends more than one follow-up per silence period, and never during the configured quiet hours.
+
+### Tide checklist (maintenance)
+
+Tide can run a configurable **checklist** of health checks (shell commands, HTTP pings, file existence, or built-ins such as Telegram polling). Automatic runs respect the same `tide.enabled` flag and quiet hours as follow-ups.
+
+```json
+"tide": {
+  "enabled": true,
+  "checklist": {
+    "enabled": true,
+    "triggers": {
+      "onRestart": true,
+      "onCycle": true,
+      "onFollowUp": false
+    },
+    "items": [
+      { "id": "telegram-polling", "label": "Telegram polling health", "type": "builtin", "builtin": "telegram_polling", "enabled": true },
+      { "id": "disk", "label": "Disk space", "type": "shell", "command": "df -h / | tail -1", "enabled": true }
+    ]
+  }
+}
+```
+
+**Terminal**
+
+```bash
+cowcode tide checklist list
+cowcode tide checklist add "Disk" --shell "df -h / | tail -1"
+cowcode tide checklist add "API" --http https://example.com
+cowcode tide checklist run
+cowcode tide checklist triggers --on-restart --on-cycle --no-on-follow-up
+cowcode tide checklist on
+```
+
+**Dashboard:** open **Tide** in the nav to edit items, triggers, and run checks manually. Last results are stored in `~/.cowcode/tide-checklist-last.json`.
 
 ---
 

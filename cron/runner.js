@@ -14,6 +14,7 @@ import { getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
 import { toUserMessage, getErrorMessageForLog } from '../lib/user-error.js';
 import { appendExchange } from '../lib/chat-log.js';
 import { toLogJid } from '../lib/owner-config.js';
+import { ensureChatSession, getCurrentSession } from '../lib/chat-session.js';
 import { isTelegramGroupJid } from '../lib/telegram.js';
 import { getMemoryConfig } from '../lib/memory-config.js';
 import { indexChatExchange } from '../lib/memory-index.js';
@@ -118,7 +119,16 @@ async function runJobOnce({ job, sock, selfJid }) {
     // via the regular exchange path). Owner DM jids collapse into the unified
     // owner log so cron-driven check-ins live alongside the rest of the convo.
     const cronLogJid = isTelegramGroupJid(jid) ? jid : toLogJid(jid);
-    const exchange = { user: job.message || '', assistant: text, timestampMs: Date.now(), jid: cronLogJid };
+    const sessionKey = String(cronLogJid || jid).trim();
+    ensureChatSession(sessionKey, {});
+    const sessionId = getCurrentSession(sessionKey)?.sessionId;
+    const exchange = {
+      user: job.message || '',
+      assistant: text,
+      timestampMs: Date.now(),
+      jid: cronLogJid,
+      sessionId,
+    };
     try {
       const memoryConfig = getMemoryConfig();
       if (memoryConfig) {

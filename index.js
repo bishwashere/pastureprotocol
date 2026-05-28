@@ -39,12 +39,19 @@ import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/pending-telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext, isInTideInactiveWindow } from './lib/timezone.js';
+import {
+  defaultTideChecklistBlock,
+  shouldRunChecklistForTrigger,
+  runTideChecklist,
+} from './lib/tide-checklist.js';
 import { getOwnerConfig, isOwner } from './lib/owner-config.js';
 import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.js';
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
+import { ensureChatSession } from './lib/chat-session.js';
+import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import { toLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -301,12 +308,19 @@ function migrateTideConfig() {
     if (!existsSync(path)) return;
     const raw = readFileSync(path, 'utf8');
     const config = JSON.parse(raw);
-    if (config.tide != null && typeof config.tide === 'object') return;
+    if (config.tide != null && typeof config.tide === 'object') {
+      if (!config.tide.checklist) {
+        config.tide.checklist = defaultTideChecklistBlock();
+        writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+      }
+      return;
+    }
     config.tide = {
       enabled: false,
       silenceCooldownMinutes: 30,
       inactiveStart: '23:00',
       inactiveEnd: '06:00',
+      checklist: defaultTideChecklistBlock(),
     };
     writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
   } catch (_) {}
@@ -418,22 +432,30 @@ async function main() {
 
   /** Last N exchanges (user + assistant) per jid for LLM context. Step 1: chat + history + tools. */
   const chatHistoryByJid = new Map();
-  function getLast5Exchanges(jid) {
+  function pushExchange(jid, userContent, assistantContent, sessionId) {
+    let list = chatHistoryByJid.get(jid);
+    if (!list) list = [];
+    list.push({ user: userContent, assistant: assistantContent, sessionId });
+    if (list.length > MAX_CHAT_HISTORY_EXCHANGES) list = list.slice(-MAX_CHAT_HISTORY_EXCHANGES);
+    chatHistoryByJid.set(jid, list);
+  }
+
+  function clearInMemoryHistoryForJids(...jids) {
+    for (const id of jids) {
+      if (id != null && String(id).trim()) chatHistoryByJid.delete(String(id).trim());
+    }
+  }
+
+  function getLast5ExchangesForSession(jid, sessionId) {
     const list = chatHistoryByJid.get(jid);
     if (!list || list.length === 0) return [];
+    const filtered = sessionId ? list.filter((ex) => ex.sessionId === sessionId) : list;
     const out = [];
-    for (const ex of list) {
+    for (const ex of filtered) {
       out.push({ role: 'user', content: ex.user });
       out.push({ role: 'assistant', content: ex.assistant });
     }
     return out;
-  }
-  function pushExchange(jid, userContent, assistantContent) {
-    let list = chatHistoryByJid.get(jid);
-    if (!list) list = [];
-    list.push({ user: userContent, assistant: assistantContent });
-    if (list.length > MAX_CHAT_HISTORY_EXCHANGES) list = list.slice(-MAX_CHAT_HISTORY_EXCHANGES);
-    chatHistoryByJid.set(jid, list);
   }
 
   // Agent logic: getSkillContext() called on every run; compact list in tool; full doc injected when a skill is called.
@@ -449,6 +471,20 @@ async function main() {
   const tideRunningJids = new Set();
   /** Handle for the global Tide interval. */
   let tideGlobalInterval = null;
+  let tideChecklistRunning = false;
+  async function maybeRunTideChecklist(trigger) {
+    if (tideChecklistRunning) return;
+    const config = getTideConfig();
+    if (!shouldRunChecklistForTrigger(trigger, { tide: config.tide || {} })) return;
+    tideChecklistRunning = true;
+    try {
+      await runTideChecklist({ trigger, telegramBot });
+    } catch (e) {
+      console.error('[tide-checklist]', getErrorMessageForLog(e));
+    } finally {
+      tideChecklistRunning = false;
+    }
+  }
   function getTideConfig() {
     try {
       const raw = readFileSync(getConfigPath(), 'utf8');
@@ -464,6 +500,7 @@ async function main() {
     const inactiveStart = tide.inactiveStart && String(tide.inactiveStart).trim();
     const inactiveEnd = tide.inactiveEnd && String(tide.inactiveEnd).trim();
     if (inactiveStart && inactiveEnd && isInTideInactiveWindow(inactiveStart, inactiveEnd)) return;
+    await maybeRunTideChecklist('onFollowUp');
     const isTgJid = isTelegramChatId(tideJid);
     const waSock = whatsappSockRef.current;
     if (isTgJid && !telegramBot) return;
@@ -476,9 +513,17 @@ async function main() {
       );
     }
     const isTgGroup = isTelegramGroupJid(tideJid);
+    const tideLogJid = isTgGroup ? tideJid : toLogJid(tideJid);
+    const tideSessionKey = String(tideLogJid || tideJid).trim();
+    const tideSession = ensureChatSession(tideSessionKey, {});
+    const tideSessionId = tideSession.sessionId;
+    if (tideSession.rotated) {
+      console.log('[tide] New session for', tideSessionKey, '—', tideSessionId);
+    }
+    const tideBootstrap = buildSessionBootstrapContext(getWorkspaceDir()).block;
     const historyMessages = isTgGroup
-      ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5)
-      : readLastPrivateExchanges(getWorkspaceDir(), tideJid, 5);
+      ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5, tideSessionId)
+      : readLastPrivateExchanges(getWorkspaceDir(), tideLogJid, 5, tideSessionId);
     // Old UX preserved: only send one follow-up per "round". Once we've sent a Tide message,
     // don't send another until the user replies. The health check above still runs every cycle.
     const lastUserMsg = historyMessages.length >= 2 ? historyMessages[historyMessages.length - 2] : null;
@@ -489,6 +534,7 @@ async function main() {
         storePath: getCronStorePath(),
         workspaceDir: getWorkspaceDir(),
         historyMessages,
+        bootstrapBlock: tideBootstrap,
       });
       let textToSend = '';
       let sendOk = false;
@@ -546,8 +592,13 @@ async function main() {
         }
         // Group: keep tideJid (group log). Private DM: collapse owner DMs into the
         // unified owner log so Tide check-ins live alongside the rest of the convo.
-        const tideLogJid = isTgGroup ? tideJid : toLogJid(tideJid);
-        const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideLogJid };
+        const exchange = {
+          user: 'Tide check',
+          assistant: text,
+          timestampMs: Date.now(),
+          jid: tideLogJid,
+          sessionId: tideSessionId,
+        };
         try {
           if (isTgGroup) {
             appendGroupExchange(getWorkspaceDir(), tideJid, exchange);
@@ -599,7 +650,10 @@ async function main() {
     );
     console.log('[tide] Enabled. Follow-up cooldown:', cooldownMinutes, 'min. Health-check interval:', healthCheckMinutes, 'min.');
     if (tideGlobalInterval) clearInterval(tideGlobalInterval);
+    maybeRunTideChecklist('onRestart');
+    buildSessionBootstrapContext(getWorkspaceDir());
     tideGlobalInterval = setInterval(() => {
+      maybeRunTideChecklist('onCycle');
       // 1. Always run the Telegram polling watchdog, independent of any active conversation.
       if (telegramBot) {
         ensurePollingAlive(telegramBot).catch((e) =>
@@ -778,6 +832,15 @@ async function main() {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
+    const logJid = isGroupJid ? jid : toLogJid(jid);
+    const sessionLogKey = String(logJid || jid).trim();
+    const { sessionId, rotated: sessionRotated } = ensureChatSession(sessionLogKey, { userText: text });
+    if (sessionRotated) clearInMemoryHistoryForJids(jid, logJid, sessionLogKey);
+    const workspaceDirForBootstrap = getWorkspaceDir();
+    const sessionBootstrap =
+      sessionRotated
+        ? buildSessionBootstrapContext(workspaceDirForBootstrap).block
+        : '';
     const agentId = (bioOpts.agentIdOverride && String(bioOpts.agentIdOverride).trim())
       || (isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID);
     console.log('[path] chat=', isGroupJid ? 'group' : 'one-on-one', 'jid=', jid, 'agentId=', agentId);
@@ -829,17 +892,16 @@ async function main() {
           agentId,
         }
       : { groupSenderName: bioOpts.groupSenderName, agentId };
-    const inMemoryHistory = getLast5Exchanges(jid);
-    // Single super-admin model: when this DM is from the owner (Telegram or
-    // WhatsApp), unify with the owner's shared chat-log + memory under one jid.
-    // Group jids are never remapped — groups always read from group-chat-log.
-    const logJid = isGroupJid ? jid : toLogJid(jid);
+    const inMemoryHistory = getLast5ExchangesForSession(jid, sessionId);
     const historyMessages = isGroupJid
-      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
-      : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES));
+      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES, sessionId)
+      : (inMemoryHistory.length > 0
+          ? inMemoryHistory
+          : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = intentPlanToSystemBlock(intentPlan);
-    const systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     const turnResult = await runAgentTurn({
@@ -967,10 +1029,10 @@ async function main() {
           }
         }
         lastSentByJidMap.set(jid, replyText);
-        pushExchange(jid, text, replyText);
+        pushExchange(jid, text, replyText, sessionId);
         const ts = Date.now();
         // Storage uses logJid (owner-unified for owner DMs); routing already used `jid`.
-        const exchange = { user: text, assistant: replyText, timestampMs: ts, jid: logJid };
+        const exchange = { user: text, assistant: replyText, timestampMs: ts, jid: logJid, sessionId };
         if (bioOpts.logExchange) {
           bioOpts.logExchange(exchange);
         } else {
@@ -987,8 +1049,9 @@ async function main() {
                 console.error('[memory] auto-index failed:', err.message)
               );
               if (process.argv.includes('--test')) await indexPromise;
+            } else {
+              appendExchange(getWorkspaceDir(), exchange);
             }
-            appendExchange(getWorkspaceDir(), exchange);
           }
         }
         console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');

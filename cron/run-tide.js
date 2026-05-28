@@ -15,6 +15,7 @@ import { getSkillContext } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
 import { getSchedulingTimeContext } from '../lib/timezone.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
+import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
 
 dotenv.config({ path: getEnvPath() });
 
@@ -49,7 +50,10 @@ async function main() {
   const ctx = { storePath, jid, workspaceDir, scheduleOneShot: noop, startCron: noop, groupNonOwner: false };
   const { runSkillTool, getFullSkillDoc, resolveToolName } = getSkillContext();
   const toolsToUse = Array.isArray(runSkillTool) && runSkillTool.length > 0 ? runSkillTool : [];
-  const systemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + TIDE_INSTRUCTION;
+  const bootstrapBlock =
+    (payload.bootstrapBlock && String(payload.bootstrapBlock).trim()) ||
+    buildSessionBootstrapContext(workspaceDir).block;
+  const systemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + (bootstrapBlock || '') + TIDE_INSTRUCTION;
   const { textToSend } = await runAgentTurn({
     userText,
     ctx,

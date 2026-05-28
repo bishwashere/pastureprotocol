@@ -206,6 +206,18 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
     child.on('close', (code) => process.exit(code ?? 0));
   }
+} else if (sub === 'tide') {
+  const tideScript = join(INSTALL_DIR, 'scripts', 'tide-cli.js');
+  if (!existsSync(tideScript)) {
+    console.error('cowcode: scripts/tide-cli.js not found.');
+    process.exit(1);
+  }
+  const child = spawn(process.execPath, [tideScript, ...args.slice(1)], {
+    stdio: 'inherit',
+    env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'index') {
   const indexScript = join(INSTALL_DIR, 'scripts', 'index-cli.js');
   if (!existsSync(indexScript)) {
@@ -415,6 +427,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('Usage: cowcode start | stop | status | restart');
   console.log('       cowcode logs');
   console.log('       cowcode dashboard');
+  console.log('       cowcode tide checklist list|add|remove|run|triggers|enable|disable');
   console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
   console.log('       cowcode auth [options]');
   console.log('       cowcode create agent <name>');
