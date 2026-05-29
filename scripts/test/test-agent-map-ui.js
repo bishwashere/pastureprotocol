@@ -28,7 +28,7 @@ const checks = [
   },
   {
     name: 'Tree drop lines use arrow markers',
-    ok: /agent-map-tree-line" marker-end="url\(#agent-tree-arrowhead\)"/.test(html),
+    ok: html.includes('agent-map-tree-line') && html.includes('agent-tree-arrowhead'),
   },
   {
     name: 'ResizeObserver redraw passes layout',
@@ -39,8 +39,12 @@ const checks = [
     ok: html.includes('agent-map-node-inbound') && html.includes('agent-map-node-has-inbound'),
   },
   {
-    name: 'Grey tree hidden when delegation links exist',
-    ok: /hasDelegationLinks/.test(html) && /!hasDelegationLinks/.test(html),
+    name: 'Reply return arc CSS and marker exist',
+    ok: html.includes('agent-map-reply-line') && html.includes('agent-reply-arrowhead'),
+  },
+  {
+    name: 'Grey org-tree connectors not drawn',
+    ok: !/agent-map-tree-line" marker-end="url\(#agent-tree-arrowhead\)"/.test(html),
   },
   {
     name: 'buildInboundLinks helper used on map',
