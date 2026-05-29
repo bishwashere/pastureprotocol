@@ -22,6 +22,7 @@
     "test:edit-e2e": "node scripts/test/test-edit-e2e.js",
     "test:me-e2e": "node scripts/test/test-me-e2e.js",
     "test:agent-send": "node scripts/test/test-agent-send.js",
+    "test:agent-title": "node scripts/test/test-agent-title.js",
     "test:tide": "node scripts/test/test-tide.js",
     "test:tide-checklist": "node scripts/test/test-tide-checklist.js",
     "test:chat-session": "node scripts/test/test-chat-session.js",

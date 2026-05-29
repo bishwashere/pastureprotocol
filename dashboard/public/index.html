@@ -148,12 +148,14 @@
       align-content: flex-start;
     }
     .agent-map-node {
+      position: relative;
       flex-shrink: 0;
       width: 132px;
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 0.6rem 0.7rem;
+      padding-top: 1.45rem;
       cursor: pointer;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
@@ -167,6 +169,39 @@
       font-weight: 600;
       color: var(--accent);
       word-break: break-word;
+    }
+    .agent-map-node-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-word;
+      line-height: 1.25;
+    }
+    .agent-map-node-id-sub {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+      word-break: break-word;
+    }
+    .agent-map-node-edit {
+      position: absolute;
+      top: 0.3rem;
+      right: 0.3rem;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.15rem 0.25rem;
+      font-size: 0.78rem;
+      line-height: 1;
+      border-radius: 4px;
+      opacity: 0.55;
+      transition: opacity 0.15s, color 0.15s, background 0.15s;
+    }
+    .agent-map-node:hover .agent-map-node-edit { opacity: 1; }
+    .agent-map-node-edit:hover {
+      color: var(--accent);
+      background: rgba(167, 139, 250, 0.12);
     }
     .agent-map-node-meta {
       font-size: 0.68rem;
@@ -516,11 +551,17 @@
       border-radius: 6px;
       background: var(--card);
     }
+    button.soul-tile-link {
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+    }
     .soul-tile-link:hover { color: var(--accent); border-color: var(--accent); }
     .soul-tile-icon { font-size: 1.1rem; color: var(--accent); }
     .soul-tile-title { font-weight: 600; font-size: 1rem; }
     .soul-tile-desc { font-size: 0.8rem; color: var(--muted); }
-    #soul-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
+    #memory-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
     .chat-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #page-home .chat-layout.card { margin-bottom: 0; }
     .chat-toolbar {
@@ -601,11 +642,37 @@
     .modal-card {
       width: 100%;
       max-width: 26rem;
+      max-height: min(88vh, 640px);
+      overflow-y: auto;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 1.25rem 1.35rem;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    }
+    .modal-card.modal-card-wide { max-width: 34rem; }
+    .modal-card.modal-card-editor { max-width: 42rem; }
+    .modal-card .identity-editor-textarea {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 16rem;
+      margin-top: 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+    #identity-editor-modal-saved {
+      margin-right: auto;
+      color: var(--green);
+      font-size: 0.85rem;
+      display: none;
+      align-self: center;
     }
     .modal-card h2 { margin: 0 0 0.35rem 0; font-size: 1.05rem; }
     .modal-card .modal-actions {
@@ -652,6 +719,35 @@
       color: var(--muted);
     }
     .modal-card button.secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
+    .agent-edit-skills-list,
+    .agent-edit-links {
+      max-height: 9rem;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+      background: var(--bg);
+    }
+    .agent-edit-skills-list label,
+    .agent-edit-links label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      margin: 0.35rem 0;
+      cursor: pointer;
+    }
+    .agent-edit-skills-list .skill-desc {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .agent-edit-row-inline {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .agent-edit-row-inline .field { flex: 1; min-width: 6rem; margin-top: 0; }
     .chat-history-panel {
       position: absolute;
       top: 100%;
@@ -984,7 +1080,7 @@
   <h1>cowCode Dashboard</h1>
   <nav>
     <a href="#home" data-page="home" class="active">Home</a>
-    <a href="#soul" data-page="soul">Soul</a>
+    <a href="#memory" data-page="memory">Memory</a>
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
     <a href="#agents" data-page="agents">Agents</a>
@@ -1006,6 +1102,10 @@
         <p class="field-hint">Lowercase letters, numbers, hyphens, and underscores. Cannot be <code>main</code>.</p>
       </div>
       <div class="field">
+        <label for="agent-create-modal-title">Title <span class="skill-meta">(optional)</span></label>
+        <input id="agent-create-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+      </div>
+      <div class="field">
         <label for="agent-create-modal-from">Copy settings from</label>
         <select id="agent-create-modal-from"></select>
         <p class="field-hint">Copies LLM config, skills (minus risky defaults), and identity files. Does not copy memory.</p>
@@ -1014,6 +1114,61 @@
       <div class="modal-actions">
         <button type="button" id="agent-create-modal-cancel" class="secondary">Cancel</button>
         <button type="button" id="agent-create-modal-submit">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="agent-edit-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card modal-card-wide" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
+      <h2 id="agent-edit-modal-heading">Edit agent</h2>
+      <p class="skill-meta" style="margin:0;">Update display title, skills, and which agents this one can message.</p>
+      <div class="field">
+        <label for="agent-edit-modal-id">Agent id</label>
+        <input id="agent-edit-modal-id" type="text" readonly disabled>
+      </div>
+      <div class="field">
+        <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
+        <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="agent-edit-modal-agent-send"> Agent messaging (<code>agent-send</code> skill)</label>
+        <p class="field-hint">When enabled, this agent can send messages to other agents you select below.</p>
+      </div>
+      <div id="agent-edit-modal-links-wrap" class="field" style="display:none;">
+        <label>Can message these agents</label>
+        <div id="agent-edit-modal-links" class="agent-edit-links"></div>
+      </div>
+      <div id="agent-edit-modal-messaging-advanced" class="field agent-edit-row-inline" style="display:none;">
+        <div class="field">
+          <label for="agent-edit-modal-max-depth">Max depth</label>
+          <input id="agent-edit-modal-max-depth" type="number" min="1" max="10" step="1">
+        </div>
+        <div class="field">
+          <label for="agent-edit-modal-max-calls">Max calls / turn</label>
+          <input id="agent-edit-modal-max-calls" type="number" min="1" max="50" step="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Skills</label>
+        <div id="agent-edit-modal-skills" class="agent-edit-skills-list"></div>
+      </div>
+      <p id="agent-edit-modal-error" class="modal-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="agent-edit-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="agent-edit-modal-submit">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="identity-editor-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card modal-card-wide modal-card-editor" role="dialog" aria-modal="true" aria-labelledby="identity-editor-modal-title">
+      <h2 id="identity-editor-modal-title">Identity</h2>
+      <p class="skill-meta" id="identity-editor-modal-meta" style="margin:0;"></p>
+      <textarea id="identity-editor-modal-textarea" class="identity-editor-textarea" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <span id="identity-editor-modal-saved">Saved.</span>
+        <button type="button" id="identity-editor-modal-cancel" class="secondary">Close</button>
+        <button type="button" id="identity-editor-modal-save">Save</button>
       </div>
     </div>
   </div>
@@ -1039,32 +1194,27 @@
             <div class="overview-item"><span class="overview-label">Time format</span><span id="chat-overview-time-format">—</span></div>
           </div>
           <div class="home-soul-section">
-            <span class="overview-label">Soul & identity</span>
+            <span class="overview-label">Identity & memory</span>
             <div class="soul-tiles-grid">
-              <a href="#soul/SOUL.md" class="soul-tile-link">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">Soul</span>
-                <span class="soul-tile-desc">Edit SOUL.md</span>
-              </a>
-              <a href="#soul/WhoAmI.md" class="soul-tile-link">
+              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="WhoAmI.md" data-label="Who am I">
                 <span class="soul-tile-icon">◇</span>
                 <span class="soul-tile-title">Who am I</span>
                 <span class="soul-tile-desc">Edit WhoAmI.md</span>
-              </a>
-              <a href="#soul/MyHuman.md" class="soul-tile-link">
+              </button>
+              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="MyHuman.md" data-label="My human">
                 <span class="soul-tile-icon">◇</span>
                 <span class="soul-tile-title">My human</span>
                 <span class="soul-tile-desc">Edit MyHuman.md</span>
-              </a>
-              <a href="#soul/MEMORY.md" class="soul-tile-link">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">Memory</span>
-                <span class="soul-tile-desc">Edit MEMORY.md</span>
-              </a>
-              <a href="#soul/group.md" class="soul-tile-link">
+              </button>
+              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="group.md" data-label="Group rules">
                 <span class="soul-tile-icon">◇</span>
                 <span class="soul-tile-title">Group rules</span>
                 <span class="soul-tile-desc">Edit group.md</span>
+              </button>
+              <a href="#memory" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">Memory</span>
+                <span class="soul-tile-desc">Edit MEMORY.md</span>
               </a>
             </div>
           </div>
@@ -1100,20 +1250,20 @@
     </div>
   </div>
 
-  <div id="page-soul" class="page">
+  <div id="page-memory" class="page">
     <div class="groups-layout">
       <div class="groups-sidebar card">
-        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Soul & identity</h2>
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Memory</h2>
         <p class="skill-meta" style="margin:0 0 0.75rem 0;">Click a file to view or edit. Changes are saved to your workspace.</p>
-        <ul id="soul-files-list" class="groups-ul"></ul>
+        <ul id="memory-files-list" class="groups-ul"></ul>
       </div>
       <div class="groups-main">
-        <div id="soul-editor-card" class="groups-detail card">
-          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="soul-editor-title">Select a file</h2>
-          <p class="skill-meta" id="soul-editor-meta" style="margin:0 0 0.75rem 0;"></p>
-          <div id="soul-editor-area" style="display:none;">
-            <textarea id="soul-editor-textarea" class="skill-doc-inline skill-doc-textarea" spellcheck="false" style="display:block; width:100%; min-height:20rem; margin-bottom:0.75rem;"></textarea>
-            <div><button id="soul-editor-save">Save</button><span id="soul-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
+        <div id="memory-editor-card" class="groups-detail card">
+          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="memory-editor-title">Select a file</h2>
+          <p class="skill-meta" id="memory-editor-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="memory-editor-area" style="display:none;">
+            <textarea id="memory-editor-textarea" class="skill-doc-inline skill-doc-textarea" spellcheck="false" style="display:block; width:100%; min-height:20rem; margin-bottom:0.75rem;"></textarea>
+            <div><button id="memory-editor-save">Save</button><span id="memory-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
           </div>
         </div>
       </div>
@@ -1335,9 +1485,13 @@
 
   <script>
     const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'soul', 'test', 'projects'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects'];
+    var IDENTITY_FILE_LABELS = { 'WhoAmI.md': 'Who am I', 'MyHuman.md': 'My human', 'group.md': 'Group rules' };
     var tideChecklistCache = null;
-    function setPage(name, soulFileId) {
+    function isMemoryWorkspaceFile(id) {
+      return id === 'MEMORY.md' || (id && id.indexOf('memory/') === 0);
+    }
+    function setPage(name, memoryFileId, openIdentityFileId) {
       if (name === 'chat' || name === 'status') name = 'home';
       if (!name || !validPages.includes(name)) name = 'home';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1356,30 +1510,45 @@
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
       if (name === 'test') fetchTests();
-      if (name === 'soul') {
-        fetchSoulFiles().then(function () {
-          if (soulFileId) selectSoulFile(soulFileId);
+      if (name === 'memory') {
+        fetchMemoryFiles().then(function () {
+          if (memoryFileId) selectMemoryFile(memoryFileId);
         });
       }
+      if (openIdentityFileId) openIdentityEditor(openIdentityFileId);
     }
     function parseHash() {
       var raw = (location.hash || '#home').slice(1) || 'home';
       var slash = raw.indexOf('/');
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
-      var soulFile = slash >= 0 ? raw.slice(slash + 1) : null;
+      var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
-      return { name: name, soulFile: soulFile };
+      if (name === 'soul') {
+        if (!subFile || subFile === 'SOUL.md') {
+          return { name: 'home', memoryFile: null, openIdentity: null };
+        }
+        if (isMemoryWorkspaceFile(subFile)) {
+          return { name: 'memory', memoryFile: subFile, openIdentity: null };
+        }
+        if (IDENTITY_FILE_LABELS[subFile]) {
+          return { name: 'home', memoryFile: null, openIdentity: subFile };
+        }
+        return { name: 'memory', memoryFile: subFile, openIdentity: null };
+      }
+      if (name === 'memory') {
+        return { name: 'memory', memoryFile: subFile, openIdentity: null };
+      }
+      return { name: name, memoryFile: null, openIdentity: null };
     }
     document.querySelectorAll('nav a[data-page]').forEach(function (a) {
       a.addEventListener('click', function (e) {
         e.preventDefault();
-        var page = a.dataset.page;
-        location.hash = page === 'soul' ? '#soul' : '#' + page;
+        location.hash = '#' + a.dataset.page;
       });
     });
     window.addEventListener('hashchange', function () {
       var p = parseHash();
-      setPage(p.name, p.soulFile);
+      setPage(p.name, p.memoryFile, p.openIdentity);
     });
 
     async function fetchStatus() {
@@ -1629,7 +1798,7 @@
     async function loadAgentMdFiles(agentId) {
       var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
       var d = await r.json();
-      var files = d.files || [];
+      var files = (d.files || []).filter(function (f) { return f.id !== 'SOUL.md'; });
       var filesEl = document.getElementById('agent-md-files');
       filesEl.innerHTML = files.map(function (f) {
         return '<button type="button" class="agent-md-btn" data-agent-file="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
@@ -1658,9 +1827,10 @@
       return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
     }
 
-    async function createAgentViaApi(name, fromAgentId) {
+    async function createAgentViaApi(name, fromAgentId, title) {
       var body = { id: name };
       if (fromAgentId) body.fromAgentId = fromAgentId;
+      if (title && String(title).trim()) body.title = String(title).trim();
       var r = await fetch(API + '/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1671,6 +1841,12 @@
         throw new Error(d.error || ('Create failed (' + r.status + ')'));
       }
       return d;
+    }
+
+    function agentDisplayLabel(a) {
+      var id = String((a && a.id) || 'main');
+      var title = (a && a.title) ? String(a.title).trim() : '';
+      return title ? title + ' (' + id + ')' : id;
     }
 
     var agentCreateModalOpen = false;
@@ -1686,7 +1862,7 @@
         select.innerHTML = agents.map(function (a) {
           var id = String(a.id || 'main');
           var selected = id === preferred ? ' selected' : '';
-          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(id) + '</option>';
+          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
         }).join('');
       } catch (_) {
         select.innerHTML = '<option value="main" selected>main</option>';
@@ -1712,6 +1888,8 @@
       if (!modal || !nameInput) return;
       showAgentCreateModalError('');
       nameInput.value = '';
+      var titleInput = document.getElementById('agent-create-modal-title');
+      if (titleInput) titleInput.value = '';
       await populateAgentCreateFromSelect(opts.fromAgentId);
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
@@ -1745,10 +1923,12 @@
         return;
       }
       var fromAgentId = (fromSelect.value || 'main').trim() || 'main';
+      var titleInput = document.getElementById('agent-create-modal-title');
+      var title = titleInput ? titleInput.value : '';
       if (submitBtn) submitBtn.disabled = true;
       showAgentCreateModalError('');
       try {
-        var d = await createAgentViaApi(normalized, fromAgentId);
+        var d = await createAgentViaApi(normalized, fromAgentId, title);
         closeAgentCreateModal();
         selectedAgentId = d.id || normalized;
         if (switchChatToNew) selectedChatAgentId = d.id || normalized;
@@ -1757,6 +1937,181 @@
         if (switchChatToNew) setChatAgent(selectedChatAgentId);
       } catch (err) {
         showAgentCreateModalError(err.message || String(err));
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    var agentEditModalOpen = false;
+    var agentEditModalAgentId = '';
+
+    function showAgentEditModalError(msg) {
+      var el = document.getElementById('agent-edit-modal-error');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    function syncAgentEditMessagingSections() {
+      var sendCb = document.getElementById('agent-edit-modal-agent-send');
+      var linksWrap = document.getElementById('agent-edit-modal-links-wrap');
+      var adv = document.getElementById('agent-edit-modal-messaging-advanced');
+      var on = sendCb && sendCb.checked;
+      if (linksWrap) linksWrap.style.display = on ? '' : 'none';
+      if (adv) adv.style.display = on ? '' : 'none';
+    }
+
+    function syncAgentSendFromSkillsCheckbox() {
+      var sendCb = document.getElementById('agent-edit-modal-agent-send');
+      var skillsEl = document.getElementById('agent-edit-modal-skills');
+      if (!sendCb || !skillsEl) return;
+      var agentSendSkill = skillsEl.querySelector('input[data-edit-skill="agent-send"]');
+      if (agentSendSkill) agentSendSkill.checked = sendCb.checked;
+    }
+
+    function syncAgentSendFromSkillsList() {
+      var sendCb = document.getElementById('agent-edit-modal-agent-send');
+      var skillsEl = document.getElementById('agent-edit-modal-skills');
+      if (!sendCb || !skillsEl) return;
+      var agentSendSkill = skillsEl.querySelector('input[data-edit-skill="agent-send"]');
+      if (agentSendSkill) sendCb.checked = agentSendSkill.checked;
+      syncAgentEditMessagingSections();
+    }
+
+    async function openAgentEditModal(agentId) {
+      agentEditModalAgentId = agentId || 'main';
+      showAgentEditModalError('');
+      var modal = document.getElementById('agent-edit-modal');
+      if (!modal) return;
+      try {
+        var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+        var skillsResp = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
+        var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
+        var idInput = document.getElementById('agent-edit-modal-id');
+        var titleInput = document.getElementById('agent-edit-modal-title');
+        var heading = document.getElementById('agent-edit-modal-heading');
+        if (idInput) idInput.value = agentId;
+        if (titleInput) titleInput.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
+        if (heading) heading.textContent = 'Edit agent: ' + agentId;
+        var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
+        var list = skillsResp.skills || [];
+        var skillsEl = document.getElementById('agent-edit-modal-skills');
+        if (skillsEl) {
+          skillsEl.innerHTML = list.map(function (s) {
+            var sid = escapeHtml(s.id);
+            var checked = enabled.includes(s.id) ? ' checked' : '';
+            var desc = escapeHtml((s.description || '').trim());
+            return '<label><input type="checkbox" data-edit-skill="' + sid + '"' + checked + '><span><span class="skill-id">' + sid + '</span>' +
+              (desc ? '<div class="skill-desc">' + desc + '</div>' : '') + '</span></label>';
+          }).join('');
+          skillsEl.querySelectorAll('input[data-edit-skill]').forEach(function (cb) {
+            cb.addEventListener('change', syncAgentSendFromSkillsList);
+          });
+        }
+        var messaging = cfg.agentMessaging || {};
+        var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
+        var sendCb = document.getElementById('agent-edit-modal-agent-send');
+        if (sendCb) {
+          sendCb.checked = enabled.includes('agent-send');
+          sendCb.onchange = function () {
+            syncAgentSendFromSkillsCheckbox();
+            syncAgentEditMessagingSections();
+          };
+        }
+        var maxDepthEl = document.getElementById('agent-edit-modal-max-depth');
+        var maxCallsEl = document.getElementById('agent-edit-modal-max-calls');
+        if (maxDepthEl) maxDepthEl.value = messaging.maxDepth != null ? messaging.maxDepth : 2;
+        if (maxCallsEl) maxCallsEl.value = messaging.maxCallsPerTurn != null ? messaging.maxCallsPerTurn : 5;
+        var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
+        var linksEl = document.getElementById('agent-edit-modal-links');
+        if (linksEl) {
+          if (!others.length) {
+            linksEl.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
+          } else {
+            linksEl.innerHTML = others.map(function (a) {
+              var tid = escapeHtml(a.id);
+              var ttitle = (a.title && String(a.title).trim()) ? escapeHtml(String(a.title).trim()) : tid;
+              var checked = allow.includes(a.id) ? ' checked' : '';
+              var sub = ttitle !== tid ? ' <span class="skill-meta">(' + tid + ')</span>' : '';
+              return '<label><input type="checkbox" data-edit-link="' + tid + '"' + checked + '><span>' + ttitle + sub + '</span></label>';
+            }).join('');
+          }
+        }
+        syncAgentEditMessagingSections();
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        agentEditModalOpen = true;
+        setTimeout(function () { if (titleInput) titleInput.focus(); }, 0);
+      } catch (err) {
+        window.alert('Could not load agent: ' + (err.message || err));
+      }
+    }
+
+    function closeAgentEditModal() {
+      var modal = document.getElementById('agent-edit-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      agentEditModalOpen = false;
+      agentEditModalAgentId = '';
+      showAgentEditModalError('');
+    }
+
+    async function submitAgentEditModal() {
+      var agentId = agentEditModalAgentId;
+      if (!agentId) return;
+      var submitBtn = document.getElementById('agent-edit-modal-submit');
+      var titleInput = document.getElementById('agent-edit-modal-title');
+      var skillsEl = document.getElementById('agent-edit-modal-skills');
+      var linksEl = document.getElementById('agent-edit-modal-links');
+      var sendCb = document.getElementById('agent-edit-modal-agent-send');
+      var enabled = [];
+      if (skillsEl) {
+        skillsEl.querySelectorAll('input[data-edit-skill]:checked').forEach(function (cb) {
+          enabled.push(cb.getAttribute('data-edit-skill'));
+        });
+      }
+      if (sendCb && sendCb.checked && enabled.indexOf('agent-send') === -1) enabled.push('agent-send');
+      if (sendCb && !sendCb.checked) enabled = enabled.filter(function (s) { return s !== 'agent-send'; });
+      var allow = [];
+      if (linksEl) {
+        linksEl.querySelectorAll('input[data-edit-link]:checked').forEach(function (cb) {
+          allow.push(cb.getAttribute('data-edit-link'));
+        });
+      }
+      var maxDepthEl = document.getElementById('agent-edit-modal-max-depth');
+      var maxCallsEl = document.getElementById('agent-edit-modal-max-calls');
+      var maxDepth = maxDepthEl ? parseInt(maxDepthEl.value, 10) : 2;
+      var maxCalls = maxCallsEl ? parseInt(maxCallsEl.value, 10) : 5;
+      var patch = {
+        title: titleInput ? titleInput.value : '',
+        skills: { enabled: enabled },
+        agentMessaging: {
+          allow: allow,
+          maxDepth: Number.isFinite(maxDepth) && maxDepth > 0 ? maxDepth : 2,
+          maxCallsPerTurn: Number.isFinite(maxCalls) && maxCalls > 0 ? maxCalls : 5,
+        },
+      };
+      if (submitBtn) submitBtn.disabled = true;
+      showAgentEditModalError('');
+      try {
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(d.error || ('Save failed (' + r.status + ')'));
+        closeAgentEditModal();
+        await fetchChatAgents();
+        if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+      } catch (err) {
+        showAgentEditModalError(err.message || String(err));
       } finally {
         if (submitBtn) submitBtn.disabled = false;
       }
@@ -2511,43 +2866,39 @@
 
     document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
 
-    var selectedSoulFileId = null;
+    var selectedMemoryFileId = null;
+    var identityEditorFileId = null;
 
-    async function fetchSoulFiles() {
+    async function fetchMemoryFiles() {
       try {
         const r = await fetch(API + '/api/workspace-md');
         const d = await r.json();
-        const files = d.files || [];
-        const ul = document.getElementById('soul-files-list');
+        const files = (d.files || []).filter(function (f) { return isMemoryWorkspaceFile(f.id); });
+        const ul = document.getElementById('memory-files-list');
         ul.innerHTML = files.map(function (f) {
-          return '<li class="' + (selectedSoulFileId === f.id ? 'selected' : '') + '"><button type="button" class="link soul-file-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label) + '</button></li>';
+          return '<li class="' + (selectedMemoryFileId === f.id ? 'selected' : '') + '"><button type="button" class="link memory-file-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label) + '</button></li>';
         }).join('');
-        if (files.length === 0) ul.innerHTML = '<li class="empty">No workspace MD files.</li>';
-        ul.querySelectorAll('.soul-file-btn').forEach(function (btn) {
-          btn.addEventListener('click', function () { selectSoulFile(btn.getAttribute('data-id')); });
+        if (files.length === 0) ul.innerHTML = '<li class="empty">No memory files yet.</li>';
+        ul.querySelectorAll('.memory-file-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectMemoryFile(btn.getAttribute('data-id')); });
         });
       } catch (e) {
-        console.error('[soul]', e);
-        document.getElementById('soul-files-list').innerHTML = '<li class="skill-meta">Error loading files.</li>';
+        console.error('[memory]', e);
+        document.getElementById('memory-files-list').innerHTML = '<li class="skill-meta">Error loading files.</li>';
       }
     }
 
-    async function selectSoulFile(id) {
-      selectedSoulFileId = id;
-      if (id && location.hash !== '#soul/' + id) location.hash = '#soul/' + id;
-      document.querySelectorAll('#soul-files-list li').forEach(function (li) {
-        var btn = li.querySelector('.soul-file-btn');
+    async function selectMemoryFile(id) {
+      selectedMemoryFileId = id;
+      if (id && location.hash !== '#memory/' + id) location.hash = '#memory/' + id;
+      document.querySelectorAll('#memory-files-list li').forEach(function (li) {
+        var btn = li.querySelector('.memory-file-btn');
         li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
       });
-      var titleEl = document.getElementById('soul-editor-title');
-      var metaEl = document.getElementById('soul-editor-meta');
-      var areaEl = document.getElementById('soul-editor-area');
-      var label = id;
-      if (id === 'SOUL.md') label = 'Soul';
-      else if (id === 'WhoAmI.md') label = 'Who am I';
-      else if (id === 'MyHuman.md') label = 'My human';
-      else if (id === 'group.md') label = 'Group rules';
-      else if (id === 'MEMORY.md') label = 'Memory';
+      var titleEl = document.getElementById('memory-editor-title');
+      var metaEl = document.getElementById('memory-editor-meta');
+      var areaEl = document.getElementById('memory-editor-area');
+      var label = id === 'MEMORY.md' ? 'Memory' : id;
       titleEl.textContent = label;
       metaEl.textContent = 'File: ' + id;
       areaEl.style.display = 'block';
@@ -2555,22 +2906,81 @@
         var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
         if (!r.ok) throw new Error('Failed to load');
         var d = await r.json();
-        document.getElementById('soul-editor-textarea').value = d.content || '';
+        document.getElementById('memory-editor-textarea').value = d.content || '';
       } catch (e) {
-        document.getElementById('soul-editor-textarea').value = '';
+        document.getElementById('memory-editor-textarea').value = '';
       }
     }
 
-    document.getElementById('soul-editor-save').addEventListener('click', async function () {
-      var id = selectedSoulFileId;
+    document.getElementById('memory-editor-save').addEventListener('click', async function () {
+      var id = selectedMemoryFileId;
       if (!id) return;
-      var content = document.getElementById('soul-editor-textarea').value;
+      var content = document.getElementById('memory-editor-textarea').value;
       var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
       if (r.ok) {
-        var savedEl = document.getElementById('soul-editor-saved');
+        var savedEl = document.getElementById('memory-editor-saved');
         savedEl.style.display = 'inline';
         setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
       }
+    });
+
+    function closeIdentityEditor() {
+      var modal = document.getElementById('identity-editor-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      identityEditorFileId = null;
+      var savedEl = document.getElementById('identity-editor-modal-saved');
+      if (savedEl) savedEl.style.display = 'none';
+    }
+
+    async function openIdentityEditor(fileId) {
+      var label = IDENTITY_FILE_LABELS[fileId] || fileId;
+      identityEditorFileId = fileId;
+      var modal = document.getElementById('identity-editor-modal');
+      var titleEl = document.getElementById('identity-editor-modal-title');
+      var metaEl = document.getElementById('identity-editor-modal-meta');
+      var textarea = document.getElementById('identity-editor-modal-textarea');
+      if (!modal || !titleEl || !metaEl || !textarea) return;
+      titleEl.textContent = label;
+      metaEl.textContent = 'File: ' + fileId;
+      textarea.value = '';
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(fileId));
+        if (!r.ok) throw new Error('Failed to load');
+        var d = await r.json();
+        textarea.value = d.content || '';
+      } catch (e) {
+        textarea.value = '';
+      }
+      textarea.focus();
+    }
+
+    document.querySelectorAll('.identity-tile-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var fileId = btn.getAttribute('data-file-id');
+        if (fileId) openIdentityEditor(fileId);
+      });
+    });
+    document.getElementById('identity-editor-modal-cancel').addEventListener('click', closeIdentityEditor);
+    document.getElementById('identity-editor-modal-save').addEventListener('click', async function () {
+      var id = identityEditorFileId;
+      if (!id) return;
+      var content = document.getElementById('identity-editor-modal-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('identity-editor-modal-saved');
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      }
+    });
+    document.getElementById('identity-editor-modal').addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'identity-editor-modal') closeIdentityEditor();
+    });
+    document.querySelector('#identity-editor-modal .modal-card').addEventListener('click', function (e) {
+      e.stopPropagation();
     });
 
     async function renderLlmForm() {
@@ -2818,6 +3228,10 @@
       }
       nodesEl.innerHTML = agents.map(function (a) {
         var id = escapeHtml(a.id);
+        var rawTitle = (a.title && String(a.title).trim()) ? String(a.title).trim() : '';
+        var titleHtml = rawTitle
+          ? '<div class="agent-map-node-title">' + escapeHtml(rawTitle) + '</div><div class="agent-map-node-id-sub">' + id + '</div>'
+          : '<div class="agent-map-node-id">' + id + '</div>';
         var skillCount = Array.isArray(a.skillsEnabled) ? a.skillsEnabled.length : 0;
         var allowCount = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow.length : 0;
         var canSend = !!a.canAgentSend;
@@ -2826,10 +3240,19 @@
         else if (a.id === 'main') meta = 'default agent';
         else meta = 'isolated';
         var sel = a.id === selectedChatAgentId ? ' selected' : '';
-        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0" title="Chat with ' + id + '">' +
-          '<div class="agent-map-node-id">' + id + '</div>' +
+        var chatLabel = rawTitle ? rawTitle + ' (' + a.id + ')' : a.id;
+        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0" title="Chat with ' + escapeHtml(chatLabel) + '">' +
+          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit agent ' + id + '" title="Edit agent">✎</button>' +
+          titleHtml +
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
       }).join('');
+      nodesEl.querySelectorAll('.agent-map-node-edit').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var aid = btn.getAttribute('data-agent-id');
+          if (aid) openAgentEditModal(aid);
+        });
+      });
       nodesEl.querySelectorAll('.agent-map-node').forEach(function (node) {
         function pick() {
           var id = node.getAttribute('data-agent-id');
@@ -2886,7 +3309,7 @@
         select.innerHTML = agents.map(function (a) {
           var id = String(a.id || 'main');
           var selected = id === selectedChatAgentId ? ' selected' : '';
-          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(id) + '</option>';
+          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
         }).join('');
         renderAgentMap();
         setChatAgent(selectedChatAgentId);
@@ -3090,8 +3513,17 @@
         submitAgentCreateModal(true);
       }
     });
+    document.getElementById('agent-edit-modal-cancel').addEventListener('click', closeAgentEditModal);
+    document.getElementById('agent-edit-modal-submit').addEventListener('click', submitAgentEditModal);
+    document.getElementById('agent-edit-modal').addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'agent-edit-modal') closeAgentEditModal();
+    });
+    document.querySelector('#agent-edit-modal .modal-card').addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
+      if (e.key === 'Escape' && agentEditModalOpen) closeAgentEditModal();
+      else if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
     });
     document.getElementById('chat-new-btn').addEventListener('click', function () {
       closeChatHistory();
@@ -3128,7 +3560,7 @@
     })();
     (function () {
       var p = parseHash();
-      setPage(p.name, p.soulFile);
+      setPage(p.name, p.memoryFile, p.openIdentity);
     })();
 
     // ── Projects ────────────────────────────────────────────────────────────

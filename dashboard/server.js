@@ -19,7 +19,7 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy } from '../lib/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -308,6 +308,7 @@ app.get('/api/agents', (_req, res) => {
       const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
       return {
         id,
+        title: getAgentTitle(id),
         skillsEnabled,
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
@@ -337,6 +338,14 @@ app.patch('/api/agents/:id/config', (req, res) => {
     const config = loadAgentConfig(id);
     if (patch.llm !== undefined) config.llm = patch.llm;
     if (patch.skills !== undefined) config.skills = patch.skills;
+    if (patch.title !== undefined) {
+      const t = normalizeAgentTitle(patch.title);
+      if (t) config.title = t;
+      else delete config.title;
+    }
+    if (patch.agentMessaging !== undefined) {
+      config.agentMessaging = normalizeAgentMessagingPolicy(patch.agentMessaging);
+    }
     saveAgentConfig(id, config);
     if (id === DEFAULT_AGENT_ID) saveConfig(config);
     res.json(config);
@@ -353,8 +362,18 @@ app.post('/api/agents', (req, res) => {
       return;
     }
     const fromAgentId = typeof req.body?.fromAgentId === 'string' ? req.body.fromAgentId.trim() : '';
-    const created = createAgent(rawId, fromAgentId ? { fromAgentId } : {});
-    const config = loadAgentConfig(created.id);
+    const titleRaw = typeof req.body?.title === 'string' ? req.body.title : '';
+    const opts = {};
+    if (fromAgentId) opts.fromAgentId = fromAgentId;
+    if (titleRaw.trim()) opts.title = titleRaw;
+    const created = createAgent(rawId, opts);
+    let config = loadAgentConfig(created.id);
+    if (!created.created && titleRaw.trim()) {
+      const t = normalizeAgentTitle(titleRaw);
+      if (t) config.title = t;
+      else delete config.title;
+      saveAgentConfig(created.id, config);
+    }
     res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
   } catch (err) {
     res.status(500).json({ error: err.message });
