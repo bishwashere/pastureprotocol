@@ -379,6 +379,39 @@ cowcode server add|use|list|remove   # SSH inspect targets
 | `list files in my workspace` | Lists the workspace directory |
 | `in config.json replace "debug": false with "debug": true` | Patch-edits a file |
 
+#### GitHub (requires `github` skill + token)
+
+| Message | Effect |
+|---|---|
+| `list open issues` | Lists open issues in the default repo |
+| `show me PR #12` | Reads PR #12 with all comments |
+| `create branch feat/login from main` | Creates a new branch (confirms first) |
+| `open a PR from feat/login titled "Add login"` | Opens a pull request (confirms first) |
+| `post a comment on issue #5: "Fixed in #9"` | Posts a comment (confirms first) |
+| `merge PR #10` | Merges the PR (shows details, confirms first) |
+
+#### Gmail (requires `gmail` skill + `gog auth`)
+
+| Message | Effect |
+|---|---|
+| `what's in my inbox?` | Lists recent inbox messages |
+| `show unread emails` | Filters to unread |
+| `search for emails from alice@co.com` | Gmail search |
+| `summarize my inbox` | Sender/subject breakdown |
+| `send an email to bob@co.com about the deadline` | Composes and confirms before sending |
+| `archive all emails older than 30 days` | Bulk archive (confirms first) |
+| `clear my inbox` | Archives all inbox messages (confirms first) |
+
+#### Calendar (requires `calendar` skill + `gog auth`)
+
+| Message | Effect |
+|---|---|
+| `what's on my calendar today?` | Lists today's events |
+| `book a 30 min meeting with john@co.com next Tuesday 2pm` | Creates event (confirms first) |
+| `am I free Friday at 3pm?` | Checks free/busy |
+| `find a free 1-hour slot this week` | Finds next open block |
+| `delete the standup tomorrow` | Deletes event (confirms first) |
+
 ---
 
 ## Skills Reference
@@ -893,7 +926,8 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 ```
 ~/.cowcode/
 ├── config.json              # Main configuration
-├── .env                     # API keys and env var overrides
+├── secrets.json             # Sensitive credentials (gitignored) — GitHub token, etc.
+├── .env                     # API keys and env var overrides (gitignored)
 ├── daemon.log               # Bot daemon stdout log
 ├── daemon.err               # Bot daemon stderr log
 ├── auth_info/               # WhatsApp session files (Baileys)
@@ -907,9 +941,16 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 ├── projects.db              # Dashboard Projects tracker (SQLite)
 ├── workspace/               # Default workspace for file operations
 │   ├── MEMORY.md            # User notes (read/written by skills)
-│   ├── memory/              # Daily logs + vector memory store
+│   ├── memory/              # Vector memory store + custom .md files
+│   ├── chat-log/            # Chat history JSONL files (daily + private)
 │   └── ...                  # User files
-└── agents/ groups/          # Per-agent and per-group config (when used)
+├── agents/                  # Per-agent config (id, skills, workspace/)
+│   └── <agent-id>/
+│       └── workspace/
+│           ├── SOUL.md
+│           ├── WhoAmI.md
+│           └── MyHuman.md
+└── groups/                  # Per-group config (agent assignment, skill deny list)
 ```
 
 ### Code (`~/.local/share/cowcode/` or clone root)
@@ -935,10 +976,13 @@ cowCode/
 │   ├── timezone.js          # Time-zone utilities
 │   ├── owner-config.js      # Owner/admin identity resolution
 │   ├── tide-checklist.js    # Tide maintenance checklist (agent turns)
-│   └── executors/           # Skill execution engines (browse, vision, etc.)
+│   └── executors/           # Skill execution engines (browse, vision, github, gmail, calendar, etc.)
 ├── skills/
 │   ├── browse/              # Playwright browser skill
 │   ├── cron/                # Reminder scheduling skill
+│   ├── github/              # GitHub skill (repos, issues, PRs)
+│   ├── gmail/               # Gmail skill (list, read, send, archive)
+│   ├── calendar/            # Google Calendar skill (events, availability)
 │   ├── memory/              # Semantic memory skill
 │   ├── search/              # Web search skill (Brave)
 │   ├── vision/              # Image/webcam vision skill
