@@ -21,12 +21,15 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 7. [Environment Variables](#environment-variables)
 8. [Command Reference](#command-reference)
 9. [Skills Reference](#skills-reference)
-10. [Cron / Reminder Store (SQLite-free JSON store)](#cron--reminder-store)
-11. [Memory Store (SQLite + vector search)](#memory-store-sqlite--vector-search)
-12. [Tide (follow-up after silence)](#tide-follow-up-after-silence)
-13. [File and Directory Layout](#file-and-directory-layout)
-14. [Dashboard](#dashboard)
-15. [Running as a Daemon](#running-as-a-daemon)
+10. [GitHub Integration](#github-integration)
+11. [Google Integration (Gmail & Calendar)](#google-integration-gmail--calendar)
+12. [Multi-Agent (Agent Team)](#multi-agent-agent-team)
+13. [Dashboard Guide](#dashboard-guide)
+14. [Cron / Reminder Store (SQLite-free JSON store)](#cron--reminder-store)
+15. [Memory Store (SQLite + vector search)](#memory-store-sqlite--vector-search)
+16. [Tide (follow-up after silence)](#tide-follow-up-after-silence)
+17. [File and Directory Layout](#file-and-directory-layout)
+18. [Running as a Daemon](#running-as-a-daemon)
 
 ---
 
@@ -45,8 +48,11 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 | **Home Assistant** | Integration with a local Home Assistant instance. |
 | **SSH inspect** | Inspect remote servers over SSH. |
 | **Tide** | Sends one AI-composed follow-up message after a configurable silence window. |
+| **GitHub** | Read repos, issues, and PRs. Create branches, open PRs, post comments. |
+| **Gmail** | List, read, search, send, archive, and summarize emails. |
+| **Calendar** | List events, create meetings, check availability, find free slots. |
 | **Multi-channel** | WhatsApp (Baileys) and Telegram simultaneously. |
-| **Multi-agent** | Multiple agent personas configurable via Markdown files. |
+| **Multi-agent** | Multiple agent personas, each with its own skills, identity, and memory. Route chats to specialists. |
 
 ---
 
