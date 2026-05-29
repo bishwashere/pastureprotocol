@@ -24,6 +24,11 @@ import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
 import { getOwnerLogJid } from '../lib/owner-config.js';
 import { getMemoryConfig } from '../lib/memory-config.js';
 import { indexChatExchange } from '../lib/memory-index.js';
+import {
+  afterExchangeLogged,
+  beforeUserMessage,
+  buildRetrospectiveContextBlock,
+} from '../lib/retrospective.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -74,6 +79,7 @@ async function main() {
   if (sessionRotated) {
     process.stderr.write(`[chat-dashboard] new session ${sessionId}\n`);
   }
+  await beforeUserMessage(workspaceDir, dashboardJid, sessionId, message);
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
   const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);
@@ -116,6 +122,9 @@ async function main() {
   if (sessionRotated) {
     systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
   }
+  const memoryConfig = getMemoryConfig();
+  const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
+  if (retroBlock) systemPrompt += retroBlock;
 
   try {
     const { textToSend } = await runAgentTurn({
@@ -140,11 +149,12 @@ async function main() {
       sessionId,
     };
     try {
-      const memoryConfig = getMemoryConfig();
       if (memoryConfig) {
-        await indexChatExchange(memoryConfig, exchange);
+        const logMeta = await indexChatExchange(memoryConfig, exchange);
+        afterExchangeLogged(workspaceDir, exchange, logMeta);
       } else {
-        appendExchange(workspaceDir, exchange);
+        const logMeta = appendExchange(workspaceDir, exchange);
+        afterExchangeLogged(workspaceDir, exchange, logMeta);
       }
     } catch (memErr) {
       try {

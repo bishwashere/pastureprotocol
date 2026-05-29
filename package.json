@@ -24,7 +24,7 @@
     "test:agent-send": "node scripts/test/test-agent-send.js",
     "test:background-tasks": "node scripts/test/test-background-tasks.js",
     "test:agent-title": "node scripts/test/test-agent-title.js",
-    "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
+    "test:retrospective": "node scripts/test/test-retrospective.js",
     "test:tide": "node scripts/test/test-tide.js",
     "test:tide-checklist": "node scripts/test/test-tide-checklist.js",
     "test:chat-session": "node scripts/test/test-chat-session.js",

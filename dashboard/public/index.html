@@ -46,18 +46,34 @@
     .page { display: none; }
     .page.active { display: block; }
     /* Home page fills the viewport: chat region scrolls in the lower half */
-    body.dashboard-home-active {
+    body.dashboard-home-active,
+    body.dashboard-team-active {
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
       padding: 0.65rem 1rem 0.5rem;
     }
-    #page-home.active {
+    #page-home.active,
+    #page-team.active {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+    }
+    .team-page-card {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 0;
+      padding: 0.85rem 1rem;
+    }
+    .team-page-head {
+      flex-shrink: 0;
+    }
+    .team-page-card .agent-map-canvas {
+      min-height: 12rem;
     }
     .chat-page-split {
       flex: 1 1 0;
@@ -1352,6 +1368,7 @@
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
     <a href="#agents" data-page="agents">Agents</a>
+    <a href="#team" data-page="team">Team</a>
     <a href="#groups" data-page="groups">Groups</a>
     <a href="#llm" data-page="llm">LLM</a>
     <a href="#tide" data-page="tide">Tide</a>
@@ -1478,7 +1495,7 @@
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
               <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
               <div style="display:flex; align-items:center; gap:0.35rem;">
-                <button type="button" id="agent-team-ext-btn" class="agent-team-ext-btn" title="Open team agent page for selected agent" aria-label="Open team agent page">
+                <button type="button" id="agent-team-ext-btn" class="agent-team-ext-btn" title="Open full team page" aria-label="Open full team page">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8a2 2 0 0 1 2 2v1h1.5a.5.5 0 0 1 .4.8l-2.2 2.93a.5.5 0 0 1-.4.2H12v4.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13.5V2zm1 0v11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V7a.5.5 0 0 1 .5-.5h1.29L13.6 5H12a1 1 0 0 1-1-1V3H5zm2.75 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5z"/></svg>
                 </button>
                 <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
@@ -1679,10 +1696,30 @@
     </div>
   </div>
 
+  <div id="page-team" class="page">
+    <div class="card team-page-card">
+      <div class="team-page-head">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+          <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
+          <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+        </div>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to edit. Tree shows hierarchy; dashed arrows show message-passing links.</p>
+      </div>
+      <div id="team-map-canvas" class="agent-map-canvas">
+        <div id="team-map-scaler" class="agent-map-scaler">
+          <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
+            <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+            <div id="team-map-nodes" class="agent-map-nodes"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="page-team-agent" class="page">
     <div class="card team-agent-page">
       <div class="team-agent-page-head">
-        <button type="button" id="team-agent-back" class="secondary" style="margin:0;">← Home</button>
+        <button type="button" id="team-agent-back" class="secondary" style="margin:0;">← Team</button>
         <h2 id="team-agent-heading">Agent</h2>
       </div>
       <p class="skill-meta" style="margin:0 0 1rem 0;">Identity, skills, and team links for this agent.</p>
@@ -1894,7 +1931,7 @@
 
   <script>
     const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -1927,11 +1964,13 @@
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
+      document.body.classList.toggle('dashboard-team-active', name === 'team');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'agents') fetchAgentsPage();
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
+      if (name === 'team') fetchAgentMapData();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
@@ -1951,8 +1990,10 @@
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
       if (name === 'team') {
-        var teamId = subFile ? decodeURIComponent(subFile) : 'main';
-        return { name: 'team-agent', memoryFile: null, openIdentity: null, teamAgentId: teamId };
+        if (!subFile) {
+          return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
+        }
+        return { name: 'team-agent', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
       }
       if (name === 'soul') {
         if (!subFile || subFile === 'SOUL.md') {
@@ -2657,6 +2698,10 @@
 
     function openTeamAgentPage(agentId) {
       location.hash = '#team/' + encodeURIComponent(agentId || 'main');
+    }
+
+    function openTeamPage() {
+      location.hash = '#team';
     }
 
     async function loadTeamAgentPage(agentId) {
@@ -3935,7 +3980,21 @@
     }
 
     var agentMapData = [];
-    var agentMapLastLayout = null;
+    var agentMapLastLayouts = {};
+    var AGENT_MAP_PREFIXES = [
+      { prefix: 'agent-map', mode: 'chat' },
+      { prefix: 'team-map', mode: 'edit-page' },
+    ];
+
+    function agentMapEls(prefix) {
+      return {
+        canvas: document.getElementById(prefix + '-canvas'),
+        scaler: document.getElementById(prefix + '-scaler'),
+        inner: document.getElementById(prefix + '-canvas-inner'),
+        arrows: document.getElementById(prefix + '-arrows'),
+        nodes: document.getElementById(prefix + '-nodes'),
+      };
+    }
 
     function updateAgentMapSelection() {
       document.querySelectorAll('.agent-map-node').forEach(function (n) {
@@ -3980,15 +4039,13 @@
       return { positions: positions, canvasW: canvasW, canvasH: canvasH, nodeH: nh, root: root, others: others };
     }
 
-    function applyAgentMapLayout(layout) {
-      var inner = document.getElementById('agent-map-canvas-inner');
-      var scaler = document.getElementById('agent-map-scaler');
-      if (!inner || !layout) return;
-      inner.style.width = layout.canvasW + 'px';
-      inner.style.height = layout.canvasH + 'px';
-      if (scaler) {
-        scaler.style.width = layout.canvasW + 'px';
-        scaler.style.height = layout.canvasH + 'px';
+    function applyAgentMapLayout(layout, els) {
+      if (!els || !els.inner || !layout) return;
+      els.inner.style.width = layout.canvasW + 'px';
+      els.inner.style.height = layout.canvasH + 'px';
+      if (els.scaler) {
+        els.scaler.style.width = layout.canvasW + 'px';
+        els.scaler.style.height = layout.canvasH + 'px';
       }
     }
 
@@ -4004,21 +4061,19 @@
       });
     }
 
-    function fitAgentMapToContainer() {
-      var canvas = document.getElementById('agent-map-canvas');
-      var scaler = document.getElementById('agent-map-scaler');
-      var inner = document.getElementById('agent-map-canvas-inner');
-      var layout = agentMapLastLayout;
-      if (!canvas || !scaler || !inner || !layout) return;
-      var availW = canvas.clientWidth;
-      var availH = canvas.clientHeight;
+    function fitAgentMapToContainer(prefix) {
+      var els = agentMapEls(prefix);
+      var layout = agentMapLastLayouts[prefix];
+      if (!els.canvas || !els.scaler || !els.inner || !layout) return;
+      var availW = els.canvas.clientWidth;
+      var availH = els.canvas.clientHeight;
       if (availW < 1 || availH < 1) return;
       var scale = Math.min(1, availW / layout.canvasW, availH / layout.canvasH);
-      inner.style.transform = 'scale(' + scale + ')';
-      scaler.style.width = Math.ceil(layout.canvasW * scale) + 'px';
-      scaler.style.height = Math.ceil(layout.canvasH * scale) + 'px';
-      inner.style.width = layout.canvasW + 'px';
-      inner.style.height = layout.canvasH + 'px';
+      els.inner.style.transform = 'scale(' + scale + ')';
+      els.scaler.style.width = Math.ceil(layout.canvasW * scale) + 'px';
+      els.scaler.style.height = Math.ceil(layout.canvasH * scale) + 'px';
+      els.inner.style.width = layout.canvasW + 'px';
+      els.inner.style.height = layout.canvasH + 'px';
     }
 
     function buildInboundLinks(agents) {
@@ -4034,25 +4089,25 @@
       return inbound;
     }
 
-    function drawAgentMapArrows(agents, layout) {
-      var svg = document.getElementById('agent-map-arrows');
-      var inner = document.getElementById('agent-map-canvas-inner');
-      if (!svg || !inner || !layout) { if (svg) svg.innerHTML = ''; return; }
+    function drawAgentMapArrows(agents, layout, els, markerPrefix) {
+      if (!els) els = agentMapEls('agent-map');
+      markerPrefix = markerPrefix || 'agent';
+      if (!els.arrows || !els.inner || !layout) { if (els.arrows) els.arrows.innerHTML = ''; return; }
       var w = layout.canvasW;
       var h = layout.canvasH;
-      svg.setAttribute('width', String(w));
-      svg.setAttribute('height', String(h));
-      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      els.arrows.setAttribute('width', String(w));
+      els.arrows.setAttribute('height', String(h));
+      els.arrows.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
 
       var nh = layout.nodeH || T_NODE_H;
       var defs = '<defs>' +
-        '<marker id="agent-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
+        '<marker id="' + markerPrefix + '-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#a78bfa" opacity="0.8"/>' +
         '</marker>' +
-        '<marker id="agent-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
+        '<marker id="' + markerPrefix + '-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#71717a" opacity="0.95"/>' +
         '</marker>' +
-        '<marker id="agent-reply-arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+        '<marker id="' + markerPrefix + '-reply-arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
           '<polygon points="0 0, 6 3, 0 6" fill="#22c55e" opacity="0.55"/>' +
         '</marker>' +
       '</defs>';
@@ -4070,36 +4125,37 @@
           var fx = fp.x + T_NODE_W / 2, fy = fp.y + nh / 2;
           var tx = tp.x + T_NODE_W / 2, ty = tp.y + nh / 2;
           var cx = (fx + tx) / 2, cy = Math.min(fy, ty) - 28;
-          shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>');
+          shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#' + markerPrefix + '-arrowhead)"/>');
           var rcx = (fx + tx) / 2, rcy = Math.max(fy, ty) + 34;
-          shapes.push('<path d="M' + tx + ',' + ty + ' Q' + rcx + ',' + rcy + ' ' + fx + ',' + fy + '" class="agent-map-reply-line" marker-end="url(#agent-reply-arrowhead)"/>');
+          shapes.push('<path d="M' + tx + ',' + ty + ' Q' + rcx + ',' + rcy + ' ' + fx + ',' + fy + '" class="agent-map-reply-line" marker-end="url(#' + markerPrefix + '-reply-arrowhead)"/>');
         });
       });
 
-      svg.innerHTML = defs + shapes.join('');
+      els.arrows.innerHTML = defs + shapes.join('');
     }
 
-    function renderAgentMap() {
-      var nodesEl = document.getElementById('agent-map-nodes');
-      var inner = document.getElementById('agent-map-canvas-inner');
-      var scaler = document.getElementById('agent-map-scaler');
-      if (!nodesEl || !inner) return;
+    function renderAgentMapForPrefix(mapConfig) {
+      var prefix = mapConfig.prefix;
+      var mode = mapConfig.mode || 'chat';
+      var els = agentMapEls(prefix);
+      if (!els.nodes || !els.inner) return;
       var agents = agentMapData || [];
+      var markerPrefix = prefix === 'agent-map' ? 'agent' : 'team';
       if (!agents.length) {
-        nodesEl.innerHTML = '';
-        agentMapLastLayout = null;
-        inner.style.height = '3rem';
-        inner.style.transform = '';
-        if (scaler) { scaler.style.width = ''; scaler.style.height = ''; }
-        if (document.getElementById('agent-map-arrows')) document.getElementById('agent-map-arrows').innerHTML = '';
+        els.nodes.innerHTML = '';
+        agentMapLastLayouts[prefix] = null;
+        els.inner.style.height = '3rem';
+        els.inner.style.transform = '';
+        if (els.scaler) { els.scaler.style.width = ''; els.scaler.style.height = ''; }
+        if (els.arrows) els.arrows.innerHTML = '';
         return;
       }
 
       var layout = agentTreeLayout(agents);
-      applyAgentMapLayout(layout);
+      applyAgentMapLayout(layout, els);
       var inboundLinks = buildInboundLinks(agents);
 
-      nodesEl.innerHTML = agents.map(function(a) {
+      els.nodes.innerHTML = agents.map(function(a) {
         var pos = layout.positions[a.id] || { x: 0, y: 0 };
         var id = escapeHtml(a.id);
         var rawTitle = (a.title && String(a.title).trim()) ? String(a.title).trim() : '';
@@ -4116,8 +4172,11 @@
           ? '<div class="agent-map-node-inbound" title="Receives delegation from ' + escapeHtml(fromIds.join(', ')) + '">← ' + escapeHtml(fromIds.join(', ')) + '</div>'
           : '';
         var inboundClass = fromIds.length ? ' agent-map-node-has-inbound' : '';
+        var nodeTitle = mode === 'edit-page'
+          ? 'Edit ' + escapeHtml(chatLabel)
+          : 'Chat with ' + escapeHtml(chatLabel);
         return '<div class="agent-map-node' + sel + inboundClass + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
-          ' title="Chat with ' + escapeHtml(chatLabel) + '"' +
+          ' title="' + nodeTitle + '"' +
           ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
           '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
@@ -4125,17 +4184,21 @@
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
       }).join('');
 
-      nodesEl.querySelectorAll('.agent-map-node-edit').forEach(function(btn) {
+      els.nodes.querySelectorAll('.agent-map-node-edit').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
           if (aid) openAgentEditModal(aid);
         });
       });
-      nodesEl.querySelectorAll('.agent-map-node').forEach(function(node) {
+      els.nodes.querySelectorAll('.agent-map-node').forEach(function(node) {
         function pick() {
           var id = node.getAttribute('data-agent-id');
           if (!id) return;
+          if (mode === 'edit-page') {
+            openTeamAgentPage(id);
+            return;
+          }
           var sel = document.getElementById('chat-agent-select');
           if (sel) sel.value = id;
           setChatAgent(id);
@@ -4147,18 +4210,38 @@
         });
       });
 
-      var measuredH = measureAgentNodeHeight(nodesEl);
+      var measuredH = measureAgentNodeHeight(els.nodes);
       if (Math.abs(measuredH - layout.nodeH) > 2) {
         layout = agentTreeLayout(agents, measuredH);
-        applyAgentMapLayout(layout);
-        repositionAgentMapNodes(nodesEl, layout);
+        applyAgentMapLayout(layout, els);
+        repositionAgentMapNodes(els.nodes, layout);
       }
-      agentMapLastLayout = layout;
-      drawAgentMapArrows(agents, layout);
+      agentMapLastLayouts[prefix] = layout;
+      drawAgentMapArrows(agents, layout, els, markerPrefix);
       requestAnimationFrame(function () {
-        fitAgentMapToContainer();
-        drawAgentMapArrows(agents, layout);
+        fitAgentMapToContainer(prefix);
+        drawAgentMapArrows(agents, layout, els, markerPrefix);
       });
+    }
+
+    function renderAgentMap() {
+      AGENT_MAP_PREFIXES.forEach(renderAgentMapForPrefix);
+    }
+
+    async function fetchAgentMapData() {
+      try {
+        var r = await fetch(API + '/api/agents');
+        var d = await r.json();
+        var agents = Array.isArray(d.agents) ? d.agents : [];
+        agentMapData = agents;
+        if (!agents.length) agentMapData = [{ id: 'main' }];
+        renderAgentMap();
+        return agentMapData;
+      } catch (_) {
+        agentMapData = [{ id: 'main' }];
+        renderAgentMap();
+        return agentMapData;
+      }
     }
 
     function setChatAgent(agentId) {
@@ -4186,28 +4269,17 @@
     async function fetchChatAgents() {
       var select = document.getElementById('chat-agent-select');
       if (!select) return;
-      try {
-        var r = await fetch(API + '/api/agents');
-        var d = await r.json();
-        var agents = Array.isArray(d.agents) ? d.agents : [];
-        agentMapData = agents;
-        if (!agents.length) agents = [{ id: 'main' }];
-        if (!agents.some(function (a) { return a.id === selectedChatAgentId; })) {
-          selectedChatAgentId = agents[0].id;
-        }
-        select.innerHTML = agents.map(function (a) {
-          var id = String(a.id || 'main');
-          var selected = id === selectedChatAgentId ? ' selected' : '';
-          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
-        }).join('');
-        renderAgentMap();
-        setChatAgent(selectedChatAgentId);
-      } catch (_) {
-        agentMapData = [{ id: 'main' }];
-        select.innerHTML = '<option value="main" selected>main</option>';
-        renderAgentMap();
-        setChatAgent('main');
+      var agents = await fetchAgentMapData();
+      if (!agents.length) agents = [{ id: 'main' }];
+      if (!agents.some(function (a) { return a.id === selectedChatAgentId; })) {
+        selectedChatAgentId = agents[0].id;
       }
+      select.innerHTML = agents.map(function (a) {
+        var id = String(a.id || 'main');
+        var selected = id === selectedChatAgentId ? ' selected' : '';
+        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
+      }).join('');
+      setChatAgent(selectedChatAgentId);
     }
 
     function renderChatMessages() {
@@ -4387,9 +4459,12 @@
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
     document.getElementById('agent-team-ext-btn').addEventListener('click', function () {
-      openTeamAgentPage(selectedChatAgentId || 'main');
+      openTeamPage();
     });
     document.getElementById('agent-team-create-btn').addEventListener('click', function () {
+      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+    });
+    document.getElementById('team-page-create-btn').addEventListener('click', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
@@ -4421,7 +4496,7 @@
       }
     });
     document.getElementById('team-agent-back').addEventListener('click', function () {
-      location.hash = '#home';
+      location.hash = '#team';
     });
     document.getElementById('team-agent-save').addEventListener('click', submitTeamAgentPage);
     document.getElementById('team-agent-md-save').addEventListener('click', async function () {
@@ -4469,16 +4544,20 @@
     fetchChatAgents();
     setInterval(fetchStatus, 8000);
     (function () {
-      var canvas = document.getElementById('agent-map-canvas');
-      if (!canvas || typeof ResizeObserver === 'undefined') return;
-      var redrawTimer;
-      new ResizeObserver(function () {
-        clearTimeout(redrawTimer);
-        redrawTimer = setTimeout(function () {
-          fitAgentMapToContainer();
-          if (agentMapLastLayout) drawAgentMapArrows(agentMapData, agentMapLastLayout);
-        }, 80);
-      }).observe(canvas);
+      AGENT_MAP_PREFIXES.forEach(function (mapConfig) {
+        var canvas = document.getElementById(mapConfig.prefix + '-canvas');
+        if (!canvas || typeof ResizeObserver === 'undefined') return;
+        var prefix = mapConfig.prefix;
+        var redrawTimer;
+        new ResizeObserver(function () {
+          clearTimeout(redrawTimer);
+          redrawTimer = setTimeout(function () {
+            fitAgentMapToContainer(prefix);
+            var layout = agentMapLastLayouts[prefix];
+            if (layout) drawAgentMapArrows(agentMapData, layout, agentMapEls(prefix), prefix === 'agent-map' ? 'agent' : 'team');
+          }, 80);
+        }).observe(canvas);
+      });
     })();
     (function () {
       var p = parseHash();

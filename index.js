@@ -50,6 +50,13 @@ import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
+import {
+  migrateRetrospectiveConfig,
+  startRetrospective,
+  afterExchangeLogged,
+  beforeUserMessage,
+  buildRetrospectiveContextBlock,
+} from './lib/retrospective.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { ensureChatSession } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
@@ -334,6 +341,7 @@ async function main() {
   ensureMainAgentInitialized();
   migrateSkillsConfigToIncludeDefaults();
   migrateTideConfig();
+  migrateRetrospectiveConfig();
   if (authOnly && existsSync(getAuthDir())) {
     rmSync(getAuthDir(), { recursive: true });
     mkdirSync(getAuthDir(), { recursive: true });
@@ -841,6 +849,9 @@ async function main() {
     const sessionLogKey = String(logJid || jid).trim();
     const { sessionId, rotated: sessionRotated } = ensureChatSession(sessionLogKey, { userText: text });
     if (sessionRotated) clearInMemoryHistoryForJids(jid, logJid, sessionLogKey);
+    if (!isGroupJid) {
+      await beforeUserMessage(getWorkspaceDir(), logJid, sessionId, text);
+    }
     const workspaceDirForBootstrap = getWorkspaceDir();
     const sessionBootstrap =
       sessionRotated
@@ -914,6 +925,11 @@ async function main() {
     const planBlock = intentPlanToSystemBlock(intentPlan);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
+    if (!isGroupJid) {
+      const memoryConfig = getMemoryConfig();
+      const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
+      if (retroBlock) systemPromptWithPlan += retroBlock;
+    }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     const turnResult = await runAgentTurn({
@@ -1056,13 +1072,19 @@ async function main() {
             }
           } else {
             const memoryConfig = getMemoryConfig();
+            let logMeta = null;
             if (memoryConfig) {
-              const indexPromise = indexChatExchange(memoryConfig, exchange).catch((err) =>
+              const indexPromise = indexChatExchange(memoryConfig, exchange).then((meta) => {
+                logMeta = meta;
+                afterExchangeLogged(getWorkspaceDir(), exchange, logMeta);
+              }).catch((err) =>
                 console.error('[memory] auto-index failed:', err.message)
               );
               if (process.argv.includes('--test')) await indexPromise;
             } else {
-              appendExchange(getWorkspaceDir(), exchange);
+              const out = appendExchange(getWorkspaceDir(), exchange);
+              logMeta = out;
+              afterExchangeLogged(getWorkspaceDir(), exchange, logMeta);
             }
           }
         }
@@ -1175,6 +1197,7 @@ async function main() {
       writeDaemonStarted();
       startCron({ storePath: getCronStorePath(), telegramBot: optsTelegramBot });
       startTide(sock, null);
+      startRetrospective();
       const lastSentByJid = new Map();
       const ourSentMessageIds = new Set();
       const telegramRepliedIds = new Set();
@@ -1237,6 +1260,7 @@ async function main() {
       console.log('  Telegram bot enabled.');
       console.log('[tide] Calling startTide (Telegram path)');
       startTide(telegramSock, null);
+      startRetrospective();
     }
 
     sock.ev.on('connection.update', (u) => {
@@ -1251,6 +1275,7 @@ async function main() {
       if (sid) {
         startCron({ sock, selfJid: sid, storePath: getCronStorePath(), telegramBot: telegramBot || undefined });
         startTide(sock, sid);
+        startRetrospective();
       }
       // Flush replies that failed to send while disconnected
       while (pendingReplies.length > 0) {
