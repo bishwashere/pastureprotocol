@@ -744,6 +744,55 @@
     .modal-card.modal-card-agent-edit {
       max-width: min(92vw, 52rem);
       max-height: min(92vh, 820px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .agent-edit-modal-scroll {
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding-right: 0.15rem;
+    }
+    .agent-edit-md-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 12rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+    .agent-edit-md-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .agent-edit-md-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.82rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 0;
+    }
+    .agent-edit-md-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(167, 139, 250, 0.08);
+    }
+    #agent-edit-modal-md-saved {
+      margin-left: 0.75rem;
+      color: var(--green);
+      font-size: 0.85rem;
+      display: none;
     }
     .modal-card .identity-editor-textarea {
       display: block;
@@ -1292,7 +1341,8 @@
   <div id="agent-edit-modal" class="modal-overlay" aria-hidden="true">
     <div class="modal-card modal-card-agent-edit" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
       <h2 id="agent-edit-modal-heading">Edit agent</h2>
-      <p class="skill-meta" style="margin:0;">Update display title, skills, and which agents this one can message.</p>
+      <p class="skill-meta" style="margin:0;">Update title, identity files, skills, and team links.</p>
+      <div class="agent-edit-modal-scroll">
       <div class="agent-edit-basics">
         <div class="field">
           <label for="agent-edit-modal-id">Agent id</label>
@@ -1301,6 +1351,19 @@
         <div class="field">
           <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
           <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Identity files</label>
+        <p class="field-hint" style="margin:0;">Soul, WhoAmI, MyHuman, group rules, and memory for this agent.</p>
+        <div id="agent-edit-modal-md-files" class="agent-edit-md-files"></div>
+        <div id="agent-edit-modal-md-editor" style="display:none; margin-top:0.65rem;">
+          <div id="agent-edit-modal-md-label" class="skill-meta" style="margin-bottom:0.35rem;"></div>
+          <textarea id="agent-edit-modal-md-textarea" class="agent-edit-md-textarea" spellcheck="false"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button type="button" id="agent-edit-modal-md-save" class="secondary" style="margin-top:0;">Save file</button>
+            <span id="agent-edit-modal-md-saved">Saved.</span>
+          </div>
         </div>
       </div>
       <div class="field agent-edit-section">
@@ -1318,6 +1381,7 @@
           <p class="field-hint" style="margin:0;">Outbound team links. Other agents that link here show ← on the map (reply path is automatic).</p>
           <div id="agent-edit-modal-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
         </div>
+      </div>
       </div>
       <p id="agent-edit-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">
@@ -1735,7 +1799,9 @@
       'WhoAmI.md': 'Who am I',
       'MyHuman.md': 'My human',
       'group.md': 'Group rules',
+      'MEMORY.md': 'Memory',
     };
+    var AGENT_IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md', 'MEMORY.md'];
     var tideChecklistCache = null;
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
@@ -2214,6 +2280,8 @@
 
     var agentEditModalOpen = false;
     var agentEditModalAgentId = '';
+    var agentEditModalMdFile = '';
+    var agentEditModalMdDirty = false;
 
     function showAgentEditModalError(msg) {
       var el = document.getElementById('agent-edit-modal-error');
@@ -2225,6 +2293,84 @@
         el.textContent = '';
         el.classList.remove('visible');
       }
+    }
+
+    async function loadAgentEditModalMdFiles(agentId) {
+      var filesEl = document.getElementById('agent-edit-modal-md-files');
+      var editorEl = document.getElementById('agent-edit-modal-md-editor');
+      if (!filesEl) return;
+      agentEditModalMdFile = '';
+      agentEditModalMdDirty = false;
+      var savedEl = document.getElementById('agent-edit-modal-md-saved');
+      if (savedEl) savedEl.style.display = 'none';
+      if (editorEl) editorEl.style.display = 'none';
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
+      var d = await r.json();
+      var files = d.files || AGENT_IDENTITY_FILE_ORDER.map(function (id) {
+        return { id: id, label: IDENTITY_FILE_LABELS[id] || id, exists: false };
+      });
+      filesEl.innerHTML = files.map(function (f) {
+        var missing = f.exists === false ? ' · new' : '';
+        return '<button type="button" class="agent-edit-md-btn" data-agent-edit-file="' + escapeHtml(f.id) + '">' +
+          escapeHtml(f.label || IDENTITY_FILE_LABELS[f.id] || f.id) + missing + '</button>';
+      }).join('');
+      filesEl.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectAgentEditModalMdFile(agentId, btn.getAttribute('data-agent-edit-file'));
+        });
+      });
+      if (files.length > 0) await selectAgentEditModalMdFile(agentId, files[0].id);
+    }
+
+    async function selectAgentEditModalMdFile(agentId, fileId) {
+      if (!fileId) return;
+      agentEditModalMdFile = fileId;
+      agentEditModalMdDirty = false;
+      var savedEl = document.getElementById('agent-edit-modal-md-saved');
+      if (savedEl) savedEl.style.display = 'none';
+      document.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-agent-edit-file') === fileId);
+      });
+      var editorEl = document.getElementById('agent-edit-modal-md-editor');
+      var labelEl = document.getElementById('agent-edit-modal-md-label');
+      var textarea = document.getElementById('agent-edit-modal-md-textarea');
+      if (editorEl) editorEl.style.display = 'block';
+      if (labelEl) labelEl.textContent = (IDENTITY_FILE_LABELS[fileId] || fileId) + ' · ' + fileId;
+      if (textarea) {
+        textarea.value = '';
+        textarea.oninput = function () { agentEditModalMdDirty = true; };
+      }
+      try {
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(fileId));
+        if (!r.ok) throw new Error('Failed to load');
+        var data = await r.json();
+        if (textarea) textarea.value = data.content || '';
+        agentEditModalMdDirty = false;
+      } catch (_) {
+        if (textarea) textarea.value = '';
+      }
+    }
+
+    async function saveAgentEditModalMdFile(agentId) {
+      if (!agentId || !agentEditModalMdFile) return true;
+      var textarea = document.getElementById('agent-edit-modal-md-textarea');
+      if (!textarea) return true;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(agentEditModalMdFile), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: textarea.value }),
+      });
+      if (!r.ok) {
+        var d = await r.json().catch(function () { return {}; });
+        throw new Error(d.error || 'Failed to save identity file');
+      }
+      agentEditModalMdDirty = false;
+      var savedEl = document.getElementById('agent-edit-modal-md-saved');
+      if (savedEl) {
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      }
+      return true;
     }
 
     function renderAgentEditSkillTile(skill, enabled) {
@@ -2267,6 +2413,7 @@
         if (idInput) idInput.value = agentId;
         if (titleInput) titleInput.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
         if (heading) heading.textContent = 'Edit agent: ' + agentId;
+        await loadAgentEditModalMdFiles(agentId);
         var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
         var list = (skillsResp.skills || []).filter(function (s) { return s.id !== 'agent-send' && s.id !== 'background-tasks'; });
         var skillsEl = document.getElementById('agent-edit-modal-skills');
@@ -2319,6 +2466,8 @@
       modal.setAttribute('aria-hidden', 'true');
       agentEditModalOpen = false;
       agentEditModalAgentId = '';
+      agentEditModalMdFile = '';
+      agentEditModalMdDirty = false;
       showAgentEditModalError('');
     }
 
@@ -2349,6 +2498,9 @@
       if (submitBtn) submitBtn.disabled = true;
       showAgentEditModalError('');
       try {
+        if (agentEditModalMdDirty && agentEditModalMdFile) {
+          await saveAgentEditModalMdFile(agentId);
+        }
         var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -4093,6 +4245,16 @@
     });
     document.getElementById('agent-edit-modal-cancel').addEventListener('click', closeAgentEditModal);
     document.getElementById('agent-edit-modal-submit').addEventListener('click', submitAgentEditModal);
+    document.getElementById('agent-edit-modal-md-save').addEventListener('click', async function () {
+      var agentId = agentEditModalAgentId;
+      if (!agentId || !agentEditModalMdFile) return;
+      showAgentEditModalError('');
+      try {
+        await saveAgentEditModalMdFile(agentId);
+      } catch (err) {
+        showAgentEditModalError(err.message || String(err));
+      }
+    });
     document.getElementById('agent-edit-modal').addEventListener('click', function (e) {
       if (e.target && e.target.id === 'agent-edit-modal') closeAgentEditModal();
     });

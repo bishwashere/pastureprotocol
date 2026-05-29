@@ -47,6 +47,10 @@ const checks = [
     ok: !/agent-map-tree-line" marker-end="url\(#agent-tree-arrowhead\)"/.test(html),
   },
   {
+    name: 'Agent edit modal includes identity file editor',
+    ok: html.includes('agent-edit-modal-md-files') && html.includes('agent-edit-modal-md-textarea'),
+  },
+  {
     name: 'buildInboundLinks helper used on map',
     ok: /buildInboundLinks\(agents\)/.test(html),
   },
