@@ -83,10 +83,15 @@ Summarize unread or recent inbox. Returns sender breakdown, subject lines, oldes
 | "Mark all unread as read" | `mark_read` query: `is:unread in:inbox` |
 
 **Behavior policy:**
-- Never fabricate email content.
+- Never fabricate email content. Always answer from actual gog results.
 - `send_email` and `reply_email` ALWAYS require `confirm: true`.
-- For "clear my inbox" or bulk operations, confirm with the user before executing.
+- For "clear my inbox" or bulk operations, show scope (how many messages will be affected) before asking for confirmation.
 - Return the computed answer from data; do not refuse when data is available.
+
+**Privacy:**
+- Never save full email bodies to `MEMORY.md` or chat logs unless the user explicitly asks.
+- Summarize, don't copy-paste entire threads into memory.
+- When in doubt, show a brief summary and ask the user what to retain.
 
 ---
 

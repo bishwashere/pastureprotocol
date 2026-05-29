@@ -146,6 +146,49 @@ function getSkillMdPath(skillId) {
   return join(dir, 'SKILL.md');
 }
 
+/**
+ * Check whether a skill that requires external credentials is configured.
+ * Returns 'ok' | 'missing' | null (null = no credential required).
+ */
+function getSkillConfigStatus(skillId) {
+  const NEEDS_CONFIG = new Set(['github', 'gmail', 'calendar', 'gog', 'home-assistant', 'search', 'speech', 'ssh-inspect']);
+  if (!NEEDS_CONFIG.has(skillId)) return null;
+
+  if (skillId === 'github') {
+    if (process.env.GITHUB_TOKEN) return 'ok';
+    try {
+      const secretsPath = join(getStateDir(), 'secrets.json');
+      if (existsSync(secretsPath)) {
+        const s = JSON.parse(readFileSync(secretsPath, 'utf8'));
+        if (s?.github?.token) return 'ok';
+      }
+      const config = loadConfig();
+      if (config?.skills?.github?.token) return 'ok-legacy';
+    } catch (_) {}
+    return 'missing';
+  }
+
+  if (skillId === 'gmail' || skillId === 'calendar' || skillId === 'gog') {
+    // gog uses system OAuth — check if gog is installed and account is set
+    const config = loadConfig();
+    const account = config?.skills?.gog?.account || config?.skills?.[skillId]?.account || process.env.GOG_ACCOUNT;
+    return account ? 'ok' : 'unchecked';
+  }
+
+  if (skillId === 'search') {
+    const config = loadConfig();
+    const key = config?.skills?.search?.apiKey || process.env.BRAVE_API_KEY;
+    return key ? 'ok' : 'missing';
+  }
+
+  if (skillId === 'home-assistant') {
+    const config = loadConfig();
+    return config?.skills?.['home-assistant']?.url ? 'ok' : 'missing';
+  }
+
+  return null;
+}
+
 function getDaemonUptimeSeconds() {
   const path = join(getStateDir(), 'daemon.started');
   if (!existsSync(path)) return null;
@@ -245,7 +288,12 @@ app.get('/api/skills', (_req, res) => {
     const config = loadConfig();
     const enabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
     const allIds = getAllSkillIds();
-    const list = allIds.map((id) => ({ id, enabled: enabled.includes(id), description: getSkillDescription(id) }));
+    const list = allIds.map((id) => ({
+      id,
+      enabled: enabled.includes(id),
+      description: getSkillDescription(id),
+      configStatus: getSkillConfigStatus(id),
+    }));
     res.json({ skills: list, enabled });
   } catch (err) {
     res.status(500).json({ error: err.message });

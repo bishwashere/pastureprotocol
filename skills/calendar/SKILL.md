@@ -83,10 +83,15 @@ Find the next available time slot of a given duration within a time range.
 
 **Behavior policy:**
 - `create_event`, `update_event`, and `delete_event` ALWAYS require `confirm: true`.
-- For natural language times (e.g. "next Tuesday 2pm"), convert to ISO 8601 before calling.
-- Never fabricate event data.
+- For natural language times (e.g. "next Tuesday 2pm"), convert to ISO 8601 before calling. Use the user's local timezone (from system or prior context).
+- For "all day" events, use the all-day date format (e.g. start: "2026-06-05", end: "2026-06-06").
+- Never fabricate event data or claim to have created/deleted something without calling the tool.
 - Return the computed answer from data; do not refuse when data is available.
-- For "book a meeting with X", always ask for confirmation before creating.
+- Before `create_event`, always show what will be created (title, time, attendees) and ask for confirmation.
+
+**Privacy:**
+- Never save event attendee emails or meeting notes to `MEMORY.md` without explicit user request.
+- Summarize calendar data rather than storing raw API responses in memory.
 
 ---
 

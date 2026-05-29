@@ -1,18 +1,33 @@
 ---
 id: github
 name: GitHub
-description: GitHub integration. Read repos, list/read issues and PRs, create branches, post comments, create PRs, read files. Requires GITHUB_TOKEN in .env or skills.github.token in config.
+description: GitHub integration. Read repos, list/read issues and PRs, create branches, post comments, create PRs. Requires GitHub token in ~/.cowcode/secrets.json or GITHUB_TOKEN env var.
 ---
 
 # GitHub
 
-Interact with GitHub via the REST API. Call `run_skill` with **skill: `"github"`** and **arguments.action** set to one of the actions below.
+Interact with GitHub via the REST API. Read repositories, issues, PRs, and files. Create branches, post comments, open PRs, merge PRs.
 
-Requires a GitHub Personal Access Token (classic or fine-grained) with appropriate scopes:
-- `repo` — for private repos and write operations (branches, PRs, comments)
-- `public_repo` — for read-only public repo access
+---
 
-Set it in `~/.cowcode/.env` as `GITHUB_TOKEN=ghp_xxx`, or in `config.json` under `skills.github.token`.
+## Setup (required before first use)
+
+1. Create a GitHub Personal Access Token at https://github.com/settings/tokens
+   - **Read-only** (repos, issues, PRs): select scope `public_repo` (public) or `repo` (private)
+   - **Write** (create branch, post comment, open PR): scope `repo`
+   - **Minimum recommended scopes:** `repo`, `issues`, `pull_requests`
+   - **Never** grant `admin:org`, `delete_repo`, or `workflow` unless you explicitly need them
+
+2. Save the token in `~/.cowcode/secrets.json` (gitignored, never committed):
+   ```json
+   { "github": { "token": "ghp_your_token_here" } }
+   ```
+   Or set `GITHUB_TOKEN` in `~/.cowcode/.env`.
+
+3. (Optional) Set a default repo in `config.json` so you don't repeat it each time:
+   ```json
+   "skills": { "github": { "defaultRepo": "owner/repo" } }
+   ```
 
 ---
 
@@ -25,16 +40,16 @@ List repositories for the authenticated user or a specified org/user.
 - **per_page** (optional) — max results, 1–100 (default: 30)
 
 ### `read_repo`
-Get details about a repository (description, stars, default branch, topics, open issues count).
-- **repo** (required) — `owner/repo` (e.g. `bishwashere/cowCode`)
+Get details about a repository (description, stars, default branch, topics, open issue count).
+- **repo** (required) — `owner/repo`
 
 ### `list_issues`
-List issues (or pull requests) in a repository.
+List issues or pull requests in a repository.
 - **repo** (required) — `owner/repo`
 - **state** (optional) — `open`, `closed`, `all` (default: `open`)
 - **type** (optional) — `issues`, `prs`, `all` (default: `issues`)
-- **labels** (optional) — comma-separated label names
-- **per_page** (optional) — max results, 1–100 (default: 20)
+- **labels** (optional) — comma-separated label names to filter by
+- **per_page** (optional) — max results (default: 20)
 
 ### `read_issue`
 Read the full body and comment thread of a single issue or PR.
@@ -42,61 +57,78 @@ Read the full body and comment thread of a single issue or PR.
 - **number** (required) — issue or PR number
 
 ### `list_prs`
-List open pull requests in a repository.
+List pull requests in a repository.
 - **repo** (required) — `owner/repo`
 - **state** (optional) — `open`, `closed`, `all` (default: `open`)
-- **per_page** (optional) — max results, 1–100 (default: 20)
+- **per_page** (optional) — max results (default: 20)
 
 ### `read_file`
-Read a file from a repository (returns decoded text content).
+Read a file from a repository (returns decoded text content). Avoid reading large binary files.
 - **repo** (required) — `owner/repo`
 - **path** (required) — file path in the repo (e.g. `README.md`)
-- **ref** (optional) — branch, tag, or commit SHA (default: repo's default branch)
+- **ref** (optional) — branch, tag, or commit SHA (default: repo default branch)
 
-### `create_branch`
+### `create_branch` ⚠️ requires confirm
 Create a new branch from an existing one.
 - **repo** (required) — `owner/repo`
 - **branch** (required) — new branch name (e.g. `feat/my-feature`)
-- **from** (optional) — source branch/SHA (default: repo's default branch)
+- **from** (optional) — source branch or commit SHA (default: repo default branch)
+- **confirm** (required) — must be `true` to proceed
 
-### `post_comment`
+### `post_comment` ⚠️ requires confirm
 Post a comment on an issue or pull request.
 - **repo** (required) — `owner/repo`
 - **number** (required) — issue or PR number
 - **body** (required) — comment text (markdown supported)
+- **confirm** (required) — must be `true` to proceed
 
-### `create_pr`
-Create a pull request.
+### `create_pr` ⚠️ requires confirm
+Open a pull request.
 - **repo** (required) — `owner/repo`
 - **title** (required) — PR title
 - **head** (required) — branch with the changes (e.g. `feat/my-feature`)
-- **base** (optional) — target branch (default: repo's default branch)
+- **base** (optional) — target branch (default: repo default branch)
 - **body** (optional) — PR description (markdown)
 - **draft** (optional) — boolean, create as draft PR (default: false)
+- **confirm** (required) — must be `true` to proceed
 
-### `merge_pr`
+### `merge_pr` ⚠️ requires confirm (irreversible)
 Merge an open pull request.
 - **repo** (required) — `owner/repo`
 - **number** (required) — PR number
 - **method** (optional) — `merge`, `squash`, `rebase` (default: `merge`)
 - **message** (optional) — commit message (for merge/squash)
+- **confirm** (required) — must be `true` to proceed (always show user PR title and target branch first)
 
 ### `search_code`
 Search code across GitHub.
-- **query** (required) — GitHub code search query (e.g. `cowcode language:js repo:bishwashere/cowCode`)
+- **query** (required) — GitHub code search query (e.g. `cowcode language:js repo:owner/repo`)
 - **per_page** (optional) — max results, 1–30 (default: 10)
 
 ---
 
-## Usage examples
+## Natural language examples
 
-- "List open issues in bishwashere/cowCode" → action: `list_issues`, repo: `bishwashere/cowCode`
-- "Show me PR #42 in myorg/myrepo" → action: `read_issue`, repo: `myorg/myrepo`, number: 42
-- "Create branch feat/webhook from main in myorg/myrepo" → action: `create_branch`
-- "Open a PR from feat/webhook to main" → action: `create_pr`
-- "Post a comment on issue #5 in myorg/myrepo saying 'Fixed in #7'" → action: `post_comment`
+| User says | Action |
+|---|---|
+| "List open issues in myorg/myrepo" | `list_issues` |
+| "Show me PR #42" | `read_issue` number: 42 |
+| "What PRs are open?" | `list_prs` |
+| "Read the README from main branch" | `read_file` path: README.md |
+| "Create branch feat/webhook from main" | `create_branch` (ask confirm) |
+| "Open a PR from feat/webhook to main titled 'Add webhooks'" | `create_pr` (ask confirm) |
+| "Post a comment on issue #5 saying 'Fixed in #8'" | `post_comment` (ask confirm) |
+| "Merge PR #10 with squash" | `merge_pr` method: squash (ask confirm, show PR details first) |
+| "Search for 'executeGithub' in my repo" | `search_code` |
 
-Always use `owner/repo` format for the **repo** argument. Never fabricate API responses.
+---
+
+## Privacy & Safety
+
+- **Never** save raw GitHub file contents or issue bodies to `MEMORY.md` unless the user explicitly asks.
+- **Scope tokens to minimum necessary.** Prefer fine-grained tokens with specific repo + permission access.
+- **Confirmation is required** for all write actions. Always show what will happen before calling with `confirm: true`.
+- For `merge_pr`, always display the PR title and target branch to the user before confirming.
 
 ---
 
@@ -116,7 +148,7 @@ github_read_repo
     repo: string
 
 github_list_issues
-  description: List issues in a GitHub repository.
+  description: List issues or pull requests in a GitHub repository.
   parameters:
     repo: string
     state: string (optional)
@@ -125,7 +157,7 @@ github_list_issues
     per_page: number (optional)
 
 github_read_issue
-  description: Read a single issue or PR including comments.
+  description: Read a single issue or PR including all comments.
   parameters:
     repo: string
     number: number
@@ -138,28 +170,30 @@ github_list_prs
     per_page: number (optional)
 
 github_read_file
-  description: Read a file from a GitHub repository.
+  description: Read a file from a GitHub repository (decoded text content).
   parameters:
     repo: string
     path: string
     ref: string (optional)
 
 github_create_branch
-  description: Create a new branch in a GitHub repository.
+  description: Create a new branch in a GitHub repository. Requires confirm=true.
   parameters:
     repo: string
     branch: string
     from: string (optional)
+    confirm: boolean
 
 github_post_comment
-  description: Post a comment on a GitHub issue or pull request.
+  description: Post a comment on a GitHub issue or pull request. Requires confirm=true.
   parameters:
     repo: string
     number: number
     body: string
+    confirm: boolean
 
 github_create_pr
-  description: Create a pull request on GitHub.
+  description: Create a pull request on GitHub. Requires confirm=true.
   parameters:
     repo: string
     title: string
@@ -167,14 +201,16 @@ github_create_pr
     base: string (optional)
     body: string (optional)
     draft: boolean (optional)
+    confirm: boolean
 
 github_merge_pr
-  description: Merge an open GitHub pull request.
+  description: Merge an open GitHub pull request. Irreversible — always show PR details to user first. Requires confirm=true.
   parameters:
     repo: string
     number: number
     method: string (optional)
     message: string (optional)
+    confirm: boolean
 
 github_search_code
   description: Search code on GitHub.

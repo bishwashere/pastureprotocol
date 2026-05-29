@@ -270,6 +270,11 @@
     .skill-item:last-child { border-bottom: none; }
     .skill-row { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; }
     .skill-id { font-weight: 500; }
+    .skill-config-badge { font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 3px; margin-left: 0.4rem; vertical-align: middle; font-weight: 500; }
+    .skill-config-badge.ok { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+    .skill-config-badge.ok-legacy { background: rgba(250, 200, 50, 0.15); color: #c9a800; }
+    .skill-config-badge.missing { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+    .skill-config-badge.unchecked { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
     .skill-meta { font-size: 0.8rem; color: var(--muted); }
     label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     input[type="checkbox"] { accent-color: var(--accent); }
@@ -1795,7 +1800,13 @@
         const checked = currentEnabled.includes(s.id) ? ' checked' : '';
         const desc = (s.description || '').trim();
         const descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
-        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>' +
+        const cs = s.configStatus;
+        const configBadge = cs === 'ok' ? '<span class="skill-config-badge ok" title="Credentials configured">configured</span>'
+          : cs === 'ok-legacy' ? '<span class="skill-config-badge ok-legacy" title="Token found in config.json — move to secrets.json for better security">token in config</span>'
+          : cs === 'missing' ? '<span class="skill-config-badge missing" title="Credentials not set — see SKILL.md for setup">needs setup</span>'
+          : cs === 'unchecked' ? '<span class="skill-config-badge unchecked" title="Uses gog CLI auth — run \'gog auth\' if not yet authenticated">gog auth</span>'
+          : '';
+        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + configBadge + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>' +
           '<div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
       }).join('');
       el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
