@@ -51,6 +51,18 @@ const checks = [
     ok: html.includes('agent-edit-modal-md-files') && html.includes('agent-edit-modal-md-textarea'),
   },
   {
+    name: 'Agent map node has team page extension button',
+    ok: html.includes('agent-map-node-ext') && html.includes('openTeamAgentPage'),
+  },
+  {
+    name: 'Dedicated team agent page exists',
+    ok: html.includes('id="page-team-agent"') && html.includes('id="team-agent-md-files"'),
+  },
+  {
+    name: 'Team agent hash route parsed',
+    ok: /name === 'team'/.test(html) && html.includes("name: 'team-agent'"),
+  },
+  {
     name: 'buildInboundLinks helper used on map',
     ok: /buildInboundLinks\(agents\)/.test(html),
   },

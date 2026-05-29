@@ -204,7 +204,8 @@
     .agent-map-node-edit {
       position: absolute;
       top: 0.3rem;
-      right: 0.3rem;
+      left: 0.3rem;
+      right: auto;
       background: none;
       border: none;
       color: var(--muted);
@@ -220,6 +221,32 @@
     .agent-map-node-edit:hover {
       color: var(--accent);
       background: rgba(167, 139, 250, 0.12);
+    }
+    .agent-map-node-ext {
+      position: absolute;
+      top: 0.3rem;
+      right: 0.3rem;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.28rem 0.42rem;
+      font-size: 1.05rem;
+      line-height: 1;
+      border-radius: 4px;
+      opacity: 0.55;
+      transition: opacity 0.15s, color 0.15s, background 0.15s;
+    }
+    .agent-map-node:hover .agent-map-node-ext { opacity: 1; }
+    .agent-map-node-ext:hover {
+      color: var(--accent);
+      background: rgba(167, 139, 250, 0.12);
+    }
+    .agent-map-node-ext svg {
+      display: block;
+      width: 1rem;
+      height: 1rem;
+      fill: currentColor;
     }
     .agent-map-node-meta {
       font-size: 0.68rem;
@@ -789,6 +816,27 @@
       background: rgba(167, 139, 250, 0.08);
     }
     #agent-edit-modal-md-saved {
+      margin-left: 0.75rem;
+      color: var(--green);
+      font-size: 0.85rem;
+      display: none;
+    }
+    .team-agent-page {
+      max-width: min(92vw, 52rem);
+      margin: 1.5rem auto;
+    }
+    .team-agent-page-head {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .team-agent-page-head h2 {
+      margin: 0;
+      flex: 1 1 auto;
+      font-size: 1.15rem;
+    }
+    #team-agent-md-saved {
       margin-left: 0.75rem;
       color: var(--green);
       font-size: 0.85rem;
@@ -1630,6 +1678,59 @@
     </div>
   </div>
 
+  <div id="page-team-agent" class="page">
+    <div class="card team-agent-page">
+      <div class="team-agent-page-head">
+        <button type="button" id="team-agent-back" class="secondary" style="margin:0;">← Home</button>
+        <h2 id="team-agent-heading">Agent</h2>
+      </div>
+      <p class="skill-meta" style="margin:0 0 1rem 0;">Identity, skills, and team links for this agent.</p>
+      <div class="agent-edit-basics">
+        <div class="field">
+          <label for="team-agent-id">Agent id</label>
+          <input id="team-agent-id" type="text" readonly disabled>
+        </div>
+        <div class="field">
+          <label for="team-agent-title">Title <span class="skill-meta">(optional)</span></label>
+          <input id="team-agent-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Identity files</label>
+        <p class="field-hint" style="margin:0;">Soul, WhoAmI, MyHuman, group rules, and memory for this agent.</p>
+        <div id="team-agent-md-files" class="agent-edit-md-files"></div>
+        <div id="team-agent-md-editor" style="display:none; margin-top:0.65rem;">
+          <div id="team-agent-md-label" class="skill-meta" style="margin-bottom:0.35rem;"></div>
+          <textarea id="team-agent-md-textarea" class="agent-edit-md-textarea" spellcheck="false"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button type="button" id="team-agent-md-save" class="secondary" style="margin-top:0;">Save file</button>
+            <span id="team-agent-md-saved">Saved.</span>
+          </div>
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Skills</label>
+        <p class="field-hint" style="margin:0;">Click tiles to enable or disable skills for this agent.</p>
+        <div id="team-agent-skills" class="agent-edit-tiles-grid"></div>
+      </div>
+      <div class="agent-edit-messaging-block">
+        <div id="team-agent-links-wrap" class="field agent-edit-section">
+          <div id="team-agent-inbound-wrap" class="field" style="display:none; margin-bottom:0.65rem;">
+            <label>Receives delegation from</label>
+            <p id="team-agent-inbound" class="skill-meta" style="margin:0;"></p>
+          </div>
+          <label>Can delegate to</label>
+          <p class="field-hint" style="margin:0;">Outbound team links. Other agents that link here show ← on the map (reply path is automatic).</p>
+          <div id="team-agent-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
+        </div>
+      </div>
+      <p id="team-agent-error" class="modal-error" role="alert"></p>
+      <div style="margin-top:0.75rem;">
+        <button type="button" id="team-agent-save">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div id="page-groups" class="page">
     <div class="groups-layout">
       <div class="groups-sidebar card">
@@ -1792,7 +1893,7 @@
 
   <script>
     const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -1815,7 +1916,7 @@
     function isMemoryWorkspaceFile(id) {
       return isMemoryNotesFile(id) || isMemoryChatLogFile(id);
     }
-    function setPage(name, memoryFileId, openIdentityFileId) {
+    function setPage(name, memoryFileId, openIdentityFileId, teamAgentId) {
       if (name === 'chat' || name === 'status') name = 'home';
       if (!name || !validPages.includes(name)) name = 'home';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1834,6 +1935,7 @@
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
       if (name === 'test') fetchTests();
+      if (name === 'team-agent' && teamAgentId) loadTeamAgentPage(teamAgentId);
       if (name === 'memory') {
         fetchMemoryFiles().then(function () {
           if (memoryFileId) selectMemoryFile(memoryFileId, isMemoryChatLogFile(memoryFileId));
@@ -1847,22 +1949,26 @@
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
+      if (name === 'team') {
+        var teamId = subFile ? decodeURIComponent(subFile) : 'main';
+        return { name: 'team-agent', memoryFile: null, openIdentity: null, teamAgentId: teamId };
+      }
       if (name === 'soul') {
         if (!subFile || subFile === 'SOUL.md') {
-          return { name: 'home', memoryFile: null, openIdentity: 'SOUL.md' };
+          return { name: 'home', memoryFile: null, openIdentity: 'SOUL.md', teamAgentId: null };
         }
         if (isMemoryWorkspaceFile(subFile)) {
-          return { name: 'memory', memoryFile: subFile, openIdentity: null };
+          return { name: 'memory', memoryFile: subFile, openIdentity: null, teamAgentId: null };
         }
         if (IDENTITY_FILE_LABELS[subFile]) {
-          return { name: 'home', memoryFile: null, openIdentity: subFile };
+          return { name: 'home', memoryFile: null, openIdentity: subFile, teamAgentId: null };
         }
-        return { name: 'memory', memoryFile: subFile, openIdentity: null };
+        return { name: 'memory', memoryFile: subFile, openIdentity: null, teamAgentId: null };
       }
       if (name === 'memory') {
-        return { name: 'memory', memoryFile: subFile, openIdentity: null };
+        return { name: 'memory', memoryFile: subFile, openIdentity: null, teamAgentId: null };
       }
-      return { name: name, memoryFile: null, openIdentity: null };
+      return { name: name, memoryFile: null, openIdentity: null, teamAgentId: null };
     }
     document.querySelectorAll('nav a[data-page]').forEach(function (a) {
       a.addEventListener('click', function (e) {
@@ -1872,7 +1978,7 @@
     });
     window.addEventListener('hashchange', function () {
       var p = parseHash();
-      setPage(p.name, p.memoryFile, p.openIdentity);
+      setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
     });
 
     async function fetchStatus() {
@@ -2279,12 +2385,32 @@
     }
 
     var agentEditModalOpen = false;
-    var agentEditModalAgentId = '';
-    var agentEditModalMdFile = '';
-    var agentEditModalMdDirty = false;
+    var agentEditorState = {
+      modal: { agentId: '', mdFile: '', mdDirty: false },
+      page: { agentId: '', mdFile: '', mdDirty: false },
+    };
 
-    function showAgentEditModalError(msg) {
-      var el = document.getElementById('agent-edit-modal-error');
+    function agentEditorDom(scope) {
+      var p = scope === 'page' ? 'team-agent' : 'agent-edit-modal';
+      return {
+        title: document.getElementById(p + '-title'),
+        id: document.getElementById(p + '-id'),
+        heading: document.getElementById(p + '-heading'),
+        mdFiles: document.getElementById(p + '-md-files'),
+        mdEditor: document.getElementById(p + '-md-editor'),
+        mdLabel: document.getElementById(p + '-md-label'),
+        mdTextarea: document.getElementById(p + '-md-textarea'),
+        mdSaved: document.getElementById(p + '-md-saved'),
+        skills: document.getElementById(p + '-skills'),
+        inboundWrap: document.getElementById(p + '-inbound-wrap'),
+        inbound: document.getElementById(p + '-inbound'),
+        links: document.getElementById(p + '-links'),
+        error: document.getElementById(p + '-error'),
+      };
+    }
+
+    function showAgentEditorError(msg, scope) {
+      var el = agentEditorDom(scope).error;
       if (!el) return;
       if (msg) {
         el.textContent = msg;
@@ -2295,82 +2421,84 @@
       }
     }
 
-    async function loadAgentEditModalMdFiles(agentId) {
-      var filesEl = document.getElementById('agent-edit-modal-md-files');
-      var editorEl = document.getElementById('agent-edit-modal-md-editor');
-      if (!filesEl) return;
-      agentEditModalMdFile = '';
-      agentEditModalMdDirty = false;
-      var savedEl = document.getElementById('agent-edit-modal-md-saved');
-      if (savedEl) savedEl.style.display = 'none';
-      if (editorEl) editorEl.style.display = 'none';
+    async function loadAgentEditorMdFiles(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      if (!dom.mdFiles) return;
+      state.mdFile = '';
+      state.mdDirty = false;
+      if (dom.mdSaved) dom.mdSaved.style.display = 'none';
+      if (dom.mdEditor) dom.mdEditor.style.display = 'none';
       var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
       var d = await r.json();
       var files = d.files || AGENT_IDENTITY_FILE_ORDER.map(function (id) {
         return { id: id, label: IDENTITY_FILE_LABELS[id] || id, exists: false };
       });
-      filesEl.innerHTML = files.map(function (f) {
+      dom.mdFiles.innerHTML = files.map(function (f) {
         var missing = f.exists === false ? ' · new' : '';
         return '<button type="button" class="agent-edit-md-btn" data-agent-edit-file="' + escapeHtml(f.id) + '">' +
           escapeHtml(f.label || IDENTITY_FILE_LABELS[f.id] || f.id) + missing + '</button>';
       }).join('');
-      filesEl.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+      dom.mdFiles.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
-          selectAgentEditModalMdFile(agentId, btn.getAttribute('data-agent-edit-file'));
+          selectAgentEditorMdFile(agentId, btn.getAttribute('data-agent-edit-file'), scope);
         });
       });
-      if (files.length > 0) await selectAgentEditModalMdFile(agentId, files[0].id);
+      if (files.length > 0) await selectAgentEditorMdFile(agentId, files[0].id, scope);
     }
 
-    async function selectAgentEditModalMdFile(agentId, fileId) {
+    async function selectAgentEditorMdFile(agentId, fileId, scope) {
       if (!fileId) return;
-      agentEditModalMdFile = fileId;
-      agentEditModalMdDirty = false;
-      var savedEl = document.getElementById('agent-edit-modal-md-saved');
-      if (savedEl) savedEl.style.display = 'none';
-      document.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-agent-edit-file') === fileId);
-      });
-      var editorEl = document.getElementById('agent-edit-modal-md-editor');
-      var labelEl = document.getElementById('agent-edit-modal-md-label');
-      var textarea = document.getElementById('agent-edit-modal-md-textarea');
-      if (editorEl) editorEl.style.display = 'block';
-      if (labelEl) labelEl.textContent = (IDENTITY_FILE_LABELS[fileId] || fileId) + ' · ' + fileId;
-      if (textarea) {
-        textarea.value = '';
-        textarea.oninput = function () { agentEditModalMdDirty = true; };
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      state.mdFile = fileId;
+      state.mdDirty = false;
+      if (dom.mdSaved) dom.mdSaved.style.display = 'none';
+      if (dom.mdFiles) {
+        dom.mdFiles.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-agent-edit-file') === fileId);
+        });
+      }
+      if (dom.mdEditor) dom.mdEditor.style.display = 'block';
+      if (dom.mdLabel) dom.mdLabel.textContent = (IDENTITY_FILE_LABELS[fileId] || fileId) + ' · ' + fileId;
+      if (dom.mdTextarea) {
+        dom.mdTextarea.value = '';
+        dom.mdTextarea.oninput = function () { state.mdDirty = true; };
       }
       try {
         var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(fileId));
         if (!r.ok) throw new Error('Failed to load');
         var data = await r.json();
-        if (textarea) textarea.value = data.content || '';
-        agentEditModalMdDirty = false;
+        if (dom.mdTextarea) dom.mdTextarea.value = data.content || '';
+        state.mdDirty = false;
       } catch (_) {
-        if (textarea) textarea.value = '';
+        if (dom.mdTextarea) dom.mdTextarea.value = '';
       }
     }
 
-    async function saveAgentEditModalMdFile(agentId) {
-      if (!agentId || !agentEditModalMdFile) return true;
-      var textarea = document.getElementById('agent-edit-modal-md-textarea');
-      if (!textarea) return true;
-      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(agentEditModalMdFile), {
+    async function saveAgentEditorMdFile(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      if (!agentId || !state.mdFile || !dom.mdTextarea) return true;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(state.mdFile), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: textarea.value }),
+        body: JSON.stringify({ content: dom.mdTextarea.value }),
       });
       if (!r.ok) {
         var d = await r.json().catch(function () { return {}; });
         throw new Error(d.error || 'Failed to save identity file');
       }
-      agentEditModalMdDirty = false;
-      var savedEl = document.getElementById('agent-edit-modal-md-saved');
-      if (savedEl) {
-        savedEl.style.display = 'inline';
-        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      state.mdDirty = false;
+      if (dom.mdSaved) {
+        dom.mdSaved.style.display = 'inline';
+        setTimeout(function () { dom.mdSaved.style.display = 'none'; }, 2000);
       }
       return true;
+    }
+
+    function showAgentEditModalError(msg) {
+      showAgentEditorError(msg, 'modal');
     }
 
     function renderAgentEditSkillTile(skill, enabled) {
@@ -2398,62 +2526,107 @@
         '</label>';
     }
 
+    async function loadAgentEditor(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      state.agentId = agentId || 'main';
+      showAgentEditorError('', scope);
+      var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+      var skillsResp = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
+      var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
+      if (dom.id) dom.id.value = agentId;
+      if (dom.title) dom.title.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
+      if (dom.heading) dom.heading.textContent = (scope === 'page' ? 'Team agent: ' : 'Edit agent: ') + agentId;
+      await loadAgentEditorMdFiles(agentId, scope);
+      var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
+      var list = (skillsResp.skills || []).filter(function (s) { return s.id !== 'agent-send' && s.id !== 'background-tasks'; });
+      if (dom.skills) {
+        dom.skills.innerHTML = list.map(function (s) {
+          return renderAgentEditSkillTile(s, enabled);
+        }).join('');
+      }
+      var messaging = cfg.agentMessaging || {};
+      var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
+      var inboundFrom = (agentsResp.agents || []).filter(function (a) {
+        var peerAllow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        return a.id !== agentId && peerAllow.indexOf(agentId) !== -1;
+      }).map(function (a) { return a.title && String(a.title).trim() ? String(a.title).trim() + ' (' + a.id + ')' : a.id; });
+      if (dom.inboundWrap && dom.inbound) {
+        if (inboundFrom.length) {
+          dom.inboundWrap.style.display = '';
+          dom.inbound.textContent = inboundFrom.join(', ');
+        } else {
+          dom.inboundWrap.style.display = 'none';
+          dom.inbound.textContent = '';
+        }
+      }
+      var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
+      if (dom.links) {
+        if (!others.length) {
+          dom.links.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
+        } else {
+          dom.links.innerHTML = others.map(function (a) {
+            return renderAgentEditPeerTile(a, allow);
+          }).join('');
+        }
+      }
+      return dom;
+    }
+
+    async function submitAgentEditor(scope, opts) {
+      opts = opts || {};
+      var state = agentEditorState[scope];
+      var agentId = state.agentId;
+      if (!agentId) return;
+      var dom = agentEditorDom(scope);
+      var submitBtn = opts.submitBtn || null;
+      var enabled = [];
+      if (dom.skills) {
+        dom.skills.querySelectorAll('input[data-edit-skill]:checked').forEach(function (cb) {
+          enabled.push(cb.getAttribute('data-edit-skill'));
+        });
+      }
+      var allow = [];
+      if (dom.links) {
+        dom.links.querySelectorAll('input[data-edit-link]:checked').forEach(function (cb) {
+          allow.push(cb.getAttribute('data-edit-link'));
+        });
+      }
+      var patch = {
+        title: dom.title ? dom.title.value : '',
+        skills: { enabled: enabled },
+        agentMessaging: { allow: allow },
+      };
+      if (submitBtn) submitBtn.disabled = true;
+      showAgentEditorError('', scope);
+      try {
+        if (state.mdDirty && state.mdFile) {
+          await saveAgentEditorMdFile(agentId, scope);
+        }
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(d.error || ('Save failed (' + r.status + ')'));
+        if (opts.onSuccess) await opts.onSuccess();
+      } catch (err) {
+        showAgentEditorError(err.message || String(err), scope);
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
     async function openAgentEditModal(agentId) {
-      agentEditModalAgentId = agentId || 'main';
-      showAgentEditModalError('');
       var modal = document.getElementById('agent-edit-modal');
       if (!modal) return;
       try {
-        var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
-        var skillsResp = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
-        var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
-        var idInput = document.getElementById('agent-edit-modal-id');
-        var titleInput = document.getElementById('agent-edit-modal-title');
-        var heading = document.getElementById('agent-edit-modal-heading');
-        if (idInput) idInput.value = agentId;
-        if (titleInput) titleInput.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
-        if (heading) heading.textContent = 'Edit agent: ' + agentId;
-        await loadAgentEditModalMdFiles(agentId);
-        var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
-        var list = (skillsResp.skills || []).filter(function (s) { return s.id !== 'agent-send' && s.id !== 'background-tasks'; });
-        var skillsEl = document.getElementById('agent-edit-modal-skills');
-        if (skillsEl) {
-          skillsEl.innerHTML = list.map(function (s) {
-            return renderAgentEditSkillTile(s, enabled);
-          }).join('');
-        }
-        var messaging = cfg.agentMessaging || {};
-        var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
-        var inboundFrom = (agentsResp.agents || []).filter(function (a) {
-          var peerAllow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
-          return a.id !== agentId && peerAllow.indexOf(agentId) !== -1;
-        }).map(function (a) { return a.title && String(a.title).trim() ? String(a.title).trim() + ' (' + a.id + ')' : a.id; });
-        var inboundWrap = document.getElementById('agent-edit-modal-inbound-wrap');
-        var inboundEl = document.getElementById('agent-edit-modal-inbound');
-        if (inboundWrap && inboundEl) {
-          if (inboundFrom.length) {
-            inboundWrap.style.display = '';
-            inboundEl.textContent = inboundFrom.join(', ');
-          } else {
-            inboundWrap.style.display = 'none';
-            inboundEl.textContent = '';
-          }
-        }
-        var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
-        var linksEl = document.getElementById('agent-edit-modal-links');
-        if (linksEl) {
-          if (!others.length) {
-            linksEl.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
-          } else {
-            linksEl.innerHTML = others.map(function (a) {
-              return renderAgentEditPeerTile(a, allow);
-            }).join('');
-          }
-        }
+        var dom = await loadAgentEditor(agentId, 'modal');
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
         agentEditModalOpen = true;
-        setTimeout(function () { if (titleInput) titleInput.focus(); }, 0);
+        setTimeout(function () { if (dom.title) dom.title.focus(); }, 0);
       } catch (err) {
         window.alert('Could not load agent: ' + (err.message || err));
       }
@@ -2465,57 +2638,45 @@
       modal.classList.remove('open');
       modal.setAttribute('aria-hidden', 'true');
       agentEditModalOpen = false;
-      agentEditModalAgentId = '';
-      agentEditModalMdFile = '';
-      agentEditModalMdDirty = false;
-      showAgentEditModalError('');
+      agentEditorState.modal = { agentId: '', mdFile: '', mdDirty: false };
+      showAgentEditorError('', 'modal');
     }
 
     async function submitAgentEditModal() {
-      var agentId = agentEditModalAgentId;
-      if (!agentId) return;
       var submitBtn = document.getElementById('agent-edit-modal-submit');
-      var titleInput = document.getElementById('agent-edit-modal-title');
-      var skillsEl = document.getElementById('agent-edit-modal-skills');
-      var linksEl = document.getElementById('agent-edit-modal-links');
-      var enabled = [];
-      if (skillsEl) {
-        skillsEl.querySelectorAll('input[data-edit-skill]:checked').forEach(function (cb) {
-          enabled.push(cb.getAttribute('data-edit-skill'));
-        });
-      }
-      var allow = [];
-      if (linksEl) {
-        linksEl.querySelectorAll('input[data-edit-link]:checked').forEach(function (cb) {
-          allow.push(cb.getAttribute('data-edit-link'));
-        });
-      }
-      var patch = {
-        title: titleInput ? titleInput.value : '',
-        skills: { enabled: enabled },
-        agentMessaging: { allow: allow },
-      };
-      if (submitBtn) submitBtn.disabled = true;
-      showAgentEditModalError('');
+      await submitAgentEditor('modal', {
+        submitBtn: submitBtn,
+        onSuccess: async function () {
+          closeAgentEditModal();
+          await fetchChatAgents();
+          if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+        },
+      });
+    }
+
+    function openTeamAgentPage(agentId) {
+      location.hash = '#team/' + encodeURIComponent(agentId || 'main');
+    }
+
+    async function loadTeamAgentPage(agentId) {
+      if (!agentId) agentId = 'main';
       try {
-        if (agentEditModalMdDirty && agentEditModalMdFile) {
-          await saveAgentEditModalMdFile(agentId);
-        }
-        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
-        });
-        var d = await r.json().catch(function () { return {}; });
-        if (!r.ok) throw new Error(d.error || ('Save failed (' + r.status + ')'));
-        closeAgentEditModal();
-        await fetchChatAgents();
-        if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+        var dom = await loadAgentEditor(agentId, 'page');
+        setTimeout(function () { if (dom.title) dom.title.focus(); }, 0);
       } catch (err) {
-        showAgentEditModalError(err.message || String(err));
-      } finally {
-        if (submitBtn) submitBtn.disabled = false;
+        showAgentEditorError('Could not load agent: ' + (err.message || err), 'page');
       }
+    }
+
+    async function submitTeamAgentPage() {
+      var submitBtn = document.getElementById('team-agent-save');
+      await submitAgentEditor('page', {
+        submitBtn: submitBtn,
+        onSuccess: async function () {
+          await fetchChatAgents();
+          if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+        },
+      });
     }
 
     document.getElementById('agent-create-btn').addEventListener('click', async function () {
@@ -3957,7 +4118,10 @@
         return '<div class="agent-map-node' + sel + inboundClass + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
           ' title="Chat with ' + escapeHtml(chatLabel) + '"' +
           ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
-          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
+          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Quick edit">✎</button>' +
+          '<button type="button" class="agent-map-node-ext" data-agent-id="' + id + '" aria-label="Open team page for ' + id + '" title="Open team agent page">' +
+          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8a2 2 0 0 1 2 2v1h1.5a.5.5 0 0 1 .4.8l-2.2 2.93a.5.5 0 0 1-.4.2H12v4.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13.5V2zm1 0v11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V7a.5.5 0 0 1 .5-.5h1.29L13.6 5H12a1 1 0 0 1-1-1V3H5zm2.75 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5z"/></svg>' +
+          '</button>' +
           titleHtml +
           inboundHtml +
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
@@ -3968,6 +4132,13 @@
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
           if (aid) openAgentEditModal(aid);
+        });
+      });
+      nodesEl.querySelectorAll('.agent-map-node-ext').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var aid = btn.getAttribute('data-agent-id');
+          if (aid) openTeamAgentPage(aid);
         });
       });
       nodesEl.querySelectorAll('.agent-map-node').forEach(function(node) {
@@ -4246,13 +4417,27 @@
     document.getElementById('agent-edit-modal-cancel').addEventListener('click', closeAgentEditModal);
     document.getElementById('agent-edit-modal-submit').addEventListener('click', submitAgentEditModal);
     document.getElementById('agent-edit-modal-md-save').addEventListener('click', async function () {
-      var agentId = agentEditModalAgentId;
-      if (!agentId || !agentEditModalMdFile) return;
-      showAgentEditModalError('');
+      var agentId = agentEditorState.modal.agentId;
+      if (!agentId || !agentEditorState.modal.mdFile) return;
+      showAgentEditorError('', 'modal');
       try {
-        await saveAgentEditModalMdFile(agentId);
+        await saveAgentEditorMdFile(agentId, 'modal');
       } catch (err) {
-        showAgentEditModalError(err.message || String(err));
+        showAgentEditorError(err.message || String(err), 'modal');
+      }
+    });
+    document.getElementById('team-agent-back').addEventListener('click', function () {
+      location.hash = '#home';
+    });
+    document.getElementById('team-agent-save').addEventListener('click', submitTeamAgentPage);
+    document.getElementById('team-agent-md-save').addEventListener('click', async function () {
+      var agentId = agentEditorState.page.agentId;
+      if (!agentId || !agentEditorState.page.mdFile) return;
+      showAgentEditorError('', 'page');
+      try {
+        await saveAgentEditorMdFile(agentId, 'page');
+      } catch (err) {
+        showAgentEditorError(err.message || String(err), 'page');
       }
     });
     document.getElementById('agent-edit-modal').addEventListener('click', function (e) {
@@ -4303,7 +4488,7 @@
     })();
     (function () {
       var p = parseHash();
-      setPage(p.name, p.memoryFile, p.openIdentity);
+      setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
     })();
 
     // ── Projects ────────────────────────────────────────────────────────────
