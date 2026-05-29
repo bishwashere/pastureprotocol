@@ -45,14 +45,14 @@
     nav a.active { color: var(--accent); }
     .page { display: none; }
     .page.active { display: block; }
-    /* Chat fills one viewport: body height capped so messages region gets overflow-y */
-    body.dashboard-chat-active {
+    /* Home page fills the viewport: chat region scrolls in the lower half */
+    body.dashboard-home-active {
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
       padding: 0.65rem 1rem 0.5rem;
     }
-    #page-chat.active {
+    #page-home.active {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
@@ -89,6 +89,25 @@
       gap: 0.5rem 0.75rem;
     }
     .chat-upper-left .url-box { font-size: 0.78rem; margin-top: 0.5rem; }
+    .home-soul-section {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .chat-upper-left .soul-tiles-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.45rem;
+    }
+    .chat-upper-left .soul-tile-link {
+      padding: 0.4rem 0.55rem;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.35rem;
+      background: var(--bg);
+    }
+    .chat-upper-left .soul-tile-title { font-size: 0.76rem; }
+    .chat-upper-left .soul-tile-desc { display: none; }
+    .chat-upper-left .soul-tile-icon { font-size: 0.85rem; }
     .chat-upper-right-title {
       margin: 0 0 0.5rem 0;
       font-size: 0.82rem;
@@ -503,7 +522,7 @@
     .soul-tile-desc { font-size: 0.8rem; color: var(--muted); }
     #soul-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
     .chat-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-    #page-chat .chat-layout.card { margin-bottom: 0; }
+    #page-home .chat-layout.card { margin-bottom: 0; }
     .chat-toolbar {
       flex-shrink: 0;
       display: flex;
@@ -964,8 +983,7 @@
 <body>
   <h1>cowCode Dashboard</h1>
   <nav>
-    <a href="#chat" data-page="chat" class="active">Chat</a>
-    <a href="#status" data-page="status">Status</a>
+    <a href="#home" data-page="home" class="active">Home</a>
     <a href="#soul" data-page="soul">Soul</a>
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
@@ -1000,7 +1018,7 @@
     </div>
   </div>
 
-  <div id="page-chat" class="page active">
+  <div id="page-home" class="page active">
     <div class="chat-page-split">
       <div class="chat-upper">
         <div class="chat-upper-left card">
@@ -1019,6 +1037,36 @@
             <div class="overview-item"><span class="overview-label">Priority model</span><span id="chat-overview-model">—</span></div>
             <div class="overview-item"><span class="overview-label">Time zone</span><span id="chat-overview-timezone">—</span></div>
             <div class="overview-item"><span class="overview-label">Time format</span><span id="chat-overview-time-format">—</span></div>
+          </div>
+          <div class="home-soul-section">
+            <span class="overview-label">Soul & identity</span>
+            <div class="soul-tiles-grid">
+              <a href="#soul/SOUL.md" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">Soul</span>
+                <span class="soul-tile-desc">Edit SOUL.md</span>
+              </a>
+              <a href="#soul/WhoAmI.md" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">Who am I</span>
+                <span class="soul-tile-desc">Edit WhoAmI.md</span>
+              </a>
+              <a href="#soul/MyHuman.md" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">My human</span>
+                <span class="soul-tile-desc">Edit MyHuman.md</span>
+              </a>
+              <a href="#soul/MEMORY.md" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">Memory</span>
+                <span class="soul-tile-desc">Edit MEMORY.md</span>
+              </a>
+              <a href="#soul/group.md" class="soul-tile-link">
+                <span class="soul-tile-icon">◇</span>
+                <span class="soul-tile-title">Group rules</span>
+                <span class="soul-tile-desc">Edit group.md</span>
+              </a>
+            </div>
           </div>
         </div>
         <div class="chat-upper-right card">
@@ -1048,57 +1096,6 @@
             <button type="button" id="chat-send">Send</button>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="page-status" class="page">
-    <div class="card">
-      <div>
-        <span id="status-dot" class="status-dot stopped"></span>
-        <span id="status-text">Checking…</span>
-      </div>
-      <div class="url-box">
-        Dashboard URL (for future POST/API): <strong id="dashboard-url">—</strong>
-      </div>
-      <div class="overview-grid">
-        <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="overview-uptime">—</span></div>
-        <div class="overview-item"><span class="overview-label">Crons activated</span><span id="overview-crons">—</span></div>
-        <div class="overview-item"><span class="overview-label">Skills activated</span><span id="overview-skills">—</span></div>
-        <div class="overview-item"><span class="overview-label">Group restrictions</span><span id="overview-group-skills">—</span></div>
-        <div class="overview-item"><span class="overview-label">Priority model</span><span id="overview-model">—</span></div>
-        <div class="overview-item"><span class="overview-label">Time zone</span><span id="overview-timezone">—</span></div>
-        <div class="overview-item"><span class="overview-label">Time format</span><span id="overview-time-format">—</span></div>
-      </div>
-    </div>
-    <div class="card soul-tile-card">
-      <p class="overview-label" style="margin:0 0 0.5rem 0;">Soul & identity (one-on-one)</p>
-      <div class="soul-tiles-grid">
-        <a href="#soul/SOUL.md" class="soul-tile-link">
-          <span class="soul-tile-icon">◇</span>
-          <span class="soul-tile-title">Soul</span>
-          <span class="soul-tile-desc">Edit SOUL.md</span>
-        </a>
-        <a href="#soul/WhoAmI.md" class="soul-tile-link">
-          <span class="soul-tile-icon">◇</span>
-          <span class="soul-tile-title">Who am I</span>
-          <span class="soul-tile-desc">Edit WhoAmI.md</span>
-        </a>
-        <a href="#soul/MyHuman.md" class="soul-tile-link">
-          <span class="soul-tile-icon">◇</span>
-          <span class="soul-tile-title">My human</span>
-          <span class="soul-tile-desc">Edit MyHuman.md</span>
-        </a>
-        <a href="#soul/MEMORY.md" class="soul-tile-link">
-          <span class="soul-tile-icon">◇</span>
-          <span class="soul-tile-title">Memory</span>
-          <span class="soul-tile-desc">Edit MEMORY.md</span>
-        </a>
-        <a href="#soul/group.md" class="soul-tile-link">
-          <span class="soul-tile-icon">◇</span>
-          <span class="soul-tile-title">Group rules</span>
-          <span class="soul-tile-desc">Edit group.md (applies to all group chats)</span>
-        </a>
       </div>
     </div>
   </div>
@@ -1338,22 +1335,23 @@
 
   <script>
     const API = '';
-    var validPages = ['chat', 'status', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'soul', 'test', 'projects'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'soul', 'test', 'projects'];
     var tideChecklistCache = null;
     function setPage(name, soulFileId) {
-      if (!name || !validPages.includes(name)) name = 'chat';
+      if (name === 'chat' || name === 'status') name = 'home';
+      if (!name || !validPages.includes(name)) name = 'home';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
       var page = document.getElementById('page-' + name);
       var link = document.querySelector('nav a[data-page="' + name + '"]');
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
-      document.body.classList.toggle('dashboard-chat-active', name === 'chat');
+      document.body.classList.toggle('dashboard-home-active', name === 'home');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'agents') fetchAgentsPage();
       if (name === 'groups') fetchGroups();
-      if (name === 'chat') fetchChatAgents();
+      if (name === 'home') fetchChatAgents();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
@@ -1365,10 +1363,11 @@
       }
     }
     function parseHash() {
-      var raw = (location.hash || '#chat').slice(1) || 'chat';
+      var raw = (location.hash || '#home').slice(1) || 'home';
       var slash = raw.indexOf('/');
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var soulFile = slash >= 0 ? raw.slice(slash + 1) : null;
+      if (name === 'chat' || name === 'status') name = 'home';
       return { name: name, soulFile: soulFile };
     }
     document.querySelectorAll('nav a[data-page]').forEach(function (a) {
@@ -1384,24 +1383,17 @@
     });
 
     async function fetchStatus() {
-      const dot = document.getElementById('status-dot');
-      const text = document.getElementById('status-text');
-      const urlEl = document.getElementById('dashboard-url');
-      const chatDot = document.getElementById('chat-status-dot');
-      const chatText = document.getElementById('chat-status-text');
-      const chatUrlEl = document.getElementById('chat-dashboard-url');
+      const dot = document.getElementById('chat-status-dot');
+      const text = document.getElementById('chat-status-text');
+      const urlEl = document.getElementById('chat-dashboard-url');
       function setDaemonStatus(running, label) {
         var cls = running ? 'status-dot running' : 'status-dot stopped';
-        if (dot) { dot.className = cls; text.textContent = label; }
-        if (chatDot) { chatDot.className = cls; if (chatText) chatText.textContent = label; }
+        if (dot) { dot.className = cls; if (text) text.textContent = label; }
       }
       try {
         const statusRes = await fetch(API + '/api/status');
         const statusData = await statusRes.json();
-        if (statusData.dashboardUrl) {
-          if (urlEl) urlEl.textContent = statusData.dashboardUrl;
-          if (chatUrlEl) chatUrlEl.textContent = statusData.dashboardUrl;
-        }
+        if (statusData.dashboardUrl && urlEl) urlEl.textContent = statusData.dashboardUrl;
         if (statusData.daemonRunning) {
           setDaemonStatus(true, 'Daemon is running');
         } else {
@@ -1410,7 +1402,6 @@
       } catch (e) {
         setDaemonStatus(false, 'Daemon is not running');
         if (urlEl) urlEl.textContent = '—';
-        if (chatUrlEl) chatUrlEl.textContent = '—';
       }
       function formatUptime(sec) {
         if (sec == null || typeof sec !== 'number' || sec < 0) return '—';
@@ -1427,23 +1418,21 @@
       }
       function setOverview(d) {
         var fields = [
-          ['overview-uptime', 'chat-overview-uptime', d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—'],
-          ['overview-crons', 'chat-overview-crons', typeof d.cronCount === 'number' ? d.cronCount : '—'],
-          ['overview-skills', 'chat-overview-skills', typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—'],
-          ['overview-model', 'chat-overview-model', d.priorityModelLabel || '—'],
-          ['overview-timezone', 'chat-overview-timezone', d.timezone || '—'],
-          ['overview-time-format', 'chat-overview-time-format', d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—')],
+          ['chat-overview-uptime', d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—'],
+          ['chat-overview-crons', typeof d.cronCount === 'number' ? d.cronCount : '—'],
+          ['chat-overview-skills', typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—'],
+          ['chat-overview-model', d.priorityModelLabel || '—'],
+          ['chat-overview-timezone', d.timezone || '—'],
+          ['chat-overview-time-format', d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—')],
         ];
         var groupVal;
         if (typeof d.groupSkillsDeniedCount === 'number') groupVal = d.groupSkillsDeniedCount + ' denied';
         else if (typeof d.groupSkillsEnabledCount === 'number') groupVal = d.groupSkillsEnabledCount;
         else groupVal = '—';
-        fields.push(['overview-group-skills', 'chat-overview-group-skills', groupVal]);
+        fields.push(['chat-overview-group-skills', groupVal]);
         fields.forEach(function (pair) {
           var el = document.getElementById(pair[0]);
-          var chatEl = document.getElementById(pair[1]);
-          if (el) el.textContent = pair[2];
-          if (chatEl) chatEl.textContent = pair[2];
+          if (el) el.textContent = pair[1];
         });
       }
       try {
