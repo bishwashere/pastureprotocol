@@ -29,6 +29,10 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from '../lib/retrospective.js';
+import {
+  buildContinuationContextBlock,
+  getImplicitContinuationHint,
+} from '../lib/conversation-context.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(

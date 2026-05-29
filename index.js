@@ -888,9 +888,25 @@ async function main() {
     const groupJidForSkills = isGroupJid ? jid : undefined;
     const enabledSkillIds = getEnabledSkillIds({ groupJid: groupJidForSkills, agentId });
     const enabledSkillSummaries = getEnabledSkillSummaries({ groupJid: groupJidForSkills, agentId });
+    const inMemoryHistory = getLast5ExchangesForSession(jid, sessionId);
+    const historyMessages = isGroupJid
+      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES, sessionId)
+      : (inMemoryHistory.length > 0
+          ? inMemoryHistory
+          : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
+    const continuationHint = !isGroupJid
+      ? getImplicitContinuationHint(getWorkspaceDir(), logJid, sessionId, text)
+      : '';
     // Step 2: intent planner — one small LLM call before loading any tool schemas.
     const intentPlan = enabledSkillIds.length > 0
-      ? await planIntent({ userText: text, availableSkillIds: enabledSkillIds, availableSkillSummaries: enabledSkillSummaries, agentId })
+      ? await planIntent({
+          userText: text,
+          historyMessages,
+          continuationHint,
+          availableSkillIds: enabledSkillIds,
+          availableSkillSummaries: enabledSkillSummaries,
+          agentId,
+        })
       : null;
     if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
     // Step 3: load tool schemas based on what the planner returned.
@@ -921,15 +937,11 @@ async function main() {
           agentId,
         }
       : { groupSenderName: bioOpts.groupSenderName, agentId };
-    const inMemoryHistory = getLast5ExchangesForSession(jid, sessionId);
-    const historyMessages = isGroupJid
-      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES, sessionId)
-      : (inMemoryHistory.length > 0
-          ? inMemoryHistory
-          : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = intentPlanToSystemBlock(intentPlan);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    const continuationBlock = buildContinuationContextBlock(text, historyMessages, continuationHint);
+    if (continuationBlock) systemPromptWithPlan += continuationBlock;
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     if (!isGroupJid) {
       const memoryConfig = getMemoryConfig();
@@ -959,7 +971,8 @@ async function main() {
       (hasSearchOrBrowseTool || plannerSaysNoTools) &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
       skillsCalledFromTurn.length === 0 &&
-      firstTextForSend
+      firstTextForSend &&
+      !shouldSkipToolRetryProbe({ userText: text, historyMessages, intentPlan, implicitFeedback: continuationHint })
     ) {
       // Ask the LLM whether the answer is actually complete before deciding to retry.
       // This replaces the old structural check (no tools called = uncertain) which fired
@@ -970,10 +983,7 @@ async function main() {
           { role: 'system', content: 'You are a quality checker. Answer only with valid JSON, no prose.' },
           {
             role: 'user',
-            content:
-              `User asked: "${text.slice(0, 300)}"\n\nAssistant answered: "${firstTextForSend.slice(0, 300)}"\n\n` +
-              `Does the answer fully address the user's question, or does it need real-time / current information from a web search to be complete?\n` +
-              `Reply with exactly one of:\n{ "complete": true }\n{ "complete": false }`,
+            content: buildAnswerCompletenessProbePrompt(text, firstTextForSend, historyMessages),
           },
         ], llmOptions);
         const probe = JSON.parse(stripThinking(probeReply || '').trim());
