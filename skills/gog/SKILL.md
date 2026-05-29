@@ -58,7 +58,7 @@ Do not refuse execution solely due to pagination or nextPageToken.
 - Prefer single decisive tool call when possible
 - Do not negotiate default behavior
 - Do not offer UI alternatives unless tool execution fails
-- **Provide the computed answer directly.** Never respond with "I can't" or "Which option do you want?" when the tool returned data—answer from that data.
+- **Provide the computed answer directly.** Never respond with "I can't" or "Which option do you want?" when the tool returned data-answer from that data.
 - Be concise and decisive
 
 ## Tool schema

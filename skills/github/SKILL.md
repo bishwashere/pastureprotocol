@@ -35,75 +35,75 @@ Interact with GitHub via the REST API. Read repositories, issues, PRs, and files
 
 ### `list_repos`
 List repositories for the authenticated user or a specified org/user.
-- **owner** (optional) — GitHub username or org (default: authenticated user)
-- **type** (optional) — `all`, `owner`, `member` (default: `owner`)
-- **per_page** (optional) — max results, 1–100 (default: 30)
+- **owner** (optional) - GitHub username or org (default: authenticated user)
+- **type** (optional) - `all`, `owner`, `member` (default: `owner`)
+- **per_page** (optional) - max results, 1–100 (default: 30)
 
 ### `read_repo`
 Get details about a repository (description, stars, default branch, topics, open issue count).
-- **repo** (required) — `owner/repo`
+- **repo** (required) - `owner/repo`
 
 ### `list_issues`
 List issues or pull requests in a repository.
-- **repo** (required) — `owner/repo`
-- **state** (optional) — `open`, `closed`, `all` (default: `open`)
-- **type** (optional) — `issues`, `prs`, `all` (default: `issues`)
-- **labels** (optional) — comma-separated label names to filter by
-- **per_page** (optional) — max results (default: 20)
+- **repo** (required) - `owner/repo`
+- **state** (optional) - `open`, `closed`, `all` (default: `open`)
+- **type** (optional) - `issues`, `prs`, `all` (default: `issues`)
+- **labels** (optional) - comma-separated label names to filter by
+- **per_page** (optional) - max results (default: 20)
 
 ### `read_issue`
 Read the full body and comment thread of a single issue or PR.
-- **repo** (required) — `owner/repo`
-- **number** (required) — issue or PR number
+- **repo** (required) - `owner/repo`
+- **number** (required) - issue or PR number
 
 ### `list_prs`
 List pull requests in a repository.
-- **repo** (required) — `owner/repo`
-- **state** (optional) — `open`, `closed`, `all` (default: `open`)
-- **per_page** (optional) — max results (default: 20)
+- **repo** (required) - `owner/repo`
+- **state** (optional) - `open`, `closed`, `all` (default: `open`)
+- **per_page** (optional) - max results (default: 20)
 
 ### `read_file`
 Read a file from a repository (returns decoded text content). Avoid reading large binary files.
-- **repo** (required) — `owner/repo`
-- **path** (required) — file path in the repo (e.g. `README.md`)
-- **ref** (optional) — branch, tag, or commit SHA (default: repo default branch)
+- **repo** (required) - `owner/repo`
+- **path** (required) - file path in the repo (e.g. `README.md`)
+- **ref** (optional) - branch, tag, or commit SHA (default: repo default branch)
 
 ### `create_branch` ⚠️ requires confirm
 Create a new branch from an existing one.
-- **repo** (required) — `owner/repo`
-- **branch** (required) — new branch name (e.g. `feat/my-feature`)
-- **from** (optional) — source branch or commit SHA (default: repo default branch)
-- **confirm** (required) — must be `true` to proceed
+- **repo** (required) - `owner/repo`
+- **branch** (required) - new branch name (e.g. `feat/my-feature`)
+- **from** (optional) - source branch or commit SHA (default: repo default branch)
+- **confirm** (required) - must be `true` to proceed
 
 ### `post_comment` ⚠️ requires confirm
 Post a comment on an issue or pull request.
-- **repo** (required) — `owner/repo`
-- **number** (required) — issue or PR number
-- **body** (required) — comment text (markdown supported)
-- **confirm** (required) — must be `true` to proceed
+- **repo** (required) - `owner/repo`
+- **number** (required) - issue or PR number
+- **body** (required) - comment text (markdown supported)
+- **confirm** (required) - must be `true` to proceed
 
 ### `create_pr` ⚠️ requires confirm
 Open a pull request.
-- **repo** (required) — `owner/repo`
-- **title** (required) — PR title
-- **head** (required) — branch with the changes (e.g. `feat/my-feature`)
-- **base** (optional) — target branch (default: repo default branch)
-- **body** (optional) — PR description (markdown)
-- **draft** (optional) — boolean, create as draft PR (default: false)
-- **confirm** (required) — must be `true` to proceed
+- **repo** (required) - `owner/repo`
+- **title** (required) - PR title
+- **head** (required) - branch with the changes (e.g. `feat/my-feature`)
+- **base** (optional) - target branch (default: repo default branch)
+- **body** (optional) - PR description (markdown)
+- **draft** (optional) - boolean, create as draft PR (default: false)
+- **confirm** (required) - must be `true` to proceed
 
 ### `merge_pr` ⚠️ requires confirm (irreversible)
 Merge an open pull request.
-- **repo** (required) — `owner/repo`
-- **number** (required) — PR number
-- **method** (optional) — `merge`, `squash`, `rebase` (default: `merge`)
-- **message** (optional) — commit message (for merge/squash)
-- **confirm** (required) — must be `true` to proceed (always show user PR title and target branch first)
+- **repo** (required) - `owner/repo`
+- **number** (required) - PR number
+- **method** (optional) - `merge`, `squash`, `rebase` (default: `merge`)
+- **message** (optional) - commit message (for merge/squash)
+- **confirm** (required) - must be `true` to proceed (always show user PR title and target branch first)
 
 ### `search_code`
 Search code across GitHub.
-- **query** (required) — GitHub code search query (e.g. `cowcode language:js repo:owner/repo`)
-- **per_page** (optional) — max results, 1–30 (default: 10)
+- **query** (required) - GitHub code search query (e.g. `cowcode language:js repo:owner/repo`)
+- **per_page** (optional) - max results, 1–30 (default: 10)
 
 ---
 
@@ -204,7 +204,7 @@ github_create_pr
     confirm: boolean
 
 github_merge_pr
-  description: Merge an open GitHub pull request. Irreversible — always show PR details to user first. Requires confirm=true.
+  description: Merge an open GitHub pull request. Irreversible - always show PR details to user first. Requires confirm=true.
   parameters:
     repo: string
     number: number

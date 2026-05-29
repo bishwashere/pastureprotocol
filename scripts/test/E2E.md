@@ -1,18 +1,18 @@
 # E2E Tests: What We Test
 
-E2E tests in this folder validate **the project’s skills** — not external APIs, tokens, or connectivity.
+E2E tests in this folder validate **the project’s skills** - not external APIs, tokens, or connectivity.
 
 ## What we are testing
 
-1. **Talking to the LLM** — The main app receives the user message and the primary LLM chooses the right skill and produces a reply.
-2. **Skill behavior** — The skill runs (loads config/env, calls tools or external services as designed), and the reply reflects that outcome.
-3. **Whether the user got what they wanted** — A **separate LLM judge** reads the user message and the bot’s reply and answers: *Did the user get what they wanted?* No code assertions on exact wording or APIs; the judge decides.
+1. **Talking to the LLM** - The main app receives the user message and the primary LLM chooses the right skill and produces a reply.
+2. **Skill behavior** - The skill runs (loads config/env, calls tools or external services as designed), and the reply reflects that outcome.
+3. **Whether the user got what they wanted** - A **separate LLM judge** reads the user message and the bot’s reply and answers: *Did the user get what they wanted?* No code assertions on exact wording or APIs; the judge decides.
 
 ## What we are NOT testing
 
-- **External API validity** — We do not assert that a third-party API (e.g. Home Assistant, news, weather) is “correct” or that tokens/URLs are valid.
-- **Network or auth** — We do not test that the network is up or that API keys are correct; we test that **our skill** behaves correctly given whatever the environment provides (real HA, real cron store, etc.).
-- **Exact strings or regex** — We avoid brittle assertions on reply text; the judge evaluates meaning and user satisfaction.
+- **External API validity** - We do not assert that a third-party API (e.g. Home Assistant, news, weather) is “correct” or that tokens/URLs are valid.
+- **Network or auth** - We do not test that the network is up or that API keys are correct; we test that **our skill** behaves correctly given whatever the environment provides (real HA, real cron store, etc.).
+- **Exact strings or regex** - We avoid brittle assertions on reply text; the judge evaluates meaning and user satisfaction.
 
 ## Flow (every E2E skill test)
 
@@ -47,8 +47,8 @@ Each skill test has its own folder with an **inputs.md** that lists the test fil
 |--------|-----------|----------|
 | [cron/](cron/inputs.md) | `test-cron-e2e.js` | List/add/recurring/manage queries |
 | [tide/](tide/inputs.md) | `test-tide.js` | Payload (jid, historyMessages) |
-| — | `test-tide-checklist.js` | Checklist CRUD, prompt normalization, legacy item migration |
-| — | `test-chat-session.js` | Daily boundary, manual new session, log filter |
+| - | `test-tide-checklist.js` | Checklist CRUD, prompt normalization, legacy item migration |
+| - | `test-chat-session.js` | Daily boundary, manual new session, log filter |
 | [agent/](agent/inputs.md) | `test-agent.js` | Scenario messages |
 | [edit/](edit/inputs.md) | `test-edit-e2e.js` | Edit target file + queries |
 | [write/](write/inputs.md) | `test-write-e2e.js` | Write queries |

@@ -6,17 +6,17 @@ description: Apply a Git-style diff hunk to a file. Feed a diff hunk (plus new l
 
 # Apply Patch
 
-Git-style **patch applicator**. You feed it a **diff hunk** — lines with `+` (add) or `-` (remove), optionally context lines (space-prefixed). The skill applies the hunk to the file.
+Git-style **patch applicator**. You feed it a **diff hunk** - lines with `+` (add) or `-` (remove), optionally context lines (space-prefixed). The skill applies the hunk to the file.
 
 Call **run_skill** with **skill: "apply-patch"**. Set **command** or **arguments.action** to **apply** (or **apply-patch**).
 
 ## Arguments
 
-- **arguments.path** (required) — File to patch. Relative to workspace or absolute.
-- **arguments.hunk** (required) — The diff hunk text. Unified-style lines:
-  - **Space** — context line (must match file)
-  - **-** — line to remove
-  - **+** — line to add
+- **arguments.path** (required) - File to patch. Relative to workspace or absolute.
+- **arguments.hunk** (required) - The diff hunk text. Unified-style lines:
+  - **Space** - context line (must match file)
+  - **-** - line to remove
+  - **+** - line to add
 
 Example hunk:
 ```

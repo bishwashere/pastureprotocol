@@ -6,7 +6,7 @@ description: Control and query home appliances and sensors via Home Assistant. U
 
 # Home Assistant
 
-Control and query your **Home Assistant** instance with simple commands. You do not need to say "entities", "domain", or "state"—use the command phrases below and the skill will run the right action.
+Control and query your **Home Assistant** instance with simple commands. You do not need to say "entities", "domain", or "state"-use the command phrases below and the skill will run the right action.
 
 **Config:** Set **HA_TOKEN** in `~/.cowcode/.env` (e.g. via `cowcode skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`. Add `"home-assistant"` to `skills.enabled` in config.
 
@@ -48,7 +48,7 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 | Run my "good night" script | `script script.good_night` |
 | Trigger morning automation | `automation automation.morning` |
 | Set thermostat to 21 | `climate climate.thermostat 21` |
-| Anything about outdoor / weather | Do NOT use this skill — use web search instead |
+| Anything about outdoor / weather | Do NOT use this skill - use web search instead |
 
 ## Finding entity IDs
 
@@ -65,7 +65,7 @@ If the user mentions a room or device by name and you don't know the entity_id:
 
 ```tool-schema
 home_assistant_run
-  description: Control and query home appliances and sensors inside the home (lights, switches, plugs, fans, thermostats, home sensors, automations, scenes, scripts). Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room". Do NOT use for outdoor or weather queries — use web search for those.
+  description: Control and query home appliances and sensors inside the home (lights, switches, plugs, fans, thermostats, home sensors, automations, scenes, scripts). Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room". Do NOT use for outdoor or weather queries - use web search for those.
   parameters:
     command: string
 ```

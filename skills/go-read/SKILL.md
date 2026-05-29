@@ -12,18 +12,18 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 
 ## Commands (allowlist)
 
-- **ls** — List directory contents. argv: e.g. `["-la"]`, `["-la", "~/Downloads"]`
-- **cd** — Change directory and output the new path. argv: `["/path"]`. Returns the resolved path.
-- **pwd** — Print working directory. argv: `[]`
-- **cat** — Output file contents. argv: `["/path/to/file"]`
-- **less** — View file (non-interactive). argv: `["/path/to/file"]` or with flags
-- **du** — Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
+- **ls** - List directory contents. argv: e.g. `["-la"]`, `["-la", "~/Downloads"]`
+- **cd** - Change directory and output the new path. argv: `["/path"]`. Returns the resolved path.
+- **pwd** - Print working directory. argv: `[]`
+- **cat** - Output file contents. argv: `["/path/to/file"]`
+- **less** - View file (non-interactive). argv: `["/path/to/file"]` or with flags
+- **du** - Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
 
 ## Arguments
 
-- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du
-- **arguments.argv** (required) — Array of strings (flags and paths). Do not include the command name.
-- **arguments.cwd** (optional) — Working directory. Defaults to workspace.
+- **arguments.command** or **arguments.action** (required) - One of: ls, cd, pwd, cat, less, du
+- **arguments.argv** (required) - Array of strings (flags and paths). Do not include the command name.
+- **arguments.cwd** (optional) - Working directory. Defaults to workspace.
 
 ## When to use
 

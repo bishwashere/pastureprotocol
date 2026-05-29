@@ -1,4 +1,4 @@
-# Projects — Dashboard Page
+# Projects - Dashboard Page
 
 A visual project tracker built into the cowCode dashboard. Track work across multiple projects with chained updates and named sub-tracks (branches).
 
@@ -8,7 +8,7 @@ Open the dashboard (`cowcode dashboard` or `pnpm run dashboard`) and click **Pro
 
 You'll be prompted to sign in.
 
-## Auth — default credentials
+## Auth - default credentials
 
 | Field | Default | Override |
 |-------|---------|----------|
@@ -42,18 +42,18 @@ Stored at `$COWCODE_STATE_DIR/projects.db` (default: `~/.cowcode/projects.db`) u
 ### Schema
 
 ```sql
-projects  — id, name, description, created_at, updated_at
-updates   — id, project_id, branch_id (null = main track), parent_update_id, text, created_at
-branches  — id, project_id, parent_update_id (which update it branches from), name, created_at
+projects  - id, name, description, created_at, updated_at
+updates   - id, project_id, branch_id (null = main track), parent_update_id, text, created_at
+branches  - id, project_id, parent_update_id (which update it branches from), name, created_at
 ```
 
 ## How to use
 
-1. **Add a project** — type a name (and optional description) in the toolbar, click **+ Add Project**.
-2. **Add an update** — click **+ Add update** at the end of any chain. Type what was done, press **⌘/Ctrl + Enter** or click **Save**.
-3. **Branch off** — click **+ Branch** inside any update node. Give the branch a name (e.g. "Marketing"). A new horizontal chain appears below the main track.
-4. **Edit an update** — click **✏ Edit** inside any node.
-5. **Delete** — use the 🗑 buttons on updates/branches/projects. Deleting a project removes all its data.
+1. **Add a project** - type a name (and optional description) in the toolbar, click **+ Add Project**.
+2. **Add an update** - click **+ Add update** at the end of any chain. Type what was done, press **⌘/Ctrl + Enter** or click **Save**.
+3. **Branch off** - click **+ Branch** inside any update node. Give the branch a name (e.g. "Marketing"). A new horizontal chain appears below the main track.
+4. **Edit an update** - click **✏ Edit** inside any node.
+5. **Delete** - use the 🗑 buttons on updates/branches/projects. Deleting a project removes all its data.
 
 ## API
 

@@ -4,9 +4,9 @@
   <img width="320" height="320" alt="cowCode" src="https://github.com/user-attachments/assets/7d245e10-8172-4956-bc29-aaba9e30aa10" />
 </div>
 
-**cowCode — your private AI companion**
+**cowCode - your private AI companion**
 
-Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud LLM of your choice. No external routing — your chats stay on your machine.
+Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud LLM of your choice. No external routing - your chats stay on your machine.
 
 ---
 
@@ -61,8 +61,8 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 - **Node.js 18+** (LTS recommended)
 - **pnpm 9** (`npm install -g pnpm@9`)
 - **Local LLM** (recommended for privacy):
-  - [LM Studio](https://lmstudio.ai) — download a model and start the local server
-  - [Ollama](https://ollama.ai) — `ollama serve`
+  - [LM Studio](https://lmstudio.ai) - download a model and start the local server
+  - [Ollama](https://ollama.ai) - `ollama serve`
 - **Or a cloud API key**: OpenAI, Anthropic, Grok (xAI), Together AI, or DeepSeek
 - **Playwright browsers** (for the `browse` and `vision` skills): installed automatically on first use, or run `npx playwright install chromium`
 
@@ -70,7 +70,7 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 
 ## Installation
 
-### Option A — One-line install (recommended)
+### Option A - One-line install (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
@@ -90,7 +90,7 @@ cowcode update     # pull the latest version
 cowcode uninstall  # remove cowCode
 ```
 
-### Option B — From a git clone
+### Option B - From a git clone
 
 ```bash
 git clone https://github.com/bishwashere/cowCode.git
@@ -120,7 +120,7 @@ A QR code appears in your terminal. Open WhatsApp on your phone:
 1. Go to **Settings → Linked Devices → Link a Device**.
 2. Scan the QR code.
 3. Wait for "Connection Successful" in the terminal.
-4. Press `Ctrl+C` — auth files are saved and reused on every subsequent start.
+4. Press `Ctrl+C` - auth files are saved and reused on every subsequent start.
 
 ### Pairing code (alternative to QR)
 
@@ -193,21 +193,21 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
   "llm": {
     "maxTokens": 2048,          // max tokens per LLM response
     "models": [
-      // Local model (LM Studio) — used by default
+      // Local model (LM Studio) - used by default
       {
         "provider": "lmstudio",
         "baseUrl": "http://127.0.0.1:1234/v1",
         "model": "local",
         "apiKey": "not-needed"
       },
-      // Cloud model with priority flag — used first if available
+      // Cloud model with priority flag - used first if available
       {
         "provider": "openai",
         "apiKey": "LLM_1_API_KEY",  // env var name or literal key
         "model": "gpt-4o",
         "priority": true
       },
-      // Other cloud providers — used as fallback
+      // Other cloud providers - used as fallback
       { "provider": "grok",      "apiKey": "LLM_2_API_KEY" },
       { "provider": "anthropic", "apiKey": "LLM_3_API_KEY", "model": "claude-3-5-sonnet-20241022" }
     ]
@@ -257,9 +257,9 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
 ### LLM model priority
 
 When multiple models are configured, cowCode selects in this order:
-1. Any model with `"priority": true` — used first if the provider is reachable.
-2. Local providers (`lmstudio`, `ollama`) — used next as a privacy-preserving fallback.
-3. Other cloud models — used in order of appearance as further fallbacks.
+1. Any model with `"priority": true` - used first if the provider is reachable.
+2. Local providers (`lmstudio`, `ollama`) - used next as a privacy-preserving fallback.
+3. Other cloud models - used in order of appearance as further fallbacks.
 
 ### Supported providers
 
@@ -315,7 +315,7 @@ cowcode dashboard   # Open the local web dashboard
 cowcode update      # Pull and install the latest version
 cowcode uninstall   # Remove cowCode and the CLI command
 
-# Tide checklist — see [Tide checklist](#tide-checklist-maintenance)
+# Tide checklist - see [Tide checklist](#tide-checklist-maintenance)
 cowcode tide checklist list|add|remove|run|on|off|triggers|enable|disable
 
 # Agents, skills, servers, memory index
@@ -425,17 +425,17 @@ Skills are modular capabilities. They are listed in `config.json` under `skills.
 | `browse` | Headless browser automation | Playwright / Chromium |
 | `vision` | Image and webcam analysis | LLM with vision support, or vision fallback model |
 | `memory` | Semantic memory indexing and recall | sqlite-vec (vector extension) |
-| `read` | Read files from the workspace | — |
-| `write` | Create or overwrite workspace files | — |
-| `edit` | Patch-edit workspace files (targeted find/replace) | — |
-| `apply-patch` | Apply unified diffs to workspace files | — |
+| `read` | Read files from the workspace | - |
+| `write` | Create or overwrite workspace files | - |
+| `edit` | Patch-edit workspace files (targeted find/replace) | - |
+| `apply-patch` | Apply unified diffs to workspace files | - |
 | `gog` | Google Workspace CLI (Gmail, Calendar, Drive, etc.) | `gog` CLI |
-| `gmail` | Gmail — list, read, search, send, archive, summarize | `gog` CLI |
-| `calendar` | Google Calendar — list, create, delete, check availability | `gog` CLI |
-| `github` | GitHub — repos, issues, PRs, branches, comments | `GITHUB_TOKEN` |
-| `me` | Self-reflective memory about the agent's identity | — |
-| `go-read` | Read files from arbitrary paths (outside workspace) | — |
-| `go-write` | Write files to arbitrary paths (outside workspace) | — |
+| `gmail` | Gmail - list, read, search, send, archive, summarize | `gog` CLI |
+| `calendar` | Google Calendar - list, create, delete, check availability | `gog` CLI |
+| `github` | GitHub - repos, issues, PRs, branches, comments | `GITHUB_TOKEN` |
+| `me` | Self-reflective memory about the agent's identity | - |
+| `go-read` | Read files from arbitrary paths (outside workspace) | - |
+| `go-write` | Write files to arbitrary paths (outside workspace) | - |
 | `home-assistant` | Control Home Assistant entities | Home Assistant instance |
 | `ssh-inspect` | Inspect and query remote servers over SSH | SSH access |
 | `speech` | Voice transcription and synthesis | Speech provider config |
@@ -446,7 +446,7 @@ Skill files live in `skills/<id>/SKILL.md` and define the prompts and executor l
 
 ## GitHub Integration
 
-Connect cowCode to GitHub so the agent can read repositories, manage issues and PRs, create branches, post comments, and more — all through natural conversation.
+Connect cowCode to GitHub so the agent can read repositories, manage issues and PRs, create branches, post comments, and more - all through natural conversation.
 
 ### 1. Create a token
 
@@ -463,14 +463,14 @@ Go to **GitHub → Settings → Developer settings → Personal access tokens**.
 
 ### 2. Store the token
 
-**Option A — `secrets.json`** (recommended, gitignored):
+**Option A - `secrets.json`** (recommended, gitignored):
 
 ```json
 // ~/.cowcode/secrets.json
 { "github": { "token": "ghp_your_token_here" } }
 ```
 
-**Option B — `.env`** file:
+**Option B - `.env`** file:
 
 ```env
 # ~/.cowcode/.env
@@ -497,7 +497,7 @@ When `defaultRepo` is set, you can say "list issues" without repeating the repo 
 }
 ```
 
-Or toggle it on the **Skills** page in the dashboard. The badge next to the skill shows **configured** (green), **needs setup** (red), or **token in config** (yellow — move it to `secrets.json`).
+Or toggle it on the **Skills** page in the dashboard. The badge next to the skill shows **configured** (green), **needs setup** (red), or **token in config** (yellow - move it to `secrets.json`).
 
 ### What you can say
 
@@ -519,7 +519,7 @@ All write operations (**create branch**, **post comment**, **create PR**, **merg
 
 ## Google Integration (Gmail & Calendar)
 
-Gmail and Calendar use the [`gog` CLI](https://gogcli.sh) — a Google Workspace command-line tool that handles OAuth. cowCode calls `gog` behind the scenes, so you only need to authenticate once.
+Gmail and Calendar use the [`gog` CLI](https://gogcli.sh) - a Google Workspace command-line tool that handles OAuth. cowCode calls `gog` behind the scenes, so you only need to authenticate once.
 
 ### 1. Install gog
 
@@ -556,7 +556,7 @@ Omit this if you only have one Google account. When set, all `gmail` and `calend
 
 ---
 
-### Gmail — what you can say
+### Gmail - what you can say
 
 | Message | What happens |
 |---|---|
@@ -575,7 +575,7 @@ Send and reply actions **always** require explicit confirmation before executing
 
 ---
 
-### Calendar — what you can say
+### Calendar - what you can say
 
 | Message | What happens |
 |---|---|
@@ -595,7 +595,7 @@ Create, update, and delete actions **always** require explicit confirmation. For
 
 ## Multi-Agent (Agent Team)
 
-cowCode supports multiple **agent personas**. Each agent has its own identity files, skill set, and optionally its own LLM config. You can route different conversations to different specialists — a coding agent, a writing agent, a personal assistant, etc.
+cowCode supports multiple **agent personas**. Each agent has its own identity files, skill set, and optionally its own LLM config. You can route different conversations to different specialists - a coding agent, a writing agent, a personal assistant, etc.
 
 ### Concepts
 
@@ -614,7 +614,7 @@ cowCode supports multiple **agent personas**. Each agent has its own identity fi
 1. Open the dashboard home page.
 2. Click **+ Agent** (top-right of the Agent team card, or in the chat toolbar).
 3. Type a **name** (e.g. "Backend Bot", "Writer"). The internal id is auto-generated (`backend-bot`, `writer`).
-4. Choose **Copy settings from** — defaults to the most recently used non-main agent. This copies the LLM config, skills (minus sensitive defaults), and identity files.
+4. Choose **Copy settings from** - defaults to the most recently used non-main agent. This copies the LLM config, skills (minus sensitive defaults), and identity files.
 5. Click **Create**. The new agent appears in the tree immediately.
 
 **From the CLI:**
@@ -627,9 +627,9 @@ cowcode create agent backend-bot
 
 Click the **✎** button on any agent card to edit:
 
-- **Title** — display name shown in the UI and chat toolbar
-- **Skills** — toggle which skills this agent has access to (independent of the main agent)
-- **Agent messaging** — enable the `agent-send` skill and add which other agents this one can invoke
+- **Title** - display name shown in the UI and chat toolbar
+- **Skills** - toggle which skills this agent has access to (independent of the main agent)
+- **Agent messaging** - enable the `agent-send` skill and add which other agents this one can invoke
 
 ### The Agent team tree
 
@@ -641,7 +641,7 @@ The dashboard home page shows all agents as a **tree**:
      [writer]     [backend-bot]
 ```
 
-- **`main` is always the root** — it sits at the top.
+- **`main` is always the root** - it sits at the top.
 - Other agents branch below it.
 - **Solid lines** = tree structure (hierarchy).
 - **Dashed arrows** = message-passing permission (agent A can invoke agent B).
@@ -666,13 +666,13 @@ Each agent's identity lives in `~/.cowcode/agents/<id>/workspace/`:
 
 | File | Purpose |
 |---|---|
-| `SOUL.md` | Core personality — tone, style, rules |
+| `SOUL.md` | Core personality - tone, style, rules |
 | `WhoAmI.md` | Agent's self-description |
 | `MyHuman.md` | What this agent knows about the user |
 
 Edit these from the **Agents** page in the dashboard (select an agent → Identity files).
 
-### Groups — assigning agents
+### Groups - assigning agents
 
 On the **Groups** page, select a group and assign it to an agent. You can also add a **skills deny list** for that group (e.g., disable `go-write` in a shared group).
 
@@ -709,17 +709,17 @@ cowcode dashboard
 
 The home page has two panels:
 
-**Left — Overview & Identity:**
+**Left - Overview & Identity:**
 - Live status (daemon up/down, active model, skill count, timezone)
 - Identity tiles: click **Who am I**, **My human**, or **Group rules** to open an inline editor for that file
 
-**Right — Agent team:**
+**Right - Agent team:**
 - Tree visualization of all agents
 - Click any node to select that agent for chat
 - **✎** button on each node opens the edit modal
 - **+ Agent** button (top-right) opens the create-agent dialog
 
-**Below — Chat:**
+**Below - Chat:**
 - Full in-browser chat with the selected agent
 - Agent selector dropdown + **+ Agent** button in the toolbar
 - **New** starts a fresh session; **History** browses past conversations
@@ -734,7 +734,7 @@ The Memory page has **5 tiles** across the top. Click any tile to switch the vie
 |---|---|
 | **Today** 📅 | Today's conversation log (read-only). Auto-loads on open. |
 | **Yesterday** 🗓 | Yesterday's conversation log (read-only). |
-| **Long-term** 🧠 | `MEMORY.md` — the agent's persistent notes about you. Editable with a Save button. |
+| **Long-term** 🧠 | `MEMORY.md` - the agent's persistent notes about you. Editable with a Save button. |
 | **History** 💬 | All past chat days, newest first. Click a day to read the full log. |
 | **Notes** 📝 | Custom memory files (e.g. `preferences.md`). Editable. |
 
@@ -754,7 +754,7 @@ Each skill shows:
 
 1. Go to **Home** or **Agents**.
 2. Click **+ Agent**.
-3. Enter a **name** — e.g. "Research Bot". The id `research-bot` is auto-generated.
+3. Enter a **name** - e.g. "Research Bot". The id `research-bot` is auto-generated.
 4. **Copy settings from**: defaults to the most recently used non-main agent. Copies skills and identity files.
 5. Click **Create**. The agent appears in the tree on the home page.
 6. Click **✎** on the new agent node to:
@@ -768,15 +768,15 @@ Each skill shows:
 ### GitHub skill in the dashboard
 
 On the **Skills** page, `github` shows a credential badge:
-- **configured** — token found in `secrets.json` or `GITHUB_TOKEN` env var. Ready to use.
-- **needs setup** — no token found. Click the skill to expand and read the setup instructions.
-- **token in config** — token found in `config.json`. Works, but move it to `secrets.json` for better security.
+- **configured** - token found in `secrets.json` or `GITHUB_TOKEN` env var. Ready to use.
+- **needs setup** - no token found. Click the skill to expand and read the setup instructions.
+- **token in config** - token found in `config.json`. Works, but move it to `secrets.json` for better security.
 
 ---
 
 ### Gmail & Calendar skills in the dashboard
 
-`gmail` and `calendar` show a **gog auth** badge — they rely on the `gog` CLI's OAuth session. If you see errors, run `gog auth` in a terminal to re-authenticate.
+`gmail` and `calendar` show a **gog auth** badge - they rely on the `gog` CLI's OAuth session. If you see errors, run `gog auth` in a terminal to re-authenticate.
 
 ---
 
@@ -825,7 +825,7 @@ Semantic memory is stored in a SQLite database with the [`sqlite-vec`](https://g
 ### How memory works
 
 1. When memory is enabled, each message exchange is indexed into SQLite from **chat-log** (`chat-log/YYYY-MM-DD.jsonl` and `chat-log/private/*.jsonl`). Long-term notes in **MEMORY.md** (and optional custom `memory/*.md` files like `preferences.md`) are indexed too.
-2. Legacy date-stamped `memory/YYYY-MM-DD.md` files are **not** indexed — daily history lives in chat-log only.
+2. Legacy date-stamped `memory/YYYY-MM-DD.md` files are **not** indexed - daily history lives in chat-log only.
 3. On each new message, the bot runs a similarity search against stored memories and prepends relevant past context to the system prompt.
 4. Explicit save commands (`"remember that..."`, `"save this to notes"`) append to `MEMORY.md`.
 
@@ -845,16 +845,16 @@ Chat history is written to plain text files in `~/.cowcode/workspace/` so you ca
 
 LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group). Full logs still append to the same JSONL files with a `sessionId` field.
 
-- **Daily reset** — New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
-- **Manual reset** — Say e.g. `start a new session`, `new session`, or `/new-session` (no special reply text; context simply clears).
-- **State file** — `~/.cowcode/chat-sessions/state.json`
-- **Bootstrap (not in session history)** — On each **new session**, daemon **restart**, and every **Tide** follow-up, the model receives `MEMORY.md` plus **today and yesterday’s chat logs** (`chat-log/YYYY-MM-DD.jsonl` and, for private chats, `chat-log/private/<jid>.jsonl`). Chat session history stays scoped to the current session only.
+- **Daily reset** - New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
+- **Manual reset** - Say e.g. `start a new session`, `new session`, or `/new-session` (no special reply text; context simply clears).
+- **State file** - `~/.cowcode/chat-sessions/state.json`
+- **Bootstrap (not in session history)** - On each **new session**, daemon **restart**, and every **Tide** follow-up, the model receives `MEMORY.md` plus **today and yesterday’s chat logs** (`chat-log/YYYY-MM-DD.jsonl` and, for private chats, `chat-log/private/<jid>.jsonl`). Chat session history stays scoped to the current session only.
 
 ---
 
 ## Tide (follow-up after silence)
 
-Tide sends a single AI-composed follow-up message when a conversation goes quiet. It reads the recent conversation context and generates a short, relevant nudge ("Tests passed — what's next?" / "Still no reply on that, should I follow up?").
+Tide sends a single AI-composed follow-up message when a conversation goes quiet. It reads the recent conversation context and generates a short, relevant nudge ("Tests passed - what's next?" / "Still no reply on that, should I follow up?").
 
 ```json
 // ~/.cowcode/config.json
@@ -863,7 +863,7 @@ Tide sends a single AI-composed follow-up message when a conversation goes quiet
     "enabled": true,
     "silenceCooldownMinutes": 60,  // minimum silence before a follow-up is sent
     "healthCheckMinutes": 2,       // polling watchdog + follow-up scheduler interval (default 2)
-    "inactiveStart": "23:00",      // quiet hours start — no Tide during this window
+    "inactiveStart": "23:00",      // quiet hours start - no Tide during this window
     "inactiveEnd": "06:00",        // quiet hours end
     "jid": ""                      // leave empty for auto-detection
   }
@@ -874,7 +874,7 @@ Tide never sends more than one follow-up per silence period, and never during th
 
 ### Tide checklist (maintenance)
 
-Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same skills and bootstrap context as chat)—executed **one by one** in order. Prior item results are passed as context to the next. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user.
+Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same skills and bootstrap context as chat)-executed **one by one** in order. Prior item results are passed as context to the next. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user.
 
 **Item schema:** `id`, `label`, `prompt`, `enabled`. The agent should end with `OK:` or `FAIL:`; anything else is treated as pass unless it starts with `FAIL`.
 
@@ -915,7 +915,7 @@ cowcode tide checklist run [--id <id>]
 cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-on-cycle] [--on-follow-up|--no-on-follow-up]
 ```
 
-**Dashboard:** **Tide** page — toggle Tide/checklist, edit triggers and items, run manually, view last results. Legacy `shell`/`http`/`builtin` config items are auto-converted to prompts on load.
+**Dashboard:** **Tide** page - toggle Tide/checklist, edit triggers and items, run manually, view last results. Legacy `shell`/`http`/`builtin` config items are auto-converted to prompts on load.
 
 ---
 
@@ -926,7 +926,7 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 ```
 ~/.cowcode/
 ├── config.json              # Main configuration
-├── secrets.json             # Sensitive credentials (gitignored) — GitHub token, etc.
+├── secrets.json             # Sensitive credentials (gitignored) - GitHub token, etc.
 ├── .env                     # API keys and env var overrides (gitignored)
 ├── daemon.log               # Bot daemon stdout log
 ├── daemon.err               # Bot daemon stderr log
@@ -957,7 +957,7 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 
 ```
 cowCode/
-├── index.js                 # Entry point — connects WhatsApp + Telegram, routes messages
+├── index.js                 # Entry point - connects WhatsApp + Telegram, routes messages
 ├── llm.js                   # LLM provider loader and multi-model fallback logic
 ├── cli.js                   # CLI command dispatcher
 ├── setup.js                 # Interactive first-run setup wizard
@@ -1020,8 +1020,8 @@ tail -f ~/.cowcode/daemon.log
 ## Privacy
 
 - Runs entirely on your machine.
-- WhatsApp and Telegram connect directly — no external proxy.
-- Config, auth, and chats live in `~/.cowcode` — not in the code directory.
+- WhatsApp and Telegram connect directly - no external proxy.
+- Config, auth, and chats live in `~/.cowcode` - not in the code directory.
 - Local models (LM Studio, Ollama) mean zero data leaves your device.
-- Cloud LLMs send only the current conversation context to the provider's API — no call history is ever sent unless it is in the active context window.
+- Cloud LLMs send only the current conversation context to the provider's API - no call history is ever sent unless it is in the active context window.
 - `git push` on this repo never uploads your chats, auth files, or API keys. The `.gitignore` excludes all common state layout names.

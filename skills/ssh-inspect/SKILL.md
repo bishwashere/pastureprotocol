@@ -14,30 +14,30 @@ Run **read-only** commands on a remote host from the cowCode machine via `ssh`. 
 
 ## Arguments
 
-- **host** (optional) — Registered server name (e.g. `"prod"`), IP, or dotted hostname. If omitted, the active server is used automatically.
-- **command** (required) — One of the allowlisted names below.
-- **argv** (required) — Array of flags and paths for that remote command only.
+- **host** (optional) - Registered server name (e.g. `"prod"`), IP, or dotted hostname. If omitted, the active server is used automatically.
+- **command** (required) - One of the allowlisted names below.
+- **argv** (required) - Array of flags and paths for that remote command only.
 
-## Inferring the server — important
+## Inferring the server - important
 
 **Do not ask the user to repeat the server name on every message.** Use this priority order to determine `host`:
 
 1. If the user mentions a server name or alias anywhere in the message (e.g. "atlas", "prod", "server1", "home assistant") → extract it and pass as `host`. Do this even when the name appears naturally, e.g. "what is the health of atlas" → `host: "atlas"`, "check atlas disk" → `host: "atlas"`.
 2. If the current message has no server name but **recent conversation history** shows a server being used AND the current message is still clearly about that server or servers in general → use that same server. Pass it as `host` in the tool call.
-3. If the conversation has clearly moved to a **non-server topic** (e.g. reminders, recipes, general questions, home automation, weather) — do **not** carry forward a server name from history. Treat the context as fresh; omit `host` and let the executor resolve the default.
+3. If the conversation has clearly moved to a **non-server topic** (e.g. reminders, recipes, general questions, home automation, weather) - do **not** carry forward a server name from history. Treat the context as fresh; omit `host` and let the executor resolve the default.
 4. If no server can be inferred from context → omit `host` entirely; the executor will auto-select the only registered server if there is one, or use the active server.
 5. Only ask for clarification if truly ambiguous (e.g. multiple servers mentioned and it's unclear which applies).
 
-**Never** respond saying the server isn't configured or ask the user to run `cowcode server use` — always attempt the tool call first with the inferred host. The executor will return a clear error if the server genuinely isn't registered.
+**Never** respond saying the server isn't configured or ask the user to run `cowcode server use` - always attempt the tool call first with the inferred host. The executor will return a clear error if the server genuinely isn't registered.
 
 ## Health checks
 
-When the user asks about "health", "status", "how is X doing", or similar — run **multiple commands in sequence** to give a full picture:
+When the user asks about "health", "status", "how is X doing", or similar - run **multiple commands in sequence** to give a full picture:
 
-1. `uptime` — load average and how long it's been running
-2. `free` with `argv: ["-h"]` — memory usage
-3. `df` with `argv: ["-h", "--total"]` — disk usage
-4. `ps` with `argv: ["aux", "--sort=-%cpu"]` and `argv: ["--no-headers", "-o", "pid,comm,%cpu,%mem"]` — top processes (optional, use if relevant)
+1. `uptime` - load average and how long it's been running
+2. `free` with `argv: ["-h"]` - memory usage
+3. `df` with `argv: ["-h", "--total"]` - disk usage
+4. `ps` with `argv: ["aux", "--sort=-%cpu"]` and `argv: ["--no-headers", "-o", "pid,comm,%cpu,%mem"]` - top processes (optional, use if relevant)
 
 Summarise all results in one reply. Do not run them one at a time and ask the user between each.
 
@@ -83,7 +83,7 @@ Docker commands use a virtual name (e.g. `docker-ps`) as `command`; the executor
 
 ## Examples
 
-Disk usage (server inferred from history — no host needed):
+Disk usage (server inferred from history - no host needed):
 
 `run_skill` with skill: `"ssh-inspect"`, arguments: `{ "command": "df", "argv": ["-h"] }`
 
@@ -109,7 +109,7 @@ Inspect a container:
 
 ## Configuration
 
-**This skill is not enabled by default** and must be explicitly enabled — it is never active in group chats.
+**This skill is not enabled by default** and must be explicitly enabled - it is never active in group chats.
 To enable it, either:
 - Add `"ssh-inspect"` to `skills.enabled` in your dashboard (Skills tab), or
 - Run `cowcode skills install ssh-inspect` from the terminal, or
@@ -137,7 +137,7 @@ cowcode server add 192.168.1.166 atlas --user root --alias "home assistant"
 ```
 cowcode server use prod
 ```
-Once set, you can ask things like "check disk" or "list /var/log" without ever mentioning the server — it uses `prod` automatically.
+Once set, you can ask things like "check disk" or "list /var/log" without ever mentioning the server - it uses `prod` automatically.
 
 **List registered servers:**
 ```
@@ -154,13 +154,13 @@ If the name is not in the registry, it is used directly as a hostname/IP (passth
 
 ## Server label in replies
 
-When a server has an alias, the executor prefixes every result with `[name (alias)]` — for example `[atlas (home assistant)]`. When you summarise results in your reply, naturally include this label so the user sees both the server name and the alias, e.g.: *"Atlas (Home Assistant) has 12 GB free on /"*. Do not force it into every sentence — use it where it reads naturally.
+When a server has an alias, the executor prefixes every result with `[name (alias)]` - for example `[atlas (home assistant)]`. When you summarise results in your reply, naturally include this label so the user sees both the server name and the alias, e.g.: *"Atlas (Home Assistant) has 12 GB free on /"*. Do not force it into every sentence - use it where it reads naturally.
 
 ## Tool schema
 
 ```tool-schema
 ssh_inspect_run
-  description: Run one read-only/inspection command on a remote host via SSH. Allowed commands include df, du, ls, find, cat, head, tail, grep, ps, top, netstat, ss, lsof, ip, free, uname, uptime, systemctl, journalctl, and Docker inspection commands (docker-ps, docker-images, docker-logs, docker-inspect, docker-stats, docker-top, docker-diff, docker-port, docker-network-ls, docker-network-inspect, docker-volume-ls, docker-volume-inspect, docker-info, docker-version, docker-system-df, docker-image-history). argv contains only the flags and paths for that command. host is optional — infer from conversation history or omit to use the active server.
+  description: Run one read-only/inspection command on a remote host via SSH. Allowed commands include df, du, ls, find, cat, head, tail, grep, ps, top, netstat, ss, lsof, ip, free, uname, uptime, systemctl, journalctl, and Docker inspection commands (docker-ps, docker-images, docker-logs, docker-inspect, docker-stats, docker-top, docker-diff, docker-port, docker-network-ls, docker-network-inspect, docker-volume-ls, docker-volume-inspect, docker-info, docker-version, docker-system-df, docker-image-history). argv contains only the flags and paths for that command. host is optional - infer from conversation history or omit to use the active server.
   parameters:
     host: string (optional)
     command: string

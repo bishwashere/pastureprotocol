@@ -12,22 +12,22 @@ Call **run_skill** with **skill: "speech"**. Set **command** or **arguments.acti
 
 ## Commands
 
-- **transcribe** — Voice to text. **arguments.audio** (required): path to audio file (mp3, mp4, mpeg, mpga, m4a, wav, webm; max 25 MB). Optional: **arguments.model** (`whisper-1` or `gpt-4o-transcribe`), **arguments.language** (ISO code, e.g. `en`).
-- **synthesize** — Text to voice. **arguments.text** (required): text to speak. **arguments.voiceId** (optional): 11Labs voice ID (default from config or a built-in). Optional: **arguments.outputPath** to save to a file.
-- **reply_as_voice** — Send your reply as a voice message. **arguments.text** (required): the exact reply text to speak. Use this when the user asks for a voice reply or when you want to respond with voice (in private or group chat). The reply will be sent as a voice message; you do not need to receive a voice message first.
+- **transcribe** - Voice to text. **arguments.audio** (required): path to audio file (mp3, mp4, mpeg, mpga, m4a, wav, webm; max 25 MB). Optional: **arguments.model** (`whisper-1` or `gpt-4o-transcribe`), **arguments.language** (ISO code, e.g. `en`).
+- **synthesize** - Text to voice. **arguments.text** (required): text to speak. **arguments.voiceId** (optional): 11Labs voice ID (default from config or a built-in). Optional: **arguments.outputPath** to save to a file.
+- **reply_as_voice** - Send your reply as a voice message. **arguments.text** (required): the exact reply text to speak. Use this when the user asks for a voice reply or when you want to respond with voice (in private or group chat). The reply will be sent as a voice message; you do not need to receive a voice message first.
 
 ## Arguments
 
 - **transcribe**: `audio` (required), `model`, `language`
 - **synthesize**: `text` (required), `voiceId`, `outputPath`
-- **reply_as_voice**: `text` (required) — the reply to speak; the message will be sent as voice
+- **reply_as_voice**: `text` (required) - the reply to speak; the message will be sent as voice
 
 ## When to use
 
 - User sends a voice note or audio file and wants a transcript.
 - User asks to "transcribe this", "what did they say", or "speech to text".
-- User asks to "read this aloud", "turn this into speech", or "text to voice" — use synthesize with the text.
-- User asks to "reply in voice", "send a voice message", or "respond with voice" — use **reply_as_voice** with your reply as **arguments.text**. Works in private and group chat; the user does not need to send voice first.
+- User asks to "read this aloud", "turn this into speech", or "text to voice" - use synthesize with the text.
+- User asks to "reply in voice", "send a voice message", or "respond with voice" - use **reply_as_voice** with your reply as **arguments.text**. Works in private and group chat; the user does not need to send voice first.
 
 ## Voice in, voice out on WhatsApp and Telegram
 
@@ -37,7 +37,7 @@ When the user sends a **voice message**, the bot transcribes it with Whisper and
 
 Voice replies must be **spoken-word friendly**. The listener hears the reply as audio, so:
 
-- **Summarize and respond conversationally** — give the gist, answer the question, or reply naturally
+- **Summarize and respond conversationally** - give the gist, answer the question, or reply naturally
 - **Do NOT read out** file names, folder names, long paths, or raw file/code contents
 - **Do NOT recite** directory listings, config keys, or technical metadata
 - Only mention specific file names or paths if the user **explicitly asked** for them (e.g. "what's the exact file name?")
