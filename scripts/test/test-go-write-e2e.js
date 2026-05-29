@@ -87,6 +87,10 @@ async function main() {
   const tests = [
     {
       name: 'go-write: create empty file',
+      expectMode: 'actual',
+      skill: 'go-write',
+      stateDir,
+      actualChecks: { fileExists: 'workspace/e2e-touch.txt' },
       run: async () => {
         const result = await runE2E('Create an empty file named e2e-touch.txt in the workspace using go-write touch.', { stateDir });
         const reply = result.reply ?? result;
@@ -97,11 +101,12 @@ async function main() {
           err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply, skillsCalled: result.skillsCalled };
+        return { reply, skillsCalled: result.skillsCalled, stateDir };
       },
     },
     {
       name: 'go-write: copy file',
+      expectMode: 'behavior',
       run: async () => {
         const result = await runE2E('Copy workspace/e2e-touch.txt to workspace/e2e-copy.txt using go-write.', { stateDir });
         const reply = result.reply ?? result;

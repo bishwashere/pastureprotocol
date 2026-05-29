@@ -100,8 +100,10 @@ async function main() {
   console.log('Expect ~30s–2min per test depending on LLM. Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
   const tests = [
-    ...NEWS_QUERIES.map((query) => ({
+    ...NEWS_QUERIES.map((query, i) => ({
       name: `news: "${query}"`,
+      expectMode: i === 0 ? 'actual' : 'behavior',
+      skill: i === 0 ? 'browser' : undefined,
       run: async () => {
         const result = await runE2E(query);
         const reply = result.reply ?? result;
@@ -115,8 +117,10 @@ async function main() {
         return { reply, skillsCalled: result.skillsCalled };
       },
     })),
-    ...NON_NEWS_QUERIES.map((query) => ({
+    ...NON_NEWS_QUERIES.map((query, i) => ({
       name: `non-news: "${query}"`,
+      expectMode: i === 0 ? 'actual' : 'behavior',
+      skill: i === 0 ? 'browser' : undefined,
       run: async () => {
         const result = await runE2E(query);
         const reply = result.reply ?? result;
@@ -130,8 +134,10 @@ async function main() {
         return { reply, skillsCalled: result.skillsCalled };
       },
     })),
-    ...BROWSER_SPECIFIC_QUERIES.map((query) => ({
+    ...BROWSER_SPECIFIC_QUERIES.map((query, i) => ({
       name: `browser: "${query}"`,
+      expectMode: i === 0 ? 'actual' : 'behavior',
+      skill: i === 0 ? 'browser' : undefined,
       run: async () => {
         const result = await runE2E(query);
         const reply = result.reply ?? result;

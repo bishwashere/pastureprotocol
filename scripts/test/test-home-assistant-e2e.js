@@ -98,6 +98,8 @@ async function main() {
   const tests = [
     {
       name: 'List my lights — LLM judge: user got what they wanted',
+      expectMode: 'actual',
+      skill: 'home-assistant',
       run: async () => {
         const userMessage = 'list my lights';
         const result = await runE2E(userMessage);
@@ -114,6 +116,7 @@ async function main() {
     },
     {
       name: 'What lights do I have — LLM judge: user got what they wanted',
+      expectMode: 'behavior',
       run: async () => {
         const userMessage = 'What lights do I have?';
         const result = await runE2E(userMessage);
@@ -130,6 +133,7 @@ async function main() {
     },
     {
       name: 'List all my devices — so we see at least something returned from the API',
+      expectMode: 'behavior',
       run: async () => {
         const userMessage = 'List all my devices';
         const result = await runE2E(userMessage);

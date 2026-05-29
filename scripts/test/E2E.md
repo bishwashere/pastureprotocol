@@ -37,6 +37,10 @@ Every E2E test that checks “did the skill do the right thing for the user?” 
 
 Tests that verify **internal contracts** (e.g. cron store has exactly one job after one add, run-job stdout format, one-shot scheduling) can keep code assertions; the skill-facing behavior should go through the judge.
 
+## Expect modes (`behavior` vs `actual`)
+
+Some scenarios must prove **real data** (connection worked, file written, API returned entities) — not just a polite reply. Mark those test cases with `expectMode: 'actual'` on the test object. Others stay `behavior` (judge only). See **[E2E_EXPECT.md](E2E_EXPECT.md)** for the per-skill matrix and `e2e-expect.js` for hard checks.
+
 See individual test files for skill-specific judge prompts and setup.
 
 ## Skill test inputs

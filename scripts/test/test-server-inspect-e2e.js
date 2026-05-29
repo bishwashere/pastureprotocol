@@ -156,6 +156,8 @@ function makeTests(servers, stateDir) {
     // ── 1. Code / project repos ────────────────────────────────────────────
     tests.push({
       name: `[${label}] list project / code repos visible on the server`,
+      expectMode: 'actual',
+      skill: 'ssh-inspect',
       run: async () => {
         const message = `What code repositories or project folders do you see on ${server.name}?`;
         const { reply, skillsCalled } = await runE2E(message, { stateDir });
@@ -166,7 +168,7 @@ function makeTests(servers, stateDir) {
             `The bot replied:\n\n---\n${reply}\n---\n\n` +
             `Did the reply contain actual directory or folder names (or clearly say none were found after checking)? ` +
             `A reply that refuses to look, gives only error text without any inspection result, or is empty is NO. ` +
-            `If the server was unreachable, a clear connection error is acceptable (YES — the skill ran).\n` +
+            `A connection error alone is NO — real output or an explicit empty result after inspection is required.\n` +
             `Answer YES or NO then one short sentence.`,
         });
         if (!pass) throw Object.assign(new Error(`Judge: ${reason}`), { reply, skillsCalled });
@@ -177,6 +179,8 @@ function makeTests(servers, stateDir) {
     // ── 2. Log files ───────────────────────────────────────────────────────
     tests.push({
       name: `[${label}] list log files visible on the server`,
+      expectMode: 'actual',
+      skill: 'ssh-inspect',
       run: async () => {
         const message = `What log files do you see on ${server.name}?`;
         const { reply, skillsCalled } = await runE2E(message, { stateDir });
@@ -188,7 +192,7 @@ function makeTests(servers, stateDir) {
             `Did the reply list actual log file paths or directories (e.g. /var/log contents), ` +
             `or clearly say none were found after checking? ` +
             `A reply that refuses to look, gives only error text without any inspection result, or is empty is NO. ` +
-            `If the server was unreachable, a clear connection error is acceptable (YES — the skill ran).\n` +
+            `A connection error alone is NO — real output or an explicit empty result after inspection is required.\n` +
             `Answer YES or NO then one short sentence.`,
         });
         if (!pass) throw Object.assign(new Error(`Judge: ${reason}`), { reply, skillsCalled });
@@ -205,6 +209,8 @@ function makeTests(servers, stateDir) {
     const label2 = s2.alias ? `${s2.name} (${s2.alias})` : s2.name;
     tests.push({
       name: `[multi-server] disk usage on ${s1.name} and uptime on ${s2.name} in one message`,
+      expectMode: 'actual',
+      skill: 'ssh-inspect',
       run: async () => {
         const message =
           `Check disk usage on ${s1.name} and uptime on ${s2.name} — tell me both.`;
@@ -214,8 +220,9 @@ function makeTests(servers, stateDir) {
           prompt:
             `The user asked for disk usage from "${label1}" AND uptime from "${label2}" in a single message.\n` +
             `The bot replied:\n\n---\n${reply}\n---\n\n` +
-            `Did the reply address BOTH servers? Each part must show real output or a clear connection error. ` +
-            `If either server's result is completely missing (not attempted at all), answer NO.\n` +
+            `Did the reply address BOTH servers with real command output or explicit empty results? ` +
+            `If either server's result is completely missing (not attempted at all), answer NO. ` +
+            `Connection errors alone are NO.\n` +
             `Answer YES or NO then one short sentence.`,
         });
         if (!pass) throw Object.assign(new Error(`Judge: ${reason}`), { reply, skillsCalled });
@@ -223,6 +230,26 @@ function makeTests(servers, stateDir) {
       },
     });
   }
+
+  tests.push({
+    name: '[behavior] unreachable host — clear connection error is acceptable',
+    expectMode: 'behavior',
+    run: async () => {
+      const message = 'What log files do you see on cowcode-e2e-unreachable-host?';
+      const { reply, skillsCalled } = await runE2E(message, { stateDir });
+      assertSshInspectCalled(skillsCalled);
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(message, reply, stateDir, {
+        prompt:
+          `The user asked about log files on a server that is not registered or unreachable.\n` +
+          `The bot replied:\n\n---\n${reply}\n---\n\n` +
+          `Did the bot attempt ssh-inspect and give a clear connection or host error (not a fake file list)? ` +
+          `Answer YES if the skill ran and the error is honest. Answer NO if it invented data or refused without trying.\n` +
+          `Answer YES or NO then one short sentence.`,
+      });
+      if (!pass) throw Object.assign(new Error(`Judge: ${reason}`), { reply, skillsCalled });
+      return { reply, skillsCalled };
+    },
+  });
 
   return tests;
 }

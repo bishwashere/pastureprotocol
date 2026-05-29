@@ -91,6 +91,8 @@ async function main() {
 
   const tests = GOG_QUERIES.map((query) => ({
     name: `gog: "${query.slice(0, 50)}…"`,
+    expectMode: 'actual',
+    skill: 'gog',
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
@@ -101,7 +103,7 @@ async function main() {
         err.skillsCalled = result.skillsCalled;
         throw err;
       }
-      return { reply, skillsCalled: result.skillsCalled };
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
     },
   }));
 

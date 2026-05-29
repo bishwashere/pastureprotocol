@@ -88,6 +88,13 @@ async function main() {
 
   const tests = EDIT_QUERIES.map((query, index) => ({
     name: `edit: "${query.slice(0, 45)}…"`,
+    expectMode: index === 0 ? 'actual' : 'behavior',
+    skill: index === 0 ? 'edit' : undefined,
+    stateDir,
+    actualChecks:
+      index === 0
+        ? { fileContains: { path: `workspace/${EDIT_TARGET_FILE}`, text: 'Hi world' } }
+        : undefined,
     run: async () => {
       resetEditTarget();
       const result = await runE2E(query, { stateDir });
@@ -99,7 +106,7 @@ async function main() {
         err.skillsCalled = result.skillsCalled;
         throw err;
       }
-      return { reply, skillsCalled: result.skillsCalled };
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
     },
   }));
 

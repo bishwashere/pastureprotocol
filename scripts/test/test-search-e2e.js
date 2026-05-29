@@ -90,6 +90,8 @@ async function main() {
 
   const tests = SEARCH_QUERIES.map((query) => ({
     name: `search: "${query.slice(0, 50)}…"`,
+    expectMode: 'actual',
+    skill: 'search',
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
@@ -100,7 +102,7 @@ async function main() {
         err.skillsCalled = result.skillsCalled;
         throw err;
       }
-      return { reply, skillsCalled: result.skillsCalled };
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
     },
   }));
 

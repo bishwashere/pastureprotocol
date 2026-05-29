@@ -87,8 +87,11 @@ async function main() {
   const tests = [
     {
       name: 'apply-patch: add line at end',
+      expectMode: 'actual',
+      skill: 'apply-patch',
+      actualChecks: { fileContains: { path: 'workspace/e2e-patch-target.txt', text: 'c' } },
       run: async () => {
-        const { stateDir, workspaceDir } = createTempStateDir('a\nb\n');
+        const { stateDir } = createTempStateDir('a\nb\n');
         const query =
           'Apply this patch to workspace/e2e-patch-target.txt: the hunk adds a new line at the end. Context: line "b" then add line "c". So remove nothing, add one line "c" after "b".';
         const result = await runE2E(query, { stateDir });
@@ -100,11 +103,12 @@ async function main() {
           err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply, skillsCalled: result.skillsCalled };
+        return { reply, skillsCalled: result.skillsCalled, stateDir };
       },
     },
     {
       name: 'apply-patch: replace a line',
+      expectMode: 'behavior',
       run: async () => {
         const { stateDir } = createTempStateDir('old first\nold second\n');
         const query =

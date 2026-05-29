@@ -91,8 +91,10 @@ async function main() {
 
   const stateDir = createTempStateDir();
 
-  const tests = CORE_QUERIES.map((query) => ({
+  const tests = CORE_QUERIES.map((query, i) => ({
     name: `core: "${query.slice(0, 50)}…"`,
+    expectMode: i === 0 ? 'actual' : 'behavior',
+    skill: i === 0 ? 'core' : undefined,
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
@@ -103,7 +105,7 @@ async function main() {
         err.skillsCalled = result.skillsCalled;
         throw err;
       }
-      return { reply, skillsCalled: result.skillsCalled };
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
     },
   }));
 

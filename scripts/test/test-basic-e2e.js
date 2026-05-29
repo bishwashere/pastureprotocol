@@ -130,6 +130,7 @@ async function main() {
     // ─────────────────────────────────────────────────────────
     {
       name: 'greeting: "hi" → clean reply, no tools, no internal leak',
+      expectMode: 'behavior',
       run: async () => {
         const { reply, skillsCalled } = await runE2E('hi', { stateDir });
         assertNoInternalLeak(reply);
@@ -150,6 +151,8 @@ async function main() {
     // ─────────────────────────────────────────────────────────
     {
       name: 'two-part: outdoor weather + indoor home sensor → both answered, correct tool split',
+      expectMode: 'actual',
+      skill: ['search', 'home-assistant'],
       run: async () => {
         const message = 'What is the outdoor temperature and what is the indoor temperature?';
         const { reply, skillsCalled } = await runE2E(message, { stateDir });
@@ -172,6 +175,8 @@ async function main() {
     // ─────────────────────────────────────────────────────────
     {
       name: 'three-part: news + home device state + math → all three answered, probe handles gaps',
+      expectMode: 'actual',
+      actualChecks: { replyIncludesAny: ['221'] },
       run: async () => {
         const message = 'Give me the top 1 news headline, tell me if the living room light is on, and what is 17 times 13?';
         const { reply, skillsCalled } = await runE2E(message, { stateDir });

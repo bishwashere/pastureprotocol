@@ -232,6 +232,7 @@ async function main() {
   const tests = [
     {
       name: 'memory: chat log written',
+      expectMode: 'behavior',
       run: async () => {
         const { stateDir, workspaceDir } = createTempStateDir();
         const run = await runE2E(storeMessage, { stateDir });
@@ -253,6 +254,9 @@ async function main() {
     },
     {
       name: 'memory: recall (store phrase → ask what I asked you to remember)',
+      expectMode: 'actual',
+      skill: 'memory',
+      actualChecks: { replyIncludesAny: [STORED_PHRASE] },
       run: async () => {
         const { stateDir } = createTempStateDir();
         const run = await runE2E(storePhraseMessage, { stateDir, secondMessage: recallQuery });
@@ -272,6 +276,8 @@ async function main() {
     },
     {
       name: 'memory: filesystem index — query file-related memory and get filesystem results',
+      expectMode: 'actual',
+      actualChecks: { replyIncludesAny: ['e2e-fs-test', 'foo.txt', 'subdir', 'bar.js'] },
       run: async () => {
         const stateDir = DEFAULT_STATE_DIR;
         const workspaceDir = join(stateDir, 'workspace');
