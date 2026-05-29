@@ -30,6 +30,9 @@ export const DEFAULT_ENABLED = [
   'edit',
   'apply-patch',
   'home-assistant',
+  'github',
+  'gmail',
+  'calendar',
 ];
 
 const MD_NAMES = ['skill.md', 'SKILL.md'];

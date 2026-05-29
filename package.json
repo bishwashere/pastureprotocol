@@ -32,6 +32,9 @@
     "test:update-build": "node scripts/test/test-update-build.js",
     "test:dry-run": "node scripts/test/dry-run-reminder.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",
+    "test:github-skill": "node scripts/test/test-github-skill.js",
+    "test:gmail-skill": "node scripts/test/test-gmail-skill.js",
+    "test:calendar-skill": "node scripts/test/test-calendar-skill.js",
     "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"
   },
   "dependencies": {

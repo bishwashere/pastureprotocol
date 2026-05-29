@@ -22,6 +22,9 @@ import { executeMe } from '../lib/executors/me.js';
 import { executeCore } from '../lib/executors/core.js';
 import { executeSshInspect } from '../lib/executors/ssh-inspect.js';
 import { executeAgentSend } from '../lib/executors/agent-send.js';
+import { executeGithub } from '../lib/executors/github.js';
+import { executeGmail } from '../lib/executors/gmail.js';
+import { executeCalendar } from '../lib/executors/calendar.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -42,6 +45,9 @@ const EXECUTORS = {
   me: executeMe,
   'ssh-inspect': executeSshInspect,
   'agent-send': executeAgentSend,
+  github: executeGithub,
+  gmail: executeGmail,
+  calendar: executeCalendar,
 };
 
 /** go-read and go-write are disabled in group chats; allowed in DMs and dashboard. */

@@ -213,6 +213,13 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
     "search": {
       "provider": "brave",  // only "brave" is currently supported
       "count": 8            // number of search results to return
+    },
+    "github": {
+      "token": "GITHUB_TOKEN",      // env var name or literal PAT (repo scope for private repos)
+      "defaultRepo": "owner/repo"   // optional default repo used when agent omits repo
+    },
+    "gog": {
+      "account": "you@gmail.com"    // default Google account for gmail + calendar skills
     }
   },
 
@@ -383,7 +390,10 @@ Skills are modular capabilities. They are listed in `config.json` under `skills.
 | `write` | Create or overwrite workspace files | — |
 | `edit` | Patch-edit workspace files (targeted find/replace) | — |
 | `apply-patch` | Apply unified diffs to workspace files | — |
-| `gog` | Google search wrapper | — |
+| `gog` | Google Workspace CLI (Gmail, Calendar, Drive, etc.) | `gog` CLI |
+| `gmail` | Gmail — list, read, search, send, archive, summarize | `gog` CLI |
+| `calendar` | Google Calendar — list, create, delete, check availability | `gog` CLI |
+| `github` | GitHub — repos, issues, PRs, branches, comments | `GITHUB_TOKEN` |
 | `me` | Self-reflective memory about the agent's identity | — |
 | `go-read` | Read files from arbitrary paths (outside workspace) | — |
 | `go-write` | Write files to arbitrary paths (outside workspace) | — |
