@@ -35,8 +35,16 @@ const checks = [
     ok: /drawAgentMapArrows\(agentMapData,\s*agentMapLastLayout\)/.test(html),
   },
   {
-    name: 'Measured node height drives layout',
-    ok: html.includes('measureAgentNodeHeight') && html.includes('agentTreeLayout(agents, measuredH)'),
+    name: 'Inbound link badge CSS exists',
+    ok: html.includes('agent-map-node-inbound') && html.includes('agent-map-node-has-inbound'),
+  },
+  {
+    name: 'Reply return arc CSS and marker exist',
+    ok: html.includes('agent-map-reply-line') && html.includes('agent-reply-arrowhead'),
+  },
+  {
+    name: 'buildInboundLinks helper used on map',
+    ok: /buildInboundLinks\(agents\)/.test(html),
   },
 ];
 

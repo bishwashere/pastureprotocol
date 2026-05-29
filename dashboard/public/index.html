@@ -239,6 +239,23 @@
       fill: none;
       opacity: 0.65;
     }
+    .agent-map-reply-line {
+      stroke: var(--green);
+      stroke-width: 1;
+      stroke-dasharray: 2 5;
+      fill: none;
+      opacity: 0.5;
+    }
+    .agent-map-node-has-inbound {
+      border-color: rgba(34, 197, 94, 0.35);
+    }
+    .agent-map-node-inbound {
+      font-size: 0.62rem;
+      color: var(--green);
+      margin-top: 0.28rem;
+      line-height: 1.3;
+      word-break: break-word;
+    }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -1293,8 +1310,12 @@
       </div>
       <div class="agent-edit-messaging-block">
         <div id="agent-edit-modal-links-wrap" class="field agent-edit-section">
-          <label>Team links</label>
-          <p class="field-hint" style="margin:0;">Agents this one can delegate to. Links appear as paths on the team map.</p>
+          <div id="agent-edit-modal-inbound-wrap" class="field" style="display:none; margin-bottom:0.65rem;">
+            <label>Receives delegation from</label>
+            <p id="agent-edit-modal-inbound" class="skill-meta" style="margin:0;"></p>
+          </div>
+          <label>Can delegate to</label>
+          <p class="field-hint" style="margin:0;">Outbound team links. Other agents that link here show ← on the map (reply path is automatic).</p>
           <div id="agent-edit-modal-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
         </div>
       </div>
@@ -2256,6 +2277,21 @@
         }
         var messaging = cfg.agentMessaging || {};
         var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
+        var inboundFrom = (agentsResp.agents || []).filter(function (a) {
+          var peerAllow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+          return a.id !== agentId && peerAllow.indexOf(agentId) !== -1;
+        }).map(function (a) { return a.title && String(a.title).trim() ? String(a.title).trim() + ' (' + a.id + ')' : a.id; });
+        var inboundWrap = document.getElementById('agent-edit-modal-inbound-wrap');
+        var inboundEl = document.getElementById('agent-edit-modal-inbound');
+        if (inboundWrap && inboundEl) {
+          if (inboundFrom.length) {
+            inboundWrap.style.display = '';
+            inboundEl.textContent = inboundFrom.join(', ');
+          } else {
+            inboundWrap.style.display = 'none';
+            inboundEl.textContent = '';
+          }
+        }
         var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
         var linksEl = document.getElementById('agent-edit-modal-links');
         if (linksEl) {
@@ -3671,6 +3707,19 @@
       inner.style.height = layout.canvasH + 'px';
     }
 
+    function buildInboundLinks(agents) {
+      var inbound = {};
+      (agents || []).forEach(function(a) {
+        var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        allow.forEach(function(target) {
+          if (!(agents || []).some(function(x) { return x.id === target; })) return;
+          if (!inbound[target]) inbound[target] = [];
+          if (inbound[target].indexOf(a.id) === -1) inbound[target].push(a.id);
+        });
+      });
+      return inbound;
+    }
+
     function drawAgentMapArrows(agents, layout) {
       var svg = document.getElementById('agent-map-arrows');
       var inner = document.getElementById('agent-map-canvas-inner');
@@ -3688,6 +3737,9 @@
         '</marker>' +
         '<marker id="agent-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#71717a" opacity="0.95"/>' +
+        '</marker>' +
+        '<marker id="agent-reply-arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+          '<polygon points="0 0, 6 3, 0 6" fill="#22c55e" opacity="0.55"/>' +
         '</marker>' +
       '</defs>';
       var shapes = [];
@@ -3720,7 +3772,7 @@
         });
       }
 
-      // Permission arrows (dashed, curved)
+      // Outbound delegation (dashed purple) + inbound reply path (dotted green, visual only)
       (agents || []).forEach(function(a) {
         var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
         if (!allow.length) return;
@@ -3733,6 +3785,8 @@
           var tx = tp.x + T_NODE_W / 2, ty = tp.y + nh / 2;
           var cx = (fx + tx) / 2, cy = Math.min(fy, ty) - 28;
           shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>');
+          var rcx = (fx + tx) / 2, rcy = Math.max(fy, ty) + 34;
+          shapes.push('<path d="M' + tx + ',' + ty + ' Q' + rcx + ',' + rcy + ' ' + fx + ',' + fy + '" class="agent-map-reply-line" marker-end="url(#agent-reply-arrowhead)"/>');
         });
       });
 
@@ -3757,6 +3811,7 @@
 
       var layout = agentTreeLayout(agents);
       applyAgentMapLayout(layout);
+      var inboundLinks = buildInboundLinks(agents);
 
       nodesEl.innerHTML = agents.map(function(a) {
         var pos = layout.positions[a.id] || { x: 0, y: 0 };
@@ -3770,11 +3825,17 @@
         var meta = isMain ? 'root' : 'agent';
         var sel = a.id === selectedChatAgentId ? ' selected' : '';
         var chatLabel = rawTitle ? rawTitle + ' (' + a.id + ')' : a.id;
-        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
+        var fromIds = inboundLinks[a.id] || [];
+        var inboundHtml = fromIds.length
+          ? '<div class="agent-map-node-inbound" title="Receives delegation from ' + escapeHtml(fromIds.join(', ')) + '">← ' + escapeHtml(fromIds.join(', ')) + '</div>'
+          : '';
+        var inboundClass = fromIds.length ? ' agent-map-node-has-inbound' : '';
+        return '<div class="agent-map-node' + sel + inboundClass + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
           ' title="Chat with ' + escapeHtml(chatLabel) + '"' +
           ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
           '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
+          inboundHtml +
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
       }).join('');
 
