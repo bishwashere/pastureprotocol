@@ -465,6 +465,71 @@
       border-radius: 4px;
     }
     .chat-toolbar-btn:hover { color: var(--text); border-color: var(--muted); filter: none; }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.55);
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      width: 100%;
+      max-width: 26rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.35rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    }
+    .modal-card h2 { margin: 0 0 0.35rem 0; font-size: 1.05rem; }
+    .modal-card .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1.1rem;
+    }
+    .modal-card .modal-error {
+      margin-top: 0.65rem;
+      color: var(--red);
+      font-size: 0.82rem;
+      display: none;
+    }
+    .modal-card .modal-error.visible { display: block; }
+    .modal-card .field { margin-top: 0.85rem; }
+    .modal-card .field label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .modal-card .field input,
+    .modal-card .field select {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.55rem;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.88rem;
+    }
+    .modal-card .field-hint {
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .modal-card button.secondary {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .modal-card button.secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
     .chat-history-panel {
       position: absolute;
       top: 100%;
@@ -810,11 +875,34 @@
     <a href="#projects" data-page="projects">Projects</a>
   </nav>
 
+  <div id="agent-create-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="agent-create-modal-title">
+      <h2 id="agent-create-modal-title">Create agent</h2>
+      <p class="skill-meta" style="margin:0;">Add a new agent persona with its own skills and identity files. Memory starts empty.</p>
+      <div class="field">
+        <label for="agent-create-modal-name">Agent id</label>
+        <input id="agent-create-modal-name" type="text" placeholder="e.g. backend, pm, alex" autocomplete="off">
+        <p class="field-hint">Lowercase letters, numbers, hyphens, and underscores. Cannot be <code>main</code>.</p>
+      </div>
+      <div class="field">
+        <label for="agent-create-modal-from">Copy settings from</label>
+        <select id="agent-create-modal-from"></select>
+        <p class="field-hint">Copies LLM config, skills (minus risky defaults), and identity files. Does not copy memory.</p>
+      </div>
+      <p id="agent-create-modal-error" class="modal-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="agent-create-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="agent-create-modal-submit">Create</button>
+      </div>
+    </div>
+  </div>
+
   <div id="page-chat" class="page active">
     <div class="chat-layout card" style="padding:0;">
       <div class="chat-toolbar" style="position:relative;">
         <span class="skill-meta" style="margin:0;">Agent</span>
         <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
+        <button type="button" id="chat-agent-create-btn" class="chat-toolbar-btn" title="Create a new agent">+ Agent</button>
         <button type="button" id="chat-new-btn" class="chat-toolbar-btn" title="Start a new conversation">New</button>
         <button type="button" id="chat-history-btn" class="chat-toolbar-btn" title="Browse past conversations">History</button>
         <div id="chat-history-panel" class="chat-history-panel"></div>
@@ -1426,21 +1514,126 @@
       document.getElementById('agent-md-textarea').value = d.content || '';
     }
 
-    document.getElementById('agent-create-btn').addEventListener('click', async function () {
-      var input = document.getElementById('agent-create-name');
-      var name = (input.value || '').trim();
-      if (!name) return;
+    function normalizeAgentIdInput(raw) {
+      return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    async function createAgentViaApi(name, fromAgentId) {
+      var body = { id: name };
+      if (fromAgentId) body.fromAgentId = fromAgentId;
       var r = await fetch(API + '/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: name })
+        body: JSON.stringify(body)
       });
-      if (r.ok) {
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        throw new Error(d.error || ('Create failed (' + r.status + ')'));
+      }
+      return d;
+    }
+
+    var agentCreateModalOpen = false;
+
+    async function populateAgentCreateFromSelect(preselectId) {
+      var select = document.getElementById('agent-create-modal-from');
+      if (!select) return;
+      try {
+        var r = await fetch(API + '/api/agents');
         var d = await r.json();
-        selectedAgentId = d.id || name;
-        input.value = '';
+        var agents = Array.isArray(d.agents) ? d.agents : [{ id: 'main' }];
+        var preferred = preselectId || selectedChatAgentId || 'main';
+        select.innerHTML = agents.map(function (a) {
+          var id = String(a.id || 'main');
+          var selected = id === preferred ? ' selected' : '';
+          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(id) + '</option>';
+        }).join('');
+      } catch (_) {
+        select.innerHTML = '<option value="main" selected>main</option>';
+      }
+    }
+
+    function showAgentCreateModalError(msg) {
+      var el = document.getElementById('agent-create-modal-error');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    async function openAgentCreateModal(opts) {
+      opts = opts || {};
+      var modal = document.getElementById('agent-create-modal');
+      var nameInput = document.getElementById('agent-create-modal-name');
+      if (!modal || !nameInput) return;
+      showAgentCreateModalError('');
+      nameInput.value = '';
+      await populateAgentCreateFromSelect(opts.fromAgentId);
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      agentCreateModalOpen = true;
+      setTimeout(function () { nameInput.focus(); }, 0);
+    }
+
+    function closeAgentCreateModal() {
+      var modal = document.getElementById('agent-create-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      agentCreateModalOpen = false;
+      showAgentCreateModalError('');
+    }
+
+    async function submitAgentCreateModal(switchChatToNew) {
+      var nameInput = document.getElementById('agent-create-modal-name');
+      var fromSelect = document.getElementById('agent-create-modal-from');
+      var submitBtn = document.getElementById('agent-create-modal-submit');
+      if (!nameInput || !fromSelect) return;
+      var normalized = normalizeAgentIdInput(nameInput.value);
+      if (!normalized) {
+        showAgentCreateModalError('Enter an agent id (letters, numbers, hyphens, underscores).');
+        nameInput.focus();
+        return;
+      }
+      if (normalized === 'main') {
+        showAgentCreateModalError('Cannot create another "main" agent — that id is reserved.');
+        nameInput.focus();
+        return;
+      }
+      var fromAgentId = (fromSelect.value || 'main').trim() || 'main';
+      if (submitBtn) submitBtn.disabled = true;
+      showAgentCreateModalError('');
+      try {
+        var d = await createAgentViaApi(normalized, fromAgentId);
+        closeAgentCreateModal();
+        selectedAgentId = d.id || normalized;
+        if (switchChatToNew) selectedChatAgentId = d.id || normalized;
         await fetchAgentsPage();
         await fetchChatAgents();
+        if (switchChatToNew) setChatAgent(selectedChatAgentId);
+      } catch (err) {
+        showAgentCreateModalError(err.message || String(err));
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('agent-create-btn').addEventListener('click', async function () {
+      var input = document.getElementById('agent-create-name');
+      var name = normalizeAgentIdInput(input && input.value);
+      if (!name) return;
+      try {
+        var d = await createAgentViaApi(name, 'main');
+        selectedAgentId = d.id || name;
+        if (input) input.value = '';
+        await fetchAgentsPage();
+        await fetchChatAgents();
+      } catch (err) {
+        window.alert('Create failed: ' + (err.message || err));
       }
     });
 
@@ -2642,6 +2835,28 @@
     });
     document.getElementById('chat-agent-select').addEventListener('change', function (e) {
       setChatAgent((e.target && e.target.value) || 'main');
+    });
+    document.getElementById('chat-agent-create-btn').addEventListener('click', function () {
+      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+    });
+    document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
+    document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
+      submitAgentCreateModal(true);
+    });
+    document.getElementById('agent-create-modal').addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'agent-create-modal') closeAgentCreateModal();
+    });
+    document.querySelector('#agent-create-modal .modal-card').addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+    document.getElementById('agent-create-modal-name').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAgentCreateModal(true);
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
     });
     document.getElementById('chat-new-btn').addEventListener('click', function () {
       closeChatHistory();

@@ -349,7 +349,8 @@ app.post('/api/agents', (req, res) => {
       res.status(400).json({ error: 'id is required' });
       return;
     }
-    const created = createAgent(rawId);
+    const fromAgentId = typeof req.body?.fromAgentId === 'string' ? req.body.fromAgentId.trim() : '';
+    const created = createAgent(rawId, fromAgentId ? { fromAgentId } : {});
     const config = loadAgentConfig(created.id);
     res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
   } catch (err) {
