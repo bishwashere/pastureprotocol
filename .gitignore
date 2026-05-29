@@ -1,4 +1,5 @@
 # --- Secrets & local config (any path in the repo) ---
+BUILD
 node_modules/
 auth_info/
 credentials/

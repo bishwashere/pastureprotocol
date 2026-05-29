@@ -21,6 +21,48 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+# Git short SHA for install dir (BUILD file or .git); remote via GitHub API
+read_build() {
+  node --input-type=module -e "
+    import { readBuild } from 'file://$ROOT/lib/build-info.js';
+    const b = readBuild('$ROOT');
+    if (b) console.log(b);
+  " 2>/dev/null || {
+    [ -f "$ROOT/BUILD" ] && tr -d '[:space:]' < "$ROOT/BUILD" && return
+    [ -d "$ROOT/.git" ] && git -C "$ROOT" rev-parse --short HEAD 2>/dev/null
+  }
+}
+
+fetch_remote_build() {
+  node --input-type=module -e "
+    import { fetchRemoteBuild } from 'file://$ROOT/lib/build-info.js';
+    const b = await fetchRemoteBuild('$BRANCH');
+    if (b) console.log(b);
+  " 2>/dev/null || {
+    curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: cowcode-update" \
+      "https://api.github.com/repos/bishwashere/cowCode/commits/${BRANCH}" 2>/dev/null \
+      | node -pe "((d=JSON.parse(require('fs').readFileSync(0,'utf8'))).sha||'').slice(0,7)" 2>/dev/null || true
+  }
+}
+
+format_version_label() {
+  node --input-type=module -e "
+    import { formatVersionLabel } from 'file://$ROOT/lib/build-info.js';
+    console.log(formatVersionLabel(process.argv[1], process.argv[2] || ''));
+  " "$1" "${2:-}" 2>/dev/null || {
+    if [ -n "${2:-}" ]; then echo "v$1 ($2)"; else echo "v$1"; fi
+  }
+}
+
+write_build() {
+  local build="$1"
+  [ -z "$build" ] && return
+  node --input-type=module -e "
+    import { writeBuild } from 'file://$ROOT/lib/build-info.js';
+    writeBuild('$ROOT', '$build');
+  " 2>/dev/null || echo "$build" > "$ROOT/BUILD"
+}
+
 # Skip version check when --force or -f is passed
 FORCE_UPDATE=
 for arg in "$@"; do
@@ -35,10 +77,14 @@ if [ -z "$FORCE_UPDATE" ]; then
   if [ -n "$LOCAL_VER" ] && curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/bishwashere/cowCode/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null; then
     REMOTE_VER=$(node -p "require('$REMOTE_JSON').version" 2>/dev/null || true)
     if [ -n "$REMOTE_VER" ] && [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
-      echo ""
-      echo "  Already up to date (v$LOCAL_VER)."
-      echo ""
-      exit 0
+      LOCAL_BUILD=$(read_build)
+      REMOTE_BUILD=$(fetch_remote_build)
+      if [ -n "$LOCAL_BUILD" ] && [ -n "$REMOTE_BUILD" ] && [ "$LOCAL_BUILD" = "$REMOTE_BUILD" ]; then
+        echo ""
+        echo "  Already up to date ($(format_version_label "$LOCAL_VER" "$LOCAL_BUILD"))."
+        echo ""
+        exit 0
+      fi
     fi
   fi
 fi
@@ -48,13 +94,15 @@ BEFORE_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true
 REMOTE_JSON="${REMOTE_JSON:-$WORK/remote_package.json}"
 [ ! -f "$REMOTE_JSON" ] && curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/bishwashere/cowCode/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null || true
 AFTER_VER=$(node -p "require('$REMOTE_JSON').version" 2>/dev/null || true)
+BEFORE_BUILD=$(read_build)
+AFTER_BUILD=$(fetch_remote_build)
 
 echo ""
 echo "  cowCode — Updating..."
 if [ -n "$BEFORE_VER" ] && [ -n "$AFTER_VER" ]; then
-  echo "  From v$BEFORE_VER → v$AFTER_VER"
+  echo "  From $(format_version_label "$BEFORE_VER" "$BEFORE_BUILD") → $(format_version_label "$AFTER_VER" "$AFTER_BUILD")"
 elif [ -n "$AFTER_VER" ]; then
-  echo "  To v$AFTER_VER"
+  echo "  To $(format_version_label "$AFTER_VER" "$AFTER_BUILD")"
 fi
 echo "  ------------------------------------------------"
 echo ""
@@ -93,11 +141,13 @@ echo "  ► Installing dependencies..."
 rm -rf "$ROOT/node_modules"
 (cd "$ROOT" && (pnpm install --silent 2>/dev/null || npm install --silent 2>/dev/null || true))
 
-# Show after-version so user sees the update applied
+# Record build id and show final version
+[ -n "$AFTER_BUILD" ] && write_build "$AFTER_BUILD"
 NOW_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
+NOW_BUILD=$(read_build)
 echo ""
 if [ -n "$NOW_VER" ]; then
-  echo "  ✓ Update complete. Now at v$NOW_VER"
+  echo "  ✓ Update complete. Now at $(format_version_label "$NOW_VER" "$NOW_BUILD")"
 else
   echo "  ✓ Update complete."
 fi

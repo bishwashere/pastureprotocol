@@ -31,7 +31,13 @@ echo "  ► Installing to $INSTALL_DIR ..."
 mkdir -p "$INSTALL_DIR"
 rsync -a --exclude=node_modules "$WORK/$EXTRACTED/" "$INSTALL_DIR/" 2>/dev/null || cp -R "$WORK/$EXTRACTED/"* "$INSTALL_DIR/"
 cd "$INSTALL_DIR"
-echo "  ✓ Code installed."
+# Record git build id for update/status display (tarball installs have no .git)
+INSTALL_BUILD=$(node --input-type=module -e "
+  import { fetchRemoteBuild, writeBuild } from 'file://$INSTALL_DIR/lib/build-info.js';
+  const b = await fetchRemoteBuild('$BRANCH');
+  if (b) { writeBuild('$INSTALL_DIR', b); console.log(b); }
+" 2>/dev/null || true)
+echo "  ✓ Code installed.${INSTALL_BUILD:+ (build $INSTALL_BUILD)}"
 echo ""
 
 # Launcher: fixed path only (like OpenClaw — run cowcode from anywhere)

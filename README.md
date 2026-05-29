@@ -232,6 +232,7 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
   "tide": {
     "enabled": false,
     "silenceCooldownMinutes": 30,  // minutes of silence before sending a follow-up
+    "healthCheckMinutes": 2,       // how often Tide wakes for polling watchdog + due follow-ups (≤ cooldown)
     "jid": "",                     // target JID/chat ID; auto-detected if empty
     "inactiveStart": "23:00",      // quiet hours start (local time)
     "inactiveEnd": "06:00",        // quiet hours end (local time)
@@ -300,6 +301,16 @@ cowcode auth        # WhatsApp QR/pairing auth (stops bot first)
 cowcode dashboard   # Open the local web dashboard
 cowcode update      # Pull and install the latest version
 cowcode uninstall   # Remove cowCode and the CLI command
+
+# Tide checklist — see [Tide checklist](#tide-checklist-maintenance)
+cowcode tide checklist list|add|remove|run|on|off|triggers|enable|disable
+
+# Agents, skills, servers, memory index
+cowcode create agent <name>          # New agent persona
+cowcode delete agent <name> [--yes]
+cowcode add <skill-id>               # Install + enable a skill
+cowcode index [--source memory|filesystem] [--root <path>]
+cowcode server add|use|list|remove   # SSH inspect targets
 ```
 
 ### What you can say to the bot
@@ -465,47 +476,60 @@ Tide sends a single AI-composed follow-up message when a conversation goes quiet
   "tide": {
     "enabled": true,
     "silenceCooldownMinutes": 60,  // minimum silence before a follow-up is sent
-    "inactiveStart": "23:00",       // quiet hours start — no Tide during this window
-    "inactiveEnd": "06:00",         // quiet hours end
-    "jid": ""                       // leave empty for auto-detection
+    "healthCheckMinutes": 2,       // polling watchdog + follow-up scheduler interval (default 2)
+    "inactiveStart": "23:00",      // quiet hours start — no Tide during this window
+    "inactiveEnd": "06:00",        // quiet hours end
+    "jid": ""                      // leave empty for auto-detection
   }
 }
 ```
 
-Tide never sends more than one follow-up per silence period, and never during the configured quiet hours.
+Tide never sends more than one follow-up per silence period, and never during the configured quiet hours. Each cycle also runs the Telegram polling watchdog (self-healing heartbeat), independent of whether a follow-up is sent.
 
 ### Tide checklist (maintenance)
 
-Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same `runAgentTurn` path, skills, and bootstrap context as chat/Tide)—executed **one by one** in order. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user. Automatic runs respect `tide.enabled` and quiet hours.
+Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same skills and bootstrap context as chat)—executed **one by one** in order. Prior item results are passed as context to the next. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user.
+
+**Item schema:** `id`, `label`, `prompt`, `enabled`. The agent should end with `OK:` or `FAIL:`; anything else is treated as pass unless it starts with `FAIL`.
+
+**Automatic runs** need `tide.enabled` + `checklist.enabled` + the trigger on + outside quiet hours. **Manual runs** (`cowcode tide checklist run` or dashboard **Run now**) ignore those flags.
+
+| Trigger | When it runs |
+|---|---|
+| `onRestart` | Daemon starts |
+| `onCycle` | Each Tide health-check interval |
+| `onFollowUp` | Before a follow-up message is sent for a chat |
 
 ```json
-"tide": {
+"checklist": {
   "enabled": true,
-  "checklist": {
-    "enabled": true,
-    "triggers": { "onRestart": true, "onCycle": true, "onFollowUp": false },
-    "items": [
-      {
-        "id": "time-check",
-        "label": "Local time",
-        "prompt": "What is the current local time? Report OK or FAIL.",
-        "enabled": true
-      }
-    ]
-  }
+  "triggers": { "onRestart": true, "onCycle": true, "onFollowUp": false },
+  "items": [
+    {
+      "id": "time-check",
+      "label": "Local time",
+      "prompt": "What is the current local time? Report OK or FAIL.",
+      "enabled": true
+    }
+  ]
 }
 ```
 
-**Terminal**
+Fresh installs get a default **Telegram polling health** item (disabled until you enable the checklist).
+
+**CLI**
 
 ```bash
 cowcode tide checklist list
 cowcode tide checklist add "Local time" --prompt "What is the current local time?"
-cowcode tide checklist run
-cowcode tide checklist on
+cowcode tide checklist remove <id>
+cowcode tide checklist enable|disable <id>
+cowcode tide checklist on|off
+cowcode tide checklist run [--id <id>]
+cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-on-cycle] [--on-follow-up|--no-on-follow-up]
 ```
 
-**Dashboard:** **Tide** page — add label + prompt, run manually. Legacy `shell`/`http` config items are converted to prompts automatically.
+**Dashboard:** **Tide** page — toggle Tide/checklist, edit triggers and items, run manually, view last results. Legacy `shell`/`http`/`builtin` config items are auto-converted to prompts on load.
 
 ---
 
@@ -517,17 +541,22 @@ cowcode tide checklist on
 ~/.cowcode/
 ├── config.json              # Main configuration
 ├── .env                     # API keys and env var overrides
+├── daemon.log               # Bot daemon stdout log
+├── daemon.err               # Bot daemon stderr log
 ├── auth_info/               # WhatsApp session files (Baileys)
 │   ├── creds.json
 │   └── *.json
+├── chat-sessions/
+│   └── state.json           # Per-chat session IDs (daily reset)
 ├── cron/
 │   └── jobs.json            # Reminder/cron job store
+├── tide-checklist-last.json # Last Tide checklist run summary
+├── projects.db              # Dashboard Projects tracker (SQLite)
 ├── workspace/               # Default workspace for file operations
 │   ├── MEMORY.md            # User notes (read/written by skills)
-│   ├── memory/              # SQLite vector memory store
+│   ├── memory/              # Daily logs + vector memory store
 │   └── ...                  # User files
-└── logs/
-    └── daemon.log           # Bot daemon log
+└── agents/ groups/          # Per-agent and per-group config (when used)
 ```
 
 ### Code (`~/.local/share/cowcode/` or clone root)
@@ -552,6 +581,7 @@ cowCode/
 │   ├── speech-client.js     # Speech-to-text / text-to-speech client
 │   ├── timezone.js          # Time-zone utilities
 │   ├── owner-config.js      # Owner/admin identity resolution
+│   ├── tide-checklist.js    # Tide maintenance checklist (agent turns)
 │   └── executors/           # Skill execution engines (browse, vision, etc.)
 ├── skills/
 │   ├── browse/              # Playwright browser skill
@@ -577,7 +607,7 @@ cowCode/
 
 ## Dashboard
 
-The local dashboard is a simple Express web UI for monitoring the bot.
+Local Express web UI for chat, config, and ops.
 
 ```bash
 cowcode dashboard
@@ -585,7 +615,9 @@ cowcode dashboard
 node dashboard/server.js
 ```
 
-Open `http://localhost:3100` (default port) in your browser to see: bot status, recent messages, active reminders, and memory entries.
+Open `http://localhost:3100` (default port). Nav pages: **Chat**, **Status**, **Soul**, **Crons**, **Skills**, **Agents**, **Groups**, **LLM**, **Tide** (checklist), **Config**, **Test**, **Projects**.
+
+**Projects** — visual project tracker with branched update chains. See [docs/projects.md](docs/projects.md) for auth and API.
 
 ---
 
@@ -593,12 +625,12 @@ Open `http://localhost:3100` (default port) in your browser to see: bot status, 
 
 `cowcode start` launches the bot as a background daemon using the platform's process manager so it survives terminal sessions.
 
-Logs are written to `~/.cowcode/logs/daemon.log`. Tail them with:
+Logs are written to `~/.cowcode/daemon.log` (stderr: `daemon.err`). Tail them with:
 
 ```bash
 cowcode logs
 # or:
-tail -f ~/.cowcode/logs/daemon.log
+tail -f ~/.cowcode/daemon.log
 ```
 
 ---

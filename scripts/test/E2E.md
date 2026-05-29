@@ -47,7 +47,7 @@ Each skill test has its own folder with an **inputs.md** that lists the test fil
 |--------|-----------|----------|
 | [cron/](cron/inputs.md) | `test-cron-e2e.js` | List/add/recurring/manage queries |
 | [tide/](tide/inputs.md) | `test-tide.js` | Payload (jid, historyMessages) |
-| — | `test-tide-checklist.js` | Checklist add/run/remove (shell echo) |
+| — | `test-tide-checklist.js` | Checklist CRUD, prompt normalization, legacy item migration |
 | — | `test-chat-session.js` | Daily boundary, manual new session, log filter |
 | [agent/](agent/inputs.md) | `test-agent.js` | Scenario messages |
 | [edit/](edit/inputs.md) | `test-edit-e2e.js` | Edit target file + queries |
