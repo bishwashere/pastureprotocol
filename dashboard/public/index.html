@@ -73,14 +73,26 @@
       display: flex;
       gap: 0.65rem;
     }
-    .chat-upper-left,
-    .chat-upper-right {
+    .chat-upper-left {
       flex: 1 1 0;
       min-width: 0;
       min-height: 0;
       overflow: auto;
       margin-bottom: 0;
       padding: 0.85rem 1rem;
+    }
+    .chat-upper-right {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      margin-bottom: 0;
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-upper-right-head {
+      flex-shrink: 0;
     }
     .chat-upper-left .overview-grid {
       margin-top: 0.75rem;
@@ -126,13 +138,21 @@
     }
     /* Agent team map (projects-style boxes) */
     .agent-map-canvas {
+      flex: 1 1 0;
+      min-height: 0;
       position: relative;
-      overflow-x: auto;
-      overflow-y: visible;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .agent-map-scaler {
+      position: relative;
+      flex-shrink: 0;
     }
     .agent-map-canvas-inner {
       position: relative;
-      min-width: 100%;
+      transform-origin: top center;
     }
     .agent-map-arrows {
       position: absolute;
@@ -208,7 +228,7 @@
       line-height: 1.35;
     }
     .agent-map-tree-line {
-      stroke: var(--border);
+      stroke: var(--muted);
       stroke-width: 1.5;
       fill: none;
     }
@@ -1338,15 +1358,19 @@
           </div>
         </div>
         <div class="chat-upper-right card">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
-            <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
-            <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          <div class="chat-upper-right-head">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+              <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
+              <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+            </div>
+            <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click to chat. Tree shows hierarchy; dashed arrows show message-passing links.</p>
           </div>
-          <p class="skill-meta" style="margin:0 0 0.6rem 0;">Click to chat. Tree shows hierarchy; dashed arrows show message-passing links.</p>
           <div id="agent-map-canvas" class="agent-map-canvas">
-            <div id="agent-map-canvas-inner" class="agent-map-canvas-inner">
-              <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
-              <div id="agent-map-nodes" class="agent-map-nodes"></div>
+            <div id="agent-map-scaler" class="agent-map-scaler">
+              <div id="agent-map-canvas-inner" class="agent-map-canvas-inner">
+                <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+                <div id="agent-map-nodes" class="agent-map-nodes"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -3627,6 +3651,7 @@
     }
 
     var agentMapData = [];
+    var agentMapLastLayout = null;
 
     function updateAgentMapSelection() {
       document.querySelectorAll('.agent-map-node').forEach(function (n) {
@@ -3636,28 +3661,80 @@
 
     // Tree layout constants
     var T_NODE_W = 132;   // card width
-    var T_NODE_H = 80;    // approximate card height
+    var T_NODE_H = 96;    // fallback card height (measured after render)
     var T_H_GAP  = 20;    // horizontal gap between siblings
     var T_V_GAP  = 52;    // vertical gap root→children
     var T_PAD_X  = 16;    // horizontal canvas padding
     var T_PAD_Y  = 10;    // vertical canvas padding
 
-    function agentTreeLayout(agents) {
+    function measureAgentNodeHeight(nodesEl) {
+      var maxH = T_NODE_H;
+      if (!nodesEl) return maxH;
+      nodesEl.querySelectorAll('.agent-map-node').forEach(function (n) {
+        var h = n.offsetHeight || 0;
+        if (h > maxH) maxH = h;
+      });
+      return maxH;
+    }
+
+    function agentTreeLayout(agents, nodeH) {
+      var nh = nodeH || T_NODE_H;
       var root = agents.find(function(a) { return a.id === 'main'; }) || agents[0];
       var others = agents.filter(function(a) { return a !== root; });
       var n = others.length;
       var rowW = n > 0 ? n * T_NODE_W + (n - 1) * T_H_GAP : 0;
       var canvasW = Math.max(rowW, T_NODE_W) + T_PAD_X * 2;
-      var canvasH = T_PAD_Y + T_NODE_H + (n > 0 ? T_V_GAP + T_NODE_H : 0) + T_PAD_Y;
+      var canvasH = T_PAD_Y + nh + (n > 0 ? T_V_GAP + nh : 0) + T_PAD_Y;
       var positions = {};
       // Root centered
       positions[root.id] = { x: (canvasW - T_NODE_W) / 2, y: T_PAD_Y };
       // Children evenly spread
       var startX = (canvasW - rowW) / 2;
       others.forEach(function(a, i) {
-        positions[a.id] = { x: startX + i * (T_NODE_W + T_H_GAP), y: T_PAD_Y + T_NODE_H + T_V_GAP };
+        positions[a.id] = { x: startX + i * (T_NODE_W + T_H_GAP), y: T_PAD_Y + nh + T_V_GAP };
       });
-      return { positions: positions, canvasW: canvasW, canvasH: canvasH, root: root, others: others };
+      return { positions: positions, canvasW: canvasW, canvasH: canvasH, nodeH: nh, root: root, others: others };
+    }
+
+    function applyAgentMapLayout(layout) {
+      var inner = document.getElementById('agent-map-canvas-inner');
+      var scaler = document.getElementById('agent-map-scaler');
+      if (!inner || !layout) return;
+      inner.style.width = layout.canvasW + 'px';
+      inner.style.height = layout.canvasH + 'px';
+      if (scaler) {
+        scaler.style.width = layout.canvasW + 'px';
+        scaler.style.height = layout.canvasH + 'px';
+      }
+    }
+
+    function repositionAgentMapNodes(nodesEl, layout) {
+      if (!nodesEl || !layout) return;
+      var nh = layout.nodeH || T_NODE_H;
+      nodesEl.querySelectorAll('.agent-map-node').forEach(function (node) {
+        var id = node.getAttribute('data-agent-id');
+        var pos = layout.positions[id];
+        if (!pos) return;
+        node.style.left = pos.x + 'px';
+        node.style.top = pos.y + 'px';
+      });
+    }
+
+    function fitAgentMapToContainer() {
+      var canvas = document.getElementById('agent-map-canvas');
+      var scaler = document.getElementById('agent-map-scaler');
+      var inner = document.getElementById('agent-map-canvas-inner');
+      var layout = agentMapLastLayout;
+      if (!canvas || !scaler || !inner || !layout) return;
+      var availW = canvas.clientWidth;
+      var availH = canvas.clientHeight;
+      if (availW < 1 || availH < 1) return;
+      var scale = Math.min(1, availW / layout.canvasW, availH / layout.canvasH);
+      inner.style.transform = 'scale(' + scale + ')';
+      scaler.style.width = Math.ceil(layout.canvasW * scale) + 'px';
+      scaler.style.height = Math.ceil(layout.canvasH * scale) + 'px';
+      inner.style.width = layout.canvasW + 'px';
+      inner.style.height = layout.canvasH + 'px';
     }
 
     function drawAgentMapArrows(agents, layout) {
@@ -3670,9 +3747,13 @@
       svg.setAttribute('height', String(h));
       svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
 
+      var nh = layout.nodeH || T_NODE_H;
       var defs = '<defs>' +
         '<marker id="agent-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#a78bfa" opacity="0.8"/>' +
+        '</marker>' +
+        '<marker id="agent-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
+          '<polygon points="0 0, 7 3, 0 6" fill="#71717a" opacity="0.95"/>' +
         '</marker>' +
       '</defs>';
       var shapes = [];
@@ -3681,7 +3762,7 @@
       if (layout.others.length > 0) {
         var rp = layout.positions[layout.root.id];
         var rootCX = rp.x + T_NODE_W / 2;
-        var rootBotY = rp.y + T_NODE_H;
+        var rootBotY = rp.y + nh;
         var midY = rootBotY + T_V_GAP / 2;
         var childCXs = layout.others.map(function(a) {
           var p = layout.positions[a.id];
@@ -3691,7 +3772,7 @@
         var rightCX = Math.max.apply(null, childCXs);
 
         // Trunk down from root
-        shapes.push('<line x1="' + rootCX + '" y1="' + rootBotY + '" x2="' + rootCX + '" y2="' + midY + '" class="agent-map-tree-line"/>');
+        shapes.push('<line x1="' + rootCX + '" y1="' + rootBotY + '" x2="' + rootCX + '" y2="' + midY + '" class="agent-map-tree-line" marker-end="url(#agent-tree-arrowhead)"/>');
         // Horizontal bar
         if (layout.others.length > 1) {
           shapes.push('<line x1="' + leftCX + '" y1="' + midY + '" x2="' + rightCX + '" y2="' + midY + '" class="agent-map-tree-line"/>');
@@ -3701,7 +3782,7 @@
           var p = layout.positions[a.id];
           if (!p) return;
           var cx = p.x + T_NODE_W / 2;
-          shapes.push('<line x1="' + cx + '" y1="' + midY + '" x2="' + cx + '" y2="' + p.y + '" class="agent-map-tree-line"/>');
+          shapes.push('<line x1="' + cx + '" y1="' + midY + '" x2="' + cx + '" y2="' + p.y + '" class="agent-map-tree-line" marker-end="url(#agent-tree-arrowhead)"/>');
         });
       }
 
@@ -3714,8 +3795,8 @@
           var fp = layout.positions[a.id];
           var tp = layout.positions[target];
           if (!fp || !tp) return;
-          var fx = fp.x + T_NODE_W / 2, fy = fp.y + T_NODE_H / 2;
-          var tx = tp.x + T_NODE_W / 2, ty = tp.y + T_NODE_H / 2;
+          var fx = fp.x + T_NODE_W / 2, fy = fp.y + nh / 2;
+          var tx = tp.x + T_NODE_W / 2, ty = tp.y + nh / 2;
           var cx = (fx + tx) / 2, cy = Math.min(fy, ty) - 28;
           shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>');
         });
@@ -3727,18 +3808,21 @@
     function renderAgentMap() {
       var nodesEl = document.getElementById('agent-map-nodes');
       var inner = document.getElementById('agent-map-canvas-inner');
+      var scaler = document.getElementById('agent-map-scaler');
       if (!nodesEl || !inner) return;
       var agents = agentMapData || [];
       if (!agents.length) {
         nodesEl.innerHTML = '';
+        agentMapLastLayout = null;
         inner.style.height = '3rem';
+        inner.style.transform = '';
+        if (scaler) { scaler.style.width = ''; scaler.style.height = ''; }
         if (document.getElementById('agent-map-arrows')) document.getElementById('agent-map-arrows').innerHTML = '';
         return;
       }
 
       var layout = agentTreeLayout(agents);
-      inner.style.width  = layout.canvasW + 'px';
-      inner.style.height = layout.canvasH + 'px';
+      applyAgentMapLayout(layout);
 
       nodesEl.innerHTML = agents.map(function(a) {
         var pos = layout.positions[a.id] || { x: 0, y: 0 };
@@ -3782,7 +3866,18 @@
         });
       });
 
+      var measuredH = measureAgentNodeHeight(nodesEl);
+      if (Math.abs(measuredH - layout.nodeH) > 2) {
+        layout = agentTreeLayout(agents, measuredH);
+        applyAgentMapLayout(layout);
+        repositionAgentMapNodes(nodesEl, layout);
+      }
+      agentMapLastLayout = layout;
       drawAgentMapArrows(agents, layout);
+      requestAnimationFrame(function () {
+        fitAgentMapToContainer();
+        drawAgentMapArrows(agents, layout);
+      });
     }
 
     function setChatAgent(agentId) {
@@ -4071,7 +4166,10 @@
       var redrawTimer;
       new ResizeObserver(function () {
         clearTimeout(redrawTimer);
-        redrawTimer = setTimeout(function () { drawAgentMapArrows(agentMapData); }, 80);
+        redrawTimer = setTimeout(function () {
+          fitAgentMapToContainer();
+          if (agentMapLastLayout) drawAgentMapArrows(agentMapData, agentMapLastLayout);
+        }, 80);
       }).observe(canvas);
     })();
     (function () {
