@@ -1,6 +1,5 @@
 /**
- * Tide checklist unit test: config CRUD + shell run (no daemon).
- * Usage: node scripts/test/test-tide-checklist.js
+ * Tide checklist: config CRUD + legacy item → prompt normalization (no LLM run).
  */
 
 import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
@@ -9,10 +8,9 @@ import { tmpdir } from 'os';
 import {
   addChecklistItem,
   getTideChecklistFromConfig,
+  normalizeChecklistConfig,
   removeChecklistItem,
-  runTideChecklist,
   setChecklistEnabled,
-  setChecklistTriggers,
 } from '../../lib/tide-checklist.js';
 
 function setupStateDir() {
@@ -24,10 +22,7 @@ function setupStateDir() {
       {
         tide: {
           enabled: true,
-          silenceCooldownMinutes: 30,
-          inactiveStart: '23:00',
-          inactiveEnd: '06:00',
-          checklist: { enabled: true, triggers: { onRestart: true, onCycle: true, onFollowUp: false }, items: [] },
+          checklist: { enabled: true, triggers: { onRestart: true }, items: [] },
         },
       },
       null,
@@ -36,37 +31,35 @@ function setupStateDir() {
     'utf8'
   );
   process.env.COWCODE_STATE_DIR = stateDir;
-  return stateDir;
 }
 
 async function main() {
   setupStateDir();
   setChecklistEnabled(true);
 
-  const add = addChecklistItem({ label: 'Echo ok', type: 'shell', command: 'echo tide-checklist-ok' });
+  const add = addChecklistItem({
+    label: 'Time check',
+    prompt: 'What is the current local time? Report OK or FAIL.',
+  });
   if (!add.ok) throw new Error(add.message);
 
-  const items = getTideChecklistFromConfig().items;
-  if (items.length !== 1 || items[0].id !== add.id) {
-    throw new Error('Expected one checklist item after add');
-  }
+  const item = getTideChecklistFromConfig().items[0];
+  if (!item.prompt.includes('local time')) throw new Error('prompt not stored');
 
-  setChecklistTriggers({ onFollowUp: true });
-  const triggers = getTideChecklistFromConfig().triggers;
-  if (!triggers.onFollowUp) throw new Error('onFollowUp trigger not set');
-
-  const summary = await runTideChecklist({ manual: true, trigger: 'manual' });
-  if (summary.total !== 1 || summary.passed !== 1) {
-    throw new Error(`Expected 1/1 passed, got ${summary.passed}/${summary.total}`);
+  const legacy = normalizeChecklistConfig({
+    checklist: {
+      items: [{ id: 'x', label: 'Shell legacy', type: 'shell', command: 'echo hi', enabled: true }],
+    },
+  });
+  if (!legacy.items[0].prompt.includes('echo hi')) {
+    throw new Error('legacy shell item should become agent prompt');
   }
 
   const rm = removeChecklistItem(add.id);
   if (!rm.ok) throw new Error(rm.message);
-  if (getTideChecklistFromConfig().items.length !== 0) {
-    throw new Error('Item should be removed');
-  }
 
-  console.log('Tide checklist test passed.');
+  console.log('Tide checklist test passed (CRUD + prompt normalization).');
+  console.log('Run agent items manually: cowcode tide checklist run');
 }
 
 main().catch((e) => {

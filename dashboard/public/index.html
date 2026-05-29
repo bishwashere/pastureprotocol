@@ -1009,7 +1009,7 @@
   <div id="page-tide" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Tide checklist</h2>
-      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Maintenance checks run when Tide fires (health cycle, follow-up, or daemon restart). Requires <code>tide.enabled</code> for automatic runs.</p>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Each item runs as one agent turn (same LLM and skills as chat), executed in order. Requires <code>tide.enabled</code> for automatic runs.</p>
       <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:0.75rem; align-items:center;">
         <label><input type="checkbox" id="tide-enabled"> Tide enabled</label>
         <label><input type="checkbox" id="tide-checklist-enabled"> Checklist enabled</label>
@@ -1028,16 +1028,10 @@
     <div class="card">
       <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Checklist items</h3>
       <div id="tide-checklist-items"></div>
-      <div style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:flex-end;">
-        <input type="text" id="tide-new-label" placeholder="Label" style="flex:1; min-width:8rem;" />
-        <select id="tide-new-type">
-          <option value="shell">Shell</option>
-          <option value="http">HTTP GET</option>
-          <option value="file_exists">File exists</option>
-          <option value="builtin">Builtin</option>
-        </select>
-        <input type="text" id="tide-new-value" placeholder="Command, URL, path, or builtin name" style="flex:2; min-width:12rem;" />
-        <button type="button" id="tide-checklist-add">Add item</button>
+      <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+        <input type="text" id="tide-new-label" placeholder="Short label" />
+        <textarea id="tide-new-prompt" placeholder="Prompt for the agent (what to check). Defaults to label if empty." rows="2" style="width:100%; font-family:inherit;"></textarea>
+        <button type="button" id="tide-checklist-add" style="align-self:flex-start;">Add item</button>
       </div>
     </div>
     <div class="card">
@@ -1724,13 +1718,6 @@
       }
     });
 
-    function tideItemDetail(it) {
-      if (it.type === 'shell') return it.command || '';
-      if (it.type === 'http') return it.url || '';
-      if (it.type === 'file_exists') return it.path || '';
-      return it.builtin || it.type;
-    }
-
     function renderTideChecklistItems(items) {
       var el = document.getElementById('tide-checklist-items');
       if (!items.length) {
@@ -1740,7 +1727,7 @@
       el.innerHTML = items.map(function (it) {
         return '<div class="skill-item" style="margin-bottom:0.5rem;"><div class="skill-row">' +
           '<div><span class="skill-id">' + escapeHtml(it.id) + '</span>' +
-          '<div class="skill-desc">' + escapeHtml(it.label) + ' · ' + escapeHtml(it.type) + ': ' + escapeHtml(tideItemDetail(it)) + '</div></div>' +
+          '<div class="skill-desc">' + escapeHtml(it.prompt || it.label) + '</div></div>' +
           '<label><input type="checkbox" data-tide-item-enable="' + escapeHtml(it.id) + '"' + (it.enabled ? ' checked' : '') + '> On</label>' +
           '<button type="button" data-tide-item-remove="' + escapeHtml(it.id) + '" style="margin-left:0.5rem; font-size:0.75rem;">Remove</button>' +
           '</div></div>';
@@ -1816,19 +1803,19 @@
 
     document.getElementById('tide-checklist-add').addEventListener('click', async function () {
       var label = document.getElementById('tide-new-label').value.trim();
-      var type = document.getElementById('tide-new-type').value;
-      var val = document.getElementById('tide-new-value').value.trim();
-      if (!label || !val) { alert('Label and value are required.'); return; }
+      var prompt = document.getElementById('tide-new-prompt').value.trim();
+      if (!label) { alert('Label is required.'); return; }
       if (!tideChecklistCache) tideChecklistCache = { items: [] };
-      var item = { id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48), label: label, enabled: true, type: type, timeoutMs: 30000 };
-      if (type === 'shell') item.command = val;
-      else if (type === 'http') item.url = val;
-      else if (type === 'file_exists') item.path = val;
-      else item.builtin = val;
+      var item = {
+        id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48),
+        label: label,
+        prompt: prompt || label,
+        enabled: true
+      };
       tideChecklistCache.items = tideChecklistCache.items || [];
       tideChecklistCache.items.push(item);
       document.getElementById('tide-new-label').value = '';
-      document.getElementById('tide-new-value').value = '';
+      document.getElementById('tide-new-prompt').value = '';
       try {
         await saveTideChecklistFromCache();
       } catch (e) {

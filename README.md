@@ -476,21 +476,21 @@ Tide never sends more than one follow-up per silence period, and never during th
 
 ### Tide checklist (maintenance)
 
-Tide can run a configurable **checklist** of health checks (shell commands, HTTP pings, file existence, or built-ins such as Telegram polling). Automatic runs respect the same `tide.enabled` flag and quiet hours as follow-ups.
+Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same `runAgentTurn` path, skills, and bootstrap context as chat/Tide)—executed **one by one** in order. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user. Automatic runs respect `tide.enabled` and quiet hours.
 
 ```json
 "tide": {
   "enabled": true,
   "checklist": {
     "enabled": true,
-    "triggers": {
-      "onRestart": true,
-      "onCycle": true,
-      "onFollowUp": false
-    },
+    "triggers": { "onRestart": true, "onCycle": true, "onFollowUp": false },
     "items": [
-      { "id": "telegram-polling", "label": "Telegram polling health", "type": "builtin", "builtin": "telegram_polling", "enabled": true },
-      { "id": "disk", "label": "Disk space", "type": "shell", "command": "df -h / | tail -1", "enabled": true }
+      {
+        "id": "time-check",
+        "label": "Local time",
+        "prompt": "What is the current local time? Report OK or FAIL.",
+        "enabled": true
+      }
     ]
   }
 }
@@ -500,14 +500,12 @@ Tide can run a configurable **checklist** of health checks (shell commands, HTTP
 
 ```bash
 cowcode tide checklist list
-cowcode tide checklist add "Disk" --shell "df -h / | tail -1"
-cowcode tide checklist add "API" --http https://example.com
+cowcode tide checklist add "Local time" --prompt "What is the current local time?"
 cowcode tide checklist run
-cowcode tide checklist triggers --on-restart --on-cycle --no-on-follow-up
 cowcode tide checklist on
 ```
 
-**Dashboard:** open **Tide** in the nav to edit items, triggers, and run checks manually. Last results are stored in `~/.cowcode/tide-checklist-last.json`.
+**Dashboard:** **Tide** page — add label + prompt, run manually. Legacy `shell`/`http` config items are converted to prompts automatically.
 
 ---
 

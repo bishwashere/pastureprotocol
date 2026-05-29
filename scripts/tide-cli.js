@@ -2,6 +2,7 @@
 /**
  * Tide checklist CLI: cowcode tide checklist ...
  *   list | add | remove | enable | disable | run | triggers
+ * Each checklist item runs as an agent turn (same LLM/tools path as chat).
  */
 
 import {
@@ -19,22 +20,8 @@ import {
 function parseFlags(argv) {
   const flags = {};
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--shell' && argv[i + 1]) {
-      flags.type = 'shell';
-      flags.command = argv[++i];
-    } else if (argv[i] === '--http' && argv[i + 1]) {
-      flags.type = 'http';
-      flags.url = argv[++i];
-    } else if (argv[i] === '--url' && argv[i + 1]) {
-      flags.url = argv[++i];
-    } else if (argv[i] === '--path' && argv[i + 1]) {
-      flags.type = 'file_exists';
-      flags.path = argv[++i];
-    } else if (argv[i] === '--builtin' && argv[i + 1]) {
-      flags.type = 'builtin';
-      flags.builtin = argv[++i];
-    } else if (argv[i] === '--expect-status' && argv[i + 1]) {
-      flags.expectStatus = Number(argv[++i]);
+    if (argv[i] === '--prompt' && argv[i + 1]) {
+      flags.prompt = argv[++i];
     } else if (argv[i] === '--on-restart') flags.onRestart = true;
     else if (argv[i] === '--no-on-restart') flags.onRestart = false;
     else if (argv[i] === '--on-cycle') flags.onCycle = true;
@@ -48,20 +35,17 @@ function parseFlags(argv) {
 }
 
 function printUsage() {
-  console.log('Tide checklist commands:');
+  console.log('Tide checklist commands (each item = one agent/LLM turn with full skills):');
   console.log('  cowcode tide checklist list');
-  console.log('  cowcode tide checklist add <label> --shell "<command>"');
-  console.log('  cowcode tide checklist add <label> --http <url> [--expect-status 200]');
-  console.log('  cowcode tide checklist add <label> --path <file>');
-  console.log('  cowcode tide checklist add <label> --builtin telegram_polling');
+  console.log('  cowcode tide checklist add <label> [--prompt "what to check"]');
   console.log('  cowcode tide checklist remove <id>');
   console.log('  cowcode tide checklist enable <id>');
   console.log('  cowcode tide checklist disable <id>');
   console.log('  cowcode tide checklist run [--id <id>]');
   console.log('  cowcode tide checklist triggers [--on-restart] [--no-on-cycle] [--on-follow-up] ...');
-  console.log('  cowcode tide checklist on|off           (checklist master switch)');
+  console.log('  cowcode tide checklist on|off');
   console.log('');
-  console.log('Requires tide.enabled in config for automatic runs on restart/cycle/follow-up.');
+  console.log('Requires tide.enabled for automatic runs. Items run one-by-one in order.');
 }
 
 function printList() {
@@ -70,21 +54,14 @@ function printList() {
   console.log('Triggers:', JSON.stringify(checklist.triggers));
   const items = listChecklistItems();
   if (!items.length) {
-    console.log('No items. Add one with: cowcode tide checklist add "My check" --shell "echo ok"');
+    console.log('No items. Example: cowcode tide checklist add "Time check" --prompt "What time is it locally?"');
     return;
   }
   console.log('');
   for (const it of items) {
     const status = it.enabled ? 'on' : 'off';
-    const extra =
-      it.type === 'shell'
-        ? it.command
-        : it.type === 'http'
-          ? it.url
-          : it.type === 'file_exists'
-            ? it.path
-            : it.builtin || it.type;
-    console.log(`  [${status}] ${it.id} — ${it.label} (${it.type}: ${extra || '—'})`);
+    console.log(`  [${status}] ${it.id} — ${it.label}`);
+    console.log(`         prompt: ${(it.prompt || '').slice(0, 100)}${(it.prompt || '').length > 100 ? '…' : ''}`);
   }
   const last = readLastChecklistRun();
   if (last?.at) {
@@ -151,7 +128,7 @@ async function main() {
     }
     const label = labelParts.join(' ').trim();
     const flags = parseFlags(rest.slice(i));
-    const r = addChecklistItem({ label, ...flags });
+    const r = addChecklistItem({ label, prompt: flags.prompt, ...flags });
     console.log(r.ok ? r.message : 'Error: ' + r.message);
     process.exit(r.ok ? 0 : 1);
     return;
@@ -166,7 +143,6 @@ async function main() {
     if (!Object.keys(patch).length) {
       const cl = getTideChecklistFromConfig();
       console.log('Triggers:', JSON.stringify(cl.triggers, null, 2));
-      console.log('Set with: cowcode tide checklist triggers --on-restart --on-cycle --no-on-follow-up');
       return;
     }
     const r = setChecklistTriggers(patch);
@@ -177,16 +153,15 @@ async function main() {
   if (sub === 'run') {
     const onlyIds = [];
     for (let j = 0; j < rest.length; j++) {
-      if (rest[j] === '--id' && rest[j + 1]) {
-        onlyIds.push(rest[++j]);
-      }
+      if (rest[j] === '--id' && rest[j + 1]) onlyIds.push(rest[++j]);
     }
     const summary = await runTideChecklist({ manual: true, trigger: 'manual', onlyIds: onlyIds.length ? onlyIds : undefined });
     for (const r of summary.results || []) {
-      console.log((r.ok ? '✓' : '✗') + ' ' + r.id + ' — ' + r.label + ': ' + r.detail);
+      console.log((r.ok ? '✓' : '✗') + ' ' + r.id + ' — ' + (r.detail || '').slice(0, 200));
+      if (r.skillsCalled?.length) console.log('   skills:', r.skillsCalled.join(', '));
     }
     console.log('');
-    console.log(summary.passed + '/' + summary.total + ' passed');
+    console.log((summary.passed ?? 0) + '/' + (summary.total ?? 0) + ' passed');
     process.exit(summary.failed > 0 ? 1 : 0);
     return;
   }

@@ -683,18 +683,16 @@ app.put('/api/tide/checklist', (req, res) => {
       current.triggers = { ...current.triggers, ...body.triggers };
     }
     if (Array.isArray(body.items)) {
-      current.items = body.items.map((it) => ({
-        id: String(it.id || '').trim() || 'check',
-        label: String(it.label || 'Check').trim(),
-        enabled: it.enabled !== false,
-        type: String(it.type || 'shell'),
-        command: it.command,
-        url: it.url,
-        path: it.path,
-        builtin: it.builtin,
-        expectStatus: it.expectStatus,
-        timeoutMs: it.timeoutMs,
-      }));
+      current.items = body.items.map((it) => {
+        const label = String(it.label || 'Check').trim();
+        return {
+          id: String(it.id || '').trim() || 'check',
+          label,
+          prompt: (it.prompt != null && String(it.prompt).trim()) || label,
+          enabled: it.enabled !== false,
+        };
+      });
+      current.items = normalizeChecklistConfig({ checklist: { items: current.items } }).items;
     }
     config.tide.checklist = current;
     if (body.tideEnabled !== undefined) config.tide.enabled = !!body.tideEnabled;
