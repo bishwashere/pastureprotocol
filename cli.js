@@ -388,8 +388,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       try {
         const skillInstallPath = join(INSTALL_DIR, 'lib', 'skill-install.js');
         const mod = await import(pathToFileURL(skillInstallPath).href);
-        const skillId = mod.normalizeSkillId(skillArg);
-        const result = await mod.runSkillInstall(skillId, INSTALL_DIR);
+        const result = await mod.runSkillInstall(skillArg, INSTALL_DIR);
         if (!result.ok) {
           console.error('cowCode:', result.message);
           process.exit(1);
@@ -420,7 +419,9 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     console.log('Usage: cowcode add <skill-id>');
     console.log('   or: cowcode skills install <skill-id>');
     console.log('  Example: cowcode add speech');
-    console.log('  Installs/enables a skill and prompts only for that skill\'s required env vars.');
+    console.log('  Example: cowcode add github');
+    console.log('  Example: cowcode add google');
+    console.log('  Enables a skill and prompts for whatever credentials it needs.');
     process.exit((sub === 'add' || skillSub === 'install') ? 1 : 0);
   }
 } else {
