@@ -39,8 +39,8 @@ const checks = [
     ok: html.includes('agent-map-node-inbound') && html.includes('agent-map-node-has-inbound'),
   },
   {
-    name: 'Reply return arc CSS and marker exist',
-    ok: html.includes('agent-map-reply-line') && html.includes('agent-reply-arrowhead'),
+    name: 'Grey tree hidden when delegation links exist',
+    ok: /hasDelegationLinks/.test(html) && /!hasDelegationLinks/.test(html),
   },
   {
     name: 'buildInboundLinks helper used on map',

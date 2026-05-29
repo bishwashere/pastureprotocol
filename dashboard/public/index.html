@@ -3738,14 +3738,16 @@
         '<marker id="agent-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#71717a" opacity="0.95"/>' +
         '</marker>' +
-        '<marker id="agent-reply-arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
-          '<polygon points="0 0, 6 3, 0 6" fill="#22c55e" opacity="0.55"/>' +
-        '</marker>' +
       '</defs>';
       var shapes = [];
 
-      // Tree connector lines: root bottom → each child top (elbow style)
-      if (layout.others.length > 0) {
+      var hasDelegationLinks = (agents || []).some(function(a) {
+        var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        return allow.length > 0;
+      });
+
+      // Tree connector lines (grey): org layout only when no team delegation links exist
+      if (layout.others.length > 0 && !hasDelegationLinks) {
         var rp = layout.positions[layout.root.id];
         var rootCX = rp.x + T_NODE_W / 2;
         var rootBotY = rp.y + nh;
@@ -3785,8 +3787,6 @@
           var tx = tp.x + T_NODE_W / 2, ty = tp.y + nh / 2;
           var cx = (fx + tx) / 2, cy = Math.min(fy, ty) - 28;
           shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>');
-          var rcx = (fx + tx) / 2, rcy = Math.max(fy, ty) + 34;
-          shapes.push('<path d="M' + tx + ',' + ty + ' Q' + rcx + ',' + rcy + ' ' + fx + ',' + fy + '" class="agent-map-reply-line" marker-end="url(#agent-reply-arrowhead)"/>');
         });
       });
 
