@@ -35,7 +35,7 @@ Interact with GitHub via the REST API. Read repositories, issues, PRs, and files
 
 ### `list_repos`
 List repositories for the authenticated user or a specified org/user.
-- **owner** (optional) - GitHub username or org (default: authenticated user)
+- **owner** (optional) - GitHub username or org. Omit for the authenticated user. Do **not** use `@me` — leave owner empty instead.
 - **type** (optional) - `all`, `owner`, `member` (default: `owner`)
 - **per_page** (optional) - max results, 1–100 (default: 30)
 

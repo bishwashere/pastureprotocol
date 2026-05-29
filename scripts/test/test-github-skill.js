@@ -5,9 +5,9 @@
  * Live tests: set GITHUB_TOKEN + GITHUB_TEST_REPO="owner/repo" to run API calls.
  */
 
-import { mkdtempSync, writeFileSync, chmodSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 import { executeGithub } from '../../lib/executors/github.js';
 
 let passed = 0;
@@ -54,6 +54,21 @@ function assertConfirmRequired(result) {
 
 const savedToken = process.env.GITHUB_TOKEN;
 const savedStateDir = process.env.COWCODE_STATE_DIR;
+
+function getLiveToken() {
+  if (savedToken) return savedToken;
+  const secretsPath = join(savedStateDir || homedir(), '.cowcode', 'secrets.json');
+  try {
+    if (existsSync(secretsPath)) {
+      const secrets = JSON.parse(readFileSync(secretsPath, 'utf8'));
+      const t = secrets?.github?.token;
+      if (t && String(t).trim()) return String(t).trim();
+    }
+  } catch (_) {}
+  return '';
+}
+
+const liveToken = getLiveToken();
 
 function withNoToken(fn) {
   return async () => {
@@ -106,43 +121,43 @@ await test('reads token from secrets.json', async () => {
 // ── Argument validation ───────────────────────────────────────────────────────
 
 await test('read_repo requires owner/repo format', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'invalid-no-slash' }, 'github_read_repo');
   assertError(result, 'owner/repo');
 });
 
 await test('create_branch requires branch name', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', confirm: true }, 'github_create_branch');
   assertError(result, 'branch');
 });
 
 await test('post_comment requires body', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', number: 1, confirm: true }, 'github_post_comment');
   assertError(result, 'body');
 });
 
 await test('create_pr requires head', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', title: 'test', confirm: true }, 'github_create_pr');
   assertError(result, 'head');
 });
 
 await test('search_code requires query', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, {}, 'github_search_code');
   assertError(result, 'query');
 });
 
 await test('read_issue requires number', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b' }, 'github_read_issue');
   assertError(result, 'number');
 });
 
 await test('unknown action returns list of valid actions', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, {}, 'github_unknown_action');
   assertError(result, 'valid actions');
 });
@@ -150,13 +165,13 @@ await test('unknown action returns list of valid actions', async () => {
 // ── Confirmation guards ───────────────────────────────────────────────────────
 
 await test('create_branch requires confirm:true', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', branch: 'feat/x' }, 'github_create_branch');
   assertConfirmRequired(result);
 });
 
 await test('create_branch confirmation message shows branch and repo', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', branch: 'feat/x' }, 'github_create_branch');
   const obj = parse(result);
   if (!obj.message.includes('feat/x')) throw new Error('Confirmation message must mention branch name');
@@ -164,20 +179,20 @@ await test('create_branch confirmation message shows branch and repo', async () 
 });
 
 await test('post_comment requires confirm:true', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', number: 1, body: 'hello' }, 'github_post_comment');
   assertConfirmRequired(result);
 });
 
 await test('post_comment confirmation message shows body preview', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', number: 5, body: 'Fixed in #8' }, 'github_post_comment');
   const obj = parse(result);
   if (!obj.message.includes('Fixed in #8')) throw new Error('Confirmation must show comment body');
 });
 
 await test('create_pr requires confirm:true', async () => {
-  if (!savedToken) return;
+  if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', title: 'My PR', head: 'feat/x' }, 'github_create_pr');
   assertConfirmRequired(result);
 });
@@ -186,7 +201,25 @@ await test('create_pr requires confirm:true', async () => {
 
 // ── Live integration tests ────────────────────────────────────────────────────
 
-if (savedToken && process.env.GITHUB_TEST_REPO) {
+if (liveToken) {
+  console.log('\n  Running live list_repos tests\n');
+
+  await test('list_repos accepts owner @me (authenticated user)', async () => {
+    const result = await executeGithub({}, { owner: '@me', per_page: 5 }, 'github_list_repos');
+    const arr = parse(result);
+    if (!Array.isArray(arr)) throw new Error(`Expected array, got: ${JSON.stringify(arr).slice(0, 200)}`);
+    if (arr.length === 0) throw new Error('Expected at least one repo for authenticated user');
+  });
+
+  await test('list_repos returns repos for authenticated user', async () => {
+    const result = await executeGithub({}, { per_page: 5 }, 'github_list_repos');
+    const arr = parse(result);
+    if (!Array.isArray(arr)) throw new Error('Expected array');
+    if (arr.length === 0) throw new Error('Expected at least one repo');
+  });
+}
+
+if (liveToken && process.env.GITHUB_TEST_REPO) {
   console.log(`\n  Running live tests against ${process.env.GITHUB_TEST_REPO}\n`);
 
   await test('read_repo returns metadata', async () => {
