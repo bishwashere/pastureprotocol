@@ -60,6 +60,7 @@ import { ensureGroupConfigFor } from './lib/group-config.js';
 import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID } from './lib/agent-config.js';
+import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage, getErrorMessageForLog } from './lib/user-error.js';
@@ -329,6 +330,7 @@ function migrateTideConfig() {
 
 async function main() {
   ensureStateDir();
+  recoverStaleBackgroundTasks();
   ensureMainAgentInitialized();
   migrateSkillsConfigToIncludeDefaults();
   migrateTideConfig();
@@ -850,6 +852,7 @@ async function main() {
     const ctx = {
       storePath: getCronStorePath(),
       jid,
+      sock,
       workspaceDir: getWorkspaceDir(),
       agentId,
       scheduleOneShot,
@@ -860,7 +863,9 @@ async function main() {
       runInternalAgent: isGroupJid ? undefined : runInternalAgentTurn,
       agentDepth: 0,
       agentCallChain: [agentId],
+      onExchange: bioOpts.logExchange,
     };
+    ctx.spawnBackgroundTask = (opts) => spawnBackgroundTask({ ...opts, ctx });
     const isGroupNonOwner = !!bioOpts.groupNonOwner;
     // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
     const groupJidForSkills = isGroupJid ? jid : undefined;
@@ -1400,6 +1405,16 @@ async function main() {
         continue;
       }
 
+      if (userText.trim().toLowerCase() === '/tasks') {
+        const reply = formatTasksList(jid);
+        try {
+          await sock.sendMessage(jid, { text: reply });
+        } catch (e) {
+          pendingReplies.push({ jid, text: reply });
+        }
+        continue;
+      }
+
       if (userSentVoice && userText) {
         userText += '\n\n[The user sent a voice message. Reply using the speech skill with action reply_as_voice so your reply is sent as a voice message. Keep your reply conversational and spoken-word friendly: summarize, answer, or respond naturally. Do NOT read out file names, folder names, long paths, or raw file contents unless the user explicitly asks for them.]';
       }
@@ -1459,6 +1474,7 @@ async function main() {
       telegramRepliedIds,
       MAX_TELEGRAM_REPLIED,
       resetBrowseSession,
+      formatTasksList,
       runPastDueOneShots,
       runAgentWithSkills,
       lastSentByJid,

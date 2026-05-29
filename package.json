@@ -22,6 +22,7 @@
     "test:edit-e2e": "node scripts/test/test-edit-e2e.js",
     "test:me-e2e": "node scripts/test/test-me-e2e.js",
     "test:agent-send": "node scripts/test/test-agent-send.js",
+    "test:background-tasks": "node scripts/test/test-background-tasks.js",
     "test:agent-title": "node scripts/test/test-agent-title.js",
     "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
     "test:tide": "node scripts/test/test-tide.js",

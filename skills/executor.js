@@ -22,6 +22,7 @@ import { executeMe } from '../lib/executors/me.js';
 import { executeCore } from '../lib/executors/core.js';
 import { executeSshInspect } from '../lib/executors/ssh-inspect.js';
 import { executeAgentSend } from '../lib/executors/agent-send.js';
+import { executeBackgroundTasks } from '../lib/executors/background-tasks.js';
 import { executeGithub } from '../lib/executors/github.js';
 import { executeGmail } from '../lib/executors/gmail.js';
 import { executeCalendar } from '../lib/executors/calendar.js';
@@ -45,6 +46,7 @@ const EXECUTORS = {
   me: executeMe,
   'ssh-inspect': executeSshInspect,
   'agent-send': executeAgentSend,
+  'background-tasks': executeBackgroundTasks,
   github: executeGithub,
   gmail: executeGmail,
   calendar: executeCalendar,

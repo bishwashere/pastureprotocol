@@ -33,6 +33,7 @@ export const DEFAULT_ENABLED = [
   'github',
   'gmail',
   'calendar',
+  'background-tasks',
 ];
 
 const MD_NAMES = ['skill.md', 'SKILL.md'];
