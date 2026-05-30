@@ -457,6 +457,16 @@
       overflow-y: auto;
       flex-shrink: 0;
     }
+    .test-sidebar-group + .test-sidebar-group { border-top: 1px solid var(--border); }
+    .test-sidebar-group-title {
+      padding: 0.45rem 0.75rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      background: var(--bg);
+    }
     .test-sidebar-item {
       display: flex;
       align-items: center;
@@ -3193,12 +3203,109 @@
     var testStatusMap = {};
     var activeTestId = null;
     var testRunBusy = false;
+    var TEST_GROUP_ORDER = [
+      'Core Skills',
+      'Agent-to-Agent',
+      'User Skills',
+      'Memory & Workspace',
+      'Utilities & Infra',
+      'Other Tests',
+    ];
+    var TEST_GROUP_BY_ID = {
+      'agent': 'Agent-to-Agent',
+      'agent-config': 'Agent-to-Agent',
+      'agent-map-ui': 'Agent-to-Agent',
+      'agent-send': 'Agent-to-Agent',
+      'agent-team': 'Agent-to-Agent',
+      'background-tasks': 'Agent-to-Agent',
+      'chat-session': 'Agent-to-Agent',
+      'conversation-context': 'Agent-to-Agent',
+      'intent-planner': 'Agent-to-Agent',
+      'retrospective': 'Agent-to-Agent',
+      'session-bootstrap': 'Agent-to-Agent',
+      'basic': 'Core Skills',
+      'edit': 'Core Skills',
+      'e2e-expect': 'Core Skills',
+      'go-read': 'Core Skills',
+      'go-write': 'Core Skills',
+      'output-parse': 'Core Skills',
+      'read': 'Core Skills',
+      'search': 'Core Skills',
+      'vision': 'Core Skills',
+      'write': 'Core Skills',
+      'apply-patch': 'Core Skills',
+      'apply-patch-unit': 'Core Skills',
+      'browser': 'Core Skills',
+      'calendar-skill': 'User Skills',
+      'cron': 'User Skills',
+      'github-skill': 'User Skills',
+      'gmail-skill': 'User Skills',
+      'gog': 'User Skills',
+      'home-assistant': 'User Skills',
+      'home-assistant-format': 'User Skills',
+      'speech': 'User Skills',
+      'telegram-send': 'User Skills',
+      'fixture-state': 'Memory & Workspace',
+      'me': 'Memory & Workspace',
+      'memory': 'Memory & Workspace',
+      'memory-index-files': 'Memory & Workspace',
+      'workspace-chat-days': 'Memory & Workspace',
+      'workspace-path': 'Memory & Workspace',
+      'credential-utils': 'Utilities & Infra',
+      'dry-run': 'Utilities & Infra',
+      'server-inspect': 'Utilities & Infra',
+      'skill-install': 'Utilities & Infra',
+      'test-output-parse': 'Utilities & Infra',
+      'tide': 'Utilities & Infra',
+      'tide-checklist': 'Utilities & Infra',
+      'update-build': 'Utilities & Infra',
+    };
 
     function updateTestRunSkillButton() {
       var btn = document.getElementById('test-run-skill');
       if (!btn) return;
       btn.disabled = testRunBusy || !activeTestId;
       btn.textContent = activeTestId ? ('Run ' + activeTestId) : 'Run skill';
+    }
+
+    function getTestGroupName(testId) {
+      return TEST_GROUP_BY_ID[testId] || 'Other Tests';
+    }
+
+    function groupTestsByCategory(tests) {
+      var buckets = {};
+      TEST_GROUP_ORDER.forEach(function (name) { buckets[name] = []; });
+      tests.forEach(function (t) {
+        var groupName = getTestGroupName(t.id);
+        if (!buckets[groupName]) buckets[groupName] = [];
+        buckets[groupName].push(t);
+      });
+      return TEST_GROUP_ORDER.filter(function (name) { return buckets[name] && buckets[name].length; }).map(function (name) {
+        return { name: name, tests: buckets[name] };
+      });
+    }
+
+    function renderTestSidebarHtml(tests) {
+      return groupTestsByCategory(tests).map(function (group) {
+        var groupItems = group.tests.map(function (t) {
+          var tid = escapeHtml(t.id);
+          var name = escapeHtml(t.name);
+          var statusHtml = '';
+          if (testStatusMap[t.id] !== undefined) {
+            var p = testStatusMap[t.id];
+            statusHtml = '<span class="test-sidebar-status ' + (p ? 'pass' : 'fail') + '">' + (p ? 'PASS' : 'FAIL') + '</span>';
+          }
+          return '<div class="test-sidebar-item" data-test-id="' + tid + '">' +
+            '<span class="test-sidebar-name">' + name + '</span>' +
+            '<button type="button" class="test-run-one" data-test-id="' + tid + '" style="font-size:0.75rem; padding:0.15rem 0.45rem;">Run</button>' +
+            statusHtml +
+            '</div>';
+        }).join('');
+        return '<div class="test-sidebar-group">' +
+          '<div class="test-sidebar-group-title">' + escapeHtml(group.name) + '</div>' +
+          groupItems +
+          '</div>';
+      }).join('');
     }
 
     function setTestRunBusy(busy) {
@@ -3275,20 +3382,7 @@
         var d = await r.json();
         var tests = d.tests || [];
         var sidebar = document.getElementById('test-sidebar');
-        sidebar.innerHTML = tests.map(function (t) {
-          var tid = escapeHtml(t.id);
-          var name = escapeHtml(t.name);
-          var statusHtml = '';
-          if (testStatusMap[t.id] !== undefined) {
-            var p = testStatusMap[t.id];
-            statusHtml = '<span class="test-sidebar-status ' + (p ? 'pass' : 'fail') + '">' + (p ? 'PASS' : 'FAIL') + '</span>';
-          }
-          return '<div class="test-sidebar-item" data-test-id="' + tid + '">' +
-            '<span class="test-sidebar-name">' + name + '</span>' +
-            '<button type="button" class="test-run-one" data-test-id="' + tid + '" style="font-size:0.75rem; padding:0.15rem 0.45rem;">Run</button>' +
-            statusHtml +
-            '</div>';
-        }).join('');
+        sidebar.innerHTML = renderTestSidebarHtml(tests);
 
         sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
           item.addEventListener('click', function (e) {
