@@ -72,14 +72,95 @@
     .team-page-head {
       flex-shrink: 0;
     }
+    .team-page-body {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      gap: 0.65rem;
+    }
+    .team-map-wrap {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
     .team-page-card .agent-map-canvas {
+      flex: 1 1 0;
       min-height: 12rem;
     }
     .team-activity-wrap {
-      margin-top: 0.75rem;
-      border-top: 1px solid var(--border);
-      padding-top: 0.6rem;
+      flex: 0 0 2.4rem;
+      width: 2.4rem;
+      min-width: 2.4rem;
       min-height: 0;
+      overflow: hidden;
+      border-left: 1px solid var(--border);
+      padding-left: 0.55rem;
+      transition: width 0.2s ease, flex-basis 0.2s ease;
+    }
+    .team-activity-wrap.expanded {
+      flex-basis: min(34vw, 26rem);
+      width: min(34vw, 26rem);
+      min-width: 18rem;
+    }
+    .team-activity-shell {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.35rem;
+    }
+    .team-activity-wrap.collapsed .team-activity-shell {
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0.35rem 0.2rem;
+    }
+    .team-activity-wrap.collapsed .team-activity-title,
+    .team-activity-wrap.collapsed .team-activity-status,
+    .team-activity-wrap.collapsed .team-activity-list {
+      display: none;
+    }
+    .team-activity-wrap.collapsed .team-activity-head {
+      margin-bottom: 0;
+      width: 100%;
+      justify-content: center;
+    }
+    .team-activity-toggle {
+      margin: 0;
+      padding: 0.25rem 0.35rem;
+      min-width: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card);
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      line-height: 1;
+      font-size: 0.85rem;
+    }
+    .team-activity-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .team-activity-wrap.collapsed .team-activity-toggle {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      min-height: 5rem;
+      padding: 0.45rem 0.2rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .team-activity-wrap.expanded .team-activity-toggle {
+      min-width: 1.7rem;
+    }
+    .team-activity-wrap.expanded .team-activity-list {
+      min-height: 0;
+      flex: 1 1 0;
     }
     .team-activity-head {
       display: flex;
@@ -99,7 +180,7 @@
       color: var(--muted);
     }
     .team-activity-list {
-      max-height: 11.5rem;
+      max-height: none;
       overflow: auto;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -1803,21 +1884,28 @@
         </div>
         <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to edit. Tree shows hierarchy; dashed arrows show message-passing links.</p>
       </div>
-      <div id="team-map-canvas" class="agent-map-canvas">
-        <div id="team-map-scaler" class="agent-map-scaler">
-          <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
-            <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
-            <div id="team-map-nodes" class="agent-map-nodes"></div>
+      <div class="team-page-body">
+        <div class="team-map-wrap">
+          <div id="team-map-canvas" class="agent-map-canvas">
+            <div id="team-map-scaler" class="agent-map-scaler">
+              <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
+                <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+                <div id="team-map-nodes" class="agent-map-nodes"></div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="team-activity-wrap">
-        <div class="team-activity-head">
-          <h3>Live agent activity</h3>
-          <span id="team-activity-status" class="team-activity-status">Idle</span>
-        </div>
-        <div id="team-activity-list" class="team-activity-list">
-          <p class="team-activity-empty">No activity yet.</p>
+        <div id="team-activity-wrap" class="team-activity-wrap collapsed">
+          <div class="team-activity-shell">
+            <div class="team-activity-head">
+              <h3 class="team-activity-title">Live agent activity</h3>
+              <span id="team-activity-status" class="team-activity-status">Idle</span>
+              <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
+            </div>
+            <div id="team-activity-list" class="team-activity-list">
+              <p class="team-activity-empty">No activity yet.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -4477,6 +4565,20 @@
       list.innerHTML = rows || '<p class="team-activity-empty">No activity yet.</p>';
     }
 
+    var teamActivityExpanded = false;
+
+    function setTeamActivityExpanded(nextExpanded) {
+      teamActivityExpanded = !!nextExpanded;
+      var wrap = document.getElementById('team-activity-wrap');
+      var toggle = document.getElementById('team-activity-toggle');
+      if (!wrap || !toggle) return;
+      wrap.classList.toggle('expanded', teamActivityExpanded);
+      wrap.classList.toggle('collapsed', !teamActivityExpanded);
+      toggle.setAttribute('aria-expanded', teamActivityExpanded ? 'true' : 'false');
+      toggle.textContent = teamActivityExpanded ? 'Collapse' : 'Activity';
+      toggle.title = teamActivityExpanded ? 'Collapse live activity panel' : 'Expand live activity panel';
+    }
+
     async function fetchTeamActivityFeed() {
       try {
         var q = '?since=' + encodeURIComponent(String(teamActivityLastTs || 0)) + '&limit=100';
@@ -4511,6 +4613,14 @@
       fetchTeamActivityFeed();
       teamActivityPollTimer = setInterval(fetchTeamActivityFeed, TEAM_ACTIVITY_POLL_MS);
     }
+
+    var teamActivityToggleEl = document.getElementById('team-activity-toggle');
+    if (teamActivityToggleEl) {
+      teamActivityToggleEl.addEventListener('click', function () {
+        setTeamActivityExpanded(!teamActivityExpanded);
+      });
+    }
+    setTeamActivityExpanded(false);
 
     function stopTeamActivityFeed() {
       if (!teamActivityPollTimer) return;

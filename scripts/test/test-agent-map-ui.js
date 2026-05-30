@@ -63,6 +63,18 @@ const checks = [
     ok: html.includes('id="team-activity-list"') && html.includes('Live agent activity'),
   },
   {
+    name: 'Team activity panel has collapse toggle',
+    ok: html.includes('id="team-activity-toggle"') && html.includes('setTeamActivityExpanded'),
+  },
+  {
+    name: 'Team activity panel defaults to collapsed',
+    ok: html.includes('id="team-activity-wrap" class="team-activity-wrap collapsed"') && html.includes('setTeamActivityExpanded(false);'),
+  },
+  {
+    name: 'Team page uses right-side split layout',
+    ok: html.includes('class="team-page-body"') && /\.team-activity-wrap\s*\{[^}]*border-left:\s*1px/s.test(html),
+  },
+  {
     name: 'Team page has activity feed polling hooks',
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
