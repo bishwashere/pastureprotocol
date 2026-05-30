@@ -14,7 +14,10 @@ import { NEW_SESSION_ACK } from '../../lib/chat-session.js';
 
 /** How a real user would ask — no skill names or meta-instructions. */
 const ASK_MARKETER_TAGLINE = "Hey, ask the marketer — what's our company tagline?";
-const ASK_CHLOE_TAGLINE = "Hey Chloe — what's our company tagline?";
+/** After title rename to Chloe — user asks the teammate by name, not a tool. */
+const ASK_CHLOE_TAGLINE = 'Could you ask Chloe what our company tagline is?';
+/** Short follow-up in same session after user nicknamed the marketer Chloe. */
+const ASK_CHLOE_TAGLINE_SHORT = "Chloe, what's our tagline?";
 const ASK_ALEX_CHECK = "Can you check with Alex if he's around?";
 
 function assert(cond, msg) {
@@ -110,7 +113,7 @@ async function main() {
     },
     {
       name: 'two-turn: nickname then short ask (same session)',
-      input: `Turn1: Let's call the marketer Chloe. Turn2: ${ASK_CHLOE_TAGLINE}`,
+      input: `Turn1: Let's call the marketer agent Chloe. Turn2: ${ASK_CHLOE_TAGLINE_SHORT}`,
       expectMode: 'actual',
       skill: 'agent-send',
       actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
@@ -118,7 +121,7 @@ async function main() {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { renameMarketerToChloe: true });
         const msg1 = "Let's call the marketer agent Chloe.";
-        const { reply, skillsCalled } = await runE2E(msg1, { stateDir, secondMessage: ASK_CHLOE_TAGLINE });
+        const { reply, skillsCalled } = await runE2E(msg1, { stateDir, secondMessage: ASK_CHLOE_TAGLINE_SHORT });
         assertDelegatedOrAnswered(reply, skillsCalled);
         return { reply, skillsCalled, stateDir };
       },
