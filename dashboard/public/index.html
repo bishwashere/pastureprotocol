@@ -1404,7 +1404,6 @@
     <a href="#memory" data-page="memory">Memory</a>
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
-    <a href="#agents" data-page="agents">Agents</a>
     <a href="#team" data-page="team">Team</a>
     <a href="#groups" data-page="groups">Groups</a>
     <a href="#llm" data-page="llm">LLM</a>
@@ -1971,7 +1970,7 @@
   <script type="module" src="test-output-parse.js"></script>
   <script>
     const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -2007,7 +2006,6 @@
       document.body.classList.toggle('dashboard-team-active', name === 'team');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
-      if (name === 'agents') fetchAgentsPage();
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
       if (name === 'team') fetchAgentMapData();
@@ -2029,6 +2027,7 @@
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
+      if (name === 'agents') name = 'team';
       if (name === 'team') {
         if (!subFile) {
           return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };

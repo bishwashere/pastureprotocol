@@ -74,6 +74,14 @@ const checks = [
     name: 'buildInboundLinks helper used on map',
     ok: /buildInboundLinks\(agents\)/.test(html),
   },
+  {
+    name: 'Top nav uses Team (no Agents tab)',
+    ok: html.includes('data-page="team"') && !html.includes('data-page="agents"'),
+  },
+  {
+    name: 'Legacy #agents hash redirects to team route',
+    ok: /if \(name === 'agents'\) name = 'team';/.test(html),
+  },
 ];
 
 let failed = 0;
