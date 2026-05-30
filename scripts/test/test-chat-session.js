@@ -10,6 +10,9 @@ import {
   ensureChatSession,
   getSessionDayKey,
   isNewSessionRequest,
+  isNewSessionOnlyRequest,
+  shouldAckNewSessionOnly,
+  NEW_SESSION_ACK,
   startNewSession,
 } from '../../lib/chat-session.js';
 import { appendExchange, readLastPrivateExchanges } from '../../lib/chat-log.js';
@@ -35,6 +38,11 @@ async function main() {
 
   if (!isNewSessionRequest('start a new session')) throw new Error('isNewSessionRequest failed');
   if (isNewSessionRequest('hello there')) throw new Error('false positive isNewSessionRequest');
+  if (!isNewSessionOnlyRequest('new session')) throw new Error('isNewSessionOnlyRequest failed');
+  if (isNewSessionOnlyRequest('new session, fix agents')) throw new Error('prefix should not be only');
+  if (!shouldAckNewSessionOnly('manual', 'new session')) throw new Error('shouldAckNewSessionOnly manual');
+  if (shouldAckNewSessionOnly('daily', 'new session')) throw new Error('daily should not ack');
+  if (NEW_SESSION_ACK.length < 20) throw new Error('NEW_SESSION_ACK should stay brief');
 
   const s1 = startNewSession(logKey, 'manual');
   appendExchange(workspaceDir, {

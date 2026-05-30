@@ -846,7 +846,7 @@ Chat history is written to plain text files in `~/.cowcode/workspace/` so you ca
 LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group). Full logs still append to the same JSONL files with a `sessionId` field.
 
 - **Daily reset** - New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
-- **Manual reset** - Say e.g. `start a new session`, `new session`, or `/new-session` (no special reply text; context simply clears).
+- **Manual reset** - Say e.g. `start a new session`, `new session`, or `/new-session`. Context clears and the bot replies briefly (e.g. "New session started.").
 - **State file** - `~/.cowcode/chat-sessions/state.json`
 - **Bootstrap (not in session history)** - On each **new session**, daemon **restart**, and every **Tide** follow-up, the model receives `MEMORY.md` plus **today and yesterday’s chat logs** (`chat-log/YYYY-MM-DD.jsonl` and, for private chats, `chat-log/private/<jid>.jsonl`). Chat session history stays scoped to the current session only.
 

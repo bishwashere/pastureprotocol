@@ -19,7 +19,7 @@ import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent-config.js';
 import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
-import { ensureChatSession } from '../lib/chat-session.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from '../lib/chat-session.js';
 import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
 import { getOwnerLogJid } from '../lib/owner-config.js';
 import { getMemoryConfig } from '../lib/memory-config.js';
@@ -75,9 +75,35 @@ async function main() {
   // their own AI. Use the unified owner log jid so this conversation shares the
   // same chat-log file and memory index as the owner's Telegram/WhatsApp DMs.
   const dashboardJid = getOwnerLogJid();
-  const { sessionId, rotated: sessionRotated } = ensureChatSession(dashboardJid, { userText: message });
+  const { sessionId, rotated: sessionRotated, reason: sessionReason } = ensureChatSession(dashboardJid, { userText: message });
   if (sessionRotated) {
     process.stderr.write(`[chat-dashboard] new session ${sessionId}\n`);
+  }
+  if (shouldAckNewSessionOnly(sessionReason, message)) {
+    const reply = NEW_SESSION_ACK;
+    const exchange = {
+      user: message,
+      assistant: reply,
+      timestampMs: Date.now(),
+      jid: dashboardJid,
+      sessionId,
+    };
+    try {
+      const memoryConfig = getMemoryConfig();
+      if (memoryConfig) {
+        const logMeta = await indexChatExchange(memoryConfig, exchange);
+        afterExchangeLogged(workspaceDir, exchange, logMeta);
+      } else {
+        const logMeta = appendExchange(workspaceDir, exchange);
+        afterExchangeLogged(workspaceDir, exchange, logMeta);
+      }
+    } catch (memErr) {
+      try {
+        process.stderr.write(`[chat-dashboard] memory index failed: ${memErr?.message || memErr}\n`);
+      } catch (_) {}
+    }
+    writeNdjsonLine({ type: 'done', reply });
+    return;
   }
   await beforeUserMessage(workspaceDir, dashboardJid, sessionId, message);
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`

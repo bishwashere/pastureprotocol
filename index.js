@@ -58,7 +58,7 @@ import {
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
-import { ensureChatSession } from './lib/chat-session.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
@@ -850,8 +850,44 @@ async function main() {
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
     const logJid = isGroupJid ? jid : toLogJid(jid);
     const sessionLogKey = String(logJid || jid).trim();
-    const { sessionId, rotated: sessionRotated } = ensureChatSession(sessionLogKey, { userText: text });
+    const { sessionId, rotated: sessionRotated, reason: sessionReason } = ensureChatSession(sessionLogKey, { userText: text });
     if (sessionRotated) clearInMemoryHistoryForJids(jid, logJid, sessionLogKey);
+    if (shouldAckNewSessionOnly(sessionReason, text)) {
+      const replyText = NEW_SESSION_ACK;
+      try {
+        const sent = await sock.sendMessage(jid, { text: replyText });
+        if (sent?.key?.id && ourSentIdsRef?.current) {
+          ourSentIdsRef.current.add(sent.key.id);
+          if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
+            const first = ourSentIdsRef.current.values().next().value;
+            if (first) ourSentIdsRef.current.delete(first);
+          }
+        }
+        lastSentByJidMap.set(jid, replyText);
+        pushExchange(jid, text, replyText, sessionId);
+        const exchange = { user: text, assistant: replyText, timestampMs: Date.now(), jid: logJid, sessionId };
+        if (bioOpts.logExchange) {
+          bioOpts.logExchange(exchange);
+        } else if (!isGroupJid) {
+          const memoryConfig = getMemoryConfig();
+          if (memoryConfig) {
+            indexChatExchange(memoryConfig, exchange)
+              .then((logMeta) => afterExchangeLogged(getWorkspaceDir(), exchange, logMeta))
+              .catch((err) => console.error('[memory] auto-index failed:', err.message));
+          } else {
+            const logMeta = appendExchange(getWorkspaceDir(), exchange);
+            afterExchangeLogged(getWorkspaceDir(), exchange, logMeta);
+          }
+        }
+        console.log('[replied] (new session ack)');
+      } catch (sendErr) {
+        lastSentByJidMap.set(jid, replyText);
+        if (!isTelegramChatId(jid)) pendingReplies.push({ jid, text: replyText });
+        else addPendingTelegram(jid, replyText);
+        console.log('[replied] new session ack queued (send failed):', getErrorMessageForLog(sendErr));
+      }
+      return { skillsCalled: [] };
+    }
     if (!isGroupJid) {
       await beforeUserMessage(getWorkspaceDir(), logJid, sessionId, text);
     }
