@@ -1,6 +1,8 @@
-# Agent config contract test
+# Agent config (unit — no LLM)
 
-Natural user messages N/A — config/on-disk checks only. See [agent-team/inputs.md](../agent-team/inputs.md) for E2E chat scenarios.
+**This suite does not run the chat agent or LLM.** It only checks config on disk (team links, rename aliases, allow-list repair).
+
+For **real user messages → LLM → bot reply → agent-send**, use **[Agent Team E2E](../agent-team/inputs.md)** in the Tests panel (`pnpm run test:agent-team-e2e`).
 
 | | |
 |--|--|
@@ -8,7 +10,10 @@ Natural user messages N/A — config/on-disk checks only. See [agent-team/inputs
 
 ## Inputs
 
-### Contract checks (no user chat)
-- Team links enable agent-send on main
-- Rename marketer → Chloe keeps id + title aliases
-- Stale allow list `[chloe, ghost]` repairs to `marketer` and drops unknown ids
+| Scenario | Message |
+|----------|---------|
+| Team links | Setup: main.agentMessaging.allow = [marketer, alex] |
+| Rename Chloe | Setup: PATCH marketer title to Chloe, then resolve Marketer / chloe / Chloe |
+| Stale allow list | Setup: save allow [chloe, ghost, alex] — expect marketer (not chloe), no ghost |
+
+Expected **Output** in the UI: JSON-style facts (`allow=[...]`, `resolveAgentReference` results) — not a chat reply.

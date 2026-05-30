@@ -930,8 +930,10 @@ function getTestList() {
     const scriptPath = existsSync(scriptE2e) ? scriptE2e : (existsSync(scriptPlain) ? scriptPlain : null);
     if (!scriptPath) continue;
     const script = 'scripts/test/' + (existsSync(scriptE2e) ? 'test-' + id + '-e2e.js' : 'test-' + id + '.js');
-    const name = id.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') +
+    let name = id.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') +
       (script.endsWith('-e2e.js') ? ' E2E' : '');
+    if (id === 'agent-config') name = 'Agent Config (unit, no LLM)';
+    if (id === 'agent-team') name = 'Agent Team E2E (LLM + chat)';
     list.push({ id, name, script, inputsPath: 'scripts/test/' + id + '/inputs.md' });
   }
   return list;
