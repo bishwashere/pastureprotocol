@@ -16,9 +16,11 @@ That file was deleted in favor of **real user-path E2E** (`index.js --test` / da
 | Short reply "Chloe" after rename offer | Partially similar to two-turn nickname test; full history probe not duplicated in E2E |
 | New session ack | `test-agent-team-e2e.js` + `test-chat-session.js` |
 
-Run config contracts: `node scripts/test/test-agent-config.js`
+Run config contracts: `pnpm run test:agent-config` (see **agent-config** in Tests panel).
 
-## E2E scenarios
+## Inputs
+
+### E2E scenarios
 
 | Scenario | User says |
 |----------|-----------|

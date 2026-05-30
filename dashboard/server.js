@@ -1004,9 +1004,20 @@ function parseInputMessages(content) {
   let inInputs = false;
   let tableMessageCol = -1;
 
+  function messageColIndex(cols) {
+    const i = cols.findIndex((c) => /^Message$/i.test(c) || /^User says$/i.test(c));
+    return i;
+  }
+
   for (const raw of lines) {
     const t = raw.trim();
-    if (/^##\s+Inputs/.test(t)) { inInputs = true; continue; }
+    if (/^##\s+(Inputs|E2E scenarios)\b/i.test(t)) {
+      if (cur.messages.length || cur.group) groups.push(cur);
+      cur = { group: '', messages: [] };
+      inInputs = true;
+      tableMessageCol = -1;
+      continue;
+    }
     if (!inInputs) continue;
     if (/^##\s+/.test(t) && !/^###/.test(t)) break; // next h2 ends Inputs
 
@@ -1017,15 +1028,15 @@ function parseInputMessages(content) {
       continue;
     }
 
-    if (t.startsWith('|') && /Message/i.test(t)) {
-      const cols = t.split('|').map(c => c.trim()).filter(Boolean);
-      tableMessageCol = cols.findIndex(c => /^Message$/i.test(c));
+    if (t.startsWith('|') && (/Message/i.test(t) || /User says/i.test(t))) {
+      const cols = t.split('|').map((c) => c.trim()).filter(Boolean);
+      tableMessageCol = messageColIndex(cols);
       continue;
     }
     if (/^\|[\s\-|]+\|$/.test(t)) continue;
 
     if (tableMessageCol >= 0 && t.startsWith('|')) {
-      const cols = t.split('|').map(c => c.trim()).filter(Boolean);
+      const cols = t.split('|').map((c) => c.trim()).filter(Boolean);
       if (cols[tableMessageCol]) cur.messages.push(cols[tableMessageCol]);
       continue;
     }
