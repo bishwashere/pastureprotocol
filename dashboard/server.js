@@ -13,6 +13,7 @@ import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
+import { readTeamActivity } from '../lib/team-activity.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
@@ -377,6 +378,20 @@ app.get('/api/agents', (_req, res) => {
       };
     });
     res.json({ agents });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/team/activity', (req, res) => {
+  try {
+    const since = Number(req.query?.since);
+    const limit = Number(req.query?.limit);
+    const events = readTeamActivity({
+      since: Number.isFinite(since) ? since : 0,
+      limit: Number.isFinite(limit) ? limit : 80,
+    });
+    res.json({ events, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

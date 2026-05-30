@@ -59,6 +59,14 @@ const checks = [
     ok: html.includes('id="page-team"') && html.includes('id="team-map-canvas"'),
   },
   {
+    name: 'Team page includes live activity panel',
+    ok: html.includes('id="team-activity-list"') && html.includes('Live agent activity'),
+  },
+  {
+    name: 'Team page has activity feed polling hooks',
+    ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
+  },
+  {
     name: 'Team hash route without agent id opens map page',
     ok: /if \(!subFile\)[\s\S]*name: 'team'/.test(html),
   },

@@ -75,6 +75,68 @@
     .team-page-card .agent-map-canvas {
       min-height: 12rem;
     }
+    .team-activity-wrap {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.6rem;
+      min-height: 0;
+    }
+    .team-activity-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.45rem;
+    }
+    .team-activity-head h3 {
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .team-activity-status {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .team-activity-list {
+      max-height: 11.5rem;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+    }
+    .team-activity-empty {
+      margin: 0;
+      padding: 0.55rem 0.65rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .team-activity-item {
+      display: flex;
+      gap: 0.55rem;
+      align-items: flex-start;
+      padding: 0.5rem 0.65rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.74rem;
+      line-height: 1.35;
+    }
+    .team-activity-item:first-child {
+      border-top: none;
+    }
+    .team-activity-time {
+      color: var(--muted);
+      font-size: 0.67rem;
+      min-width: 4.2rem;
+      flex-shrink: 0;
+      padding-top: 0.03rem;
+    }
+    .team-activity-text {
+      color: var(--text);
+      word-break: break-word;
+    }
+    .team-activity-text .accent {
+      color: var(--accent);
+    }
     .chat-page-split {
       flex: 1 1 0;
       min-height: 0;
@@ -1749,6 +1811,15 @@
           </div>
         </div>
       </div>
+      <div class="team-activity-wrap">
+        <div class="team-activity-head">
+          <h3>Live agent activity</h3>
+          <span id="team-activity-status" class="team-activity-status">Idle</span>
+        </div>
+        <div id="team-activity-list" class="team-activity-list">
+          <p class="team-activity-empty">No activity yet.</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1981,6 +2052,12 @@
     };
     var AGENT_IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md', 'MEMORY.md'];
     var tideChecklistCache = null;
+    var TEAM_ACTIVITY_POLL_MS = 1200;
+    var TEAM_ACTIVITY_MAX_ITEMS = 120;
+    var teamActivityEvents = [];
+    var teamActivityEventIds = {};
+    var teamActivityLastTs = 0;
+    var teamActivityPollTimer = null;
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -2008,7 +2085,12 @@
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
-      if (name === 'team') fetchAgentMapData();
+      if (name === 'team') {
+        fetchAgentMapData();
+        startTeamActivityFeed();
+      } else {
+        stopTeamActivityFeed();
+      }
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
@@ -4315,12 +4397,125 @@
         agentMapData = agents;
         if (!agents.length) agentMapData = [{ id: 'main' }];
         renderAgentMap();
+        renderTeamActivity();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
         renderAgentMap();
+        renderTeamActivity();
         return agentMapData;
       }
+    }
+
+    function agentNameById(agentId) {
+      var id = (agentId || '').trim();
+      if (!id) return '';
+      var hit = (agentMapData || []).find(function (a) { return a && a.id === id; });
+      if (hit) return agentDisplayLabel(hit);
+      return id;
+    }
+
+    function formatTeamActivityText(event) {
+      var type = String(event && event.type || '');
+      var agent = agentNameById(String(event && event.agentId || ''));
+      var target = agentNameById(String(event && event.targetAgentId || ''));
+      var skill = String(event && event.skillId || '');
+      var action = String(event && event.action || '');
+      var msg = String(event && event.message || '');
+      if (type === 'delegation_start') {
+        var routeNote = msg ? ' ' + escapeHtml(msg) + '.' : '';
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + routeNote;
+      }
+      if (type === 'delegation_done') {
+        var doneNote = msg ? ' ' + escapeHtml(msg) + '.' : '';
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> received a reply from <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + doneNote;
+      }
+      if (type === 'delegation_error') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> failed delegating to <span class="accent">' + escapeHtml(target || 'agent') + '</span>: ' + escapeHtml(msg || 'Error');
+      }
+      if (type === 'skill_start') {
+        var task = action ? (skill + ':' + action) : skill;
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> started <span class="accent">' + escapeHtml(task || 'task') + '</span>.';
+      }
+      if (type === 'skill_done') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> completed <span class="accent">' + escapeHtml(skill || 'task') + '</span>.';
+      }
+      if (type === 'skill_error') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> failed <span class="accent">' + escapeHtml(skill || 'task') + '</span>: ' + escapeHtml(msg || 'Error');
+      }
+      if (type === 'turn_start') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> took a new task: ' + escapeHtml(msg || 'request');
+      }
+      if (type === 'turn_done') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> finished the task. ' + escapeHtml(msg || '');
+      }
+      if (msg) return escapeHtml(msg);
+      return escapeHtml(type || 'event');
+    }
+
+    function renderTeamActivity() {
+      var list = document.getElementById('team-activity-list');
+      var statusEl = document.getElementById('team-activity-status');
+      if (!list) return;
+      if (!teamActivityEvents.length) {
+        list.innerHTML = '<p class="team-activity-empty">No activity yet.</p>';
+        if (statusEl) statusEl.textContent = 'Idle';
+        return;
+      }
+      var recentTs = teamActivityEvents[teamActivityEvents.length - 1].ts || 0;
+      if (statusEl) {
+        var ageMs = Math.max(0, Date.now() - recentTs);
+        statusEl.textContent = ageMs < 6000 ? 'Live' : 'Waiting';
+      }
+      var rows = teamActivityEvents.slice(-40).reverse().map(function (event) {
+        var time = new Date(event.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return '<div class="team-activity-item">' +
+          '<div class="team-activity-time">' + escapeHtml(time) + '</div>' +
+          '<div class="team-activity-text">' + formatTeamActivityText(event) + '</div>' +
+        '</div>';
+      }).join('');
+      list.innerHTML = rows || '<p class="team-activity-empty">No activity yet.</p>';
+    }
+
+    async function fetchTeamActivityFeed() {
+      try {
+        var q = '?since=' + encodeURIComponent(String(teamActivityLastTs || 0)) + '&limit=100';
+        var r = await fetch(API + '/api/team/activity' + q);
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        var events = Array.isArray(d.events) ? d.events : [];
+        if (!events.length) {
+          renderTeamActivity();
+          return;
+        }
+        events.forEach(function (event) {
+          var id = String(event && event.id || '');
+          if (!id || teamActivityEventIds[id]) return;
+          teamActivityEventIds[id] = true;
+          teamActivityEvents.push(event);
+          if (Number(event.ts) > teamActivityLastTs) teamActivityLastTs = Number(event.ts);
+        });
+        if (teamActivityEvents.length > TEAM_ACTIVITY_MAX_ITEMS) {
+          teamActivityEvents = teamActivityEvents.slice(-TEAM_ACTIVITY_MAX_ITEMS);
+          teamActivityEventIds = {};
+          teamActivityEvents.forEach(function (event) {
+            if (event && event.id) teamActivityEventIds[event.id] = true;
+          });
+        }
+      } catch (_) {}
+      renderTeamActivity();
+    }
+
+    function startTeamActivityFeed() {
+      if (teamActivityPollTimer) return;
+      fetchTeamActivityFeed();
+      teamActivityPollTimer = setInterval(fetchTeamActivityFeed, TEAM_ACTIVITY_POLL_MS);
+    }
+
+    function stopTeamActivityFeed() {
+      if (!teamActivityPollTimer) return;
+      clearInterval(teamActivityPollTimer);
+      teamActivityPollTimer = null;
     }
 
     function setChatAgent(agentId) {

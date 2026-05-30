@@ -26,6 +26,10 @@ async function loadAgentConfigModule() {
   return import('../../lib/agent-config.js');
 }
 
+async function loadAgentSendModule() {
+  return import('../../lib/executors/agent-send.js');
+}
+
 async function patchAgentConfig(agentId, patch, ac) {
   const {
     loadAgentConfig,
@@ -130,6 +134,50 @@ async function main() {
           !repaired.allow.includes('chloe');
         if (!ok) throw new Error(`allow repair failed: [${repaired.allow.join(', ')}]`);
         const output = `repaired allow=[${repaired.allow.join(', ')}] (chloe→marketer, ghost dropped)`;
+        return { reply: output };
+      },
+    },
+    {
+      name: 'auto delegation picks linked specialist by skills',
+      input: 'Setup: main linked to marketer+alex; marketer has calendar, alex has github; agent-send auto with skill=github routes to alex',
+      expectMode: 'behavior',
+      run: async () => {
+        createStateDir();
+        const ac = await loadAgentConfigModule();
+        const { executeAgentSend } = await loadAgentSendModule();
+        ac.ensureMainAgentInitialized();
+        ac.createAgent('marketer', { fromAgentId: 'main', title: 'Marketer' });
+        ac.createAgent('alex', { fromAgentId: 'main', title: 'Alex' });
+        await patchAgentConfig('main', { agentMessaging: { allow: ['marketer', 'alex'] } }, ac);
+        const marketerCfg = ac.loadAgentConfig('marketer');
+        marketerCfg.skills = marketerCfg.skills || {};
+        marketerCfg.skills.enabled = ['calendar'];
+        ac.saveAgentConfig('marketer', marketerCfg);
+        const alexCfg = ac.loadAgentConfig('alex');
+        alexCfg.skills = alexCfg.skills || {};
+        alexCfg.skills.enabled = ['github'];
+        ac.saveAgentConfig('alex', alexCfg);
+        let delegatedTo = '';
+        const raw = await executeAgentSend({
+          agentId: 'main',
+          agentDepth: 0,
+          agentCallChain: ['main'],
+          runInternalAgent: async ({ targetAgentId }) => {
+            delegatedTo = targetAgentId;
+            return { textToSend: '[CowCode] stub reply', skillsCalled: [] };
+          },
+        }, {
+          agent: 'auto',
+          message: 'Please check this pull request and CI status.',
+          skill: 'github',
+        });
+        const out = JSON.parse(raw);
+        if (out.error) throw new Error(out.error);
+        if (out.agent !== 'alex' || delegatedTo !== 'alex') {
+          throw new Error(`Expected auto-route to alex, got out.agent=${out.agent}, delegatedTo=${delegatedTo}`);
+        }
+        const matched = Array.isArray(out.route?.matchedSkills) ? out.route.matchedSkills.join(',') : '';
+        const output = `auto route=${out.route?.mode || 'none'}, agent=${out.agent}, matchedSkills=[${matched}]`;
         return { reply: output };
       },
     },

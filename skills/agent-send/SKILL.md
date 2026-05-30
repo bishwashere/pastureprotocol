@@ -22,7 +22,7 @@ Do **not** use it to talk to yourself, and do not use it in group chats (it is d
 
 Use the **agent_send_send** tool with:
 
-- **agent** (required) - the target agent **id** (e.g. `"backend"`) or display **title** (e.g. `"Marketer"`). Must be in your allow list. Prefer the canonical id from the Agent team block in your system prompt.
+- **agent** (required) - the target agent **id** (e.g. `"backend"`) or display **title** (e.g. `"Marketer"`). Must be in your allow list. Prefer the canonical id from the Agent team block in your system prompt. You can also pass `"auto"` to let cowCode pick the best linked teammate by skill match.
 - **message** (required) - the full question/task. Include everything the target needs; it does not see your conversation with the user.
 
 After you get the reply, synthesize a single answer for the user. You may message multiple agents (subject to the per-turn limit) and combine their replies.
@@ -57,6 +57,10 @@ Optional limits in the agent config (defaults shown):
 Ask the backend agent a question:
 
 `agent_send_send` with `{ "agent": "backend", "message": "Propose JWT vs session auth for a REST API and justify briefly." }`
+
+Auto-route to the best linked specialist:
+
+`agent_send_send` with `{ "agent": "auto", "message": "Please investigate why GitHub CI is failing and suggest a fix." }`
 
 Coordinate two specialists, then summarize:
 
