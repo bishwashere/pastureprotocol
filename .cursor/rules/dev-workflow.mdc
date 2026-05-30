@@ -19,7 +19,7 @@ Use `tail -n 100 ~/.cowcode/daemon.log` or `tail -n 100 ~/.cowcode/daemon.err` t
 
 Whenever a feature is added or an existing one is modified:
 
-1. **Find the relevant test** in `scripts/test/` (pattern: `test-<feature>.js` or `test-<feature>-e2e.js`).
+1. **Find the relevant test** in `scripts/test/` (pattern: `test-<feature>.js` or `test-<feature>-e2e.js`). When adding or changing tests, also go through **[scripts/test/E2E.md](scripts/test/E2E.md)**.
 2. **If a test exists**, run it:
    ```
    pnpm run test:<feature-name>
