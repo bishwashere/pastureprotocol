@@ -15,6 +15,10 @@ const checks = [
     ok: html.includes('.test-sidebar-group-title') && html.includes('.test-sidebar-group + .test-sidebar-group'),
   },
   {
+    name: 'Overview tile CSS and container exist',
+    ok: html.includes('.test-overview-tiles') && html.includes('.test-overview-tile') && html.includes('id="test-overview-tiles"'),
+  },
+  {
     name: 'Test group order contains 5+ logical sections',
     ok: /var TEST_GROUP_ORDER = \[[\s\S]*'Core Skills'[\s\S]*'Agent-to-Agent'[\s\S]*'User Skills'[\s\S]*'Memory & Workspace'[\s\S]*'Utilities & Infra'/.test(html),
   },
@@ -23,12 +27,16 @@ const checks = [
     ok: /function getTestGroupName\(testId\)/.test(html) && /function groupTestsByCategory\(tests\)/.test(html),
   },
   {
+    name: 'Overview tile rendering and filter handlers exist',
+    ok: /function renderOverviewTiles\(tests\)/.test(html) && /data-test-group/.test(html) && /activeTestGroup/.test(html),
+  },
+  {
     name: 'Sidebar renderer prints grouped sections',
     ok: /function renderTestSidebarHtml\(tests\)/.test(html) && html.includes('test-sidebar-group-title'),
   },
   {
     name: 'fetchTests uses grouped sidebar renderer',
-    ok: /sidebar\.innerHTML = renderTestSidebarHtml\(tests\);/.test(html),
+    ok: /renderOverviewTiles\(testListCache\);/.test(html) && /refreshTestSidebar\(\);/.test(html),
   },
 ];
 

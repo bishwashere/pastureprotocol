@@ -449,6 +449,33 @@
       height: calc(100vh - 11rem);
       min-height: 400px;
     }
+    .test-overview-tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.5rem;
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .test-overview-tile {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      padding: 0.5rem 0.6rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .test-overview-tile:hover { border-color: var(--accent); }
+    .test-overview-tile.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+    .test-overview-tile-title { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .test-overview-tile-count { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .test-overview-tile-status { font-size: 0.75rem; color: var(--muted); }
     .test-sidebar {
       min-width: 14rem;
       max-width: 18rem;
@@ -1889,6 +1916,7 @@
           <button type="button" id="test-run-all" style="font-size:0.8rem;">Run all</button>
         </div>
       </div>
+      <div id="test-overview-tiles" class="test-overview-tiles"></div>
       <div class="test-master-detail">
         <div id="test-sidebar" class="test-sidebar"></div>
         <div id="test-detail-area" class="test-detail-area">
@@ -3201,7 +3229,9 @@
     var testRawResults = {};
     var testInputsCache = {};
     var testStatusMap = {};
+    var testListCache = [];
     var activeTestId = null;
+    var activeTestGroup = 'all';
     var testRunBusy = false;
     var TEST_GROUP_ORDER = [
       'Core Skills',
@@ -3285,8 +3315,55 @@
       });
     }
 
+    function getVisibleTests(tests) {
+      if (activeTestGroup === 'all') return tests.slice();
+      return tests.filter(function (t) { return getTestGroupName(t.id) === activeTestGroup; });
+    }
+
+    function groupTileStatusText(tests) {
+      if (!tests.length) return 'No tests';
+      var done = tests.filter(function (t) { return testStatusMap[t.id] !== undefined; });
+      if (!done.length) return 'Not run yet';
+      var pass = done.filter(function (t) { return !!testStatusMap[t.id]; }).length;
+      var fail = done.length - pass;
+      if (!fail) return pass + '/' + done.length + ' passed';
+      if (!pass) return fail + '/' + done.length + ' failed';
+      return pass + ' pass · ' + fail + ' fail';
+    }
+
+    function renderOverviewTiles(tests) {
+      var el = document.getElementById('test-overview-tiles');
+      if (!el) return;
+      var groups = groupTestsByCategory(tests);
+      var allStatus = groupTileStatusText(tests);
+      var tiles = [
+        '<button type="button" class="test-overview-tile' + (activeTestGroup === 'all' ? ' active' : '') + '" data-test-group="all">' +
+          '<span class="test-overview-tile-title">All Tests</span>' +
+          '<span class="test-overview-tile-count">' + tests.length + '</span>' +
+          '<span class="test-overview-tile-status">' + escapeHtml(allStatus) + '</span>' +
+        '</button>',
+      ];
+      groups.forEach(function (group) {
+        tiles.push(
+          '<button type="button" class="test-overview-tile' + (activeTestGroup === group.name ? ' active' : '') + '" data-test-group="' + escapeHtml(group.name) + '">' +
+            '<span class="test-overview-tile-title">' + escapeHtml(group.name) + '</span>' +
+            '<span class="test-overview-tile-count">' + group.tests.length + '</span>' +
+            '<span class="test-overview-tile-status">' + escapeHtml(groupTileStatusText(group.tests)) + '</span>' +
+          '</button>',
+        );
+      });
+      el.innerHTML = tiles.join('');
+      el.querySelectorAll('.test-overview-tile').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          activeTestGroup = btn.getAttribute('data-test-group') || 'all';
+          renderOverviewTiles(testListCache);
+          refreshTestSidebar();
+        });
+      });
+    }
+
     function renderTestSidebarHtml(tests) {
-      return groupTestsByCategory(tests).map(function (group) {
+      return groupTestsByCategory(getVisibleTests(tests)).map(function (group) {
         var groupItems = group.tests.map(function (t) {
           var tid = escapeHtml(t.id);
           var name = escapeHtml(t.name);
@@ -3306,6 +3383,40 @@
           groupItems +
           '</div>';
       }).join('');
+    }
+
+    function bindSidebarHandlers(sidebar) {
+      sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          if (e.target.classList.contains('test-run-one')) return;
+          showTestDetail(item.getAttribute('data-test-id'));
+        });
+      });
+      sidebar.querySelectorAll('.test-run-one').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var tid = btn.getAttribute('data-test-id');
+          showTestDetail(tid);
+          runTest(tid);
+        });
+      });
+    }
+
+    function refreshTestSidebar() {
+      var sidebar = document.getElementById('test-sidebar');
+      if (!sidebar) return;
+      var visibleTests = getVisibleTests(testListCache);
+      if (!visibleTests.length) {
+        sidebar.innerHTML = '<p class="skill-meta" style="padding:0.65rem 0.75rem; margin:0;">No tests in this group.</p>';
+        activeTestId = null;
+        updateTestRunSkillButton();
+        return;
+      }
+      sidebar.innerHTML = renderTestSidebarHtml(testListCache);
+      bindSidebarHandlers(sidebar);
+      var visibleHasActive = visibleTests.some(function (t) { return t.id === activeTestId; });
+      var nextId = visibleHasActive ? activeTestId : visibleTests[0].id;
+      if (nextId) showTestDetail(nextId);
     }
 
     function setTestRunBusy(busy) {
@@ -3333,15 +3444,17 @@
     function updateSidebarStatus(testId, passed) {
       testStatusMap[testId] = passed;
       var item = document.querySelector('.test-sidebar-item[data-test-id="' + testId + '"]');
-      if (!item) return;
-      var badge = item.querySelector('.test-sidebar-status');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'test-sidebar-status';
-        item.appendChild(badge);
+      if (item) {
+        var badge = item.querySelector('.test-sidebar-status');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'test-sidebar-status';
+          item.appendChild(badge);
+        }
+        badge.textContent = passed ? 'PASS' : 'FAIL';
+        badge.className = 'test-sidebar-status ' + (passed ? 'pass' : 'fail');
       }
-      badge.textContent = passed ? 'PASS' : 'FAIL';
-      badge.className = 'test-sidebar-status ' + (passed ? 'pass' : 'fail');
+      renderOverviewTiles(testListCache);
     }
 
     function showTestDetail(testId) {
@@ -3380,27 +3493,9 @@
       try {
         var r = await fetch(API + '/api/tests');
         var d = await r.json();
-        var tests = d.tests || [];
-        var sidebar = document.getElementById('test-sidebar');
-        sidebar.innerHTML = renderTestSidebarHtml(tests);
-
-        sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
-          item.addEventListener('click', function (e) {
-            if (e.target.classList.contains('test-run-one')) return;
-            showTestDetail(item.getAttribute('data-test-id'));
-          });
-        });
-
-        sidebar.querySelectorAll('.test-run-one').forEach(function (btn) {
-          btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var tid = btn.getAttribute('data-test-id');
-            showTestDetail(tid);
-            runTest(tid);
-          });
-        });
-
-        if (tests.length && !activeTestId) showTestDetail(tests[0].id);
+        testListCache = d.tests || [];
+        renderOverviewTiles(testListCache);
+        refreshTestSidebar();
       } catch (e) {
         document.getElementById('test-sidebar').innerHTML = '<p class="error" style="padding:0.5rem;">Failed to load tests.</p>';
       }
