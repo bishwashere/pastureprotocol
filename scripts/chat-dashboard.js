@@ -87,6 +87,7 @@ async function main() {
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
   const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);
+  const continuationHint = getImplicitContinuationHint(workspaceDir, dashboardJid, sessionId, message);
 
   const noop = () => {};
   const ctx = {
@@ -105,7 +106,14 @@ async function main() {
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
   // Step 2: intent planner — one small LLM call before loading any tool schemas.
   const intentPlan = enabledSkillIds.length > 0
-    ? await planIntent({ userText: message, availableSkillIds: enabledSkillIds, availableSkillSummaries: enabledSkillSummaries, agentId })
+    ? await planIntent({
+        userText: message,
+        historyMessages,
+        continuationHint,
+        availableSkillIds: enabledSkillIds,
+        availableSkillSummaries: enabledSkillSummaries,
+        agentId,
+      })
     : null;
   if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
   // Step 3: load tool schemas based on what the planner returned.
@@ -123,6 +131,8 @@ async function main() {
   const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir);
   const planBlock = intentPlanToSystemBlock(intentPlan);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
+  const continuationBlock = buildContinuationContextBlock(message, historyMessages, continuationHint);
+  if (continuationBlock) systemPrompt += continuationBlock;
   if (sessionRotated) {
     systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
   }

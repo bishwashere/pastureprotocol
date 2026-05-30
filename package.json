@@ -34,6 +34,7 @@
     "test:update-build": "node scripts/test/test-update-build.js",
     "test:dry-run": "node scripts/test/dry-run-reminder.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",
+    "test:conversation-context": "node scripts/test/test-conversation-context.js",
     "test:github-skill": "node scripts/test/test-github-skill.js",
     "test:gmail-skill": "node scripts/test/test-gmail-skill.js",
     "test:calendar-skill": "node scripts/test/test-calendar-skill.js",
