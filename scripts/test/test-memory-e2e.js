@@ -227,7 +227,7 @@ async function main() {
 
   const storeMessage = `Memory e2e test message at ${Date.now()}.`;
   const storePhraseMessage = `Remember this exact phrase for the next message: ${STORED_PHRASE}.`;
-  const recallQuery = 'Use your memory skill to search for what I asked you to remember in the previous message, then tell me that phrase.';
+  const recallQuery = 'What was that phrase I asked you to remember?';
 
   const tests = [
     {
@@ -307,7 +307,7 @@ async function main() {
         const indexDbPath = join(stateDir, 'memory', 'index.db');
         assert(existsSync(indexDbPath), 'Index DB not found at ' + indexDbPath + '. Index CLI stdout: ' + (indexResult.stdout || '').slice(-400));
         console.log('[filesystem test] stateDir:', stateDir, 'index.db size:', statSync(indexDbPath).size);
-        const userMessage = 'Search my memory for directory contents or list of files and folders, then tell me what files or directories you find.';
+        const userMessage = 'Do you remember anything about files in my workspace? What folders or files come up?';
         const result = await runE2E(userMessage, { stateDir });
         const reply = result.reply;
 

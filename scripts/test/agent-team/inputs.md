@@ -1,29 +1,13 @@
-# Agent team E2E test
+# Agent team E2E (`test-agent-team-e2e.js`)
 
-| | |
-|--|--|
-| **Test file** | `../test-agent-team-e2e.js` |
+Natural user messages only — no tool names, no "reply with exact answer".
 
-## Inputs
-
-### Session
-- new session
-
-### Delegation (Telegram / --test path)
-- Use agent-send to ask the marketer agent what our company tagline is. Reply with their exact answer.
-
-### Delegation (dashboard / web chat path)
-- Use agent-send to ask the marketer agent what our company tagline is. Reply with their exact answer.
-
-### Rename then delegate
-- Use agent-send to ask Chloe what our company tagline is. Reply with their exact answer.
-
-### Two-turn same session
-- Remember: Chloe is the marketer agent on my team.
-- Use agent-send to ask Chloe for our tagline and tell me what they said.
-
-### Link restrictions
-- Use agent-send to ask alex if he is there.
-
-### Re-add link
-- Use agent-send to ask alex if he is there. Include his reply.
+| Scenario | User says |
+|----------|-----------|
+| New session | new session |
+| Delegate to marketer | Hey, ask the marketer — what's our company tagline? |
+| Dashboard same | Hey, ask the marketer — what's our company tagline? |
+| After rename to Chloe | Hey Chloe — what's our company tagline? |
+| Two-turn | Turn1: Let's call the marketer agent Chloe. Turn2: Hey Chloe — what's our company tagline? |
+| Alex not linked | Can you check with Alex if he's around? |
+| Alex linked again | Can you check with Alex if he's around? |

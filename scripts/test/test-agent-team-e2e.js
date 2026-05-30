@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Agent team E2E: message in → full app routing → reply out.
- * Report table via skill-test-runner + e2e-report.js. See scripts/test/E2E.md.
+ * Agent team E2E: natural user messages → full app routing → reply.
+ * No tool names or "reply with exact answer" in prompts. See scripts/test/E2E.md.
  *
  * Usage: node scripts/test/test-agent-team-e2e.js
  */
@@ -12,8 +12,10 @@ import { createTempStateDir, runE2E, runDashboardE2E, isNoLlmError } from './e2e
 import { setupAgentTeamFixture, patchAgentConfig, MARKETER_TAGLINE } from './agent-team-fixture.js';
 import { NEW_SESSION_ACK } from '../../lib/chat-session.js';
 
-const DELEGATE_MSG =
-  'Use agent-send to ask the marketer agent what our company tagline is. Reply with their exact answer.';
+/** How a real user would ask — no skill names or meta-instructions. */
+const ASK_MARKETER_TAGLINE = "Hey, ask the marketer — what's our company tagline?";
+const ASK_CHLOE_TAGLINE = "Hey Chloe — what's our company tagline?";
+const ASK_ALEX_CHECK = "Can you check with Alex if he's around?";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -23,8 +25,28 @@ function replyIncludesTagline(reply) {
   return reply && reply.toLowerCase().includes(MARKETER_TAGLINE.toLowerCase().slice(0, 12));
 }
 
+function assertDelegatedOrAnswered(reply, skillsCalled) {
+  const delegated = skillsCalled.includes('agent-send');
+  const answered = replyIncludesTagline(reply);
+  assert(
+    delegated && answered,
+    `Expected agent-send plus tagline in reply. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 200)}`,
+  );
+}
+
+function assertAlexDelegationBlocked(reply, skillsCalled) {
+  const notLinked = /not linked|team link|agent map|can't reach|cannot reach|unable to reach|don't have.*link|no link to alex|not connected to alex/i.test(
+    reply || '',
+  );
+  const triedSend = skillsCalled.includes('agent-send');
+  assert(
+    notLinked || (triedSend && /not linked|team link|agent map/i.test(reply || '')),
+    `Expected explanation that Alex is not on the team. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 200)}`,
+  );
+}
+
 async function main() {
-  console.log('Agent team E2E (index.js --test + chat-dashboard, no inner mocks)\n');
+  console.log('Agent team E2E (natural user messages, no tool hints)\n');
 
   const tests = [
     {
@@ -42,91 +64,92 @@ async function main() {
     },
     {
       name: 'main delegates to marketer (Telegram path / --test)',
-      input: DELEGATE_MSG,
-      expectMode: 'behavior',
+      input: ASK_MARKETER_TAGLINE,
+      expectMode: 'actual',
       skill: 'agent-send',
+      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir);
-        const { reply, skillsCalled } = await runE2E(DELEGATE_MSG, { stateDir });
-        assert(skillsCalled.includes('agent-send'), `Expected agent-send in skills, got: ${skillsCalled.join(',')}`);
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(DELEGATE_MSG, reply, stateDir, { skillHint: 'agent-send' });
-        assert(pass || replyIncludesTagline(reply), `Judge NO and no tagline in reply. ${reason || ''}`);
-        return { reply, skillsCalled };
+        const { reply, skillsCalled } = await runE2E(ASK_MARKETER_TAGLINE, { stateDir });
+        assertDelegatedOrAnswered(reply, skillsCalled);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(ASK_MARKETER_TAGLINE, reply, stateDir, {
+          skillHint: 'agent-send',
+        });
+        assert(pass || replyIncludesTagline(reply), `Judge: ${reason || 'NO'}`);
+        return { reply, skillsCalled, stateDir };
       },
     },
     {
       name: 'main delegates via dashboard (web chat path)',
-      input: DELEGATE_MSG,
-      expectMode: 'behavior',
+      input: ASK_MARKETER_TAGLINE,
+      expectMode: 'actual',
       skill: 'agent-send',
+      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir);
-        const { reply, skillsCalled } = await runDashboardE2E(DELEGATE_MSG, { stateDir });
-        assert(replyIncludesTagline(reply) || /marketer|chloe/i.test(reply), 'Expected sub-agent content in dashboard reply');
-        return { reply, skillsCalled };
+        const { reply, skillsCalled } = await runDashboardE2E(ASK_MARKETER_TAGLINE, { stateDir });
+        assertDelegatedOrAnswered(reply, skillsCalled);
+        return { reply, skillsCalled, stateDir };
       },
     },
     {
       name: 'rename to Chloe (PATCH) then delegate by alias — no restart',
-      input: 'Use agent-send to ask Chloe what our company tagline is. Reply with their exact answer.',
-      expectMode: 'behavior',
+      input: ASK_CHLOE_TAGLINE,
+      expectMode: 'actual',
       skill: 'agent-send',
+      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { renameMarketerToChloe: true });
-        const msg = 'Use agent-send to ask Chloe what our company tagline is. Reply with their exact answer.';
-        const { reply, skillsCalled } = await runE2E(msg, { stateDir });
-        assert(skillsCalled.includes('agent-send'), 'Expected agent-send after rename');
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(msg, reply, stateDir, { skillHint: 'agent-send' });
-        assert(pass || replyIncludesTagline(reply), `Rename delegation failed. ${reason || ''}`);
-        return { reply, skillsCalled };
+        const { reply, skillsCalled } = await runE2E(ASK_CHLOE_TAGLINE, { stateDir });
+        assertDelegatedOrAnswered(reply, skillsCalled);
+        return { reply, skillsCalled, stateDir };
       },
     },
     {
-      name: 'two-turn: setup context then short message (same session)',
-      input: 'Turn1: Remember Chloe = marketer. Turn2: Use agent-send to ask Chloe for tagline.',
-      expectMode: 'behavior',
+      name: 'two-turn: nickname then short ask (same session)',
+      input: `Turn1: Let's call the marketer Chloe. Turn2: ${ASK_CHLOE_TAGLINE}`,
+      expectMode: 'actual',
+      skill: 'agent-send',
+      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { renameMarketerToChloe: true });
-        const msg1 = 'Remember: Chloe is the marketer agent on my team.';
-        const msg2 = 'Use agent-send to ask Chloe for our tagline and tell me what they said.';
-        const { reply, skillsCalled } = await runE2E(msg1, { stateDir, secondMessage: msg2 });
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(msg2, reply, stateDir, { skillHint: 'agent-send' });
-        assert(pass || replyIncludesTagline(reply), `Two-turn delegation failed. ${reason || ''}`);
-        return { reply, skillsCalled };
+        const msg1 = "Let's call the marketer agent Chloe.";
+        const { reply, skillsCalled } = await runE2E(msg1, { stateDir, secondMessage: ASK_CHLOE_TAGLINE });
+        assertDelegatedOrAnswered(reply, skillsCalled);
+        return { reply, skillsCalled, stateDir };
       },
     },
     {
       name: 'remove alex from links → delegation blocked',
-      input: 'Use agent-send to ask alex if he is there. (main linked only to marketer)',
+      input: ASK_ALEX_CHECK,
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir);
         await patchAgentConfig('main', { agentMessaging: { allow: ['marketer'] } });
-        const msg = 'Use agent-send to ask alex if he is there.';
-        const { reply, skillsCalled } = await runE2E(msg, { stateDir });
-        const blocked = /not linked|cannot|can't|unable|don't have.*link|no link/i.test(reply);
-        assert(blocked, 'Expected blocked delegation message');
+        const { reply, skillsCalled } = await runE2E(ASK_ALEX_CHECK, { stateDir });
+        assertAlexDelegationBlocked(reply, skillsCalled);
         return { reply, skillsCalled };
       },
     },
     {
       name: 're-add alex → delegation works',
-      input: 'Use agent-send to ask alex if he is there. Include his reply.',
-      expectMode: 'behavior',
+      input: ASK_ALEX_CHECK,
+      expectMode: 'actual',
       skill: 'agent-send',
+      actualChecks: { replyIncludesAny: ['alex here', 'Alex here', 'backend'] },
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { allow: ['marketer'] });
         await patchAgentConfig('main', { agentMessaging: { allow: ['marketer', 'alex'] } });
-        const msg = 'Use agent-send to ask alex if he is there. Include his reply.';
-        const { reply, skillsCalled } = await runE2E(msg, { stateDir });
-        assert(/alex here|backend/i.test(reply), 'Expected alex sub-agent reply');
-        return { reply, skillsCalled };
+        const { reply, skillsCalled } = await runE2E(ASK_ALEX_CHECK, { stateDir });
+        assert(skillsCalled.includes('agent-send'), `Expected agent-send, got: ${skillsCalled.join(',')}`);
+        assert(/alex here|backend/i.test(reply), 'Expected alex sub-agent reply in message');
+        return { reply, skillsCalled, stateDir };
       },
     },
   ];

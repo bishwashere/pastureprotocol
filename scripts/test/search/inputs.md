@@ -6,5 +6,5 @@
 
 ## Inputs
 
-- Search the web for the current UTC time and tell me.
-- What is the weather in London right now? Use the search skill.
+- What's the current UTC time?
+- What is the weather in London right now?

@@ -14,8 +14,10 @@ Only **transport** is skipped (mock socket instead of Telegram send). Routing, p
 ## What we are testing
 
 1. **User message in** → main app handles the turn end-to-end.
-2. **Skill / delegation behavior** — real tool calls (including `agent-send` → sub-agent LLM).
+2. **Skill / delegation behavior** — real tool calls when the model chooses them (not because the test text names a skill).
 3. **Whether the user got what they wanted** — a separate LLM **judge** reads the user message and bot reply (YES/NO).
+
+**Test prompts must sound like real users.** Do not put tool names (`agent-send`, `search`, etc.) or meta-instructions (`Reply with their exact answer`) in user messages unless the scenario is explicitly about testing a command (e.g. `/browse-reset`).
 
 ## What we are NOT doing in E2E tests
 

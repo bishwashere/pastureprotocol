@@ -1929,6 +1929,7 @@
     </div>
   </div>
 
+  <script type="module" src="test-output-parse.js"></script>
   <script>
     const API = '';
     var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
@@ -3191,133 +3192,6 @@
     var testStatusMap = {};
     var activeTestId = null;
 
-    function parseTestOutput(result) {
-      var stdout = result.stdout || '';
-      var entries = [];
-      var lines = stdout.split('\n');
-      var curReply = '';
-      var curJudge = '';
-      var curName = '';
-      var curSkillsCalled = '';
-      var collectingReply = false;
-      var collectingJudge = false;
-
-      function flush(status) {
-        if (curReply || curJudge || curName) {
-          entries.push({ name: curName, reply: curReply.trim(), judge: curJudge.trim(), skillsCalled: curSkillsCalled.trim(), pass: status === 'pass' });
-        }
-        curReply = ''; curJudge = ''; curName = ''; curSkillsCalled = ''; collectingReply = false; collectingJudge = false;
-      }
-
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        var trimmed = line.trim();
-
-        if (/^\[SUCCESS\]/.test(trimmed)) {
-          flush('pass');
-          continue;
-        }
-        if (/^\[FAILED\]/.test(trimmed) && /—/.test(trimmed)) {
-          if (!curJudge) {
-            var failReason = trimmed.replace(/^\[FAILED\]\s*[^—]*—\s*/, '');
-            curJudge = failReason;
-          }
-          flush('fail');
-          continue;
-        }
-
-        // skill-test-runner format: "  Skills called: ..." then "  Reply: ..."
-        if (/^\s*Skills called:\s/.test(line)) {
-          curSkillsCalled = line.replace(/^\s*Skills called:\s*/, '');
-          continue;
-        }
-        if (/^\s*Reply:\s/.test(line)) {
-          collectingJudge = false;
-          collectingReply = true;
-          curReply = line.replace(/^\s*Reply:\s*/, '');
-          continue;
-        }
-        if (/^\s*Judge:\s/.test(line)) {
-          collectingReply = false;
-          collectingJudge = true;
-          curJudge = line.replace(/^\s*Judge:\s*/, '');
-          continue;
-        }
-
-        // agent test format: "Scenario: name" / "Reply: ..."
-        if (/^Scenario:\s/.test(trimmed)) {
-          if (curReply || curName) flush(curReply ? 'pass' : null);
-          curName = trimmed.replace(/^Scenario:\s*/, '');
-          continue;
-        }
-        if (/^Message:\s/.test(trimmed)) {
-          continue;
-        }
-        if (/^Reply:\s/.test(trimmed)) {
-          collectingReply = true;
-          collectingJudge = false;
-          curReply = trimmed.replace(/^Reply:\s*/, '');
-          continue;
-        }
-
-        // continuation lines for multi-line reply/judge
-        if (collectingReply && trimmed && !/^─+$/.test(trimmed) && !/^Skill:/.test(trimmed) && !/^\[/.test(trimmed) && !/^---/.test(trimmed)) {
-          curReply += '\n' + line.trimStart();
-          continue;
-        }
-        if (collectingJudge && trimmed && !/^─+$/.test(trimmed) && !/^\[/.test(trimmed) && !/^---/.test(trimmed)) {
-          curJudge += '\n' + line.trimStart();
-          continue;
-        }
-
-        collectingReply = false;
-        collectingJudge = false;
-      }
-      if (curReply || curJudge || curName) flush(curReply ? 'pass' : null);
-
-      // extract summary line
-      var summaryMatch = stdout.match(/Passed:\s*(\d+),\s*Failed:\s*(\d+)/);
-      var doneMatch = stdout.match(/Done\.\s*Scenarios:\s*(\d+)\s*Failed:\s*(\d+)/);
-      var summary = '';
-      if (summaryMatch) summary = 'Passed: ' + summaryMatch[1] + ', Failed: ' + summaryMatch[2];
-      else if (doneMatch) summary = 'Scenarios: ' + doneMatch[1] + ', Failed: ' + doneMatch[2];
-
-      return { entries: entries, summary: summary, exitCode: result.exitCode, durationMs: result.durationMs };
-    }
-
-    function renderOutputResults(parsed) {
-      if (!parsed || !parsed.entries.length) {
-        var meta = '';
-        if (parsed && parsed.exitCode != null) meta = ' (exit ' + parsed.exitCode + (parsed.durationMs ? ', ' + (parsed.durationMs / 1000).toFixed(1) + 's' : '') + ')';
-        return '<div class="test-detail-empty">No structured output' + escapeHtml(meta) + '</div>';
-      }
-      var html = '';
-      parsed.entries.forEach(function (e) {
-        var statusClass = e.pass ? 'pass' : 'fail';
-        html += '<div class="test-output-entry">';
-        if (e.name) {
-          html += '<div class="test-output-entry-header"><span class="status-dot ' + statusClass + '"></span>' + escapeHtml(e.name) + '</div>';
-        }
-        if (e.skillsCalled) {
-          html += '<div class="test-output-skills"><strong>Skills called:</strong> ' + escapeHtml(e.skillsCalled) + '</div>';
-        }
-        if (e.reply) {
-          html += '<div class="test-output-reply"><div class="test-output-reply-label">Reply</div>' + escapeHtml(e.reply) + '</div>';
-        }
-        if (e.judge) {
-          var judgeClass = /^YES/i.test(e.judge.trim()) ? 'pass' : (/^NO/i.test(e.judge.trim()) ? 'fail' : '');
-          html += '<div class="test-output-judge ' + judgeClass + '"><strong>Judge:</strong> ' + escapeHtml(e.judge) + '</div>';
-        }
-        html += '</div>';
-      });
-      if (parsed.summary) {
-        html += '<div class="test-output-summary">' + escapeHtml(parsed.summary);
-        if (parsed.durationMs) html += ' &middot; ' + (parsed.durationMs / 1000).toFixed(1) + 's';
-        html += '</div>';
-      }
-      return html;
-    }
-
     function renderInputMessages(messages) {
       if (!messages || !messages.length) return '<div class="test-detail-empty">No inputs defined</div>';
       var html = '';
@@ -3371,7 +3245,7 @@
 
       if (testRawResults[testId]) {
         var parsed = parseTestOutput(testRawResults[testId]);
-        outputEl.innerHTML = renderOutputResults(parsed);
+        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
       } else {
         outputEl.innerHTML = '<div class="test-detail-empty">No output yet. Run the test.</div>';
       }
@@ -3426,7 +3300,7 @@
       if (activeTestId === testId) {
         var outputEl = document.getElementById('test-detail-output');
         var parsed = parseTestOutput(result);
-        outputEl.innerHTML = renderOutputResults(parsed);
+        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
       }
     }
 

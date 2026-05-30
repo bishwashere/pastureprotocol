@@ -20,8 +20,8 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const SEARCH_QUERIES = [
-  'Search the web for the current UTC time and tell me.',
-  'What is the weather in London right now? Use the search skill.',
+  "What's the current UTC time?",
+  'What is the weather in London right now?',
 ];
 
 function createTempStateDir() {
