@@ -150,6 +150,24 @@ export function parseTestOutput(result) {
       continue;
     }
 
+    if (/^\[(PASS|FAIL)\]\s/.test(trimmed)) {
+      flush(null);
+      curName = trimmed.replace(/^\[(PASS|FAIL)\]\s+/, '').replace(/\s+—.*$/, '').trim();
+      curPass = trimmed.startsWith('[PASS]');
+      continue;
+    }
+    if (/^\s*PASS\s+/.test(trimmed)) {
+      flush(null);
+      curName = trimmed.replace(/^\s*PASS\s+/, '');
+      curPass = true;
+      continue;
+    }
+    if (/^\s*FAIL\s+/.test(trimmed)) {
+      flush(null);
+      curName = trimmed.replace(/^\s*FAIL\s+/, '').replace(/\s+—.*$/, '').trim();
+      curPass = false;
+      continue;
+    }
     if (/^\[SUCCESS\]/.test(trimmed)) {
       if (!curName) curName = trimmed.replace(/^\[SUCCESS\]\s*/, '');
       if (curPass == null) curPass = true;

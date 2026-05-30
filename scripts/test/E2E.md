@@ -74,3 +74,21 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [speech/](speech/inputs.md) | `test-speech-e2e.js` | `--test` |
 | [gog/](gog/inputs.md) | `test-gog-e2e.js` | `--test` |
 | [tide/](tide/inputs.md) | `test-tide.js` | direct (payload) |
+
+### Dashboard Tests panel (all `scripts/test/<id>/inputs.md` + matching script)
+
+Discovery rule: folder `scripts/test/<id>/inputs.md` plus `scripts/test/test-<id>.js` or `test-<id>-e2e.js`. Restart the dashboard after adding suites.
+
+| ID | Script | In UI |
+|----|--------|-------|
+| agent, agent-team, agent-config, agent-map-ui | mixed | ✅ |
+| apply-patch, apply-patch-unit | E2E + unit | ✅ |
+| background-tasks, basic, browser, calendar-skill, chat-session | unit / E2E | ✅ |
+| conversation-context, core, credential-utils, cron, dry-run | unit / E2E | ✅ |
+| e2e-expect, edit, fixture-state, github-skill, gmail-skill, go-read, go-write, gog | unit / E2E | ✅ |
+| home-assistant, home-assistant-format, intent-planner, me, memory | unit / E2E | ✅ |
+| memory-index-files, output-parse, read, retrospective, search, server-inspect | unit / E2E | ✅ |
+| session-bootstrap, skill-install, speech, telegram-send, tide, tide-checklist | unit / E2E | ✅ |
+| update-build, vision, workspace-chat-days, workspace-path, write | unit / E2E | ✅ |
+
+Not in UI (wrappers only): `test-agent-send.js`, `test-agent-title.js` → run `test-agent-team-e2e.js` via pnpm aliases.

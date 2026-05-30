@@ -115,6 +115,20 @@ const cases = [
     },
   },
   {
+    name: '[PASS]/[FAIL] unit test lines',
+    stdout: [
+      '[PASS] Agent team panel does not use overflow:auto',
+      '[FAIL] Missing widget — expected id=foo',
+      '',
+      '1 check(s) failed.',
+    ].join('\n'),
+    expect: {
+      entryCount: 2,
+      pass: true,
+      includesFailEntry: true,
+    },
+  },
+  {
     name: 'raw stdout fallback when unstructured',
     stdout: 'Something unexpected happened\nline two',
     expect: {
@@ -147,6 +161,10 @@ for (const c of cases) {
     issues.push('output missing "' + exp.outputIncludes + '"');
   }
   if (exp.pass != null && first.pass !== exp.pass) { ok = false; issues.push('pass=' + first.pass); }
+  if (exp.includesFailEntry && !parsed.entries.some((e) => e.pass === false)) {
+    ok = false;
+    issues.push('no fail entry');
+  }
   if (exp.rawFallback) {
     const html = renderOutputResults(parsed);
     if (!html.includes('test-output-pre')) { ok = false; issues.push('no raw pre fallback'); }

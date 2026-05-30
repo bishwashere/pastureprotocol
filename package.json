@@ -34,7 +34,7 @@
     "test:memory-index-files": "node scripts/test/test-memory-index-files.js",
     "test:workspace-chat-days": "node scripts/test/test-workspace-chat-days.js",
     "test:update-build": "node scripts/test/test-update-build.js",
-    "test:dry-run": "node scripts/test/dry-run-reminder.js",
+    "test:dry-run": "node scripts/test/test-dry-run.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",
     "test:conversation-context": "node scripts/test/test-conversation-context.js",
     "test:github-skill": "node scripts/test/test-github-skill.js",

@@ -1011,7 +1011,7 @@ function parseInputMessages(content) {
 
   for (const raw of lines) {
     const t = raw.trim();
-    if (/^##\s+(Inputs|E2E scenarios)\b/i.test(t)) {
+    if (/^##\s+(Inputs|E2E scenarios|Checks|Contract checks|Unit checks|Scenarios)\b/i.test(t)) {
       if (cur.messages.length || cur.group) groups.push(cur);
       cur = { group: '', messages: [] };
       inInputs = true;
@@ -1028,9 +1028,12 @@ function parseInputMessages(content) {
       continue;
     }
 
-    if (t.startsWith('|') && (/Message/i.test(t) || /User says/i.test(t))) {
+    if (t.startsWith('|') && (/Message/i.test(t) || /User says/i.test(t) || /Scenario/i.test(t))) {
       const cols = t.split('|').map((c) => c.trim()).filter(Boolean);
       tableMessageCol = messageColIndex(cols);
+      if (tableMessageCol < 0 && cols.findIndex((c) => /^Scenario$/i.test(c)) >= 0) {
+        tableMessageCol = cols.findIndex((c) => /^Scenario$/i.test(c));
+      }
       continue;
     }
     if (/^\|[\s\-|]+\|$/.test(t)) continue;
