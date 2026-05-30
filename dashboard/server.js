@@ -914,8 +914,20 @@ app.post('/api/chat', (req, res) => {
 
 const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
 
+/** Where test scripts run from (install dir, or repo override for dev). */
+function getTestRoot() {
+  if (process.env.COWCODE_TEST_ROOT) {
+    return resolve(process.env.COWCODE_TEST_ROOT);
+  }
+  const installMarker = join(INSTALL_DIR, 'scripts', 'test', 'e2e-report.js');
+  if (existsSync(installMarker)) return INSTALL_DIR;
+  const repoMarker = join(ROOT, 'scripts', 'test', 'e2e-report.js');
+  if (ROOT !== INSTALL_DIR && existsSync(repoMarker)) return ROOT;
+  return INSTALL_DIR;
+}
+
 function getTestList() {
-  const testDir = join(INSTALL_DIR, 'scripts', 'test');
+  const testDir = join(getTestRoot(), 'scripts', 'test');
   if (!existsSync(testDir)) return [];
   const dirs = readdirSync(testDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -943,13 +955,26 @@ function runOneTest(testId) {
   const tests = getTestList();
   const test = tests.find((t) => t.id === testId);
   if (!test) return Promise.reject(new Error(`Unknown test: ${testId}`));
-  const scriptPath = join(INSTALL_DIR, test.script);
-  if (!existsSync(scriptPath)) return Promise.reject(new Error(`Script not found: ${test.script}`));
+  const testRoot = getTestRoot();
+  const scriptPath = join(testRoot, test.script);
+  if (!existsSync(scriptPath)) {
+    return Promise.reject(
+      new Error(
+        `Script not found: ${test.script} (test root: ${testRoot}). ` +
+          'If you develop from a git clone, set COWCODE_TEST_ROOT to that repo or run cowcode update to refresh ~/.local/share/cowcode.',
+      ),
+    );
+  }
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const child = spawn(process.execPath, [scriptPath], {
-      cwd: INSTALL_DIR,
-      env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      cwd: testRoot,
+      env: {
+        ...process.env,
+        COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR,
+        COWCODE_INSTALL_DIR: INSTALL_DIR,
+        COWCODE_TEST_ROOT: testRoot,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -1061,7 +1086,7 @@ app.get('/api/tests/inputs/:id', (req, res) => {
       res.status(404).json({ error: 'Test not found' });
       return;
     }
-    const p = join(INSTALL_DIR, test.inputsPath);
+    const p = join(getTestRoot(), test.inputsPath);
     const content = existsSync(p) ? readFileSync(p, 'utf8') : '';
     const messages = parseInputMessages(content);
     res.json({ testId: test.id, name: test.name, content, messages });
