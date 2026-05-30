@@ -33,6 +33,9 @@ const {
   normalizeAgentAllowList,
   appendAgentTitleAlias,
   buildAgentTeamPromptBlock,
+  listVisibleAgentIds,
+  isInternalAgent,
+  REFLECTOR_AGENT_ID,
 } = await import('../../lib/agent-config.js');
 
 let passed = 0;
@@ -122,6 +125,22 @@ async function main() {
 
   const teamBlock = buildAgentTeamPromptBlock('main');
   check('team prompt lists canonical ids', teamBlock.includes('marketer') && teamBlock.includes('title: Marketer'));
+
+  createAgent(REFLECTOR_AGENT_ID, { title: 'Reflector', fromAgentId: 'main', internal: true });
+  check('reflector is internal', isInternalAgent(REFLECTOR_AGENT_ID));
+  check('listVisibleAgentIds hides reflector', !listVisibleAgentIds().includes(REFLECTOR_AGENT_ID));
+  check('team prompt hides reflector', !buildAgentTeamPromptBlock('main').toLowerCase().includes('reflector'));
+  check('resolveAgentReference hides reflector by id', resolveAgentReference(REFLECTOR_AGENT_ID) === '');
+  check('resolveAgentReference hides reflector by title', resolveAgentReference('Reflector') === '');
+  check('allow list strips reflector', !normalizeAgentAllowList(['alex', REFLECTOR_AGENT_ID]).includes(REFLECTOR_AGENT_ID));
+
+  let createRejected = false;
+  try {
+    createAgent(REFLECTOR_AGENT_ID, { fromAgentId: 'main' });
+  } catch (_) {
+    createRejected = true;
+  }
+  check('createAgent rejects reflector without internal flag', createRejected);
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

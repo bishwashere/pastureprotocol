@@ -20,7 +20,7 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -353,9 +353,17 @@ app.patch('/api/skills', (req, res) => {
   }
 });
 
+function rejectInternalAgent(id, res) {
+  if (isInternalAgent(id)) {
+    res.status(404).json({ error: 'Agent not found' });
+    return true;
+  }
+  return false;
+}
+
 app.get('/api/agents', (_req, res) => {
   try {
-    const ids = listAgentIds();
+    const ids = listVisibleAgentIds();
     const agents = ids.map((id) => {
       const config = loadAgentConfig(id);
       const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
@@ -377,6 +385,7 @@ app.get('/api/agents', (_req, res) => {
 app.get('/api/agents/:id/config', (req, res) => {
   try {
     const id = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(id, res)) return;
     const config = loadAgentConfig(id);
     res.json(config);
   } catch (err) {
@@ -387,6 +396,7 @@ app.get('/api/agents/:id/config', (req, res) => {
 app.patch('/api/agents/:id/config', (req, res) => {
   try {
     const id = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(id, res)) return;
     const patch = req.body || {};
     const config = loadAgentConfig(id);
     if (patch.llm !== undefined) config.llm = patch.llm;
@@ -447,6 +457,7 @@ app.post('/api/agents', (req, res) => {
 app.delete('/api/agents/:id', (req, res) => {
   try {
     const id = req.params.id || '';
+    if (rejectInternalAgent(id, res)) return;
     const confirmed = req.query?.confirm === 'true' || req.body?.confirm === true;
     if (!confirmed) {
       res.status(400).json({ error: 'Deletion requires confirmation (confirm=true)' });
@@ -1260,6 +1271,7 @@ function getAgentMdPath(agentId, key) {
 app.get('/api/agents/:id/md', (req, res) => {
   try {
     const agentId = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(agentId, res)) return;
     loadAgentConfig(agentId);
     const files = AGENT_FILE_IDS.map((id) => {
       const p = getAgentMdPath(agentId, id);
@@ -1274,6 +1286,7 @@ app.get('/api/agents/:id/md', (req, res) => {
 app.get('/api/agents/:id/md/:key', (req, res) => {
   try {
     const agentId = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(agentId, res)) return;
     loadAgentConfig(agentId);
     const key = req.params.key;
     if (!AGENT_FILE_IDS.includes(key)) {
@@ -1291,6 +1304,7 @@ app.get('/api/agents/:id/md/:key', (req, res) => {
 app.patch('/api/agents/:id/md/:key', (req, res) => {
   try {
     const agentId = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(agentId, res)) return;
     loadAgentConfig(agentId);
     const key = req.params.key;
     if (!AGENT_FILE_IDS.includes(key)) {
