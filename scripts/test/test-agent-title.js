@@ -29,6 +29,10 @@ const {
   syncAgentSendSkillInConfig,
   resolveEnabledSkillsForAgent,
   agentSendEnabledForAgent,
+  resolveAgentReference,
+  normalizeAgentAllowList,
+  appendAgentTitleAlias,
+  buildAgentTeamPromptBlock,
 } = await import('../../lib/agent-config.js');
 
 let passed = 0;
@@ -87,6 +91,37 @@ async function main() {
     agentMessaging: { allow: [] },
   });
   check('sync removes agent-send when no links', !withoutLinks.skills.enabled.includes('agent-send'));
+
+  ensureAgent('marketer');
+  ensureAgent('alex');
+  saveAgentConfig('marketer', { ...loadAgentConfig('marketer'), title: 'Marketer' });
+  check('resolveAgentReference by id', resolveAgentReference('marketer') === 'marketer');
+  check('resolveAgentReference by title', resolveAgentReference('Marketer') === 'marketer');
+  check('resolveAgentReference unknown', resolveAgentReference('chloe') === '');
+
+  saveAgentConfig('main', {
+    ...loadAgentConfig('main'),
+    agentMessaging: { allow: ['alex', 'chloe', 'marketer'] },
+  });
+  const repaired = getAgentMessagingPolicy('main');
+  check('allow list drops stale ids', !repaired.allow.includes('chloe'));
+  check('allow list keeps valid ids', repaired.allow.includes('alex') && repaired.allow.includes('marketer'));
+
+  saveAgentConfig('main', {
+    ...loadAgentConfig('main'),
+    title: 'CEO',
+    agentMessaging: { allow: ['alex'] },
+  });
+  const reloaded = loadAgentConfig('main');
+  check('main config survives reload (no legacy clobber)', reloaded.agentMessaging?.allow?.includes('alex'));
+
+  const aliasCfg = loadAgentConfig('marketer');
+  appendAgentTitleAlias(aliasCfg, 'Chloe');
+  saveAgentConfig('marketer', aliasCfg);
+  check('title alias resolves old name', resolveAgentReference('chloe') === 'marketer');
+
+  const teamBlock = buildAgentTeamPromptBlock('main');
+  check('team prompt lists canonical ids', teamBlock.includes('marketer') && teamBlock.includes('title: Marketer'));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

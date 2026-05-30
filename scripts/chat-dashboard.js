@@ -17,7 +17,7 @@ import { runAgentTurn } from '../lib/agent.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
-import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
+import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent-config.js';
 import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
 import { ensureChatSession } from '../lib/chat-session.js';
 import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
@@ -128,7 +128,7 @@ async function main() {
     toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
   }
   const toolNames = toolsToUse.map((t) => t?.function?.name).filter(Boolean);
-  const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir);
+  const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + buildAgentTeamPromptBlock(agentId);
   const planBlock = intentPlanToSystemBlock(intentPlan);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
   const continuationBlock = buildContinuationContextBlock(message, historyMessages, continuationHint);

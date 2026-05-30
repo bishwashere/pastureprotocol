@@ -20,7 +20,7 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -392,9 +392,16 @@ app.patch('/api/agents/:id/config', (req, res) => {
     if (patch.llm !== undefined) config.llm = patch.llm;
     if (patch.skills !== undefined) config.skills = patch.skills;
     if (patch.title !== undefined) {
+      const previousTitle = getAgentTitle(id);
       const t = normalizeAgentTitle(patch.title);
-      if (t) config.title = t;
-      else delete config.title;
+      if (t) {
+        config.title = t;
+        if (previousTitle && previousTitle.toLowerCase() !== t.toLowerCase()) {
+          appendAgentTitleAlias(config, previousTitle);
+        }
+      } else {
+        delete config.title;
+      }
     }
     if (patch.agentMessaging !== undefined) {
       config.agentMessaging = normalizeAgentMessagingPolicy({

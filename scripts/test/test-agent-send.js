@@ -20,7 +20,7 @@ writeFileSync(
 );
 process.env.COWCODE_STATE_DIR = stateDir;
 
-const { ensureAgent, saveAgentConfig, getAgentMessagingPolicy } = await import('../../lib/agent-config.js');
+const { ensureAgent, saveAgentConfig, loadAgentConfig, getAgentMessagingPolicy } = await import('../../lib/agent-config.js');
 const { executeAgentSend } = await import('../../lib/executors/agent-send.js');
 
 let passed = 0;
@@ -119,6 +119,11 @@ async function main() {
   check('happy: reply returned', okParsed.agent === 'backend' && /handled: design auth/.test(okParsed.reply || ''));
   check('happy: runner invoked with depth+1', calls.length === 1 && calls[0].depth === 1);
   check('happy: chain extended', calls.length === 1 && Array.isArray(calls[0].callChain) && calls[0].callChain.join('>') === 'pm>backend');
+
+  saveAgentConfig('backend', { ...loadAgentConfig('backend'), title: 'Backend Bot' });
+  calls.length = 0;
+  const byTitle = await executeAgentSend(baseCtx(), { agent: 'Backend Bot', message: 'via title' });
+  check('happy: resolve target by title', !isError(byTitle) && parse(byTitle).agent === 'backend');
 
   // Per-turn cap (maxCallsPerTurn = 2): reuse one ctx across calls
   const turnCtx = baseCtx();

@@ -24,6 +24,11 @@ const HISTORY = [
   { role: 'assistant', content: NAME_LIST_ASSISTANT },
 ];
 
+const HISTORY_RENAME = [
+  { role: 'user', content: 'Can we rename marketer to Chloe?' },
+  { role: 'assistant', content: 'I can rename marketer to Chloe. Want me to update the title in config now?' },
+];
+
 const CASES = [
   {
     label: 'Chloe after numbered name list',
@@ -56,6 +61,28 @@ const CASES = [
     userText: 'Chloe',
     history: [],
     implicitFeedback: 'The user chose Chloe from the suggested lady-name replacements.',
+    expectContinuation: true,
+  },
+  {
+    label: 'yes after action offer',
+    userText: 'yes',
+    history: HISTORY_RENAME,
+    expectContinuation: true,
+    expectSkipProbe: true,
+  },
+  {
+    label: 'do it after action offer',
+    userText: 'do it',
+    history: HISTORY_RENAME,
+    expectContinuation: true,
+  },
+  {
+    label: 'go ahead after action offer',
+    userText: 'go ahead',
+    history: [
+      { role: 'user', content: 'Ask alex to review the API' },
+      { role: 'assistant', content: 'I can ask alex via agent-send. Want me to do that now?' },
+    ],
     expectContinuation: true,
   },
 ];

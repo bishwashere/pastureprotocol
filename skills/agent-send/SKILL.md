@@ -22,7 +22,7 @@ Do **not** use it to talk to yourself, and do not use it in group chats (it is d
 
 Use the **agent_send_send** tool with:
 
-- **agent** (required) - the target agent id (e.g. `"backend"`). Must be in your allow list.
+- **agent** (required) - the target agent **id** (e.g. `"backend"`) or display **title** (e.g. `"Marketer"`). Must be in your allow list. Prefer the canonical id from the Agent team block in your system prompt.
 - **message** (required) - the full question/task. Include everything the target needs; it does not see your conversation with the user.
 
 After you get the reply, synthesize a single answer for the user. You may message multiple agents (subject to the per-turn limit) and combine their replies.
@@ -67,7 +67,7 @@ then `agent_send_send` with `{ "agent": "reviewer", "message": "Review this auth
 
 ```tool-schema
 agent_send_send
-  description: Delegate a message to another configured agent and return its reply. agent is the target agent id (must be in your allow list); message is the full task/question (the target does not see your conversation with the user). Internal only - nothing is sent to any chat channel.
+  description: Delegate a message to another configured agent and return its reply. agent is the target agent id or display title (must be in your allow list); message is the full task/question (the target does not see your conversation with the user). Internal only - nothing is sent to any chat channel.
   parameters:
     agent: string
     message: string

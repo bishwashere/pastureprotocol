@@ -66,7 +66,7 @@ import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor } from './lib/group-config.js';
 import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
-import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID } from './lib/agent-config.js';
+import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
 import {
   buildAnswerCompletenessProbePrompt,
@@ -822,7 +822,7 @@ async function main() {
       console.log('[path] buildSystemPrompt branch=one-on-one agentId=', agentId);
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
-      return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
+      return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId)) + buildAgentTeamPromptBlock(agentId);
     }
     const basePrompt = buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
     const loaded = loadGroupMd(getWorkspaceDir(), DEFAULT_WORKSPACE_DIR);
