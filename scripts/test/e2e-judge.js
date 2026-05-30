@@ -76,6 +76,8 @@ function buildDefaultJudgePrompt(userMessage, botReply, skillHint) {
       'The reply must reflect that the speech skill was used: for transcribe, the transcript or summary; for synthesize/reply_as_voice, confirmation that audio was generated or sent. A reply that only explains the skill or refuses without trying is NO. If the user asked for voice and the bot clearly could not (e.g. not configured), a short explanation is acceptable only if no voice was requested as the main goal.',
     gog:
       'The reply must show that gog was used: real data from Gmail/Calendar/Drive/etc., or a clear "no results" / empty list. A reply that only says it cannot use gog, or gives setup/error without attempting the requested action, is NO. If not configured, a brief explanation is acceptable.',
+    'agent-send':
+      'The user asked to delegate to another agent on the team. The reply must include the sub-agent\'s actual answer (not only "I sent" or "I asked" without the reply). If delegation was blocked (not linked, unknown agent), the reply must clearly say so. A hallucinated send with no sub-agent content is NO.',
     skill:
       'The reply must deliver what the user asked for: real data (e.g. list, result), a clear outcome, or an explicit "no items" / "nothing found" where that is the correct answer. Polite non-answers, setup instructions alone, or vague text that does not fulfill the request are NO. Error messages are not "what they wanted" unless the user asked for help.',
   };
