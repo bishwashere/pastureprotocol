@@ -72,31 +72,19 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 
 ### Option A - One-line install (recommended)
 
-**Linux / macOS (bash):**
+**Linux / macOS:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
 ```
 
-**Windows (PowerShell — no Git Bash required):**
+**Windows (PowerShell):**
 
 ```powershell
 irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
 ```
 
-If execution policy blocks the script:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex"
-```
-
-This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode` (Windows: `%USERPROFILE%\.cowcode`).
-
-**Windows (Git Bash alternative):**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
-```
+This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode`.
 
 After install:
 
@@ -108,7 +96,19 @@ cowcode update     # pull the latest version
 cowcode uninstall  # remove cowCode
 ```
 
-On **Windows**, `cowcode start|stop|restart|status` uses **pm2** directly (no Git Bash). Logs: `cowcode logs` or `pm2 logs cowcode`.
+<small>
+
+**Windows notes:** State and config live in `%USERPROFILE%\.cowcode`. The daemon uses pm2 (`cowcode logs` or `pm2 logs cowcode`).
+
+If PowerShell blocks the install script (execution policy), run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex"
+```
+
+On Windows with Git Bash, you can use the Linux/macOS one-liner instead (`install.sh`).
+
+</small>
 
 ### Option B - From a git clone
 
