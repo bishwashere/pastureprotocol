@@ -998,7 +998,14 @@ async function main() {
           answer_style: 'short',
         }
       : null;
-    if (!isGroupJid) ctx.delegationHistoryMessages = historyMessages;
+    if (!isGroupJid) {
+      ctx.delegationHistoryMessages = historyMessages;
+      ctx.channelContext = {
+        logJid,
+        workspaceDir: workspaceDirForBootstrap,
+        sessionBootstrap: sessionBootstrap || '',
+      };
+    }
     if (presetDelegationPlan && delegationDecision) {
       logTeamActivity({
         type: 'delegation_decision',

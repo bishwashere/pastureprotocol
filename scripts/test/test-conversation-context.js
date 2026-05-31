@@ -7,6 +7,7 @@ import {
   formatHistoryForClassifier,
   buildAnswerCompletenessProbePrompt,
   resolveSharedTurnHistory,
+  buildPairHistoryContextBlock,
 } from '../../lib/conversation-context.js';
 
 const HISTORY = [
@@ -50,6 +51,15 @@ function testResolveSharedTurnHistory() {
   if (resolveSharedTurnHistory(null, null).length !== 0) throw new Error('expected empty when no history');
 }
 
+function testPairHistoryIsAdditive() {
+  const block = buildPairHistoryContextBlock(PAIR_HISTORY, 'main');
+  if (!block.includes('Prior agent-to-agent exchanges with main')) {
+    throw new Error('pair block missing header');
+  }
+  if (!block.includes('in addition to')) throw new Error('pair block should say it is additive');
+  if (buildPairHistoryContextBlock([], 'main')) throw new Error('empty pair should produce no block');
+}
+
 async function main() {
   console.log('Conversation context helpers\n');
   const rows = [];
@@ -59,6 +69,7 @@ async function main() {
     ['formatHistoryForClassifier', testFormatHistory],
     ['buildAnswerCompletenessProbePrompt', testProbeIncludesHistory],
     ['resolveSharedTurnHistory', testResolveSharedTurnHistory],
+    ['buildPairHistoryContextBlock', testPairHistoryIsAdditive],
   ]) {
     process.stdout.write(`  ${label} … `);
     try {

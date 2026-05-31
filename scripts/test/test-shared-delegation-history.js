@@ -26,8 +26,20 @@ const checks = [
     ok: indexJs.includes('ctx.delegationHistoryMessages = historyMessages'),
   },
   {
-    name: 'no referential skip-delegation heuristic',
-    ok: !indexJs.includes('shouldSkipForcedDelegation') && !indexJs.includes('enrichDelegationMessage'),
+    name: 'agent-send passes channelContext to internal runner',
+    ok: agentSend.includes('channelContext: ctx?.channelContext'),
+  },
+  {
+    name: 'internal turn adds pair history as extra system block',
+    ok: internalTurn.includes('buildPairHistoryContextBlock(pairHistoryMessages, callerAgentId)'),
+  },
+  {
+    name: 'internal turn uses channel session bootstrap when delegating',
+    ok: internalTurn.includes('channelCtx?.sessionBootstrap'),
+  },
+  {
+    name: 'internal turn includes team prompt block like main',
+    ok: internalTurn.includes('buildAgentTeamPromptBlock(agentId)'),
   },
 ];
 

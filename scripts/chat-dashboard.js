@@ -156,6 +156,13 @@ async function main() {
       }
     : null;
   ctx.delegationHistoryMessages = historyMessages;
+  ctx.channelContext = {
+    logJid: dashboardJid,
+    workspaceDir,
+    sessionBootstrap: sessionRotated
+      ? buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block
+      : '',
+  };
   if (presetDelegationPlan && delegationDecision) {
     logTeamActivity({
       type: 'delegation_decision',
