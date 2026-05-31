@@ -2388,8 +2388,16 @@
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
       if (name === 'team') {
-        fetchAgentMapData();
         startTeamActivityFeed();
+        fetchAgentMapData().then(function () {
+          if (teamAgentId) {
+            selectTeamInboxAgent(teamAgentId);
+            openAgentEditModal(teamAgentId);
+            if (location.hash.indexOf('#team/') === 0) {
+              history.replaceState(null, '', '#team');
+            }
+          }
+        });
       } else {
         stopTeamActivityFeed();
       }
@@ -2397,7 +2405,6 @@
       if (name === 'config') fetchConfig();
       if (name === 'tide') fetchTideChecklist();
       if (name === 'test') fetchTests();
-      if (name === 'team-agent' && teamAgentId) loadTeamAgentPage(teamAgentId);
       if (name === 'memory') {
         fetchMemoryFiles().then(function () {
           if (memoryFileId) selectMemoryFile(memoryFileId, isMemoryChatLogFile(memoryFileId));
@@ -2416,7 +2423,15 @@
         if (!subFile) {
           return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
         }
-        return { name: 'team-agent', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+      }
+      if (name === 'team-agent') {
+        return {
+          name: 'team',
+          memoryFile: null,
+          openIdentity: null,
+          teamAgentId: subFile ? decodeURIComponent(subFile) : null,
+        };
       }
       if (name === 'soul') {
         if (!subFile || subFile === 'SOUL.md') {
@@ -3115,12 +3130,13 @@
           closeAgentEditModal();
           await fetchChatAgents();
           if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+          await fetchAgentMapData();
         },
       });
     }
 
     function openTeamAgentPage(agentId) {
-      location.hash = '#team/' + encodeURIComponent(agentId || 'main');
+      openAgentEditModal(agentId);
     }
 
     function openTeamPage() {
@@ -4653,8 +4669,7 @@
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
           if (!aid) return;
-          if (mode === 'edit-page') openTeamAgentPage(aid);
-          else openAgentEditModal(aid);
+          openAgentEditModal(aid);
         });
       });
       els.nodes.querySelectorAll('.agent-map-node').forEach(function(node) {

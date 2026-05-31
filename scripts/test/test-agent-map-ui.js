@@ -111,11 +111,18 @@ const checks = [
     ok: /if \(!subFile\)[\s\S]*name: 'team'/.test(html),
   },
   {
-    name: 'Team hash route with agent id opens editor page',
-    ok: /name: 'team-agent'/.test(html) && html.includes('teamAgentId: decodeURIComponent(subFile)'),
+    name: 'Team hash route with agent id opens edit modal on team page',
+    ok: /if \(name === 'team'\)[\s\S]*teamAgentId: decodeURIComponent\(subFile\)/.test(html) &&
+      html.includes('openAgentEditModal(teamAgentId)') &&
+      !/return \{ name: 'team-agent'/.test(html),
   },
   {
-    name: 'Dedicated team agent editor page exists',
+    name: 'Team map edit button opens modal not separate page',
+    ok: html.includes('openAgentEditModal(aid)') &&
+      !html.includes("location.hash = '#team/'"),
+  },
+  {
+    name: 'Dedicated team agent editor page markup retained for legacy',
     ok: html.includes('id="page-team-agent"') && html.includes('id="team-agent-md-files"'),
   },
   {
