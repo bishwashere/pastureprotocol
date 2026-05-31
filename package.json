@@ -57,6 +57,7 @@
     "test:projects": "node scripts/test/test-projects-db.js",
     "test:projects-ui": "node scripts/test/test-projects-ui.js",
     "test:projects-context": "node scripts/test/test-projects-context.js",
+    "test:goals-context": "node scripts/test/test-goals-context.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",

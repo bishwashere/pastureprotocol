@@ -18,7 +18,6 @@ async function main() {
       formatProjectsProfileLine,
       pickFocusedProject,
       enrichMessageWithProjectContext,
-      getProjectsDiscoveryIntentHint,
       isProjectDiscoveryRequest,
     } = await import('../../lib/projects-context.js');
 
@@ -39,27 +38,14 @@ async function main() {
       userText: 'what is this project all about find out',
       historyMessages: [],
     });
-    assert(block.includes('Active project focus'), 'focus block');
-    assert(block.includes('investigate first'), 'investigate first');
-    assert(block.includes('github'), 'github instruction');
-    assert(block.includes('filesystem'), 'filesystem instruction');
-    assert(block.includes('confirm'), 'confirm after');
-    assert(block.includes('nextpostai.com'), 'url in block');
+    assert(block.includes('Dashboard projects'), 'catalog block');
+    assert(block.includes('Active goal'), 'points to goals');
+    assert(block.includes('nextpostai.com'), 'url in list');
 
     const enriched = enrichMessageWithProjectContext('find out what it is about');
-    assert(enriched.includes('Projects tracker context'), 'enriched delegation');
+    assert(enriched.includes('Projects tracker'), 'enriched delegation');
     assert(enriched.includes('nextpostai'), 'project name in enrichment');
-    assert(enriched.includes('github'), 'enriched mentions github');
-    assert(enriched.includes('filesystem'), 'enriched mentions filesystem');
-
-    const hint = getProjectsDiscoveryIntentHint(
-      'what is this project all about',
-      [],
-      ['browse', 'github', 'memory', 'go-read', 'read', 'search'],
-    );
-    assert(hint && hint.skills.includes('browse'), 'intent includes browse');
-    assert(hint.skills.includes('github'), 'intent includes github');
-    assert(hint.plan.includes('before checking'), 'intent plan');
+    assert(enriched.includes('matching Goal'), 'enriched points to goal');
 
     const profile = formatProjectsProfileLine();
     assert(profile.includes('1 project'), `profile: ${profile}`);

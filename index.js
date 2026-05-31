@@ -66,9 +66,9 @@ import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './l
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
-  getProjectsDiscoveryIntentHint,
   enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
+import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -1038,10 +1038,10 @@ async function main() {
       });
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
-    const projectsIntentHint = !presetDelegationPlan
-      ? getProjectsDiscoveryIntentHint(text, historyMessages, enabledSkillIds)
+    const goalsIntentHint = !presetDelegationPlan
+      ? getGoalsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
-    const intentPlan = presetDelegationPlan || projectsIntentHint || (enabledSkillIds.length > 0
+    const intentPlan = presetDelegationPlan || goalsIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
@@ -1088,6 +1088,8 @@ async function main() {
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
+      const goalsBlock = buildGoalsContextBlock({ userText: text, historyMessages, agentId });
+      if (goalsBlock) systemPromptWithPlan += goalsBlock;
       const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
       if (projectsBlock) systemPromptWithPlan += projectsBlock;
     }
@@ -1156,13 +1158,16 @@ async function main() {
     const hasSearchOrBrowseTool = toolsForRequest.some(
       (t) => t?.function?.name?.startsWith('search_') || t?.function?.name === 'browse_navigate',
     );
-    const firstReply = sanitizeOutboundText((turnResult?.textToSend || '').trim());
-    const firstTextForSend = isTelegramChatId(jid) ? firstReply.replace(/^\[CowCode\]\s*/i, '').trim() : firstReply;
+    const replyForProbe = sanitizeOutboundText((resultToUse?.textToSend || '').trim());
+    const textForSendProbe = isTelegramChatId(jid)
+      ? replyForProbe.replace(/^\[CowCode\]\s*/i, '').trim()
+      : replyForProbe;
     if (
+      !isGroupJid &&
       (hasSearchOrBrowseTool || plannerSaysNoTools) &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
       skillsCalledFromTurn.length === 0 &&
-      firstTextForSend
+      textForSendProbe
     ) {
       // Ask the LLM whether the answer is actually complete before deciding to retry.
       // This replaces the old structural check (no tools called = uncertain) which fired
@@ -1173,7 +1178,7 @@ async function main() {
           { role: 'system', content: 'You are a quality checker. Answer only with valid JSON, no prose.' },
           {
             role: 'user',
-            content: buildAnswerCompletenessProbePrompt(text, firstTextForSend, historyMessages),
+            content: buildAnswerCompletenessProbePrompt(text, textForSendProbe, historyMessages),
           },
         ], llmOptions);
         const probe = JSON.parse(stripThinking(probeReply || '').trim());
