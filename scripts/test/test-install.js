@@ -5,7 +5,7 @@
  * 2. setup.js must not top-level-import tide-checklist.js (pulls dotenv before ensureInstall).
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -50,6 +50,39 @@ function checkSetupMinimalTopLevelImports() {
   return { ok: true, detail: 'setup.js only imports stdlib + paths.js at load time' };
 }
 
+function checkUnixPathsUnchanged() {
+  const cli = readFileSync(join(ROOT, 'cli.js'), 'utf8');
+  const sh = readFileSync(INSTALL_SH, 'utf8');
+  const checks = [];
+
+  if (!cli.includes("spawn('bash', [script, action]")) {
+    checks.push('cli.js must still spawn bash daemon.sh on Linux/macOS');
+  }
+  if (!cli.includes("spawn('bash', [script]") || !cli.includes('update.sh')) {
+    checks.push('cli.js must still use bash update.sh on Linux/macOS');
+  }
+  if (!cli.includes("spawn('bash', [script]") || !cli.includes('uninstall.sh')) {
+    checks.push('cli.js must still use bash uninstall.sh on Linux/macOS');
+  }
+  if (!cli.includes('if (IS_WIN)')) {
+    checks.push('cli.js must gate Windows-only paths behind IS_WIN');
+  }
+  if (sh.includes('install.ps1')) {
+    checks.push('install.sh must not reference install.ps1');
+  }
+  if (sh.indexOf('install_deps') > sh.indexOf('node setup.js')) {
+    checks.push('install.sh must run install_deps before setup.js');
+  }
+  if (!existsSync(join(ROOT, 'scripts', 'daemon.sh'))) {
+    checks.push('scripts/daemon.sh missing');
+  }
+
+  if (checks.length) {
+    return { ok: false, detail: checks.join('; ') };
+  }
+  return { ok: true, detail: 'Linux/macOS still use install.sh + bash daemon/update/uninstall' };
+}
+
 async function main() {
   startReport('test-install');
 
@@ -69,6 +102,14 @@ async function main() {
     status: imports.ok ? 'pass' : 'fail',
   });
 
+  const unix = checkUnixPathsUnchanged();
+  recordCase({
+    name: 'unix paths',
+    input: 'Linux/macOS install + daemon unchanged',
+    output: unix.detail,
+    status: unix.ok ? 'pass' : 'fail',
+  });
+
   const shellTest = spawnSync('bash', [join(ROOT, 'scripts/test/test-install.sh')], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -84,7 +125,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(order.ok && imports.ok && shellOk ? 0 : 1);
+  process.exit(order.ok && imports.ok && unix.ok && shellOk ? 0 : 1);
 }
 
 main();
