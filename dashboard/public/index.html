@@ -2651,7 +2651,7 @@
           <button type="button" id="team-top-tab-goals" class="team-top-tab" data-team-top="goals" role="tab" aria-selected="false">Goals</button>
           <button type="button" id="team-top-tab-initiatives" class="team-top-tab" data-team-top="initiatives" role="tab" aria-selected="false">Initiatives</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Active Context, Inbox, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
+        <p id="team-top-tab-desc" class="skill-meta" style="margin:0 0 0.45rem 0;">Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.</p>
       </div>
       <div class="team-page-body">
         <div id="team-roster-view" class="team-roster-view">
@@ -2691,6 +2691,7 @@
               <div class="team-agent-panel-tabs" role="tablist">
                 <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
                 <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
+                <button type="button" id="team-agent-tab-outbox" class="team-agent-panel-tab" data-tab="outbox" role="tab" aria-selected="false">Outbox</button>
                 <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
               </div>
               <div class="team-agent-panel-body">
@@ -2707,10 +2708,19 @@
                 <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
                   <div class="team-agent-inbox-head">
                     <h3 id="team-agent-inbox-title">Agent Inbox</h3>
-                    <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+                    <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Tasks and assignments received</span>
                   </div>
                   <div id="team-agent-inbox-list" class="team-agent-inbox-list">
-                    <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
+                    <p class="team-agent-inbox-empty">Select an agent to view incoming activity.</p>
+                  </div>
+                </div>
+                <div id="team-agent-outbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-outbox-title">Agent Outbox</h3>
+                    <span id="team-agent-outbox-subtitle" class="team-agent-inbox-sub">Delegations and replies sent</span>
+                  </div>
+                  <div id="team-agent-outbox-list" class="team-agent-inbox-list">
+                    <p class="team-agent-inbox-empty">Select an agent to view outgoing activity.</p>
                   </div>
                 </div>
                 <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
@@ -5452,6 +5462,7 @@
         renderAgentMap();
         renderTeamActivity();
         renderAgentInbox();
+        renderAgentOutbox();
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
@@ -5462,6 +5473,7 @@
         renderAgentMap();
         renderTeamActivity();
         renderAgentInbox();
+        renderAgentOutbox();
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
@@ -5512,6 +5524,7 @@
         n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedTeamInboxAgentId);
       });
       renderAgentInbox();
+      renderAgentOutbox();
       renderAgentContext();
       renderAgentMetrics();
       renderCurrentMission();
@@ -5544,14 +5557,22 @@
       }
     }
 
+    var TEAM_TOP_TAB_DESC = {
+      roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.',
+      goals: 'Long-running objectives your agents work on autonomously — create goals, track subgoals, and run or pause work.',
+      initiatives: 'Proactive suggestions from goal reflection and team activity — review and promote into goals or subgoals.',
+    };
+
     function setTeamTopTab(tab) {
       teamTopTab = tab === 'goals' ? 'goals' : (tab === 'initiatives' ? 'initiatives' : 'roster');
       var rosterTab = document.getElementById('team-top-tab-roster');
       var goalsTab = document.getElementById('team-top-tab-goals');
       var initiativesTab = document.getElementById('team-top-tab-initiatives');
+      var tabDesc = document.getElementById('team-top-tab-desc');
       var rosterView = document.getElementById('team-roster-view');
       var goalsView = document.getElementById('team-goals-view');
       var initiativesView = document.getElementById('team-initiatives-view');
+      if (tabDesc) tabDesc.textContent = TEAM_TOP_TAB_DESC[teamTopTab] || TEAM_TOP_TAB_DESC.roster;
       if (rosterTab) {
         rosterTab.classList.toggle('active', teamTopTab === 'roster');
         rosterTab.setAttribute('aria-selected', teamTopTab === 'roster' ? 'true' : 'false');
@@ -6134,16 +6155,26 @@
     }
 
     function setTeamAgentPanelTab(tab) {
-      teamAgentPanelTab = tab === 'context' ? 'context' : (tab === 'stats' ? 'stats' : 'inbox');
+      teamAgentPanelTab =
+        tab === 'context' ? 'context'
+          : tab === 'stats' ? 'stats'
+            : tab === 'outbox' ? 'outbox'
+              : 'inbox';
       var inboxTab = document.getElementById('team-agent-tab-inbox');
+      var outboxTab = document.getElementById('team-agent-tab-outbox');
       var contextTab = document.getElementById('team-agent-tab-context');
       var statsTab = document.getElementById('team-agent-tab-stats');
       var inboxPane = document.getElementById('team-agent-inbox-pane');
+      var outboxPane = document.getElementById('team-agent-outbox-pane');
       var contextPane = document.getElementById('team-agent-context-pane');
       var statsPane = document.getElementById('team-agent-stats-pane');
       if (inboxTab) {
         inboxTab.classList.toggle('active', teamAgentPanelTab === 'inbox');
         inboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'inbox' ? 'true' : 'false');
+      }
+      if (outboxTab) {
+        outboxTab.classList.toggle('active', teamAgentPanelTab === 'outbox');
+        outboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'outbox' ? 'true' : 'false');
       }
       if (contextTab) {
         contextTab.classList.toggle('active', teamAgentPanelTab === 'context');
@@ -6154,6 +6185,7 @@
         statsTab.setAttribute('aria-selected', teamAgentPanelTab === 'stats' ? 'true' : 'false');
       }
       if (inboxPane) inboxPane.hidden = teamAgentPanelTab !== 'inbox';
+      if (outboxPane) outboxPane.hidden = teamAgentPanelTab !== 'outbox';
       if (contextPane) contextPane.hidden = teamAgentPanelTab !== 'context';
       if (statsPane) statsPane.hidden = teamAgentPanelTab !== 'stats';
     }
@@ -6375,6 +6407,7 @@
             selectedConfidence: d.selectedConfidence,
             selectedScore: d.selectedScore,
             routing: d,
+            mailboxDirection: forAssignee ? 'inbox' : 'outbox',
             label: forAssignee ? ('Assigned to you from ' + agentNameById(event.agentId)) : ('Delegated to ' + agentNameById(event.targetAgentId || d.selected)),
           }],
         });
@@ -6382,6 +6415,22 @@
 
       events.forEach(function (event) {
         var type = String(event.type || '');
+        if (type === 'team_capability_evaluation' && event.agentId === id) {
+          var evalDetails = event.details || {};
+          flows.push({
+            ts: event.ts,
+            entries: [{
+              type: 'capability_evaluation',
+              ts: event.ts,
+              action: evalDetails.action || '',
+              reason: evalDetails.reason || event.message || '',
+              routing: evalDetails,
+              mailboxDirection: 'inbox',
+              label: 'Routing evaluated (handled here)',
+            }],
+          });
+          return;
+        }
         if (type === 'delegation_decision' && event.agentId === id) {
           pushDecision(event, false);
           return;
@@ -6402,6 +6451,7 @@
               task: dStart.task || '',
               context: dStart.context || '',
               routing: routingOut,
+              mailboxDirection: 'outbox',
             }],
           });
           return;
@@ -6418,6 +6468,7 @@
               task: dAssign.task || '',
               context: dAssign.context || '',
               routing: routingIn,
+              mailboxDirection: 'inbox',
             }],
           });
           return;
@@ -6437,6 +6488,7 @@
               task: inbox.task || event.message || '',
               context: inbox.context || '',
               routing: routingRecv,
+              mailboxDirection: 'inbox',
             });
           } else {
             current.entries.push({
@@ -6444,6 +6496,7 @@
               ts: event.ts,
               task: (inbox && inbox.task) || event.message || '',
               context: (inbox && inbox.context) || '',
+              mailboxDirection: 'inbox',
             });
           }
           return;
@@ -6460,7 +6513,7 @@
             : current.skills.slice();
           if (skills.length) {
             var skillsLabel = (current.entries[0] && current.entries[0].type === 'received') ? 'Used:' : 'Using skills:';
-            current.entries.push({ type: 'skills', ts: event.ts, skills: skills, label: skillsLabel });
+            current.entries.push({ type: 'skills', ts: event.ts, skills: skills, label: skillsLabel, mailboxDirection: 'inbox' });
           }
           if (doneInbox && doneInbox.kind === 'returned_to') {
             current.entries.push({
@@ -6468,12 +6521,14 @@
               ts: event.ts,
               to: doneInbox.toAgentId || '',
               result: doneInbox.result || '',
+              mailboxDirection: 'outbox',
             });
           } else {
             current.entries.push({
               type: 'completed',
               ts: event.ts,
               result: (doneInbox && doneInbox.result) || '',
+              mailboxDirection: 'inbox',
             });
           }
           flows.push(current);
@@ -6482,6 +6537,27 @@
       });
       if (current) flows.push(current);
       return flows.reverse();
+    }
+
+    var OUTBOX_MAILBOX_TYPES = { delegated_out: 1, returned: 1 };
+
+    function entryMailboxDirection(entry) {
+      if (entry && entry.mailboxDirection) return entry.mailboxDirection;
+      if (entry && entry.type === 'delegation_decision') {
+        return String(entry.label || '').indexOf('Assigned to you') === 0 ? 'inbox' : 'outbox';
+      }
+      if (entry && OUTBOX_MAILBOX_TYPES[entry.type]) return 'outbox';
+      return 'inbox';
+    }
+
+    function filterFlowsForMailbox(flows, direction) {
+      return flows.map(function (flow) {
+        var entries = (flow.entries || []).filter(function (entry) {
+          return entryMailboxDirection(entry) === direction;
+        });
+        if (!entries.length) return null;
+        return { ts: flow.ts, entries: entries };
+      }).filter(Boolean);
     }
 
     function renderInboxEntry(entry) {
@@ -6550,27 +6626,36 @@
         html += '</div>';
         return html;
       }
+      if (entry.type === 'capability_evaluation') {
+        html += '<div class="team-agent-inbox-label">' + escapeHtml(entry.label || 'Routing evaluated') + '</div>';
+        if (entry.action) {
+          html += '<div class="team-agent-inbox-block"><strong>Action:</strong> ' + escapeHtml(entry.action) + '</div>';
+        }
+        html += renderRoutingFactors(entry.routing || { reason: entry.reason });
+        html += '</div>';
+        return html;
+      }
       html += '</div>';
       return html;
     }
 
-    function renderAgentInbox() {
-      var list = document.getElementById('team-agent-inbox-list');
-      var titleEl = document.getElementById('team-agent-inbox-title');
-      var subEl = document.getElementById('team-agent-inbox-subtitle');
+    function renderAgentMailboxList(opts) {
+      var list = document.getElementById(opts.listId);
+      var titleEl = document.getElementById(opts.titleId);
+      var subEl = document.getElementById(opts.subtitleId);
       if (!list) return;
       if (!selectedTeamInboxAgentId) {
-        if (titleEl) titleEl.textContent = 'Agent Inbox';
-        if (subEl) subEl.textContent = 'Click an agent above';
-        list.innerHTML = '<p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>';
+        if (titleEl) titleEl.textContent = opts.emptyTitle;
+        if (subEl) subEl.textContent = opts.emptySubtitle;
+        list.innerHTML = '<p class="team-agent-inbox-empty">' + escapeHtml(opts.selectPrompt) + '</p>';
         return;
       }
       var label = agentNameById(selectedTeamInboxAgentId);
-      if (titleEl) titleEl.textContent = label + ' — Inbox';
-      if (subEl) subEl.textContent = 'Per-agent activity';
-      var flows = buildAgentInboxFlows(selectedTeamInboxAgentId);
+      if (titleEl) titleEl.textContent = label + ' — ' + opts.panelLabel;
+      if (subEl) subEl.textContent = opts.panelSubtitle;
+      var flows = filterFlowsForMailbox(buildAgentInboxFlows(selectedTeamInboxAgentId), opts.direction);
       if (!flows.length) {
-        list.innerHTML = '<p class="team-agent-inbox-empty">No inbox activity for ' + escapeHtml(label) + ' yet.</p>';
+        list.innerHTML = '<p class="team-agent-inbox-empty">' + escapeHtml(opts.noActivityText.replace('{agent}', label)) + '</p>';
         return;
       }
       list.innerHTML = flows.map(function (flow) {
@@ -6578,6 +6663,36 @@
           flow.entries.map(renderInboxEntry).join('') +
         '</div>';
       }).join('');
+    }
+
+    function renderAgentInbox() {
+      renderAgentMailboxList({
+        listId: 'team-agent-inbox-list',
+        titleId: 'team-agent-inbox-title',
+        subtitleId: 'team-agent-inbox-subtitle',
+        direction: 'inbox',
+        emptyTitle: 'Agent Inbox',
+        emptySubtitle: 'Tasks and assignments received',
+        panelLabel: 'Inbox',
+        panelSubtitle: 'Incoming tasks, assignments, and routing when chosen',
+        selectPrompt: 'Select an agent to view incoming activity.',
+        noActivityText: 'No inbox activity for {agent} yet.',
+      });
+    }
+
+    function renderAgentOutbox() {
+      renderAgentMailboxList({
+        listId: 'team-agent-outbox-list',
+        titleId: 'team-agent-outbox-title',
+        subtitleId: 'team-agent-outbox-subtitle',
+        direction: 'outbox',
+        emptyTitle: 'Agent Outbox',
+        emptySubtitle: 'Delegations and replies sent',
+        panelLabel: 'Outbox',
+        panelSubtitle: 'Outgoing delegations, routing decisions, and replies',
+        selectPrompt: 'Select an agent to view outgoing activity.',
+        noActivityText: 'No outbox activity for {agent} yet.',
+      });
     }
 
     function formatTeamActivityText(event) {
@@ -6717,6 +6832,7 @@
       } catch (_) {}
       renderTeamActivity();
       renderAgentInbox();
+      renderAgentOutbox();
     }
 
     async function fetchTeamContextFeed() {
@@ -6794,10 +6910,14 @@
     }
 
     var teamAgentTabInboxEl = document.getElementById('team-agent-tab-inbox');
+    var teamAgentTabOutboxEl = document.getElementById('team-agent-tab-outbox');
     var teamAgentTabContextEl = document.getElementById('team-agent-tab-context');
     var teamAgentTabStatsEl = document.getElementById('team-agent-tab-stats');
     if (teamAgentTabInboxEl) {
       teamAgentTabInboxEl.addEventListener('click', function () { setTeamAgentPanelTab('inbox'); });
+    }
+    if (teamAgentTabOutboxEl) {
+      teamAgentTabOutboxEl.addEventListener('click', function () { setTeamAgentPanelTab('outbox'); });
     }
     if (teamAgentTabContextEl) {
       teamAgentTabContextEl.addEventListener('click', function () { setTeamAgentPanelTab('context'); });

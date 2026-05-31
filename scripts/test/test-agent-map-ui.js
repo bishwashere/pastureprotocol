@@ -66,6 +66,13 @@ const checks = [
       html.includes('setTeamTopTab'),
   },
   {
+    name: 'Team top tabs show one-line descriptions on switch',
+    ok: html.includes('id="team-top-tab-desc"') &&
+      html.includes('TEAM_TOP_TAB_DESC') &&
+      html.includes('Long-running objectives your agents work on autonomously') &&
+      html.includes('Proactive suggestions from goal reflection and team activity'),
+  },
+  {
     name: 'Team page includes goals UI and API hooks',
     ok: html.includes('id="team-goals-list"') &&
       html.includes('id="team-goal-create"') &&
@@ -112,7 +119,16 @@ const checks = [
     name: 'Team page includes agent inbox below map',
     ok: html.includes('id="team-agent-panel"') &&
       html.includes('team-agent-inbox-list') &&
+      html.includes('team-agent-outbox-list') &&
       html.includes('selectTeamInboxAgent'),
+  },
+  {
+    name: 'Team page includes separate inbox and outbox tabs',
+    ok: html.includes('id="team-agent-tab-inbox"') &&
+      html.includes('id="team-agent-tab-outbox"') &&
+      html.includes('renderAgentOutbox') &&
+      html.includes('filterFlowsForMailbox') &&
+      html.includes("setTeamAgentPanelTab('outbox')"),
   },
   {
     name: 'Active Context is first agent panel tab',
@@ -203,7 +219,9 @@ const checks = [
       html.includes('renderRoutingFactors') &&
       html.includes('Contributing factors') &&
       html.includes('selectedScore') &&
-      html.includes('assigned_to_you'),
+      html.includes('assigned_to_you') &&
+      html.includes('capability_evaluation') &&
+      html.includes('team_capability_evaluation'),
   },
   {
     name: 'Team hash route without agent id opens map page',
