@@ -5628,6 +5628,7 @@
       var waitingFor = String(ctx.waitingFor || '').trim();
       var lastAction = String(ctx.lastAction || '').trim();
       if (!goalLabel && !thought && !waitingFor && !lastAction) return null;
+      if (!goalLabel && thought) goalLabel = thought.length > 120 ? thought.slice(0, 119) + '…' : thought;
       if (!goalLabel) goalLabel = 'Active team work';
       var subgoals = [];
       if (thought) subgoals.push({ title: thought, status: 'doing' });
@@ -5671,11 +5672,15 @@
       return goals[0] || null;
     }
 
+    function teamHasSavedGoals() {
+      return Array.isArray(teamGoalsSnapshot.goals) && teamGoalsSnapshot.goals.length > 0;
+    }
+
     function getCurrentMission() {
-      var live = getLiveMissionFromTeamContext();
-      if (live) return { kind: 'live', mission: live };
       var stored = getCurrentMissionGoal();
       if (stored) return { kind: 'stored', goal: stored };
+      var live = getLiveMissionFromTeamContext();
+      if (live) return { kind: 'live', mission: live, noSavedGoal: !teamHasSavedGoals() };
       return null;
     }
 
@@ -5717,6 +5722,7 @@
         return;
       }
       var goal = current.kind === 'live' ? current.mission : current.goal;
+      var liveOnly = current.kind === 'live' && !!current.noSavedGoal;
       var goalLabel = String(goal.title || '').trim() || String(goal.objective || '').trim() || 'Untitled goal';
       var progressText = goal.progressLabel
         ? String(goal.progressLabel)
@@ -5733,15 +5739,21 @@
           return '<li class="' + cls + '" title="' + escapeHtml(title) + '">' + escapeHtml(icon + ' ' + title) + '</li>';
         }).join('') + '</ul>'
         : '<p class="team-current-mission-empty" style="margin:0;">No subgoals yet.</p>';
+      var goalHeading = liveOnly ? 'Activity' : 'Goal';
+      var noteHtml = liveOnly
+        ? '<p class="team-current-mission-empty" style="margin:0.35rem 0 0;">No saved goal in the Goals tab — this is live agent context from chat. Create a goal there to track objectives and subgoals.</p>'
+        : '';
       panel.innerHTML = '' +
         '<h3 class="team-current-mission-title">Current Mission</h3>' +
-        '<p class="team-current-mission-meta"><strong>Goal:</strong> ' + escapeHtml(goalLabel) + '</p>' +
+        (liveOnly ? '<p class="team-current-mission-meta" style="margin:0 0 0.35rem;"><em>Live work (not a saved goal)</em></p>' : '') +
+        '<p class="team-current-mission-meta"><strong>' + goalHeading + ':</strong> ' + escapeHtml(goalLabel) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(progressText) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Owner:</strong> ' + escapeHtml(owner) + '</p>' +
         '<div class="team-current-mission-subgoals">' +
-          '<h4>Subgoals</h4>' +
+          '<h4>' + (liveOnly ? 'Steps' : 'Subgoals') + '</h4>' +
           subgoalsHtml +
-        '</div>';
+        '</div>' +
+        noteHtml;
     }
 
     function normalizeSubgoalStatus(status) {

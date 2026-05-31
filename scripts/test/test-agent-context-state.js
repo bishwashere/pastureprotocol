@@ -30,7 +30,8 @@ async function main() {
     });
     let main = readAgentContext('main');
     assert(main.state === 'working', 'main working on turn start');
-    assert(main.currentGoal === 'Generate marketing ideas', `goal: ${main.currentGoal}`);
+    assert(main.currentGoal === '', `no inferred goal in currentGoal: ${main.currentGoal}`);
+    assert(main.currentThought && main.currentThought.includes('blog ideas'), `thought reflects task: ${main.currentThought}`);
     assert(main.currentThought && main.currentThought.includes('Reviewing'), `thought: ${main.currentThought}`);
     assert(main.lastAction === 'Received user message', `lastAction: ${main.lastAction}`);
     assert(main.context.some((c) => c.includes('User asking')), 'main has user context');
@@ -84,7 +85,7 @@ async function main() {
     });
     onAgentSkillStart({ agentId: 'developer', skillId: 'read' });
     const dev = readAgentContext('developer');
-    assert(dev.currentGoal === 'Fix nginx issue', `dev goal: ${dev.currentGoal}`);
+    assert(dev.currentGoal === '', `no inferred dev goal: ${dev.currentGoal}`);
     assert(dev.currentStep === 'Reading files', `dev step: ${dev.currentStep}`);
 
     onAgentTurnDone({ agentId: 'developer' });
