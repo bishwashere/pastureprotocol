@@ -50,10 +50,11 @@ branches  - id, project_id, parent_update_id (which update it branches from), na
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.
-2. **Add an update** - click **+ Add update** at the end of any chain. Type what was done, press **⌘/Ctrl + Enter** or click **Save**.
-3. **Branch off** - click **+ Branch** inside any update node. Give the branch a name (e.g. "Marketing"). A new horizontal chain appears below the main track.
-4. **Edit an update** - click **✏ Edit** inside any node.
-5. **Delete** - use the 🗑 buttons on updates/branches/projects. Deleting a project removes all its data.
+2. **Edit project basics** - hover the project root box and click **✎** (or **✎ Edit** below). Update name, URL, and description in the modal, then **Save**.
+3. **Add an update** - click **+ Add update** at the end of any chain. Type what was done, press **⌘/Ctrl + Enter** or click **Save**.
+4. **Branch off** - click **+ Branch** inside any update node. Give the branch a name (e.g. "Marketing"). A new horizontal chain appears below the main track.
+5. **Edit an update** - click **✏ Edit** inside any node.
+6. **Delete** - use the 🗑 buttons on updates/branches/projects. Deleting a project removes all its data.
 
 ## API
 

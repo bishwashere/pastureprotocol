@@ -37,10 +37,12 @@ async function main() {
     assert(p3.url === 'https://app.example.io/path', `normalized: ${p3.url}`);
 
     const updated = updateProject(p1.id, {
-      name: p1.name,
-      description: p1.description,
+      name: 'Renamed',
+      description: 'New desc',
       url: 'docs.example.com',
     });
+    assert(updated.name === 'Renamed', `patch name: ${updated.name}`);
+    assert(updated.description === 'New desc', `patch desc: ${updated.description}`);
     assert(updated.url === 'https://docs.example.com', `patch url: ${updated.url}`);
 
     const db = getProjectsDb();

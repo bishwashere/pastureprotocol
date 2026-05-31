@@ -1713,10 +1713,15 @@ app.post('/api/projects', requireProjectsAuth, (req, res) => {
 
 app.patch('/api/projects/:id', requireProjectsAuth, (req, res) => {
   const { name, description, url } = req.body || {};
+  const id = Number(req.params.id);
+  const existing = getProject(id);
+  if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
+  const nextName = name !== undefined ? String(name || '').trim() : existing.name;
+  if (!nextName) { res.status(400).json({ error: 'name required' }); return; }
   try {
-    const p = updateProject(Number(req.params.id), {
-      name: String(name || '').trim(),
-      description: String(description || '').trim(),
+    const p = updateProject(id, {
+      name: nextName,
+      description: description !== undefined ? String(description || '').trim() : existing.description,
       url: url !== undefined ? String(url || '').trim() : undefined,
     });
     if (!p) { res.status(404).json({ error: 'Not found' }); return; }
