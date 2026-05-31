@@ -603,7 +603,7 @@ cowCode supports multiple **agent personas**. Each agent has its own identity fi
 |---|---|
 | **Agent** | A named persona with its own skills, identity (WhoAmI, MyHuman), and optional LLM. |
 | **`main`** | The default agent. Always exists, cannot be deleted. |
-| **Agent team** | All configured agents. Visualized as a tree on the dashboard home. |
+| **Agent space (Team)** | Central workspace for agent roster + goals. Includes cards, tree view, live context, inbox, stats, and activity feed. |
 | **Agent messaging** | One agent can invoke another via the `agent-send` skill. Controlled by an allow-list. |
 | **Groups** | WhatsApp/Telegram groups are assigned to a specific agent. Group members chat with that agent only. |
 
@@ -631,9 +631,28 @@ Click the **✎** button on any agent card to edit:
 - **Skills** - toggle which skills this agent has access to (independent of the main agent)
 - **Agent messaging** - enable the `agent-send` skill and add which other agents this one can invoke
 
-### The Agent team tree
+### Agent Space (Team page)
 
-The dashboard home page shows all agents as a **tree**:
+The **Team** page is the current agent space. It has:
+
+- **Top-level tabs:** `Roster` and `Goals`
+- **Roster views:** `Cards` (default) and `Tree`
+- **Filters:** `View Active Only` (shows only working/waiting/error agents)
+- **Per-agent panel:** `Active Context` (default), `Inbox`, `Stats`
+- **Live activity feed:** recent team events (delegation, skills, turns)
+
+#### Roster - cards view (default)
+
+Each card shows:
+
+- agent name + state (`Idle`, `Working`, `Waiting`, `Error`)
+- current step from Active Context
+- tasks completed today
+- quick edit button (`✎`)
+
+#### Roster - tree view
+
+Tree view shows team structure and link arrows:
 
 ```
               [main]
@@ -645,7 +664,23 @@ The dashboard home page shows all agents as a **tree**:
 - Other agents branch below it.
 - **Solid lines** = tree structure (hierarchy).
 - **Dashed arrows** = message-passing permission (agent A can invoke agent B).
-- Click any node to switch the chat to that agent.
+- Click any node/card to inspect that agent in the lower panel.
+
+#### Goals (persistent autonomous work)
+
+Goals are first-class entities with:
+
+- title, owner agent, status (`active|paused|completed|blocked`)
+- objective, plan steps, progress/evidence
+- last run and next run timestamps
+- context snapshot + memory anchors
+
+From Team -> Goals you can:
+
+- create a new goal (title/objective/owner)
+- view goal cards with status + progress
+- run a goal immediately (`Run now`)
+- pause/resume/activate goals
 
 ### Routing messages to agents
 
@@ -691,7 +726,8 @@ cowcode dashboard
 
 | Page | What it's for |
 |---|---|
-| **Home** | Chat with any agent. Status overview. Agent team tree. |
+| **Home** | Chat with any agent. Status overview and quick agent controls. |
+| **Team** | Agent space: roster cards/tree, Active Context, Inbox, Stats, activity feed, and Goals. |
 | **Memory** | Browse and edit all memory: Today, Yesterday, Long-term (MEMORY.md), History, Notes. |
 | **Crons** | View, add, and delete scheduled reminders. |
 | **Skills** | Enable/disable skills. View credential status badges. Edit SKILL.md files inline. |
@@ -713,11 +749,11 @@ The home page has two panels:
 - Live status (daemon up/down, active model, skill count, timezone)
 - Identity tiles: click **Who am I**, **My human**, or **Group rules** to open an inline editor for that file
 
-**Right - Agent team:**
-- Tree visualization of all agents
-- Click any node to select that agent for chat
-- **✎** button on each node opens the edit modal
-- **+ Agent** button (top-right) opens the create-agent dialog
+**Right - Agent controls:**
+- Quick agent visualization and edit controls
+- **✎** opens the edit modal
+- **+ Agent** opens the create-agent dialog
+- Full team coordination is on the **Team** page
 
 **Below - Chat:**
 - Full in-browser chat with the selected agent

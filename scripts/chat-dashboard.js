@@ -134,12 +134,17 @@ async function main() {
     userText: message,
     availableSkillIds: enabledSkillIds,
   });
-  const delegatedTarget = delegationContext?.recommendation?.targetAgentId || '';
+  const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
+    ? (delegationContext?.recommendation?.targetAgentId || '')
+    : '';
   const delegationDecision = delegationContext?.recommendation
     ? {
         reason: String(delegationContext.recommendation.reason || '').trim(),
         selected: delegatedTarget || '',
+        action: String(delegationContext.recommendation.action || '').trim(),
         selectedConfidence: Number(delegationContext.recommendation.confidence || 0),
+        offerUpgrade: !!delegationContext.recommendation.offerUpgrade,
+        suggestedDomain: String(delegationContext.recommendation.suggestedDomain || '').trim(),
         candidates: Array.isArray(delegationContext.candidates)
           ? delegationContext.candidates.slice(0, 5).map((c) => ({
               agentId: String(c.agentId || '').trim(),
@@ -148,9 +153,16 @@ async function main() {
               score: Number(c.score || 0),
             }))
           : [],
+        teamAgents: Array.isArray(delegationContext.teamCapability?.agents)
+          ? delegationContext.teamCapability.agents.slice(0, 6).map((a) => ({
+              agentId: a.agentId,
+              confidencePct: a.confidencePct,
+              reasoning: a.reasoning,
+            }))
+          : [],
       }
     : null;
-  const presetDelegationPlan = delegatedTarget
+  const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
     ? {
         mode: 'tool',
         skills: ['agent-send'],
@@ -167,6 +179,16 @@ async function main() {
       depth: 0,
       jid: dashboardJid,
       message: `Delegation decision selected ${delegatedTarget}`,
+      details: delegationDecision,
+    });
+  } else if (delegationDecision && delegationContext?.teamCapability) {
+    logTeamActivity({
+      type: 'team_capability_evaluation',
+      agentId,
+      status: 'ok',
+      depth: 0,
+      jid: dashboardJid,
+      message: `Team capability: ${delegationDecision.action || 'handle-in-main'}`,
       details: delegationDecision,
     });
   }

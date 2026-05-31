@@ -59,6 +59,19 @@ const checks = [
     ok: html.includes('id="page-team"') && html.includes('id="team-map-canvas"'),
   },
   {
+    name: 'Team page has top-level Roster and Goals tabs',
+    ok: html.includes('id="team-top-tab-roster"') &&
+      html.includes('id="team-top-tab-goals"') &&
+      html.includes('setTeamTopTab'),
+  },
+  {
+    name: 'Team page includes goals UI and API hooks',
+    ok: html.includes('id="team-goals-list"') &&
+      html.includes('id="team-goal-create"') &&
+      html.includes('/api/goals') &&
+      html.includes('fetchGoalsSnapshot'),
+  },
+  {
     name: 'Team page includes live activity panel',
     ok: html.includes('id="team-activity-list"') && html.includes('Live agent activity'),
   },

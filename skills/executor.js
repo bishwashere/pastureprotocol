@@ -26,6 +26,7 @@ import { executeBackgroundTasks } from '../lib/executors/background-tasks.js';
 import { executeGithub } from '../lib/executors/github.js';
 import { executeGmail } from '../lib/executors/gmail.js';
 import { executeCalendar } from '../lib/executors/calendar.js';
+import { executeEvaluateTeamCapability } from '../lib/executors/evaluate-team-capability.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -50,6 +51,7 @@ const EXECUTORS = {
   github: executeGithub,
   gmail: executeGmail,
   calendar: executeCalendar,
+  'evaluate-team-capability': executeEvaluateTeamCapability,
 };
 
 /** go-read and go-write are disabled in group chats; allowed in DMs and dashboard. */

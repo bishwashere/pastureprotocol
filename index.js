@@ -71,6 +71,7 @@ import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
+import { startGoalEngine } from './lib/goal-engine.js';
 import {
   buildAnswerCompletenessProbePrompt,
 } from './lib/conversation-context.js';
@@ -365,6 +366,39 @@ async function main() {
       }
     }
     return;
+  }
+
+  // Persistent autonomous goals loop (agent background work above single turns).
+  try {
+    const cfg = loadConfig();
+    const loopMs = Number(cfg?.goals?.loopMs) || 60_000;
+    startGoalEngine({
+      loopMs,
+      runGoalTurn: async (goal, prompt) =>
+        runInternalAgentTurn({
+          targetAgentId: goal?.ownerAgentId || DEFAULT_AGENT_ID,
+          userText: prompt,
+          callerAgentId: DEFAULT_AGENT_ID,
+          depth: 1,
+          callChain: [DEFAULT_AGENT_ID, goal?.ownerAgentId || DEFAULT_AGENT_ID],
+          persistHistory: true,
+        }),
+      onLog: (event) => {
+        logTeamActivity({
+          type: event.type || 'goal_tick',
+          agentId: event.ownerAgentId || DEFAULT_AGENT_ID,
+          status: event.status || 'ok',
+          message: event.message || event.title || 'Goal tick',
+          details: {
+            goalId: event.goalId || '',
+            title: event.title || '',
+          },
+        });
+      },
+    });
+    console.log('[goals] engine started');
+  } catch (err) {
+    console.log('[goals] engine failed to start:', getErrorMessageForLog(err));
   }
 
   let sock;
@@ -939,12 +973,17 @@ async function main() {
           availableSkillIds: enabledSkillIds,
         })
       : null;
-    const delegatedTarget = delegationContext?.recommendation?.targetAgentId || '';
+    const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
+      ? (delegationContext?.recommendation?.targetAgentId || '')
+      : '';
     const delegationDecision = delegationContext?.recommendation
       ? {
           reason: String(delegationContext.recommendation.reason || '').trim(),
           selected: delegatedTarget || '',
+          action: String(delegationContext.recommendation.action || '').trim(),
           selectedConfidence: Number(delegationContext.recommendation.confidence || 0),
+          offerUpgrade: !!delegationContext.recommendation.offerUpgrade,
+          suggestedDomain: String(delegationContext.recommendation.suggestedDomain || '').trim(),
           candidates: Array.isArray(delegationContext.candidates)
             ? delegationContext.candidates.slice(0, 5).map((c) => ({
                 agentId: String(c.agentId || '').trim(),
@@ -953,9 +992,16 @@ async function main() {
                 score: Number(c.score || 0),
               }))
             : [],
+          teamAgents: Array.isArray(delegationContext.teamCapability?.agents)
+            ? delegationContext.teamCapability.agents.slice(0, 6).map((a) => ({
+                agentId: a.agentId,
+                confidencePct: a.confidencePct,
+                reasoning: a.reasoning,
+              }))
+            : [],
         }
       : null;
-    const presetDelegationPlan = delegatedTarget
+    const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
       ? {
           mode: 'tool',
           skills: ['agent-send'],
@@ -972,6 +1018,16 @@ async function main() {
         depth: 0,
         jid,
         message: `Delegation decision selected ${delegatedTarget}`,
+        details: delegationDecision,
+      });
+    } else if (delegationDecision && delegationContext?.teamCapability) {
+      logTeamActivity({
+        type: 'team_capability_evaluation',
+        agentId,
+        status: 'ok',
+        depth: 0,
+        jid,
+        message: `Team capability: ${delegationDecision.action || 'handle-in-main'}`,
         details: delegationDecision,
       });
     }

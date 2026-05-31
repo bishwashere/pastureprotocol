@@ -72,11 +72,44 @@
     .team-page-head {
       flex-shrink: 0;
     }
+    .team-top-tabs {
+      display: flex;
+      gap: 0.35rem;
+      margin: 0.1rem 0 0.45rem 0;
+    }
+    .team-top-tab {
+      margin: 0;
+      padding: 0.3rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .team-top-tab.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(167, 139, 250, 0.08);
+    }
     .team-page-body {
       flex: 1 1 0;
       min-height: 0;
       display: flex;
       gap: 0.65rem;
+    }
+    .team-roster-view,
+    .team-goals-view {
+      flex: 1 1 0;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      gap: 0.65rem;
+    }
+    .team-roster-view[hidden],
+    .team-goals-view[hidden] {
+      display: none !important;
     }
     .team-map-wrap {
       flex: 1 1 0;
@@ -228,6 +261,109 @@
     }
     .team-page-card .team-cards-view ~ .team-agent-panel {
       max-height: none;
+    }
+    .team-goals-main {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      padding: 0.55rem;
+    }
+    .team-goals-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .team-goals-list {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+      gap: 0.55rem;
+      padding: 0.1rem;
+    }
+    .team-goal-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      padding: 0.55rem;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .team-goal-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.45rem;
+      margin-bottom: 0.35rem;
+      align-items: baseline;
+    }
+    .team-goal-card-title {
+      margin: 0;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .team-goal-status {
+      font-size: 0.66rem;
+      padding: 0.08rem 0.35rem;
+      border-radius: 999px;
+      text-transform: capitalize;
+    }
+    .team-goal-status.active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .team-goal-status.paused { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
+    .team-goal-status.completed { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .team-goal-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .team-goal-progress {
+      margin: 0.35rem 0;
+      height: 0.32rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .team-goal-progress > span {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+      width: 0;
+    }
+    .team-goal-meta {
+      color: var(--muted);
+      font-size: 0.68rem;
+      margin-top: 0.2rem;
+    }
+    .team-goal-actions {
+      margin-top: 0.45rem;
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .team-goals-new {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .team-goals-new input,
+    .team-goals-new select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 0.35rem 0.45rem;
+      font-family: inherit;
+      font-size: 0.72rem;
+    }
+    @media (max-width: 980px) {
+      .team-goals-new {
+        grid-template-columns: 1fr;
+      }
     }
     .team-page-card .agent-map-canvas {
       flex: 1 1 45%;
@@ -2247,82 +2383,105 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
+        <div class="team-top-tabs" role="tablist">
+          <button type="button" id="team-top-tab-roster" class="team-top-tab active" data-team-top="roster" role="tab" aria-selected="true">Roster</button>
+          <button type="button" id="team-top-tab-goals" class="team-top-tab" data-team-top="goals" role="tab" aria-selected="false">Goals</button>
+        </div>
         <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Active Context, Inbox, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
       </div>
       <div class="team-page-body">
-        <div class="team-map-wrap">
-          <div class="team-view-toolbar">
-            <div class="team-view-tabs" role="tablist">
-              <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
-              <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+        <div id="team-roster-view" class="team-roster-view">
+          <div class="team-map-wrap">
+            <div class="team-view-toolbar">
+              <div class="team-view-tabs" role="tablist">
+                <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
+                <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+              </div>
+              <label class="team-view-active-toggle" for="team-view-active-only">
+                <input type="checkbox" id="team-view-active-only">
+                View Active Only
+              </label>
             </div>
-            <label class="team-view-active-toggle" for="team-view-active-only">
-              <input type="checkbox" id="team-view-active-only">
-              View Active Only
-            </label>
-          </div>
-          <div id="team-cards-view" class="team-cards-view">
-            <div id="team-agent-cards" class="team-agent-cards-row">
-              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+            <div id="team-cards-view" class="team-cards-view">
+              <div id="team-agent-cards" class="team-agent-cards-row">
+                <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+              </div>
             </div>
-          </div>
-          <div id="team-tree-view" class="team-tree-view" hidden>
-          <div id="team-map-canvas" class="agent-map-canvas">
-            <div id="team-map-scaler" class="agent-map-scaler">
-              <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
-                <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
-                <div id="team-map-nodes" class="agent-map-nodes"></div>
+            <div id="team-tree-view" class="team-tree-view" hidden>
+            <div id="team-map-canvas" class="agent-map-canvas">
+              <div id="team-map-scaler" class="agent-map-scaler">
+                <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
+                  <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+                  <div id="team-map-nodes" class="agent-map-nodes"></div>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div id="team-agent-panel" class="team-agent-panel">
+              <div class="team-agent-panel-tabs" role="tablist">
+                <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
+                <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
+                <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
+              </div>
+              <div class="team-agent-panel-body">
+                <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel">
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-context-title">Active Context</h3>
+                    <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
+                  </div>
+                  <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
+                  <div id="team-agent-context-detail" class="team-agent-context-list">
+                    <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
+                  </div>
+                </div>
+                <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-inbox-title">Agent Inbox</h3>
+                    <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+                  </div>
+                  <div id="team-agent-inbox-list" class="team-agent-inbox-list">
+                    <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
+                  </div>
+                </div>
+                <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-stats-title">Agent Metrics</h3>
+                    <span id="team-agent-stats-subtitle" class="team-agent-inbox-sub">Historical performance</span>
+                  </div>
+                  <div id="team-agent-stats-detail" class="team-agent-metrics-list">
+                    <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          </div>
-          <div id="team-agent-panel" class="team-agent-panel">
-            <div class="team-agent-panel-tabs" role="tablist">
-              <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
-              <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
-              <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
-            </div>
-            <div class="team-agent-panel-body">
-              <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel">
-                <div class="team-agent-inbox-head">
-                  <h3 id="team-agent-context-title">Active Context</h3>
-                  <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
-                </div>
-                <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
-                <div id="team-agent-context-detail" class="team-agent-context-list">
-                  <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
-                </div>
+          <div id="team-activity-wrap" class="team-activity-wrap collapsed">
+            <div class="team-activity-shell">
+              <div class="team-activity-head">
+                <h3 class="team-activity-title">Live agent activity</h3>
+                <span id="team-activity-status" class="team-activity-status">Idle</span>
+                <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
               </div>
-              <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
-                <div class="team-agent-inbox-head">
-                  <h3 id="team-agent-inbox-title">Agent Inbox</h3>
-                  <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
-                </div>
-                <div id="team-agent-inbox-list" class="team-agent-inbox-list">
-                  <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
-                </div>
-              </div>
-              <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
-                <div class="team-agent-inbox-head">
-                  <h3 id="team-agent-stats-title">Agent Metrics</h3>
-                  <span id="team-agent-stats-subtitle" class="team-agent-inbox-sub">Historical performance</span>
-                </div>
-                <div id="team-agent-stats-detail" class="team-agent-metrics-list">
-                  <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
-                </div>
+              <div id="team-activity-list" class="team-activity-list">
+                <p class="team-activity-empty">No activity yet.</p>
               </div>
             </div>
           </div>
         </div>
-        <div id="team-activity-wrap" class="team-activity-wrap collapsed">
-          <div class="team-activity-shell">
-            <div class="team-activity-head">
-              <h3 class="team-activity-title">Live agent activity</h3>
-              <span id="team-activity-status" class="team-activity-status">Idle</span>
-              <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
+        <div id="team-goals-view" class="team-goals-view" hidden>
+          <div class="team-goals-main">
+            <div class="team-goals-head">
+              <h3 style="margin:0; font-size:0.9rem;">Goals</h3>
+              <button type="button" id="team-goals-refresh" class="secondary" style="margin:0;">Refresh</button>
             </div>
-            <div id="team-activity-list" class="team-activity-list">
-              <p class="team-activity-empty">No activity yet.</p>
+            <div class="team-goals-new">
+              <input id="team-goal-title" type="text" placeholder="Goal title (optional)">
+              <input id="team-goal-objective" type="text" placeholder="High-level objective">
+              <select id="team-goal-owner"></select>
+              <button type="button" id="team-goal-create" style="margin:0;">New Goal</button>
+            </div>
+            <div id="team-goals-list" class="team-goals-list">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>
             </div>
           </div>
         </div>
@@ -2567,10 +2726,12 @@
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
     var teamAgentPanelTab = 'context';
+    var teamTopTab = 'roster';
     var teamViewMode = 'cards';
     var teamViewActiveOnly = false;
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
+    var teamGoalsSnapshot = { goals: [], updatedAt: 0 };
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -2599,6 +2760,7 @@
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
       if (name === 'team') {
+        setTeamTopTab('roster');
         setTeamAgentPanelTab('context');
         startTeamActivityFeed();
         fetchAgentMapData().then(function () {
@@ -4978,6 +5140,7 @@
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
+        renderGoalsOwnerOptions();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
@@ -4987,6 +5150,7 @@
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
+        renderGoalsOwnerOptions();
         return agentMapData;
       }
     }
@@ -5062,6 +5226,124 @@
           if (layout && els) drawAgentMapArrows(agentMapData, layout, els, 'team');
         });
       }
+    }
+
+    function setTeamTopTab(tab) {
+      teamTopTab = tab === 'goals' ? 'goals' : 'roster';
+      var rosterTab = document.getElementById('team-top-tab-roster');
+      var goalsTab = document.getElementById('team-top-tab-goals');
+      var rosterView = document.getElementById('team-roster-view');
+      var goalsView = document.getElementById('team-goals-view');
+      if (rosterTab) {
+        rosterTab.classList.toggle('active', teamTopTab === 'roster');
+        rosterTab.setAttribute('aria-selected', teamTopTab === 'roster' ? 'true' : 'false');
+      }
+      if (goalsTab) {
+        goalsTab.classList.toggle('active', teamTopTab === 'goals');
+        goalsTab.setAttribute('aria-selected', teamTopTab === 'goals' ? 'true' : 'false');
+      }
+      if (rosterView) rosterView.hidden = teamTopTab !== 'roster';
+      if (goalsView) goalsView.hidden = teamTopTab !== 'goals';
+      if (teamTopTab === 'goals' && (!teamGoalsSnapshot.goals || !teamGoalsSnapshot.goals.length)) {
+        fetchGoalsSnapshot();
+      }
+    }
+
+    function formatGoalTs(ts) {
+      var n = Number(ts);
+      if (!isFinite(n) || n <= 0) return 'never';
+      return new Date(n).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function goalOwnerLabel(goal) {
+      return agentNameById(goal && goal.ownerAgentId ? goal.ownerAgentId : 'main');
+    }
+
+    function renderGoalsOwnerOptions() {
+      var el = document.getElementById('team-goal-owner');
+      if (!el) return;
+      var agents = agentMapData || [];
+      if (!agents.length) {
+        el.innerHTML = '<option value="main">main</option>';
+        return;
+      }
+      el.innerHTML = agents.map(function (a) {
+        var id = String(a && a.id || 'main');
+        return '<option value="' + escapeHtml(id) + '">' + escapeHtml(agentDisplayLabel(a)) + '</option>';
+      }).join('');
+    }
+
+    function renderGoalsList() {
+      var wrap = document.getElementById('team-goals-list');
+      if (!wrap) return;
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals.slice() : [];
+      goals.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (!goals.length) {
+        wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>';
+        return;
+      }
+      wrap.innerHTML = goals.map(function (g) {
+        var id = String(g.id || '');
+        var status = String(g.status || 'active').toLowerCase();
+        var pct = Number(g.progress && g.progress.pct);
+        if (!isFinite(pct)) pct = 0;
+        pct = Math.max(0, Math.min(100, Math.round(pct)));
+        var running = !!g.running;
+        var runningTxt = running ? ('Working: ' + escapeHtml(goalOwnerLabel(g))) : '';
+        var last = formatGoalTs(g.lastRunAt);
+        var next = formatGoalTs(g.nextRunAt);
+        return '<div class="team-goal-card" data-goal-id="' + escapeHtml(id) + '">' +
+          '<div class="team-goal-card-head">' +
+            '<h4 class="team-goal-card-title">' + escapeHtml(g.title || 'Untitled goal') + '</h4>' +
+            '<span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div class="team-goal-meta"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
+          '<div class="team-goal-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
+          '<div class="team-goal-progress"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="team-goal-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
+          '<div class="team-goal-meta"><strong>Last:</strong> ' + escapeHtml(last) + ' <strong>Next:</strong> ' + escapeHtml(next) + '</div>' +
+          (runningTxt ? '<div class="team-goal-meta"><strong>' + runningTxt + '</strong></div>' : '') +
+          (g.lastActivity ? '<div class="team-goal-meta"><strong>Activity:</strong> ' + escapeHtml(g.lastActivity) + '</div>' : '') +
+          '<div class="team-goal-actions">' +
+            '<button type="button" class="secondary" data-goal-run="' + escapeHtml(id) + '" style="margin:0;">Run now</button>' +
+            '<button type="button" class="secondary" data-goal-toggle="' + escapeHtml(id) + '" style="margin:0;">' + (status === 'active' ? 'Pause' : (status === 'paused' ? 'Resume' : 'Activate')) + '</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      wrap.querySelectorAll('button[data-goal-run]').forEach(function (btn) {
+        btn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          var id = btn.getAttribute('data-goal-run');
+          if (!id) return;
+          btn.disabled = true;
+          try {
+            await fetch(API + '/api/goals/' + encodeURIComponent(id) + '/run', { method: 'POST' });
+          } catch (_) {}
+          btn.disabled = false;
+          fetchGoalsSnapshot();
+        });
+      });
+      wrap.querySelectorAll('button[data-goal-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          var id = btn.getAttribute('data-goal-toggle');
+          if (!id) return;
+          var goal = goals.find(function (g) { return String(g.id) === id; });
+          if (!goal) return;
+          var nextStatus = goal.status === 'active' ? 'paused' : 'active';
+          btn.disabled = true;
+          try {
+            await fetch(API + '/api/goals/' + encodeURIComponent(id), {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: nextStatus }),
+            });
+          } catch (_) {}
+          btn.disabled = false;
+          fetchGoalsSnapshot();
+        });
+      });
     }
 
     function renderTeamAgentCards() {
@@ -5641,15 +5923,30 @@
       renderTeamAgentCards();
     }
 
+    async function fetchGoalsSnapshot() {
+      try {
+        var r = await fetch(API + '/api/goals');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        teamGoalsSnapshot = {
+          goals: Array.isArray(d.goals) ? d.goals : [],
+          updatedAt: Number(d.updatedAt) || 0,
+        };
+      } catch (_) {}
+      renderGoalsList();
+    }
+
     function startTeamActivityFeed() {
       if (teamActivityPollTimer) return;
       fetchTeamActivityFeed();
       fetchTeamContextFeed();
       fetchTeamMetricsFeed();
+      fetchGoalsSnapshot();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
         fetchTeamMetricsFeed();
+        fetchGoalsSnapshot();
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
@@ -5677,10 +5974,55 @@
     }
     setTeamViewTab('cards');
 
+    var teamTopTabRosterEl = document.getElementById('team-top-tab-roster');
+    var teamTopTabGoalsEl = document.getElementById('team-top-tab-goals');
+    if (teamTopTabRosterEl) {
+      teamTopTabRosterEl.addEventListener('click', function () { setTeamTopTab('roster'); });
+    }
+    if (teamTopTabGoalsEl) {
+      teamTopTabGoalsEl.addEventListener('click', function () { setTeamTopTab('goals'); });
+    }
+    setTeamTopTab('roster');
+
     var teamViewActiveOnlyEl = document.getElementById('team-view-active-only');
     if (teamViewActiveOnlyEl) {
       teamViewActiveOnlyEl.addEventListener('change', function () {
         setTeamViewActiveOnly(!!teamViewActiveOnlyEl.checked);
+      });
+    }
+
+    var teamGoalsRefreshEl = document.getElementById('team-goals-refresh');
+    if (teamGoalsRefreshEl) {
+      teamGoalsRefreshEl.addEventListener('click', function () { fetchGoalsSnapshot(); });
+    }
+    var teamGoalCreateEl = document.getElementById('team-goal-create');
+    if (teamGoalCreateEl) {
+      teamGoalCreateEl.addEventListener('click', async function () {
+        var titleEl = document.getElementById('team-goal-title');
+        var objectiveEl = document.getElementById('team-goal-objective');
+        var ownerEl = document.getElementById('team-goal-owner');
+        var title = titleEl ? String(titleEl.value || '').trim() : '';
+        var objective = objectiveEl ? String(objectiveEl.value || '').trim() : '';
+        var ownerAgentId = ownerEl ? String(ownerEl.value || '').trim() : 'main';
+        if (!objective) {
+          if (objectiveEl) objectiveEl.focus();
+          return;
+        }
+        teamGoalCreateEl.disabled = true;
+        try {
+          var resp = await fetch(API + '/api/goals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title, objective: objective, ownerAgentId: ownerAgentId }),
+          });
+          if (resp.ok) {
+            if (titleEl) titleEl.value = '';
+            if (objectiveEl) objectiveEl.value = '';
+            await fetchGoalsSnapshot();
+            setTeamTopTab('goals');
+          }
+        } catch (_) {}
+        teamGoalCreateEl.disabled = false;
       });
     }
 

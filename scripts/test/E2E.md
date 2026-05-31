@@ -54,6 +54,7 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [cron/](cron/inputs.md) | `test-cron-e2e.js` | `--test` |
 | [agent/](agent/inputs.md) | `test-agent.js` | `--test` |
 | [agent-team/](agent-team/inputs.md) | `test-agent-team-e2e.js` | `--test` + dashboard |
+| [evaluate-team-capability/](evaluate-team-capability/inputs.md) | `test-evaluate-team-capability.js` | direct (routing logic) |
 | [agent-team/](agent-team/inputs.md) | `test-agent-config.js` | direct (config only; replaces deleted `test-agent-team-flow.js`) |
 | [basic/](basic/inputs.md) | `test-basic-e2e.js` | `--test` |
 | - | `test-chat-session.js` | direct (session logic only) |

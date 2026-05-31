@@ -16,6 +16,8 @@ import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsTe
 import { readTeamActivity } from '../lib/team-activity.js';
 import { readAllAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
+import { listGoals, createGoal, updateGoal, getGoal, runGoalTick } from '../lib/goals.js';
+import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
@@ -233,6 +235,64 @@ if (API_KEY) {
 
 // ---- API ----
 
+function safeJsonParse(text) {
+  const s = String(text || '').replace(/^\[CowCode\]\s*/i, '').trim();
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch (_) {}
+  const m = s.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[0]);
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildGoalDraftPrompt({ title, objective, ownerAgentId, agentIds }) {
+  return [
+    'Create a persistent goal draft for an autonomous agent loop.',
+    `Title: ${title || objective}`,
+    `Objective: ${objective}`,
+    `Preferred owner: ${ownerAgentId || 'main'}`,
+    `Available owners: ${agentIds.join(', ')}`,
+    '',
+    'Return STRICT JSON only:',
+    '{',
+    '  "title": "short title",',
+    '  "ownerAgentId": "one available owner id",',
+    '  "planSteps": [{"title":"...", "status":"todo|doing|done|blocked"}],',
+    '  "contextSnapshot": "small context",',
+    '  "memoryAnchors": ["optional anchors"]',
+    '}',
+  ].join('\n');
+}
+
+async function buildGoalDraftViaMainAgent({ title, objective, ownerAgentId }) {
+  const agentIds = listVisibleAgentIds();
+  const prompt = buildGoalDraftPrompt({ title, objective, ownerAgentId, agentIds });
+  const turn = await runInternalAgentTurn({
+    targetAgentId: DEFAULT_AGENT_ID,
+    userText: prompt,
+    callerAgentId: DEFAULT_AGENT_ID,
+    depth: 1,
+    callChain: [DEFAULT_AGENT_ID, DEFAULT_AGENT_ID],
+    persistHistory: true,
+  });
+  const parsed = safeJsonParse(turn?.textToSend || '') || {};
+  const resolvedOwner = String(parsed.ownerAgentId || ownerAgentId || DEFAULT_AGENT_ID).trim();
+  return {
+    title: String(parsed.title || title || objective || '').trim(),
+    ownerAgentId: agentIds.includes(resolvedOwner) ? resolvedOwner : (ownerAgentId || DEFAULT_AGENT_ID),
+    currentPlan: {
+      steps: Array.isArray(parsed.planSteps) ? parsed.planSteps : [],
+    },
+    contextSnapshot: String(parsed.contextSnapshot || '').trim(),
+    memoryAnchors: Array.isArray(parsed.memoryAnchors) ? parsed.memoryAnchors : [],
+  };
+}
+
 app.get('/api/status', async (_req, res) => {
   try {
     const daemonRunning = await getDaemonRunning();
@@ -413,6 +473,99 @@ app.get('/api/team/metrics', (req, res) => {
     const agentId = String(req.query?.agentId || '').trim();
     const snapshot = readAgentMetrics({ agentId: agentId || undefined });
     res.json({ ...snapshot, now: Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/goals', (_req, res) => {
+  try {
+    const snapshot = listGoals();
+    res.json({ ...snapshot, now: Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/goals', async (req, res) => {
+  try {
+    const title = String(req.body?.title || '').trim();
+    const objective = String(req.body?.objective || '').trim();
+    const ownerAgentId = String(req.body?.ownerAgentId || DEFAULT_AGENT_ID).trim() || DEFAULT_AGENT_ID;
+    if (!objective) {
+      res.status(400).json({ error: 'objective is required' });
+      return;
+    }
+    let draft = {
+      title: title || objective,
+      ownerAgentId,
+      currentPlan: { steps: [] },
+      contextSnapshot: '',
+      memoryAnchors: [],
+    };
+    try {
+      draft = await buildGoalDraftViaMainAgent({ title, objective, ownerAgentId });
+    } catch (_) {
+      // Fallback is still a valid goal with a one-step plan.
+    }
+    if (!Array.isArray(draft.currentPlan?.steps) || draft.currentPlan.steps.length === 0) {
+      draft.currentPlan = { steps: [{ title: `Start: ${objective}`, status: 'todo' }] };
+    }
+    const goal = createGoal({
+      title: draft.title || title || objective,
+      objective,
+      ownerAgentId: draft.ownerAgentId || ownerAgentId,
+      status: 'active',
+      currentPlan: draft.currentPlan,
+      contextSnapshot: draft.contextSnapshot || '',
+      memoryAnchors: draft.memoryAnchors || [],
+      intervalMs: req.body?.intervalMs,
+    });
+    res.status(201).json({ goal });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/goals/:id', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'goal id is required' });
+      return;
+    }
+    const patch = req.body || {};
+    const goal = updateGoal(id, patch);
+    res.json({ goal });
+  } catch (err) {
+    if (/not found/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/goals/:id/run', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const existing = getGoal(id);
+    if (!existing) {
+      res.status(404).json({ error: 'Goal not found' });
+      return;
+    }
+    const result = await runGoalTick(id, {
+      runGoalTurn: (goal, prompt) =>
+        runInternalAgentTurn({
+          targetAgentId: goal?.ownerAgentId || DEFAULT_AGENT_ID,
+          userText: prompt,
+          callerAgentId: DEFAULT_AGENT_ID,
+          depth: 1,
+          callChain: [DEFAULT_AGENT_ID, goal?.ownerAgentId || DEFAULT_AGENT_ID],
+          persistHistory: true,
+        }),
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
