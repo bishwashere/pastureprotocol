@@ -71,6 +71,7 @@ import {
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
 import { appendUserFacingPrompt } from './lib/user-reply-style.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/user-facing-reply.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -877,13 +878,14 @@ async function main() {
     return groupBlock ? (basePrompt + '\n\n' + groupBlock) : basePrompt;
   }
 
-  /** Remove em-dash glyphs from outbound assistant text before sending. */
+  /** Normalize text for the user (no [CowCode], no "agent replied:" wrappers). */
   function sanitizeOutboundText(text) {
     if (text == null) return '';
-    return String(text)
+    const normalized = String(text)
       .replace(/\s*—\s*/g, ' ')
       .replace(/[ \t]{2,}/g, ' ')
       .trim();
+    return formatUserFacingReply(normalized);
   }
 
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}) {
@@ -1121,9 +1123,8 @@ async function main() {
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
-          const label = forced.agentTitle || forced.agent || delegatedTarget;
           turnResult = {
-            textToSend: `[CowCode] ${label} replied: ${forced.reply.trim()}`,
+            textToSend: forced.reply.trim(),
             skillsCalled: ['agent-send'],
           };
         } else if (forced && typeof forced.error === 'string') {
@@ -1226,9 +1227,11 @@ async function main() {
     }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = resultToUse || {};
     if (Array.isArray(called) && called.length) skillsCalled = called;
-    const cleanedTextToSend = sanitizeOutboundText(textToSend || '');
+    const rawTextToSend = (textToSend || '').trim();
+    const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
+    logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');
-    const textForSend = isTelegramChatId(jid) ? cleanedTextToSend.replace(/^\[CowCode\]\s*/i, '').trim() : cleanedTextToSend;
+    const textForSend = cleanedTextToSend;
     const isGroupNoReply = bioOpts.groupNonOwner && !bioOpts.groupMentioned &&
       !(cleanedVoiceReplyText && cleanedVoiceReplyText.trim()) &&
       (!textForSend || !textForSend.trim() || /^\[NO_REPLY\]\s*$/i.test(textForSend.trim()));
@@ -1257,7 +1260,7 @@ async function main() {
         }
       }
       const replyText = (cleanedVoiceReplyText && cleanedVoiceReplyText.trim()) ? cleanedVoiceReplyText.trim() : textForSend;
-      const captionForImage = (replyText && replyText.trim()) ? replyText.replace(/^\[CowCode\]\s*/i, '').trim() : (imageReplyCaption || '');
+      const captionForImage = (replyText && replyText.trim()) ? replyText.trim() : (imageReplyCaption || '');
       try {
         let sent;
         if (voiceBuffer) {

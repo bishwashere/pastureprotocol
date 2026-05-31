@@ -39,6 +39,7 @@ import {
 } from '../lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/user-facing-reply.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -62,8 +63,9 @@ function writeNdjsonLine(obj) {
 }
 
 function formatDashboardReply(textToSend) {
-  let reply = textToSend != null ? String(textToSend) : '';
-  reply = reply.replace(/(^|\n)\s*\[CowCode\]\s*/gi, '$1').trim();
+  const raw = textToSend != null ? String(textToSend) : '';
+  const reply = formatUserFacingReply(raw);
+  logOutboundReplyDecorations(raw, reply, { channel: 'dashboard' });
   return reply;
 }
 
@@ -257,8 +259,7 @@ async function main() {
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
-          const label = forced.agentTitle || forced.agent || delegatedTarget;
-          textToSend = `[CowCode] ${label} replied: ${forced.reply.trim()}`;
+          textToSend = forced.reply.trim();
           skillsCalled = ['agent-send'];
         } else if (forced && typeof forced.error === 'string') {
           textToSend = `[CowCode] ${forced.error.trim()}`;

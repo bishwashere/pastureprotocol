@@ -33,7 +33,7 @@ function replyIncludesTagline(reply) {
 }
 
 function assertDelegatedOrAnswered(reply, skillsCalled) {
-  const delegated = skillsCalled.includes('agent-send') || /\breplied:\s/i.test(reply || '');
+  const delegated = skillsCalled.includes('agent-send');
   const answered = replyIncludesTagline(reply);
   assert(
     delegated && answered,
@@ -55,7 +55,7 @@ function assertNoHallucinatedAlex(reply, skillsCalled) {
 }
 
 function assertDelegatedAndNonEmpty(reply, skillsCalled, label = 'delegation expected') {
-  const delegated = skillsCalled.includes('agent-send') || /\breplied:\s/i.test(reply || '');
+  const delegated = skillsCalled.includes('agent-send');
   assert(
     delegated && reply && reply.trim().length > 0,
     `${label}. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 220)}`,
@@ -160,7 +160,7 @@ async function main() {
         await patchAgentConfig('main', { agentMessaging: { allow: ['marketer', 'alex'] } });
         const { reply, skillsCalled } = await runE2E(ASK_CI_FAILURE, { stateDir });
         assert(reply && reply.trim().length > 0, 'Expected non-empty reply');
-        const delegated = skillsCalled.includes('agent-send') || /\breplied:\s/i.test(reply || '');
+        const delegated = skillsCalled.includes('agent-send');
         const mentionsBackend = /alex|backend|github|ci/i.test(reply || '');
         const { pass, reason } = await judgeUserGotWhatTheyWanted(ASK_CI_FAILURE, reply, stateDir, {
           skillHint: 'agent-send',
@@ -195,7 +195,7 @@ async function main() {
         const { reply, skillsCalled } = await runE2E(ASK_FEASIBILITY_REVIEW, { stateDir });
         assert(reply && reply.trim().length > 0, 'Expected non-empty feasibility response');
         const mentionsTechnical = /technical|backend|rollout|risk|ci|infrastructure/i.test(reply || '');
-        const delegated = skillsCalled.includes('agent-send') || /\breplied:\s/i.test(reply || '');
+        const delegated = skillsCalled.includes('agent-send');
         assert(mentionsTechnical || delegated, `Expected technical feasibility context. reply=${(reply || '').slice(0, 220)}`);
         return { reply, skillsCalled, stateDir };
       },
