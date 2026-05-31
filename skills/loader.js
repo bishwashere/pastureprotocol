@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { getConfigPath } from '../lib/paths.js';
 import { getGroupRestrictions } from '../lib/group-config.js';
 import { loadAgentConfig, DEFAULT_AGENT_ID, resolveEnabledSkillsForAgent } from '../lib/agent-config.js';
+import { hasGithubToken } from '../lib/github-context.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -213,6 +214,25 @@ function normalizeEnabledList(list) {
   return normalized;
 }
 
+/** When the host has a GitHub token and github is enabled globally, all agents get the skill. */
+function mergePlatformGithubSkill(enabled) {
+  const list = Array.isArray(enabled) ? enabled.slice() : [];
+  if (list.includes('github') || !hasGithubToken()) return list;
+  try {
+    const raw = readFileSync(getConfigPath(), 'utf8');
+    const config = JSON.parse(raw);
+    const globalEnabled = normalizeEnabledList(config?.skills?.enabled);
+    if (globalEnabled.includes('github')) list.push('github');
+  } catch (_) {}
+  return list;
+}
+
+function resolveEnabledForAgent(agentId, baseFiltered) {
+  return mergePlatformGithubSkill(
+    resolveEnabledSkillsForAgent(agentId, baseFiltered),
+  );
+}
+
 export function getSkillsEnabled() {
   try {
     const raw = readFileSync(getConfigPath(), 'utf8');
@@ -242,7 +262,7 @@ export function getEnabledSkillIds(options = {}) {
   if (groupJid) {
     for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
   }
-  return applyImplicitChatSkills(resolveEnabledSkillsForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
+  return applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
 }
 
 /**
@@ -288,7 +308,7 @@ export function getSkillContext(options = {}) {
   if (groupJid) {
     for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
   }
-  const enabled = applyImplicitChatSkills(resolveEnabledSkillsForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
+  const enabled = applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
   // When the intent planner provided skill hints, restrict to only those skills.
   // Fall back to the full enabled list if the intersection is empty (safety net).
   const hinted =

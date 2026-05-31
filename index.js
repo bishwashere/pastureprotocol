@@ -70,6 +70,7 @@ import {
   enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
+import { getGithubSourceIntentHint } from './lib/github-context.js';
 import { appendUserFacingPrompt } from './lib/user-reply-style.js';
 import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from './lib/user-facing-reply.js';
 import { buildToolAuditRewriteInstruction } from './lib/user-reply-style.js';
@@ -1049,7 +1050,10 @@ async function main() {
     const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
       ? getGoalsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
-    const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || (enabledSkillIds.length > 0
+    const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
+      ? getGithubSourceIntentHint(text, enabledSkillIds)
+      : null;
+    const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
