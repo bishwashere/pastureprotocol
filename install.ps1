@@ -46,7 +46,10 @@ function Test-CowcodeBranchName {
 
 function Encode-GitHubBranchPath {
     param([Parameter(Mandatory = $true)][string]$Branch)
-    ($Branch -split '/') | ForEach-Object { [uri]::EscapeDataString($_) } -join '/'
+    $encoded = foreach ($part in ($Branch -split '/')) {
+        [uri]::EscapeDataString($part)
+    }
+    return ($encoded -join '/')
 }
 
 function Get-CowcodeRequestHeaders {

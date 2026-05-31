@@ -54,6 +54,9 @@ function checkWindowsPs1(filename, opts) {
       return { ok: false, detail: `${filename} missing ${token}` };
     }
   }
+  if (/ForEach-Object\s*\{[^}]+\}\s*-join/.test(src)) {
+    return { ok: false, detail: `${filename} must not pipe ForEach-Object to -join (PS 5.1 binds -join to ForEach-Object)` };
+  }
   if (opts.depsBeforeSetup) {
     const depsIdx = src.indexOf('Installing dependencies');
     const setupIdx = src.indexOf('node setup.js');
