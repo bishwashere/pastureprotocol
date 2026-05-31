@@ -80,9 +80,24 @@ const checks = [
   },
   {
     name: 'Team page includes agent inbox below map',
-    ok: html.includes('id="team-agent-inbox"') &&
+    ok: html.includes('id="team-agent-panel"') &&
       html.includes('team-agent-inbox-list') &&
       html.includes('selectTeamInboxAgent'),
+  },
+  {
+    name: 'Team page includes active context view',
+    ok: html.includes('id="team-agent-tab-context"') &&
+      html.includes('id="team-agent-context-detail"') &&
+      html.includes('renderAgentContext') &&
+      html.includes('/api/team/context'),
+  },
+  {
+    name: 'Active context shows goal step waiting facts state',
+    ok: html.includes('Current Goal:') &&
+      html.includes('Current Step:') &&
+      html.includes('Waiting For:') &&
+      html.includes('Known Facts:') &&
+      html.includes('team-agent-context-state'),
   },
   {
     name: 'Team activity renders delegation decision confidence details',

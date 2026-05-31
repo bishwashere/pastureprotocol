@@ -165,6 +165,114 @@
       color: var(--muted);
       font-size: 0.72rem;
     }
+    .team-agent-panel {
+      flex: 1 1 55%;
+      min-height: 9rem;
+      max-height: 52%;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .team-agent-panel-tabs {
+      flex-shrink: 0;
+      display: flex;
+      gap: 0.35rem;
+      padding: 0.45rem 0.55rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .team-agent-panel-tab {
+      margin: 0;
+      padding: 0.35rem 0.55rem;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .team-agent-panel-tab.active {
+      color: var(--text);
+      background: var(--card);
+      border-color: var(--border);
+    }
+    .team-agent-panel-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .team-agent-panel-pane {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .team-agent-panel-pane[hidden] {
+      display: none !important;
+    }
+    .team-agent-context-overview {
+      flex-shrink: 0;
+      padding: 0.45rem 0.65rem;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.68rem;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .team-agent-context-overview .accent {
+      color: var(--accent);
+    }
+    .team-agent-context-list {
+      flex: 1 1 0;
+      overflow: auto;
+      padding: 0.55rem 0.65rem;
+    }
+    .team-agent-context-card {
+      font-size: 0.74rem;
+      line-height: 1.4;
+    }
+    .team-agent-context-card h4 {
+      margin: 0 0 0.45rem 0;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .team-agent-context-row {
+      margin-bottom: 0.35rem;
+    }
+    .team-agent-context-row strong {
+      font-weight: 600;
+    }
+    .team-agent-context-bullets {
+      margin: 0.15rem 0 0 0;
+      padding-left: 1.1rem;
+    }
+    .team-agent-context-state {
+      display: inline-block;
+      margin-top: 0.35rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .team-agent-context-state.idle {
+      background: rgba(113, 113, 122, 0.2);
+      color: var(--muted);
+    }
+    .team-agent-context-state.working {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+    .team-agent-context-state.blocked {
+      background: rgba(250, 204, 21, 0.15);
+      color: #eab308;
+    }
     .team-activity-wrap {
       flex: 0 0 2.4rem;
       width: 2.4rem;
@@ -1958,7 +2066,7 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to open their inbox below. Use ✎ to edit. Tree shows hierarchy; dashed arrows show message-passing links.</p>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to open Inbox (history) or Active Context (live brain state). Use ✎ to edit.</p>
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
@@ -1970,13 +2078,31 @@
               </div>
             </div>
           </div>
-          <div id="team-agent-inbox" class="team-agent-inbox">
-            <div class="team-agent-inbox-head">
-              <h3 id="team-agent-inbox-title">Agent Inbox</h3>
-              <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+          <div id="team-agent-panel" class="team-agent-panel">
+            <div class="team-agent-panel-tabs" role="tablist">
+              <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab active" data-tab="inbox" role="tab" aria-selected="true">Inbox</button>
+              <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab" data-tab="context" role="tab" aria-selected="false">Active Context</button>
             </div>
-            <div id="team-agent-inbox-list" class="team-agent-inbox-list">
-              <p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>
+            <div class="team-agent-panel-body">
+              <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel">
+                <div class="team-agent-inbox-head">
+                  <h3 id="team-agent-inbox-title">Agent Inbox</h3>
+                  <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+                </div>
+                <div id="team-agent-inbox-list" class="team-agent-inbox-list">
+                  <p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>
+                </div>
+              </div>
+              <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                <div class="team-agent-inbox-head">
+                  <h3 id="team-agent-context-title">Active Context</h3>
+                  <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
+                </div>
+                <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
+                <div id="team-agent-context-detail" class="team-agent-context-list">
+                  <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2232,6 +2358,8 @@
     var teamActivityLastTs = 0;
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
+    var teamAgentPanelTab = 'inbox';
+    var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -4576,12 +4704,14 @@
         renderAgentMap();
         renderTeamActivity();
         renderAgentInbox();
+        renderAgentContext();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
         renderAgentMap();
         renderTeamActivity();
         renderAgentInbox();
+        renderAgentContext();
         return agentMapData;
       }
     }
@@ -4605,6 +4735,106 @@
         n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedTeamInboxAgentId);
       });
       renderAgentInbox();
+      renderAgentContext();
+    }
+
+    function setTeamAgentPanelTab(tab) {
+      teamAgentPanelTab = tab === 'context' ? 'context' : 'inbox';
+      var inboxTab = document.getElementById('team-agent-tab-inbox');
+      var contextTab = document.getElementById('team-agent-tab-context');
+      var inboxPane = document.getElementById('team-agent-inbox-pane');
+      var contextPane = document.getElementById('team-agent-context-pane');
+      if (inboxTab) {
+        inboxTab.classList.toggle('active', teamAgentPanelTab === 'inbox');
+        inboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'inbox' ? 'true' : 'false');
+      }
+      if (contextTab) {
+        contextTab.classList.toggle('active', teamAgentPanelTab === 'context');
+        contextTab.setAttribute('aria-selected', teamAgentPanelTab === 'context' ? 'true' : 'false');
+      }
+      if (inboxPane) inboxPane.hidden = teamAgentPanelTab !== 'inbox';
+      if (contextPane) contextPane.hidden = teamAgentPanelTab !== 'context';
+    }
+
+    function renderAgentContextBullets(items) {
+      if (!items || !items.length) return '';
+      return '<ul class="team-agent-context-bullets">' + items.map(function (b) {
+        return '<li>' + escapeHtml(String(b)) + '</li>';
+      }).join('') + '</ul>';
+    }
+
+    function formatContextStateBadge(state) {
+      var s = String(state || 'idle').toLowerCase();
+      if (s !== 'working' && s !== 'blocked') s = 'idle';
+      return '<span class="team-agent-context-state ' + s + '">' + escapeHtml(s) + '</span>';
+    }
+
+    function renderAgentContextCard(agentId, ctx) {
+      var label = agentNameById(agentId);
+      var row = ctx || { state: 'idle' };
+      var html = '<div class="team-agent-context-card"><h4>' + escapeHtml(label) + '</h4>';
+      if (row.currentGoal) {
+        html += '<div class="team-agent-context-row"><strong>Current Goal:</strong><br>' + escapeHtml(row.currentGoal) + '</div>';
+      }
+      if (row.currentStep) {
+        html += '<div class="team-agent-context-row"><strong>Current Step:</strong><br>' + escapeHtml(row.currentStep) + '</div>';
+      }
+      if (row.waitingFor) {
+        html += '<div class="team-agent-context-row"><strong>Waiting For:</strong><br>' + escapeHtml(agentNameById(row.waitingFor)) + '</div>';
+      }
+      if (row.context && row.context.length) {
+        html += '<div class="team-agent-context-row"><strong>Current Context:</strong>' + renderAgentContextBullets(row.context) + '</div>';
+      }
+      if (row.knownFacts && row.knownFacts.length) {
+        html += '<div class="team-agent-context-row"><strong>Known Facts:</strong>' + renderAgentContextBullets(row.knownFacts) + '</div>';
+      }
+      html += '<div class="team-agent-context-row"><strong>State:</strong> ' + formatContextStateBadge(row.state) + '</div>';
+      html += '</div>';
+      return html;
+    }
+
+    function renderAgentContextOverview() {
+      var el = document.getElementById('team-agent-context-overview');
+      if (!el) return;
+      var agents = agentMapData || [];
+      if (!agents.length) {
+        el.innerHTML = '';
+        return;
+      }
+      el.innerHTML = agents.map(function (a) {
+        var id = String(a && a.id || '');
+        var ctx = (teamAgentContextSnapshot.agents || {})[id] || { state: 'idle' };
+        var label = agentDisplayLabel(a);
+        var state = String(ctx.state || 'idle');
+        var detail = '';
+        if (state === 'blocked' && ctx.waitingFor) {
+          detail = ' — waiting for ' + agentNameById(ctx.waitingFor);
+        } else if (state === 'working' && ctx.currentStep) {
+          detail = ' — ' + ctx.currentStep;
+        } else if (state === 'working' && ctx.currentGoal) {
+          detail = ' — ' + ctx.currentGoal;
+        }
+        return '<span class="accent">' + escapeHtml(label) + '</span>: ' + escapeHtml(state) + escapeHtml(detail);
+      }).join('<br>');
+    }
+
+    function renderAgentContext() {
+      renderAgentContextOverview();
+      var detail = document.getElementById('team-agent-context-detail');
+      var titleEl = document.getElementById('team-agent-context-title');
+      var subEl = document.getElementById('team-agent-context-subtitle');
+      if (!detail) return;
+      if (!selectedTeamInboxAgentId) {
+        if (titleEl) titleEl.textContent = 'Active Context';
+        if (subEl) subEl.textContent = 'Present working memory — team overview above';
+        detail.innerHTML = '<p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>';
+        return;
+      }
+      var label = agentNameById(selectedTeamInboxAgentId);
+      if (titleEl) titleEl.textContent = label + ' — Active Context';
+      if (subEl) subEl.textContent = 'What this agent is thinking about right now';
+      var ctx = (teamAgentContextSnapshot.agents || {})[selectedTeamInboxAgentId] || { state: 'idle' };
+      detail.innerHTML = renderAgentContextCard(selectedTeamInboxAgentId, ctx);
     }
 
     function buildAgentInboxFlows(agentId) {
@@ -4944,11 +5174,38 @@
       renderAgentInbox();
     }
 
+    async function fetchTeamContextFeed() {
+      try {
+        var r = await fetch(API + '/api/team/context');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        teamAgentContextSnapshot = {
+          agents: d.agents && typeof d.agents === 'object' ? d.agents : {},
+          updatedAt: Number(d.updatedAt) || 0,
+        };
+      } catch (_) {}
+      renderAgentContext();
+    }
+
     function startTeamActivityFeed() {
       if (teamActivityPollTimer) return;
       fetchTeamActivityFeed();
-      teamActivityPollTimer = setInterval(fetchTeamActivityFeed, TEAM_ACTIVITY_POLL_MS);
+      fetchTeamContextFeed();
+      teamActivityPollTimer = setInterval(function () {
+        fetchTeamActivityFeed();
+        fetchTeamContextFeed();
+      }, TEAM_ACTIVITY_POLL_MS);
     }
+
+    var teamAgentTabInboxEl = document.getElementById('team-agent-tab-inbox');
+    var teamAgentTabContextEl = document.getElementById('team-agent-tab-context');
+    if (teamAgentTabInboxEl) {
+      teamAgentTabInboxEl.addEventListener('click', function () { setTeamAgentPanelTab('inbox'); });
+    }
+    if (teamAgentTabContextEl) {
+      teamAgentTabContextEl.addEventListener('click', function () { setTeamAgentPanelTab('context'); });
+    }
+    setTeamAgentPanelTab('inbox');
 
     var teamActivityToggleEl = document.getElementById('team-activity-toggle');
     if (teamActivityToggleEl) {

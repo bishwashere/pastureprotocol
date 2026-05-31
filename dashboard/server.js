@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSy
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
 import { readTeamActivity } from '../lib/team-activity.js';
+import { readAllAgentContext } from '../lib/agent-context-state.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
@@ -392,6 +393,15 @@ app.get('/api/team/activity', (req, res) => {
       limit: Number.isFinite(limit) ? limit : 80,
     });
     res.json({ events, now: Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/team/context', (req, res) => {
+  try {
+    const snapshot = readAllAgentContext();
+    res.json({ ...snapshot, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
