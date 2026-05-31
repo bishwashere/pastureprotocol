@@ -51,7 +51,7 @@ branches  - id, project_id, parent_update_id (which update it branches from), na
 
 Projects in this tracker are injected into the **system prompt** on every private chat turn and included in the **me** skill profile. When you ask "what projects do I have?", agents should answer from this list—not claim they don't know if projects exist here.
 
-Follow-ups like "what is this project about?" / "find out" resolve to the tracked project (especially when only one exists). Agents are instructed to **browse the project URL** (or search/memory) and must not ask you to pick GitHub vs local path vs tracker. Delegated agents receive the same context in their message.
+Follow-ups like "what is this project about?" / "find out" resolve to the tracked project (especially when only one exists). Agents must **investigate first**: tracker URL (browse), GitHub repos/files with similar names, memory search, and filesystem listing (go-read/read) — then summarize. They should not ask you to pick repo vs path before looking; they may ask you to **confirm** after reporting what they found. Delegated agents receive the same context in their message.
 
 ## How to use
 

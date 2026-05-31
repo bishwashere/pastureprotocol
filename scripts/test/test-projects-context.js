@@ -40,21 +40,26 @@ async function main() {
       historyMessages: [],
     });
     assert(block.includes('Active project focus'), 'focus block');
-    assert(block.includes('Do **not** ask which project'), 'no clarify instruction');
-    assert(block.includes('browse'), 'browse instruction');
+    assert(block.includes('investigate first'), 'investigate first');
+    assert(block.includes('github'), 'github instruction');
+    assert(block.includes('filesystem'), 'filesystem instruction');
+    assert(block.includes('confirm'), 'confirm after');
     assert(block.includes('nextpostai.com'), 'url in block');
 
     const enriched = enrichMessageWithProjectContext('find out what it is about');
     assert(enriched.includes('Projects tracker context'), 'enriched delegation');
     assert(enriched.includes('nextpostai'), 'project name in enrichment');
+    assert(enriched.includes('github'), 'enriched mentions github');
+    assert(enriched.includes('filesystem'), 'enriched mentions filesystem');
 
     const hint = getProjectsDiscoveryIntentHint(
       'what is this project all about',
       [],
-      ['browse', 'search', 'read', 'memory'],
+      ['browse', 'github', 'memory', 'go-read', 'read', 'search'],
     );
     assert(hint && hint.skills.includes('browse'), 'intent includes browse');
-    assert(hint.plan.includes('No clarifying'), 'intent plan');
+    assert(hint.skills.includes('github'), 'intent includes github');
+    assert(hint.plan.includes('before checking'), 'intent plan');
 
     const profile = formatProjectsProfileLine();
     assert(profile.includes('1 project'), `profile: ${profile}`);
