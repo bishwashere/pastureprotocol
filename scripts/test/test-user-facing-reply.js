@@ -5,7 +5,7 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const { formatUserFacingReply } = await import('../../lib/user-facing-reply.js');
+  const { formatUserFacingReply, looksLikeToolAuditReply } = await import('../../lib/user-facing-reply.js');
 
   const cases = [
     {
@@ -38,6 +38,11 @@ async function main() {
     console.log(`| ${c.input.slice(0, 40)}… | ${out.slice(0, 40)} | ${ok ? '✅ Pass' : '❌ Fail'} |`);
     assert(ok, `expected "${c.expect}" got "${out}"`);
   }
+  const auditSample =
+    'This project is nextpostai.\n\nWhat I found using the required tools\n\ngo-read\nNo repo here.\n\nread\nMEMORY.md empty.\n\nmemory\nFound refs on server1.\n\nSo: product is X.';
+  assert(looksLikeToolAuditReply(auditSample), 'detects tool audit');
+  assert(!looksLikeToolAuditReply('Nextpostai is an AI marketing tool for social content.'), 'plain answer ok');
+
   console.log('\nuser-facing-reply tests passed');
 }
 

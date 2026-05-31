@@ -61,6 +61,7 @@
     "test:user-reply-style": "node scripts/test/test-user-reply-style.js",
     "test:casual-greetings": "node scripts/test/test-casual-greetings.js",
     "test:user-facing-reply": "node scripts/test/test-user-facing-reply.js",
+    "test:tool-audit-reply": "node scripts/test/test-tool-audit-reply.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",

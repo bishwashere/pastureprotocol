@@ -71,7 +71,8 @@ import {
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
 import { appendUserFacingPrompt } from './lib/user-reply-style.js';
-import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/user-facing-reply.js';
+import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from './lib/user-facing-reply.js';
+import { buildToolAuditRewriteInstruction } from './lib/user-reply-style.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -1227,7 +1228,40 @@ async function main() {
     }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = resultToUse || {};
     if (Array.isArray(called) && called.length) skillsCalled = called;
-    const rawTextToSend = (textToSend || '').trim();
+    let rawTextToSend = (textToSend || '').trim();
+    if (
+      !isGroupJid &&
+      !isNonTaskMessage(text) &&
+      rawTextToSend &&
+      looksLikeToolAuditReply(formatUserFacingReply(rawTextToSend))
+    ) {
+      console.log('[agent] tool-audit reply detected, rewriting for user');
+      try {
+        const rewriteHistory = historyMessages.concat([
+          { role: 'user', content: text },
+          { role: 'assistant', content: sanitizeOutboundText(rawTextToSend) },
+        ]);
+        const rewriteResult = await runAgentTurn({
+          userText: buildToolAuditRewriteInstruction(text),
+          ctx,
+          systemPrompt: systemPromptWithPlan,
+          tools: [],
+          historyMessages: rewriteHistory,
+          getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+          resolveToolName: skillContext?.resolveToolName ?? (() => null),
+        });
+        const rewriteRaw = (rewriteResult?.textToSend || '').trim();
+        const rewriteClean = sanitizeOutboundText(rewriteRaw);
+        if (rewriteClean && !looksLikeToolAuditReply(rewriteClean)) {
+          rawTextToSend = rewriteRaw;
+          if (Array.isArray(rewriteResult?.skillsCalled) && rewriteResult.skillsCalled.length) {
+            skillsCalledFromTurn = rewriteResult.skillsCalled;
+          }
+        }
+      } catch (err) {
+        console.error('[agent] tool-audit rewrite failed:', getErrorMessageForLog(err));
+      }
+    }
     const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
     logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');

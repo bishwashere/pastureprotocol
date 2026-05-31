@@ -39,7 +39,8 @@ import {
 } from '../lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
-import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/user-facing-reply.js';
+import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from '../lib/user-facing-reply.js';
+import { buildToolAuditRewriteInstruction } from '../lib/user-reply-style.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -286,6 +287,35 @@ async function main() {
     }
     if (skillsCalled.length) {
       process.stderr.write('[dashboard-skills] ' + skillsCalled.join(',') + '\n');
+    }
+    if (
+      !isNonTaskMessage(message) &&
+      textToSend &&
+      looksLikeToolAuditReply(formatUserFacingReply(textToSend))
+    ) {
+      process.stderr.write('[chat-dashboard] tool-audit reply detected, rewriting\n');
+      try {
+        const rewriteHistory = historyMessages.concat([
+          { role: 'user', content: message },
+          { role: 'assistant', content: formatUserFacingReply(textToSend) },
+        ]);
+        const rewrite = await runAgentTurn({
+          userText: buildToolAuditRewriteInstruction(message),
+          ctx,
+          systemPrompt,
+          tools: [],
+          historyMessages: rewriteHistory,
+          getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+          resolveToolName: skillContext?.resolveToolName ?? (() => null),
+        });
+        const candidate = formatUserFacingReply(rewrite?.textToSend || '');
+        if (candidate && !looksLikeToolAuditReply(candidate)) {
+          textToSend = rewrite.textToSend || textToSend;
+          skillsCalled = Array.isArray(rewrite?.skillsCalled) ? rewrite.skillsCalled : skillsCalled;
+        }
+      } catch (err) {
+        process.stderr.write(`[chat-dashboard] tool-audit rewrite failed: ${err?.message || err}\n`);
+      }
     }
     const reply = formatDashboardReply(textToSend);
     const exchange = {

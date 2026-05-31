@@ -19,6 +19,8 @@ const INTERNAL_LEAK_PATTERNS = [
   /tool(?:ing)? check/i,
   /github tool/i,
   /memory_search/i,
+  /what i found using/i,
+  /required tools/i,
   /don'?t need (web )?search/i,
   /\[retry with search\]/i,
 ];
