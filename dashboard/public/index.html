@@ -167,6 +167,75 @@
     .team-cards-view {
       flex-shrink: 0;
     }
+    .team-cards-mission-row {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 0.65rem;
+      min-width: 0;
+    }
+    .team-cards-mission-row .team-agent-cards-row {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .team-current-mission {
+      flex: 0 0 12.5rem;
+      max-width: 14rem;
+      padding: 0.5rem 0.55rem 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(167, 139, 250, 0.04);
+      font-size: 0.68rem;
+      line-height: 1.4;
+    }
+    .team-current-mission-title {
+      margin: 0 0 0.4rem 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .team-current-mission-meta {
+      margin: 0 0 0.22rem 0;
+      color: var(--muted);
+    }
+    .team-current-mission-meta strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .team-current-mission-subgoals {
+      margin: 0.45rem 0 0 0;
+      padding-top: 0.35rem;
+      border-top: 1px solid var(--border);
+    }
+    .team-current-mission-subgoals h4 {
+      margin: 0 0 0.3rem 0;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .team-current-mission-subgoal-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .team-current-mission-subgoal-list li {
+      margin: 0 0 0.18rem 0;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .team-current-mission-subgoal-list li.mission-doing {
+      color: var(--text);
+    }
+    .team-current-mission-subgoal-list li.mission-done {
+      color: #22c55e;
+    }
+    .team-current-mission-empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.66rem;
+    }
     .team-cards-view[hidden],
     .team-tree-view[hidden] {
       display: none !important;
@@ -2545,8 +2614,14 @@
               </label>
             </div>
             <div id="team-cards-view" class="team-cards-view">
-              <div id="team-agent-cards" class="team-agent-cards-row">
-                <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+              <div class="team-cards-mission-row">
+                <div id="team-agent-cards" class="team-agent-cards-row">
+                  <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+                </div>
+                <aside id="team-current-mission" class="team-current-mission" aria-label="Current mission">
+                  <h3 class="team-current-mission-title">Current Mission</h3>
+                  <p class="team-current-mission-empty">Loading mission…</p>
+                </aside>
               </div>
             </div>
             <div id="team-tree-view" class="team-tree-view" hidden>
@@ -5431,6 +5506,89 @@
       return agentNameById(goal && goal.ownerAgentId ? goal.ownerAgentId : 'main');
     }
 
+    function getCurrentMissionGoal() {
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals.slice() : [];
+      if (!goals.length) return null;
+      var isActive = function (g) {
+        return String(g && g.status || 'active').toLowerCase() === 'active';
+      };
+      if (selectedTeamGoalId) {
+        var selected = goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; });
+        if (selected && isActive(selected)) return selected;
+      }
+      var running = goals.find(function (g) { return !!g.running && isActive(g); });
+      if (running) return running;
+      var active = goals.filter(isActive);
+      active.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (active.length) return active[0];
+      if (selectedTeamGoalId) {
+        var anySelected = goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; });
+        if (anySelected) return anySelected;
+      }
+      goals.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      return goals[0] || null;
+    }
+
+    function missionSubgoalIcon(status) {
+      var s = normalizeSubgoalStatus(status);
+      if (s === 'done') return '✓';
+      if (s === 'doing') return '→';
+      return '○';
+    }
+
+    function missionSubgoalClass(status) {
+      var s = normalizeSubgoalStatus(status);
+      if (s === 'done') return 'mission-done';
+      if (s === 'doing') return 'mission-doing';
+      return 'mission-todo';
+    }
+
+    function flattenMissionSubgoals(subgoals, out, depth) {
+      var list = Array.isArray(subgoals) ? subgoals : [];
+      var acc = out || [];
+      var level = Number(depth) || 0;
+      if (level > 4 || acc.length >= 12) return acc;
+      list.forEach(function (sg) {
+        if (!sg || typeof sg !== 'object' || acc.length >= 12) return;
+        acc.push(sg);
+        flattenMissionSubgoals(sg.subgoals, acc, level + 1);
+      });
+      return acc;
+    }
+
+    function renderCurrentMission() {
+      var panel = document.getElementById('team-current-mission');
+      if (!panel) return;
+      var goal = getCurrentMissionGoal();
+      if (!goal) {
+        panel.innerHTML = '' +
+          '<h3 class="team-current-mission-title">Current Mission</h3>' +
+          '<p class="team-current-mission-empty">No active mission. Create a goal under Goals.</p>';
+        return;
+      }
+      var goalLabel = String(goal.title || '').trim() || String(goal.objective || '').trim() || 'Untitled goal';
+      var pct = normalizeSubgoalProgress(goal.progress && goal.progress.pct);
+      var owner = goalOwnerLabel(goal);
+      var subgoals = flattenMissionSubgoals(Array.isArray(goal.subgoals) ? goal.subgoals : [], [], 0);
+      var subgoalsHtml = subgoals.length
+        ? '<ul class="team-current-mission-subgoal-list">' + subgoals.map(function (sg) {
+          var title = String(sg.title || '').trim() || 'Untitled subgoal';
+          var icon = missionSubgoalIcon(sg.status);
+          var cls = missionSubgoalClass(sg.status);
+          return '<li class="' + cls + '" title="' + escapeHtml(title) + '">' + escapeHtml(icon + ' ' + title) + '</li>';
+        }).join('') + '</ul>'
+        : '<p class="team-current-mission-empty" style="margin:0;">No subgoals yet.</p>';
+      panel.innerHTML = '' +
+        '<h3 class="team-current-mission-title">Current Mission</h3>' +
+        '<p class="team-current-mission-meta"><strong>Goal:</strong> ' + escapeHtml(goalLabel) + '</p>' +
+        '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</p>' +
+        '<p class="team-current-mission-meta"><strong>Owner:</strong> ' + escapeHtml(owner) + '</p>' +
+        '<div class="team-current-mission-subgoals">' +
+          '<h4>Subgoals</h4>' +
+          subgoalsHtml +
+        '</div>';
+    }
+
     function normalizeSubgoalStatus(status) {
       var s = String(status || '').toLowerCase();
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
@@ -5542,6 +5700,7 @@
         selectedTeamGoalId = '';
         wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>';
         renderGoalDetail(null);
+        renderCurrentMission();
         return;
       }
       if (!selectedTeamGoalId || !goals.some(function (g) { return String(g.id || '') === selectedTeamGoalId; })) {
@@ -5585,6 +5744,7 @@
         '</div>';
       }).join('');
       renderGoalDetail(goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; }) || goals[0]);
+      renderCurrentMission();
 
       wrap.querySelectorAll('button[data-goal-run]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {

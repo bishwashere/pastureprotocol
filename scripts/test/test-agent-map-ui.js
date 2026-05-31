@@ -148,6 +148,15 @@ const checks = [
       html.includes('setTeamViewTab'),
   },
   {
+    name: 'Team roster cards view has Current Mission beside agent cards',
+    ok: html.includes('id="team-current-mission"') &&
+      html.includes('class="team-cards-mission-row"') &&
+      html.includes('renderCurrentMission') &&
+      html.includes('getCurrentMissionGoal') &&
+      html.includes('missionSubgoalIcon') &&
+      /\.team-cards-mission-row[\s\S]*\.team-current-mission/.test(html),
+  },
+  {
     name: 'Team agent cards show step and today',
     ok: html.includes('team-agent-card') &&
       html.includes('team-agent-card-step') &&

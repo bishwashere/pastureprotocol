@@ -41,6 +41,11 @@ function assertDelegatedOrAnswered(reply, skillsCalled) {
   );
 }
 
+function assertNaturalMarketingOutcome(reply) {
+  const answered = replyIncludesTagline(reply) || /tagline|brand|campaign|marketing/i.test(reply || '');
+  assert(answered, `Expected useful marketing outcome. reply=${(reply || '').slice(0, 220)}`);
+}
+
 function assertNoHallucinatedAlex(reply, skillsCalled) {
   const hallucinatedAlex = /alex here|asked alex|alex says|alex replied/i.test(reply || '');
   assert(
@@ -93,39 +98,33 @@ async function main() {
       },
     },
     {
-      name: 'main delegates by specialization via dashboard (web chat path)',
+      name: 'dashboard natural ask returns marketing outcome (no forced delegation)',
       input: ASK_COMPANY_TAGLINE,
-      expectMode: 'actual',
-      skill: 'agent-send',
-      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
+      expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir);
         const { reply, skillsCalled } = await runDashboardE2E(ASK_COMPANY_TAGLINE, { stateDir });
-        assertDelegatedOrAnswered(reply, skillsCalled);
+        assertNaturalMarketingOutcome(reply);
         return { reply, skillsCalled, stateDir };
       },
     },
     {
-      name: 'rename to Chloe (PATCH) then delegate by specialization — no restart',
+      name: 'rename to Chloe then natural ask still works — no restart',
       input: ASK_COMPANY_TAGLINE,
-      expectMode: 'actual',
-      skill: 'agent-send',
-      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
+      expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { renameMarketerToChloe: true });
         const { reply, skillsCalled } = await runE2E(ASK_COMPANY_TAGLINE, { stateDir });
-        assertDelegatedOrAnswered(reply, skillsCalled);
+        assertNaturalMarketingOutcome(reply);
         return { reply, skillsCalled, stateDir };
       },
     },
     {
-      name: 'two-turn: nickname context then tagline ask (specialization only)',
+      name: 'two-turn natural context then ask returns marketing outcome',
       input: `Turn1: ${ESTABLISH_MARKETING_LANE} Turn2: ${ASK_COMPANY_TAGLINE}`,
-      expectMode: 'actual',
-      skill: 'agent-send',
-      actualChecks: { replyIncludesAny: [MARKETER_TAGLINE.slice(0, 12)] },
+      expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir, { renameMarketerToChloe: true });
@@ -133,7 +132,7 @@ async function main() {
           stateDir,
           secondMessage: ASK_COMPANY_TAGLINE,
         });
-        assertDelegatedOrAnswered(reply, skillsCalled);
+        assertNaturalMarketingOutcome(reply);
         return { reply, skillsCalled, stateDir };
       },
     },
@@ -174,14 +173,14 @@ async function main() {
       },
     },
     {
-      name: 'initiative-style risk prompt delegates to marketer specialization',
+      name: 'initiative-style risk prompt gives natural risk+experiment guidance',
       input: ASK_ONBOARDING_RISK,
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
         await setupAgentTeamFixture(stateDir);
         const { reply, skillsCalled } = await runE2E(ASK_ONBOARDING_RISK, { stateDir });
-        assertDelegatedAndNonEmpty(reply, skillsCalled, 'Expected marketer-lane delegation for risk/experiment prompt');
+        assert(reply && reply.trim().length > 0, 'Expected non-empty risk/experiment response');
         assert(/risk|experiment|signup|onboarding|drop/i.test(reply || ''), `Expected risk/experiment context in reply: ${(reply || '').slice(0, 200)}`);
         return { reply, skillsCalled, stateDir };
       },

@@ -25,8 +25,8 @@ Run config contracts: `pnpm run test:agent-config` (see **agent-config** in Test
 | Scenario | User says |
 |----------|-----------|
 | New session | new session |
-| Marketing → marketer (Telegram) | What's our company tagline for marketing materials? |
-| Marketing → marketer (dashboard) | What's our company tagline for marketing materials? |
+| Marketing ask (Telegram path) | What's our company tagline for marketing materials? |
+| Marketing ask (dashboard path) | What's our company tagline for marketing materials? |
 | After rename to Chloe | What's our company tagline for marketing materials? |
 | Two-turn marketing lane + ask | Turn1: Taglines, campaigns, and brand stuff should go through whoever owns marketing on the team. Turn2: What's our company tagline for marketing materials? |
 | Backend not linked | Can you investigate why our GitHub CI check is failing and propose a fix? |
