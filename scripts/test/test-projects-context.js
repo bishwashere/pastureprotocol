@@ -45,7 +45,7 @@ async function main() {
     const enriched = enrichMessageWithProjectContext('find out what it is about');
     assert(enriched.includes('Projects tracker'), 'enriched delegation');
     assert(enriched.includes('nextpostai'), 'project name in enrichment');
-    assert(enriched.includes('coherent summary'), 'enriched asks for coherent summary');
+    assert(enriched.includes('matching Goal'), 'enriched points to goal');
 
     const profile = formatProjectsProfileLine();
     assert(profile.includes('1 project'), `profile: ${profile}`);

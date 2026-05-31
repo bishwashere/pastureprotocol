@@ -37,6 +37,7 @@ import {
   enrichMessageWithProjectContext,
 } from '../lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
+import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -237,6 +238,7 @@ async function main() {
   if (goalsBlock) systemPrompt += goalsBlock;
   const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
   if (projectsBlock) systemPrompt += projectsBlock;
+  systemPrompt = appendUserFacingPrompt(systemPrompt);
 
   try {
     let textToSend = '';

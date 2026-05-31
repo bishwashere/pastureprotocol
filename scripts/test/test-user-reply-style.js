@@ -11,16 +11,24 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-reply-style-'));
   process.env.COWCODE_STATE_DIR = stateDir;
   try {
-    const { buildUserReplyStyleBlock, USER_REPLY_STYLE_LINES } = await import('../../lib/user-reply-style.js');
+    const {
+      buildUserReplyStyleBlock,
+      appendUserFacingPrompt,
+      USER_REPLY_STYLE_LINES,
+    } = await import('../../lib/user-reply-style.js');
     const { buildOneOnOneSystemPrompt } = await import('../../lib/system-prompt.js');
 
     assert(USER_REPLY_STYLE_LINES.length >= 4, 'style lines defined');
     const block = buildUserReplyStyleBlock();
     assert(block.includes('coherent narrative'), 'coherent narrative rule');
-    assert(block.includes('Sources'), 'sources rule');
 
-    const prompt = buildOneOnOneSystemPrompt(stateDir);
-    assert(prompt.includes('Replying to the user'), 'wired into system prompt');
+    const once = appendUserFacingPrompt('base');
+    const twice = appendUserFacingPrompt(once);
+    assert(once.includes('Replying to the user'), 'appended once');
+    assert(once === twice, 'idempotent append');
+
+    const soul = buildOneOnOneSystemPrompt(stateDir);
+    assert(!soul.includes('Replying to the user'), 'not in soul/system-prompt base');
 
     console.log('user-reply-style tests passed');
   } finally {

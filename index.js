@@ -69,6 +69,7 @@ import {
   enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
+import { appendUserFacingPrompt } from './lib/user-reply-style.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -1092,6 +1093,7 @@ async function main() {
       if (goalsBlock) systemPromptWithPlan += goalsBlock;
       const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
       if (projectsBlock) systemPromptWithPlan += projectsBlock;
+      systemPromptWithPlan = appendUserFacingPrompt(systemPromptWithPlan);
     }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
