@@ -10,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import readline from 'readline';
+import { runPm2DaemonAction } from './lib/daemon-pm2.js';
+import { runUninstall as runWindowsUninstall } from './lib/uninstall-win.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR
@@ -20,17 +22,38 @@ const args = process.argv.slice(2);
 const sub = args[0];
 const isForceUpdate = args.slice(1).some((a) => a === '--force' || a === '-f');
 
+const IS_WIN = process.platform === 'win32';
+
+function installHint() {
+  if (IS_WIN) {
+    console.error('  irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
+    console.error('  Or: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
+  } else {
+    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+  }
+}
+
+function restartDaemonSync() {
+  if (IS_WIN) {
+    return runPm2DaemonAction('restart', { installDir: INSTALL_DIR });
+  }
+  const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
+  if (!existsSync(daemonScript)) return 1;
+  const r = spawnSync('bash', [daemonScript, 'restart'], {
+    stdio: 'inherit',
+    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  return r.status ?? 1;
+}
+
 function restartBotAfterSkillChange() {
   const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
-  if (existsSync(daemonScript)) {
+  if (IS_WIN || existsSync(daemonScript)) {
     console.log('');
     console.log('Restarting bot to apply skill changes...');
-    const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
-      stdio: 'inherit',
-      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-      cwd: INSTALL_DIR,
-    });
-    if (restartResult.status === 0) {
+    const code = restartDaemonSync();
+    if (code === 0) {
       console.log('  ✓ Bot restarted.');
     } else {
       console.error('  ✗ Auto-restart failed. Run: cowcode restart');
@@ -62,20 +85,11 @@ async function runSkillCommand(action, skillArg) {
 function runPostUpdateRestartAndDashboard() {
   console.log('');
   console.log('  Restarting bot and starting dashboard...');
-  const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
-  if (existsSync(daemonScript)) {
-    const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
-      stdio: 'inherit',
-      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-      cwd: INSTALL_DIR,
-    });
-    if (restartResult.status === 0) {
-      console.log('  ✓ Restarted.');
-    } else {
-      console.error('  ✗ Restart had issues. You can run: cowcode restart');
-    }
+  const restartCode = restartDaemonSync();
+  if (restartCode === 0) {
+    console.log('  ✓ Restarted.');
   } else {
-    console.log('  (daemon script not found; run cowcode start if needed)');
+    console.error('  ✗ Restart had issues. You can run: cowcode restart');
   }
   const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
   if (existsSync(serverPath)) {
@@ -96,11 +110,14 @@ function runPostUpdateRestartAndDashboard() {
 }
 
 function runDaemonAction(action) {
+  if (IS_WIN) {
+    process.exit(runPm2DaemonAction(action, { installDir: INSTALL_DIR }));
+  }
   const script = join(INSTALL_DIR, 'scripts', 'daemon.sh');
   if (!existsSync(script)) {
     console.error('cowCode: installation incomplete or corrupted.');
     console.error('  Re-run the installer:');
-    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+    installHint();
     process.exit(1);
   }
   const child = spawn('bash', [script, action], {
@@ -164,9 +181,27 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'update') {
   const branch = process.env.COWCODE_BRANCH || 'master';
-  const env = { ...process.env, COWCODE_ROOT: INSTALL_DIR };
+  const env = { ...process.env, COWCODE_ROOT: INSTALL_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR };
 
-  if (isForceUpdate) {
+  if (IS_WIN) {
+    const psScript = join(INSTALL_DIR, 'update.ps1');
+    if (!existsSync(psScript)) {
+      console.error('cowCode: update.ps1 not found. Re-run the installer.');
+      installHint();
+      process.exit(1);
+    }
+    const psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psScript];
+    if (isForceUpdate) psArgs.push('-Force');
+    const child = spawn('powershell', psArgs, {
+      stdio: 'inherit',
+      env,
+      cwd: INSTALL_DIR,
+    });
+    child.on('close', (code) => {
+      if (code === 0) runPostUpdateRestartAndDashboard();
+      process.exit(code ?? 0);
+    });
+  } else if (isForceUpdate) {
     // Run latest update.sh from GitHub so --force works even when installed script is old
     const url = `https://raw.githubusercontent.com/bishwashere/cowCode/${branch}/update.sh?t=${Date.now()}`;
     const tmpScript = join(tmpdir(), `cowcode-update-${Date.now()}.sh`);
@@ -198,7 +233,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     const script = join(INSTALL_DIR, 'update.sh');
     if (!existsSync(script)) {
       console.error('cowCode: update.sh not found. Re-run the installer.');
-      console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+      installHint();
       process.exit(1);
     }
     const child = spawn('bash', [script], {
@@ -214,10 +249,14 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     });
   }
 } else if (sub === 'uninstall') {
+  if (IS_WIN) {
+    runWindowsUninstall({ installDir: INSTALL_DIR });
+    process.exit(0);
+  }
   const script = join(INSTALL_DIR, 'uninstall.sh');
   if (!existsSync(script)) {
     console.error('cowCode: uninstall.sh not found. Re-run the installer.');
-    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+    installHint();
     process.exit(1);
   }
   const child = spawn('bash', [script], {

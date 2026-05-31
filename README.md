@@ -72,13 +72,31 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 
 ### Option A - One-line install (recommended)
 
+**Linux / macOS (bash):**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
 ```
 
-This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode`.
+**Windows (PowerShell — no Git Bash required):**
 
-**Windows:** Use Git Bash and Node.js. Run `bash install.sh` inside the repo.
+```powershell
+irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+```
+
+If execution policy blocks the script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex"
+```
+
+This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode` (Windows: `%USERPROFILE%\.cowcode`).
+
+**Windows (Git Bash alternative):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
+```
 
 After install:
 
