@@ -70,6 +70,9 @@ function checkWindowsPs1(filename, opts) {
   if (opts.exitHelper && !src.includes(opts.exitHelper)) {
     return { ok: false, detail: `${filename} must define ${opts.exitHelper}` };
   }
+  if (opts.offerNode && !src.includes('Offer-CowcodeNodeJs')) {
+    return { ok: false, detail: `${filename} must offer Node.js install help` };
+  }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }
 
@@ -78,6 +81,7 @@ function checkInstallPs1() {
     depsBeforeSetup: true,
     launcher: true,
     exitHelper: 'Exit-Install',
+    offerNode: true,
   });
 }
 

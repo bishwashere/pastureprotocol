@@ -35,6 +35,41 @@ function Invoke-Native {
     }
 }
 
+function Offer-CowcodeNodeJs {
+    param([Parameter(Mandatory = $true)][string]$Reason)
+    Write-Host ""
+    Write-Host "  [X] $Reason"
+    Write-Host ""
+    Write-Host "  This step runs in PowerShell only. Node.js is not needed to download"
+    Write-Host "  cowCode, but it is required for npm install, setup, and running the bot."
+    Write-Host ""
+    if ($Host.Name -eq "ConsoleHost") {
+        try {
+            if (Get-Command winget -ErrorAction SilentlyContinue) {
+                $answer = Read-Host "  Install Node.js LTS with winget now? [Y/n]"
+                if ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^[yY]') {
+                    Write-Host "  > Installing Node.js LTS via winget..."
+                    & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+                    Write-Host ""
+                    Write-Host "  When winget finishes, close this window and open a NEW PowerShell."
+                    Write-Host "  Then run:  node -v   and   npm -v   and run this installer again."
+                    Exit-Install 0
+                }
+            }
+            $open = Read-Host "  Open https://nodejs.org/ in your browser? [Y/n]"
+            if ([string]::IsNullOrWhiteSpace($open) -or $open -match '^[yY]') {
+                Start-Process "https://nodejs.org/"
+            }
+        } catch {
+            Write-Host "  Install from: https://nodejs.org/"
+        }
+    } else {
+        Write-Host "  Install from: https://nodejs.org/"
+    }
+    Write-Host "  Open a new PowerShell window after installing, then run the installer again."
+    Exit-Install 1
+}
+
 function Test-CowcodeBranchName {
     param([Parameter(Mandatory = $true)][string]$Branch)
     if ([string]::IsNullOrWhiteSpace($Branch)) { return $false }
@@ -158,6 +193,32 @@ function Copy-CowcodeTree {
     }
 }
 
+Write-Host ""
+Write-Host "  Welcome to cowCode - WhatsApp bot with your own LLM"
+Write-Host "  ------------------------------------------------"
+Write-Host ""
+
+# --- sanity checks (before download; PowerShell-only until npm install) ---
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+    Offer-CowcodeNodeJs "Node.js was not found on PATH."
+}
+
+$hasPnpm = [bool](Get-Command pnpm -ErrorAction SilentlyContinue)
+$hasNpm = [bool](Get-Command npm -ErrorAction SilentlyContinue)
+if (-not $hasPnpm -and -not $hasNpm) {
+    $reason = "npm (or pnpm) was not found on PATH."
+    if ($nodeCmd.Source -match "cursor|Cursor") {
+        $reason = "Node from Cursor was found, but that build does not include npm."
+    }
+    Offer-CowcodeNodeJs $reason
+}
+
+if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
+    Write-Host "  [X] tar is required (Windows 10+ built-in tar, or install Git for Windows)."
+    Exit-Install 1
+}
+
 $Branch = if ($env:COWCODE_BRANCH) { $env:COWCODE_BRANCH.Trim() } else { "master" }
 if (-not (Test-CowcodeBranchName $Branch)) {
     Write-Host "  [X] Invalid branch name in COWCODE_BRANCH."
@@ -171,35 +232,6 @@ $Extracted = "cowCode-$Branch"
 $InstallDir = if ($env:COWCODE_INSTALL_DIR) { $env:COWCODE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\cowcode" }
 $BinDir = Join-Path $env:USERPROFILE ".local\bin"
 $Launcher = Join-Path $BinDir "cowcode.cmd"
-
-Write-Host ""
-Write-Host "  Welcome to cowCode - WhatsApp bot with your own LLM"
-Write-Host "  ------------------------------------------------"
-Write-Host ""
-
-# --- sanity checks (before download) ---
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-if (-not $nodeCmd) {
-    Write-Host "  [X] Node.js is required but not installed."
-    Write-Host "  Download: https://nodejs.org/"
-    Exit-Install 1
-}
-
-$hasPnpm = [bool](Get-Command pnpm -ErrorAction SilentlyContinue)
-$hasNpm = [bool](Get-Command npm -ErrorAction SilentlyContinue)
-if (-not $hasPnpm -and -not $hasNpm) {
-    Write-Host "  [X] npm (or pnpm) is not in PATH."
-    if ($nodeCmd.Source -match "cursor|Cursor") {
-        Write-Host "  Node from Cursor was found, but that install does not include npm."
-    }
-    Write-Host "  Install Node.js from https://nodejs.org/ then open a new PowerShell window."
-    Exit-Install 1
-}
-
-if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
-    Write-Host "  [X] tar is required (Windows 10+ built-in tar, or install Git for Windows)."
-    Exit-Install 1
-}
 
 # --- temp workspace ---
 $Work = Join-Path ([System.IO.Path]::GetTempPath()) ("cowcode-install-" + [guid]::NewGuid().ToString("n"))
