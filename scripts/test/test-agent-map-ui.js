@@ -200,9 +200,10 @@ const checks = [
   {
     name: 'Team activity renders delegation decision confidence details',
     ok: html.includes("type === 'delegation_decision'") &&
-      html.includes('<strong>Reason:</strong>') &&
-      html.includes('<strong>Candidate Agents:</strong>') &&
-      html.includes('selectedConfidence'),
+      html.includes('renderRoutingFactors') &&
+      html.includes('Contributing factors') &&
+      html.includes('selectedScore') &&
+      html.includes('assigned_to_you'),
   },
   {
     name: 'Team hash route without agent id opens map page',

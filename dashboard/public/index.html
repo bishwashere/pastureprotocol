@@ -643,6 +643,11 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .team-agent-inbox-routing {
+      margin-top: 0.35rem;
+      padding-top: 0.35rem;
+      border-top: 1px dashed var(--border);
+    }
     .team-agent-inbox-skills {
       margin: 0.15rem 0 0 0;
       padding-left: 1.1rem;
@@ -6297,6 +6302,55 @@
       detail.innerHTML = renderAgentMetricsCard(selectedTeamInboxAgentId, metrics);
     }
 
+    function fmtMatchPct(value) {
+      var n = Number(value);
+      if (!isFinite(n)) return '0%';
+      if (n > 1) n = n / 100;
+      return Math.round(Math.max(0, Math.min(1, n)) * 100) + '%';
+    }
+
+    function renderRoutingFactors(routing) {
+      if (!routing || typeof routing !== 'object') return '';
+      var html = '<div class="team-agent-inbox-routing">';
+      if (routing.reason) {
+        html += '<div class="team-agent-inbox-block"><strong>Why this agent:</strong><br>' +
+          escapeHtml(routing.reason) + '</div>';
+      }
+      var selected = String(routing.selected || routing.selectedAgentId || '').trim();
+      if (selected) {
+        var selScore = Number(routing.selectedScore);
+        var selLine = escapeHtml(agentNameById(selected));
+        if (isFinite(selScore)) selLine += ' — score ' + selScore;
+        if (routing.selectedConfidence != null) selLine += ' (' + fmtMatchPct(routing.selectedConfidence) + ')';
+        var skills = Array.isArray(routing.selectedMatchedSkills) ? routing.selectedMatchedSkills : [];
+        var concepts = Array.isArray(routing.selectedMatchedConcepts) ? routing.selectedMatchedConcepts : [];
+        if (skills.length) selLine += '<br>Skills: ' + escapeHtml(skills.join(', '));
+        if (concepts.length) selLine += '<br>Topics: ' + escapeHtml(concepts.join(', '));
+        html += '<div class="team-agent-inbox-block"><strong>Selected:</strong><br>' + selLine + '</div>';
+      }
+      var candidates = Array.isArray(routing.candidates) ? routing.candidates : [];
+      if (candidates.length) {
+        html += '<div class="team-agent-inbox-block"><strong>Contributing factors (team scores):</strong><ul class="team-agent-inbox-skills">';
+        candidates.forEach(function (c) {
+          var line = escapeHtml(agentNameById(c.agentId)) + ' — score ' + (Number(c.score) || 0) +
+            ' (' + fmtMatchPct(c.confidence) + ')';
+          if (c.matchedSkills && c.matchedSkills.length) {
+            line += '<br>Skills: ' + escapeHtml(c.matchedSkills.join(', '));
+          }
+          if (c.matchedConcepts && c.matchedConcepts.length) {
+            line += '<br>Topics: ' + escapeHtml(c.matchedConcepts.join(', '));
+          }
+          if (c.reasoning) {
+            line += '<br><span style="color:var(--muted)">' + escapeHtml(c.reasoning) + '</span>';
+          }
+          html += '<li>' + line + '</li>';
+        });
+        html += '</ul></div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
     function buildAgentInboxFlows(agentId) {
       var id = String(agentId || '').trim();
       if (!id) return [];
@@ -6306,7 +6360,7 @@
       var flows = [];
       var current = null;
 
-      function pushDecision(event) {
+      function pushDecision(event, forAssignee) {
         var d = event.details || {};
         var candidates = Array.isArray(d.candidates) ? d.candidates : [];
         flows.push({
@@ -6319,6 +6373,9 @@
             candidates: candidates,
             selected: d.selected || event.targetAgentId || '',
             selectedConfidence: d.selectedConfidence,
+            selectedScore: d.selectedScore,
+            routing: d,
+            label: forAssignee ? ('Assigned to you from ' + agentNameById(event.agentId)) : ('Delegated to ' + agentNameById(event.targetAgentId || d.selected)),
           }],
         });
       }
@@ -6326,11 +6383,16 @@
       events.forEach(function (event) {
         var type = String(event.type || '');
         if (type === 'delegation_decision' && event.agentId === id) {
-          pushDecision(event);
+          pushDecision(event, false);
+          return;
+        }
+        if (type === 'delegation_decision' && (event.targetAgentId === id || (event.details && event.details.selected === id))) {
+          pushDecision(event, true);
           return;
         }
         if (type === 'delegation_start' && event.agentId === id) {
           var dStart = event.details && event.details.inbox ? event.details.inbox : {};
+          var routingOut = (event.details && event.details.routing) || dStart.routing || null;
           flows.push({
             ts: event.ts,
             entries: [{
@@ -6339,6 +6401,23 @@
               to: event.targetAgentId || dStart.toAgentId || '',
               task: dStart.task || '',
               context: dStart.context || '',
+              routing: routingOut,
+            }],
+          });
+          return;
+        }
+        if (type === 'delegation_start' && event.targetAgentId === id) {
+          var dAssign = event.details && event.details.inbox ? event.details.inbox : {};
+          var routingIn = (event.details && event.details.routing) || dAssign.routing || null;
+          flows.push({
+            ts: event.ts,
+            entries: [{
+              type: 'assigned_to_you',
+              ts: event.ts,
+              from: event.agentId || dAssign.fromAgentId || '',
+              task: dAssign.task || '',
+              context: dAssign.context || '',
+              routing: routingIn,
             }],
           });
           return;
@@ -6350,12 +6429,14 @@
           current = { ts: event.ts, skills: [], entries: [] };
           var inbox = event.details && event.details.inbox ? event.details.inbox : null;
           if (inbox && inbox.kind === 'received_from') {
+            var routingRecv = inbox.routing || null;
             current.entries.push({
               type: 'received_from',
               ts: event.ts,
               from: inbox.fromAgentId || '',
               task: inbox.task || event.message || '',
               context: inbox.context || '',
+              routing: routingRecv,
             });
           } else {
             current.entries.push({
@@ -6407,22 +6488,22 @@
       var time = formatInboxTime(entry.ts);
       var html = '<div class="team-agent-inbox-entry"><div class="team-agent-inbox-time">' + escapeHtml(time) + '</div>';
       if (entry.type === 'delegation_decision') {
-        html += '<div class="team-agent-inbox-label">Delegated to ' + escapeHtml(agentNameById(entry.target)) + '</div>';
-        if (entry.reason) {
-          html += '<div class="team-agent-inbox-block"><strong>Reason:</strong><br>' + escapeHtml(entry.reason) + '</div>';
-        }
-        if (entry.candidates && entry.candidates.length) {
-          html += '<div class="team-agent-inbox-block"><strong>Candidate Agents:</strong><br>';
-          entry.candidates.forEach(function (c) {
-            var conf = Number(c.confidence);
-            var confTxt = isFinite(conf) ? conf.toFixed(2) : '0.00';
-            html += '- ' + escapeHtml(agentNameById(c.agentId)) + ' (' + confTxt + ')<br>';
-          });
-          html += '</div>';
-        }
-        if (entry.selected) {
-          html += '<div class="team-agent-inbox-block"><strong>Selected:</strong><br>' + escapeHtml(agentNameById(entry.selected)) + '</div>';
-        }
+        html += '<div class="team-agent-inbox-label">' + escapeHtml(entry.label || ('Delegated to ' + agentNameById(entry.target))) + '</div>';
+        html += renderRoutingFactors(entry.routing || {
+          reason: entry.reason,
+          selected: entry.selected || entry.target,
+          selectedScore: entry.selectedScore,
+          selectedConfidence: entry.selectedConfidence,
+          candidates: entry.candidates,
+        });
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'assigned_to_you') {
+        html += '<div class="team-agent-inbox-label">Assigned from ' + escapeHtml(agentNameById(entry.from)) + '</div>';
+        if (entry.task) html += '<div class="team-agent-inbox-block"><strong>Task:</strong><br>"' + escapeHtml(entry.task) + '"</div>';
+        if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += renderRoutingFactors(entry.routing);
         html += '</div>';
         return html;
       }
@@ -6430,6 +6511,7 @@
         html += '<div class="team-agent-inbox-label">Delegated to ' + escapeHtml(agentNameById(entry.to)) + '</div>';
         if (entry.task) html += '<div class="team-agent-inbox-block"><strong>Task:</strong><br>"' + escapeHtml(entry.task) + '"</div>';
         if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += renderRoutingFactors(entry.routing);
         html += '</div>';
         return html;
       }
@@ -6437,6 +6519,7 @@
         html += '<div class="team-agent-inbox-label">Received from ' + escapeHtml(agentNameById(entry.from)) + '</div>';
         if (entry.task) html += '<div class="team-agent-inbox-block"><strong>Task:</strong><br>"' + escapeHtml(entry.task) + '"</div>';
         if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += renderRoutingFactors(entry.routing);
         html += '</div>';
         return html;
       }
@@ -6521,7 +6604,9 @@
         var candidateLines = candidates.map(function (c) {
           var label = agentNameById(String(c && c.agentId || ''));
           var conf = fmtConfidence(c && c.confidence);
-          return '- ' + escapeHtml(label || 'agent') + ' (' + conf + ')';
+          var score = Number(c && c.score);
+          var scoreTxt = isFinite(score) ? (' score ' + score) : '';
+          return '- ' + escapeHtml(label || 'agent') + scoreTxt + ' (' + conf + ')';
         });
         var out = '';
         if (reason) out += '<br><strong>Reason:</strong> ' + escapeHtml(reason);

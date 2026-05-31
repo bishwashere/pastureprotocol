@@ -18,6 +18,7 @@ import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/intent-planner.js';
 import { isNonTaskMessage } from '../lib/evaluate-team-capability.js';
 import { buildDelegationContext } from '../lib/agent-delegation-router.js';
+import { buildDelegationDecisionDetails } from '../lib/delegation-routing-details.js';
 import { executeSkill } from '../skills/executor.js';
 import { logTeamActivity } from '../lib/team-activity.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
@@ -148,31 +149,7 @@ async function main() {
   const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
     ? (delegationContext?.recommendation?.targetAgentId || '')
     : '';
-  const delegationDecision = delegationContext?.recommendation
-    ? {
-        reason: String(delegationContext.recommendation.reason || '').trim(),
-        selected: delegatedTarget || '',
-        action: String(delegationContext.recommendation.action || '').trim(),
-        selectedConfidence: Number(delegationContext.recommendation.confidence || 0),
-        offerUpgrade: !!delegationContext.recommendation.offerUpgrade,
-        suggestedDomain: String(delegationContext.recommendation.suggestedDomain || '').trim(),
-        candidates: Array.isArray(delegationContext.candidates)
-          ? delegationContext.candidates.slice(0, 5).map((c) => ({
-              agentId: String(c.agentId || '').trim(),
-              title: String(c.title || '').trim(),
-              confidence: Number(c.confidence || 0),
-              score: Number(c.score || 0),
-            }))
-          : [],
-        teamAgents: Array.isArray(delegationContext.teamCapability?.agents)
-          ? delegationContext.teamCapability.agents.slice(0, 6).map((a) => ({
-              agentId: a.agentId,
-              confidencePct: a.confidencePct,
-              reasoning: a.reasoning,
-            }))
-          : [],
-      }
-    : null;
+  const delegationDecision = buildDelegationDecisionDetails(delegationContext);
   const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
     ? {
         mode: 'tool',
@@ -258,6 +235,7 @@ async function main() {
     let skillsCalled = [];
     if (presetDelegationPlan && delegatedTarget) {
       try {
+        if (delegationDecision) ctx.delegationRouting = delegationDecision;
         const forcedRaw = await executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
           message: enrichMessageWithProjectContext(message, historyMessages),
