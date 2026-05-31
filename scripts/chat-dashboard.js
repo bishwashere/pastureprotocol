@@ -32,7 +32,11 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from '../lib/retrospective.js';
-import { buildProjectsContextBlock } from '../lib/projects-context.js';
+import {
+  buildProjectsContextBlock,
+  getProjectsDiscoveryIntentHint,
+  enrichMessageWithProjectContext,
+} from '../lib/projects-context.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -194,7 +198,10 @@ async function main() {
     });
   }
   // Step 3: intent planner — one small LLM call before loading any tool schemas.
-  const intentPlan = presetDelegationPlan || (enabledSkillIds.length > 0
+  const projectsIntentHint = !presetDelegationPlan
+    ? getProjectsDiscoveryIntentHint(message, historyMessages, enabledSkillIds)
+    : null;
+  const intentPlan = presetDelegationPlan || projectsIntentHint || (enabledSkillIds.length > 0
     ? await planIntent({
         userText: message,
         historyMessages,
@@ -226,7 +233,7 @@ async function main() {
   const memoryConfig = getMemoryConfig();
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
-  const projectsBlock = buildProjectsContextBlock();
+  const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
   if (projectsBlock) systemPrompt += projectsBlock;
 
   try {
@@ -236,7 +243,7 @@ async function main() {
       try {
         const forcedRaw = await executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
-          message,
+          message: enrichMessageWithProjectContext(message, historyMessages),
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {

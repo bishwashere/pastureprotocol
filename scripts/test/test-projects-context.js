@@ -16,25 +16,48 @@ async function main() {
       buildProjectsContextBlock,
       formatProjectsForPrompt,
       formatProjectsProfileLine,
+      pickFocusedProject,
+      enrichMessageWithProjectContext,
+      getProjectsDiscoveryIntentHint,
+      isProjectDiscoveryRequest,
     } = await import('../../lib/projects-context.js');
 
     assert(formatProjectsForPrompt([]).includes('No projects'), 'empty list copy');
+    assert(isProjectDiscoveryRequest('what is this project all about find out'), 'discovery phrase');
+
     createProject({
-      name: 'NextPostAI',
-      description: 'Improve onboarding conversion',
+      name: 'nextpostai',
+      description: 'AI marketing tool',
       url: 'https://nextpostai.com',
     });
-    createProject({ name: 'Side app', description: '', url: '' });
 
-    const block = buildProjectsContextBlock();
-    assert(block.includes('Dashboard projects'), 'block header');
-    assert(block.includes('NextPostAI'), 'includes name');
-    assert(block.includes('nextpostai.com'), 'includes url');
-    assert(block.includes('Do **not** say you do not know'), 'instruction');
+    const projects = [{ name: 'nextpostai', description: 'AI marketing tool', url: 'https://nextpostai.com' }];
+    const focus = pickFocusedProject(projects, 'what is this project all about find out', []);
+    assert(focus && focus.name === 'nextpostai', 'single project focus');
+
+    const block = buildProjectsContextBlock({
+      userText: 'what is this project all about find out',
+      historyMessages: [],
+    });
+    assert(block.includes('Active project focus'), 'focus block');
+    assert(block.includes('Do **not** ask which project'), 'no clarify instruction');
+    assert(block.includes('browse'), 'browse instruction');
+    assert(block.includes('nextpostai.com'), 'url in block');
+
+    const enriched = enrichMessageWithProjectContext('find out what it is about');
+    assert(enriched.includes('Projects tracker context'), 'enriched delegation');
+    assert(enriched.includes('nextpostai'), 'project name in enrichment');
+
+    const hint = getProjectsDiscoveryIntentHint(
+      'what is this project all about',
+      [],
+      ['browse', 'search', 'read', 'memory'],
+    );
+    assert(hint && hint.skills.includes('browse'), 'intent includes browse');
+    assert(hint.plan.includes('No clarifying'), 'intent plan');
 
     const profile = formatProjectsProfileLine();
-    assert(profile.includes('2 project'), `profile count: ${profile}`);
-    assert(profile.includes('NextPostAI'), 'profile name');
+    assert(profile.includes('1 project'), `profile: ${profile}`);
 
     console.log('projects-context tests passed');
   } finally {

@@ -64,7 +64,11 @@ import {
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
-import { buildProjectsContextBlock } from './lib/projects-context.js';
+import {
+  buildProjectsContextBlock,
+  getProjectsDiscoveryIntentHint,
+  enrichMessageWithProjectContext,
+} from './lib/projects-context.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -1034,7 +1038,10 @@ async function main() {
       });
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
-    const intentPlan = presetDelegationPlan || (enabledSkillIds.length > 0
+    const projectsIntentHint = !presetDelegationPlan
+      ? getProjectsDiscoveryIntentHint(text, historyMessages, enabledSkillIds)
+      : null;
+    const intentPlan = presetDelegationPlan || projectsIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
@@ -1081,7 +1088,7 @@ async function main() {
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
-      const projectsBlock = buildProjectsContextBlock();
+      const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
       if (projectsBlock) systemPromptWithPlan += projectsBlock;
     }
     const llmOptions = agentId ? { agentId } : {};
@@ -1100,7 +1107,7 @@ async function main() {
         console.log('[agent-router] forcing agent-send to', delegatedTarget);
         const forcedRaw = await executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
-          message: text,
+          message: enrichMessageWithProjectContext(text, historyMessages),
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {

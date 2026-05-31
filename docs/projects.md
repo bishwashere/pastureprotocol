@@ -51,6 +51,8 @@ branches  - id, project_id, parent_update_id (which update it branches from), na
 
 Projects in this tracker are injected into the **system prompt** on every private chat turn and included in the **me** skill profile. When you ask "what projects do I have?", agents should answer from this list—not claim they don't know if projects exist here.
 
+Follow-ups like "what is this project about?" / "find out" resolve to the tracked project (especially when only one exists). Agents are instructed to **browse the project URL** (or search/memory) and must not ask you to pick GitHub vs local path vs tracker. Delegated agents receive the same context in their message.
+
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.
