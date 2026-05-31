@@ -43,6 +43,7 @@
     "test:dry-run": "node scripts/test/test-dry-run.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",
     "test:conversation-context": "node scripts/test/test-conversation-context.js",
+    "test:shared-delegation-history": "node scripts/test/test-shared-delegation-history.js",
     "test:github-skill": "node scripts/test/test-github-skill.js",
     "test:gmail-skill": "node scripts/test/test-gmail-skill.js",
     "test:calendar-skill": "node scripts/test/test-calendar-skill.js",

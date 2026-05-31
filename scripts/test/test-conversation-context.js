@@ -6,10 +6,7 @@
 import {
   formatHistoryForClassifier,
   buildAnswerCompletenessProbePrompt,
-  isReferentialFollowUp,
-  getLastAssistantContent,
-  shouldSkipForcedDelegation,
-  enrichDelegationMessage,
+  resolveSharedTurnHistory,
 } from '../../lib/conversation-context.js';
 
 const HISTORY = [
@@ -19,12 +16,17 @@ const HISTORY = [
   { role: 'assistant', content: 'Got it — Chloe. Want me to update the config?' },
 ];
 
-const ARTICLE_HISTORY = [
+const USER_CHANNEL_HISTORY = [
   { role: 'user', content: 'ok prepare one such article' },
   {
     role: 'assistant',
-    content: 'Title: Stop Writing AI News Recaps. Write This Instead\n\nIf your content calendar is full of "new AI model launched" posts, you are doing free PR for other companies.\n\nThose posts can get views, sure. But they rarely build trust with the people who will actually pay you.',
+    content: 'Title: Stop Writing AI News Recaps. Write This Instead\n\nIf your content calendar is full of "new AI model launched" posts, you are doing free PR for other companies.',
   },
+];
+
+const PAIR_HISTORY = [
+  { role: 'user', content: 'what are the main blog post from nextpostai?' },
+  { role: 'assistant', content: 'Main blog posts are under /ideas.' },
 ];
 
 function testFormatHistory() {
@@ -40,39 +42,12 @@ function testProbeIncludesHistory() {
   if (!prompt.includes('complete')) throw new Error('probe missing JSON instruction');
 }
 
-function testReferentialFollowUpDetection() {
-  if (!isReferentialFollowUp('revise it with some facts or numbers')) {
-    throw new Error('expected revise-it to be referential');
-  }
-  if (!isReferentialFollowUp('not from idea section the one you suggested me that one')) {
-    throw new Error('expected suggested-that-one to be referential');
-  }
-  if (isReferentialFollowUp('write 3 blog ideas for nextpostai.com')) {
-    throw new Error('new task should not be referential');
-  }
-}
-
-function testSkipForcedDelegation() {
-  if (!shouldSkipForcedDelegation('revise it with some facts or numbers', ARTICLE_HISTORY)) {
-    throw new Error('expected skip forced delegation when article is in history');
-  }
-  if (shouldSkipForcedDelegation('write 3 blog ideas for nextpostai.com', ARTICLE_HISTORY)) {
-    throw new Error('new task should not skip delegation');
-  }
-}
-
-function testEnrichDelegationMessage() {
-  const enriched = enrichDelegationMessage('revise it with some facts or numbers', ARTICLE_HISTORY);
-  if (!enriched.includes('Prior output from this conversation')) {
-    throw new Error('enriched message missing prior output block');
-  }
-  if (!enriched.includes('Stop Writing AI News Recaps')) {
-    throw new Error('enriched message missing article title');
-  }
-  const last = getLastAssistantContent(ARTICLE_HISTORY);
-  if (!last.includes('Stop Writing AI News Recaps')) {
-    throw new Error('getLastAssistantContent failed');
-  }
+function testResolveSharedTurnHistory() {
+  const shared = resolveSharedTurnHistory(USER_CHANNEL_HISTORY, PAIR_HISTORY);
+  if (shared !== USER_CHANNEL_HISTORY) throw new Error('expected user-channel history when shared is present');
+  const fallback = resolveSharedTurnHistory([], PAIR_HISTORY);
+  if (fallback !== PAIR_HISTORY) throw new Error('expected pair history fallback');
+  if (resolveSharedTurnHistory(null, null).length !== 0) throw new Error('expected empty when no history');
 }
 
 async function main() {
@@ -83,9 +58,7 @@ async function main() {
   for (const [label, fn] of [
     ['formatHistoryForClassifier', testFormatHistory],
     ['buildAnswerCompletenessProbePrompt', testProbeIncludesHistory],
-    ['isReferentialFollowUp', testReferentialFollowUpDetection],
-    ['shouldSkipForcedDelegation', testSkipForcedDelegation],
-    ['enrichDelegationMessage', testEnrichDelegationMessage],
+    ['resolveSharedTurnHistory', testResolveSharedTurnHistory],
   ]) {
     process.stdout.write(`  ${label} … `);
     try {

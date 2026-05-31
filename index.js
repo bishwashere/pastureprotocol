@@ -68,6 +68,7 @@ import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './l
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
+  enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
 import { getGithubSourceIntentHint } from './lib/github-context.js';
@@ -85,8 +86,6 @@ import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } fro
 import { startGoalEngine } from './lib/goal-engine.js';
 import {
   buildAnswerCompletenessProbePrompt,
-  enrichDelegationMessage,
-  shouldSkipForcedDelegation,
 } from './lib/conversation-context.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
@@ -999,18 +998,12 @@ async function main() {
           answer_style: 'short',
         }
       : null;
-    const skipForcedDelegation = !isGroupJid && presetDelegationPlan && shouldSkipForcedDelegation(text, historyMessages);
-    const activePresetDelegationPlan = skipForcedDelegation ? null : presetDelegationPlan;
-    const activeDelegatedTarget = skipForcedDelegation ? '' : delegatedTarget;
-    if (skipForcedDelegation) {
-      console.log('[agent-router] referential follow-up — handling on caller with chat history');
-    }
     if (!isGroupJid) ctx.delegationHistoryMessages = historyMessages;
-    if (activePresetDelegationPlan && delegationDecision) {
+    if (presetDelegationPlan && delegationDecision) {
       logTeamActivity({
         type: 'delegation_decision',
         agentId,
-        targetAgentId: activeDelegatedTarget || delegatedTarget,
+        targetAgentId: delegatedTarget,
         status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
         depth: 0,
         jid,
@@ -1029,16 +1022,16 @@ async function main() {
       });
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
-    const casualIntentPlan = !activePresetDelegationPlan && isNonTaskMessage(text)
+    const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(text)
       ? buildCasualChatIntentPlan()
       : null;
-    const goalsIntentHint = !activePresetDelegationPlan && !casualIntentPlan
+    const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
       ? getGoalsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
-    const githubIntentHint = !activePresetDelegationPlan && !casualIntentPlan
+    const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
       ? getGithubSourceIntentHint(text, enabledSkillIds)
       : null;
-    const intentPlan = activePresetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+    const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
@@ -1096,7 +1089,7 @@ async function main() {
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     let turnResult = null;
-    if (activePresetDelegationPlan && activeDelegatedTarget) {
+    if (presetDelegationPlan && delegatedTarget) {
       try {
         logTeamActivity({
           type: 'turn_start',
@@ -1106,11 +1099,11 @@ async function main() {
           message: text,
         });
         onAgentTurnStart({ agentId, userText: text, ctx });
-        console.log('[agent-router] forcing agent-send to', activeDelegatedTarget);
+        console.log('[agent-router] forcing agent-send to', delegatedTarget);
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
         const forcedRaw = await executeSkill('agent-send', ctx, {
-          agent: activeDelegatedTarget,
-          message: enrichDelegationMessage(text, historyMessages),
+          agent: delegatedTarget,
+          message: enrichMessageWithProjectContext(text, historyMessages),
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
