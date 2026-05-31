@@ -86,6 +86,121 @@
       flex-direction: column;
       gap: 0.55rem;
     }
+    .team-view-tabs {
+      flex-shrink: 0;
+      display: flex;
+      gap: 0.35rem;
+    }
+    .team-view-tab {
+      margin: 0;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .team-view-tab.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(167, 139, 250, 0.08);
+    }
+    .team-cards-view {
+      flex-shrink: 0;
+    }
+    .team-cards-view[hidden],
+    .team-tree-view[hidden] {
+      display: none !important;
+    }
+    .team-tree-view {
+      flex: 1 1 0;
+      min-height: 10rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .team-tree-view .agent-map-canvas {
+      flex: 1 1 0;
+      min-height: 10rem;
+    }
+    .team-agent-cards-row {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 0.55rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.15rem 0.1rem 0.35rem 0.1rem;
+      scrollbar-width: thin;
+    }
+    .team-agent-card {
+      flex: 0 0 auto;
+      width: 7.25rem;
+      min-height: 5.5rem;
+      padding: 0.5rem 0.55rem 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      cursor: pointer;
+      position: relative;
+      font-size: 0.68rem;
+      line-height: 1.35;
+    }
+    .team-agent-card:hover {
+      border-color: var(--muted);
+    }
+    .team-agent-card.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25);
+    }
+    .team-agent-card-edit {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      margin: 0;
+      padding: 0.1rem 0.25rem;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+    }
+    .team-agent-card:hover .team-agent-card-edit,
+    .team-agent-card.selected .team-agent-card-edit {
+      opacity: 1;
+    }
+    .team-agent-card-edit:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .team-agent-card-head {
+      font-size: 0.74rem;
+      font-weight: 600;
+      margin: 0 1rem 0.2rem 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .team-agent-card-state {
+      color: var(--text);
+      margin-bottom: 0.2rem;
+    }
+    .team-agent-card-last,
+    .team-agent-card-today {
+      color: var(--muted);
+    }
+    .team-page-card .team-cards-view + .team-agent-panel,
+    .team-page-card .team-tree-view + .team-agent-panel {
+      flex: 1 1 0;
+      min-height: 9rem;
+    }
+    .team-page-card .team-cards-view ~ .team-agent-panel {
+      max-height: none;
+    }
     .team-page-card .agent-map-canvas {
       flex: 1 1 45%;
       min-height: 10rem;
@@ -2104,10 +2219,20 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent for Inbox, Active Context, or Stats. Use ✎ to edit.</p>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Inbox, Active Context, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
+          <div class="team-view-tabs" role="tablist">
+            <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
+            <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+          </div>
+          <div id="team-cards-view" class="team-cards-view">
+            <div id="team-agent-cards" class="team-agent-cards-row">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+            </div>
+          </div>
+          <div id="team-tree-view" class="team-tree-view" hidden>
           <div id="team-map-canvas" class="agent-map-canvas">
             <div id="team-map-scaler" class="agent-map-scaler">
               <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
@@ -2115,6 +2240,7 @@
                 <div id="team-map-nodes" class="agent-map-nodes"></div>
               </div>
             </div>
+          </div>
           </div>
           <div id="team-agent-panel" class="team-agent-panel">
             <div class="team-agent-panel-tabs" role="tablist">
@@ -2129,7 +2255,7 @@
                   <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
                 </div>
                 <div id="team-agent-inbox-list" class="team-agent-inbox-list">
-                  <p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>
+                  <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
                 </div>
               </div>
               <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
@@ -2407,6 +2533,7 @@
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
     var teamAgentPanelTab = 'inbox';
+    var teamViewMode = 'cards';
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
     function isMemoryNotesFile(id) {
@@ -2812,6 +2939,23 @@
       var id = String((a && a.id) || 'main');
       var title = (a && a.title) ? String(a.title).trim() : '';
       return title ? title + ' (' + id + ')' : id;
+    }
+
+    function agentCardShortName(a) {
+      var title = (a && a.title) ? String(a.title).trim() : '';
+      if (title) return title;
+      var id = String((a && a.id) || 'main');
+      return id.charAt(0).toUpperCase() + id.slice(1);
+    }
+
+    function getStateEmoji(state) {
+      return formatAgentStateDisplay(state).text.split(' ')[0] || '⚪';
+    }
+
+    function getStateTextLabel(state) {
+      var text = formatAgentStateDisplay(state).text;
+      var sp = text.indexOf(' ');
+      return sp >= 0 ? text.slice(sp + 1) : text;
     }
 
     var agentCreateModalOpen = false;
@@ -4774,6 +4918,7 @@
         renderAgentInbox();
         renderAgentContext();
         renderAgentMetrics();
+        renderTeamAgentCards();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
@@ -4782,6 +4927,7 @@
         renderAgentInbox();
         renderAgentContext();
         renderAgentMetrics();
+        renderTeamAgentCards();
         return agentMapData;
       }
     }
@@ -4824,9 +4970,84 @@
       document.querySelectorAll('#team-map-nodes .agent-map-node').forEach(function (n) {
         n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedTeamInboxAgentId);
       });
+      document.querySelectorAll('#team-agent-cards .team-agent-card').forEach(function (n) {
+        n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedTeamInboxAgentId);
+      });
       renderAgentInbox();
       renderAgentContext();
       renderAgentMetrics();
+    }
+
+    function setTeamViewTab(mode) {
+      teamViewMode = mode === 'tree' ? 'tree' : 'cards';
+      var cardsTab = document.getElementById('team-view-tab-cards');
+      var treeTab = document.getElementById('team-view-tab-tree');
+      var cardsView = document.getElementById('team-cards-view');
+      var treeView = document.getElementById('team-tree-view');
+      if (cardsTab) {
+        cardsTab.classList.toggle('active', teamViewMode === 'cards');
+        cardsTab.setAttribute('aria-selected', teamViewMode === 'cards' ? 'true' : 'false');
+      }
+      if (treeTab) {
+        treeTab.classList.toggle('active', teamViewMode === 'tree');
+        treeTab.setAttribute('aria-selected', teamViewMode === 'tree' ? 'true' : 'false');
+      }
+      if (cardsView) cardsView.hidden = teamViewMode !== 'cards';
+      if (treeView) treeView.hidden = teamViewMode !== 'tree';
+      if (teamViewMode === 'tree') {
+        renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
+        requestAnimationFrame(function () {
+          fitAgentMapToContainer('team-map');
+          var layout = agentMapLastLayouts['team-map'];
+          var els = agentMapEls('team-map');
+          if (layout && els) drawAgentMapArrows(agentMapData, layout, els, 'team');
+        });
+      }
+    }
+
+    function renderTeamAgentCards() {
+      var row = document.getElementById('team-agent-cards');
+      if (!row) return;
+      var agents = agentMapData || [];
+      if (!agents.length) {
+        row.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No agents yet.</p>';
+        return;
+      }
+      row.innerHTML = agents.map(function (a) {
+        var id = String(a && a.id || '');
+        var shortName = escapeHtml(agentCardShortName(a));
+        var ctx = (teamAgentContextSnapshot.agents || {})[id] || { state: 'idle' };
+        var emoji = getStateEmoji(ctx.state);
+        var stateLabel = getStateTextLabel(ctx.state);
+        var metrics = (teamAgentMetricsSnapshot.agents || {})[id] || {};
+        var lastLabel = metrics.lastActivity ? ('Last: ' + String(metrics.lastActivity)) : 'Last: —';
+        var todayCount = Number(metrics.tasksToday) || 0;
+        var sel = id === selectedTeamInboxAgentId ? ' selected' : '';
+        return '<div class="team-agent-card' + sel + '" data-agent-id="' + escapeHtml(id) + '" role="button" tabindex="0" title="Open ' + shortName + '">' +
+          '<button type="button" class="team-agent-card-edit" data-agent-id="' + escapeHtml(id) + '" aria-label="Edit ' + escapeHtml(id) + '" title="Edit agent">✎</button>' +
+          '<div class="team-agent-card-head">' + shortName + ' ' + emoji + '</div>' +
+          '<div class="team-agent-card-state">' + escapeHtml(stateLabel) + '</div>' +
+          '<div class="team-agent-card-last">' + escapeHtml(lastLabel) + '</div>' +
+          '<div class="team-agent-card-today">' + escapeHtml(String(todayCount)) + ' today</div>' +
+        '</div>';
+      }).join('');
+      row.querySelectorAll('.team-agent-card-edit').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var aid = btn.getAttribute('data-agent-id');
+          if (aid) openAgentEditModal(aid);
+        });
+      });
+      row.querySelectorAll('.team-agent-card').forEach(function (card) {
+        function pick() {
+          var id = card.getAttribute('data-agent-id');
+          if (id) selectTeamInboxAgent(id);
+        }
+        card.addEventListener('click', pick);
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+        });
+      });
     }
 
     function setTeamAgentPanelTab(tab) {
@@ -5338,6 +5559,7 @@
         };
       } catch (_) {}
       renderAgentContext();
+      renderTeamAgentCards();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
     }
 
@@ -5352,6 +5574,7 @@
         };
       } catch (_) {}
       renderAgentMetrics();
+      renderTeamAgentCards();
     }
 
     function startTeamActivityFeed() {
@@ -5379,6 +5602,16 @@
       teamAgentTabStatsEl.addEventListener('click', function () { setTeamAgentPanelTab('stats'); });
     }
     setTeamAgentPanelTab('inbox');
+
+    var teamViewTabCardsEl = document.getElementById('team-view-tab-cards');
+    var teamViewTabTreeEl = document.getElementById('team-view-tab-tree');
+    if (teamViewTabCardsEl) {
+      teamViewTabCardsEl.addEventListener('click', function () { setTeamViewTab('cards'); });
+    }
+    if (teamViewTabTreeEl) {
+      teamViewTabTreeEl.addEventListener('click', function () { setTeamViewTab('tree'); });
+    }
+    setTeamViewTab('cards');
 
     var teamActivityToggleEl = document.getElementById('team-activity-toggle');
     if (teamActivityToggleEl) {

@@ -87,6 +87,20 @@ async function main() {
     assert(marketerMetrics.averageExecutionSec === '2.4s', `marketer avg: ${marketerMetrics.averageExecutionSec}`);
     const marketerSkillIds = marketerMetrics.mostUsedSkills.map((s) => s.skillId).sort();
     assert(marketerSkillIds.join(',') === 'browse,search', `marketer skills: ${marketerSkillIds.join(',')}`);
+    assert(mainMetrics.lastActivity === 'done', `main last: ${mainMetrics.lastActivity}`);
+    assert(marketerMetrics.lastActivity === 'done', `marketer last: ${marketerMetrics.lastActivity}`);
+    assert(mainMetrics.tasksToday >= 0, 'tasksToday present');
+
+    const memEvents = [
+      { type: 'skill_done', agentId: 'developer', skillId: 'memory', ts: Date.now() },
+    ];
+    const devMetrics = computeAgentMetrics('developer', memEvents);
+    assert(devMetrics.lastActivity === 'mem', `dev last: ${devMetrics.lastActivity}`);
+
+    const delegEvents = [
+      { type: 'delegation_start', agentId: 'main', targetAgentId: 'marketer', ts: Date.now() },
+    ];
+    assert(computeAgentMetrics('main', delegEvents).lastActivity === 'deleg', 'deleg last activity');
 
     const snapshot = readAgentMetrics({ agentId: 'main' });
     assert(snapshot.agent.tasksHandled >= 1, 'readAgentMetrics returns main stats');

@@ -92,6 +92,20 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
+    name: 'Team page has cards and tree view tabs',
+    ok: html.includes('id="team-view-tab-cards"') &&
+      html.includes('id="team-view-tab-tree"') &&
+      html.includes('id="team-agent-cards"') &&
+      html.includes('setTeamViewTab'),
+  },
+  {
+    name: 'Team agent cards show state last and today',
+    ok: html.includes('team-agent-card') &&
+      html.includes('team-agent-card-last') &&
+      html.includes(' today</div>') &&
+      html.includes('renderTeamAgentCards'),
+  },
+  {
     name: 'Team map nodes show live agent state',
     ok: html.includes('agent-map-node-state') &&
       html.includes('🟢 Working') &&
