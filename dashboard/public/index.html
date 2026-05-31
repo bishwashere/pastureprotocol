@@ -84,10 +84,86 @@
       min-height: 0;
       display: flex;
       flex-direction: column;
+      gap: 0.55rem;
     }
     .team-page-card .agent-map-canvas {
+      flex: 1 1 45%;
+      min-height: 10rem;
+    }
+    .team-agent-inbox {
+      flex: 1 1 55%;
+      min-height: 9rem;
+      max-height: 52%;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .team-agent-inbox-head {
+      flex-shrink: 0;
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .team-agent-inbox-head h3 {
+      margin: 0;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .team-agent-inbox-sub {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .team-agent-inbox-list {
       flex: 1 1 0;
-      min-height: 12rem;
+      overflow: auto;
+      padding: 0.55rem 0.65rem;
+    }
+    .team-agent-inbox-flow {
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px dashed var(--border);
+    }
+    .team-agent-inbox-flow:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+    .team-agent-inbox-entry {
+      margin-bottom: 0.55rem;
+      font-size: 0.74rem;
+      line-height: 1.4;
+    }
+    .team-agent-inbox-time {
+      color: var(--muted);
+      font-size: 0.67rem;
+      margin-bottom: 0.15rem;
+    }
+    .team-agent-inbox-label {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .team-agent-inbox-block {
+      margin: 0.2rem 0 0 0;
+      padding-left: 0.5rem;
+      border-left: 2px solid var(--border);
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .team-agent-inbox-skills {
+      margin: 0.15rem 0 0 0;
+      padding-left: 1.1rem;
+      list-style: disc;
+    }
+    .team-agent-inbox-empty {
+      margin: 0;
+      padding: 0.75rem 0.25rem;
+      color: var(--muted);
+      font-size: 0.72rem;
     }
     .team-activity-wrap {
       flex: 0 0 2.4rem;
@@ -1882,7 +1958,7 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to edit. Tree shows hierarchy; dashed arrows show message-passing links.</p>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to open their inbox below. Use ✎ to edit. Tree shows hierarchy; dashed arrows show message-passing links.</p>
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
@@ -1892,6 +1968,15 @@
                 <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
                 <div id="team-map-nodes" class="agent-map-nodes"></div>
               </div>
+            </div>
+          </div>
+          <div id="team-agent-inbox" class="team-agent-inbox">
+            <div class="team-agent-inbox-head">
+              <h3 id="team-agent-inbox-title">Agent Inbox</h3>
+              <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+            </div>
+            <div id="team-agent-inbox-list" class="team-agent-inbox-list">
+              <p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>
             </div>
           </div>
         </div>
@@ -2146,6 +2231,7 @@
     var teamActivityEventIds = {};
     var teamActivityLastTs = 0;
     var teamActivityPollTimer = null;
+    var selectedTeamInboxAgentId = '';
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -4414,7 +4500,8 @@
         var skillCount = Array.isArray(a.skillsEnabled) ? a.skillsEnabled.length : 0;
         var isMain = a.id === 'main';
         var meta = isMain ? 'root' : 'agent';
-        var sel = a.id === selectedChatAgentId ? ' selected' : '';
+        var selectedId = mode === 'edit-page' ? selectedTeamInboxAgentId : selectedChatAgentId;
+        var sel = a.id === selectedId ? ' selected' : '';
         var chatLabel = rawTitle ? rawTitle + ' (' + a.id + ')' : a.id;
         var fromIds = inboundLinks[a.id] || [];
         var inboundHtml = fromIds.length
@@ -4422,7 +4509,7 @@
           : '';
         var inboundClass = fromIds.length ? ' agent-map-node-has-inbound' : '';
         var nodeTitle = mode === 'edit-page'
-          ? 'Edit ' + escapeHtml(chatLabel)
+          ? 'Open inbox for ' + escapeHtml(chatLabel)
           : 'Chat with ' + escapeHtml(chatLabel);
         return '<div class="agent-map-node' + sel + inboundClass + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
           ' title="' + nodeTitle + '"' +
@@ -4437,7 +4524,9 @@
         btn.addEventListener('click', function(e) {
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
-          if (aid) openAgentEditModal(aid);
+          if (!aid) return;
+          if (mode === 'edit-page') openTeamAgentPage(aid);
+          else openAgentEditModal(aid);
         });
       });
       els.nodes.querySelectorAll('.agent-map-node').forEach(function(node) {
@@ -4445,7 +4534,7 @@
           var id = node.getAttribute('data-agent-id');
           if (!id) return;
           if (mode === 'edit-page') {
-            openTeamAgentPage(id);
+            selectTeamInboxAgent(id);
             return;
           }
           var sel = document.getElementById('chat-agent-select');
@@ -4486,11 +4575,13 @@
         if (!agents.length) agentMapData = [{ id: 'main' }];
         renderAgentMap();
         renderTeamActivity();
+        renderAgentInbox();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
         renderAgentMap();
         renderTeamActivity();
+        renderAgentInbox();
         return agentMapData;
       }
     }
@@ -4501,6 +4592,219 @@
       var hit = (agentMapData || []).find(function (a) { return a && a.id === id; });
       if (hit) return agentDisplayLabel(hit);
       return id;
+    }
+
+    function formatInboxTime(ts) {
+      var d = new Date(Number(ts) || Date.now());
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function selectTeamInboxAgent(agentId) {
+      selectedTeamInboxAgentId = String(agentId || '').trim();
+      document.querySelectorAll('#team-map-nodes .agent-map-node').forEach(function (n) {
+        n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedTeamInboxAgentId);
+      });
+      renderAgentInbox();
+    }
+
+    function buildAgentInboxFlows(agentId) {
+      var id = String(agentId || '').trim();
+      if (!id) return [];
+      var events = (teamActivityEvents || []).slice().sort(function (a, b) {
+        return (Number(a.ts) || 0) - (Number(b.ts) || 0);
+      });
+      var flows = [];
+      var current = null;
+
+      function pushDecision(event) {
+        var d = event.details || {};
+        var candidates = Array.isArray(d.candidates) ? d.candidates : [];
+        flows.push({
+          ts: event.ts,
+          entries: [{
+            type: 'delegation_decision',
+            ts: event.ts,
+            target: event.targetAgentId || d.selected || '',
+            reason: d.reason || '',
+            candidates: candidates,
+            selected: d.selected || event.targetAgentId || '',
+            selectedConfidence: d.selectedConfidence,
+          }],
+        });
+      }
+
+      events.forEach(function (event) {
+        var type = String(event.type || '');
+        if (type === 'delegation_decision' && event.agentId === id) {
+          pushDecision(event);
+          return;
+        }
+        if (type === 'delegation_start' && event.agentId === id) {
+          var dStart = event.details && event.details.inbox ? event.details.inbox : {};
+          flows.push({
+            ts: event.ts,
+            entries: [{
+              type: 'delegated_out',
+              ts: event.ts,
+              to: event.targetAgentId || dStart.toAgentId || '',
+              task: dStart.task || '',
+              context: dStart.context || '',
+            }],
+          });
+          return;
+        }
+        if (event.agentId !== id) return;
+
+        if (type === 'turn_start') {
+          if (current) flows.push(current);
+          current = { ts: event.ts, skills: [], entries: [] };
+          var inbox = event.details && event.details.inbox ? event.details.inbox : null;
+          if (inbox && inbox.kind === 'received_from') {
+            current.entries.push({
+              type: 'received_from',
+              ts: event.ts,
+              from: inbox.fromAgentId || '',
+              task: inbox.task || event.message || '',
+              context: inbox.context || '',
+            });
+          } else {
+            current.entries.push({
+              type: 'received',
+              ts: event.ts,
+              task: (inbox && inbox.task) || event.message || '',
+              context: (inbox && inbox.context) || '',
+            });
+          }
+          return;
+        }
+        if (type === 'skill_start' && current) {
+          var sid = String(event.skillId || '').trim();
+          if (sid && current.skills.indexOf(sid) === -1) current.skills.push(sid);
+          return;
+        }
+        if (type === 'turn_done' && current) {
+          var doneInbox = event.details && event.details.inbox ? event.details.inbox : null;
+          var skills = (doneInbox && Array.isArray(doneInbox.skills) && doneInbox.skills.length)
+            ? doneInbox.skills.slice()
+            : current.skills.slice();
+          if (skills.length) {
+            var skillsLabel = (current.entries[0] && current.entries[0].type === 'received') ? 'Used:' : 'Using skills:';
+            current.entries.push({ type: 'skills', ts: event.ts, skills: skills, label: skillsLabel });
+          }
+          if (doneInbox && doneInbox.kind === 'returned_to') {
+            current.entries.push({
+              type: 'returned',
+              ts: event.ts,
+              to: doneInbox.toAgentId || '',
+              result: doneInbox.result || '',
+            });
+          } else {
+            current.entries.push({
+              type: 'completed',
+              ts: event.ts,
+              result: (doneInbox && doneInbox.result) || '',
+            });
+          }
+          flows.push(current);
+          current = null;
+        }
+      });
+      if (current) flows.push(current);
+      return flows.reverse();
+    }
+
+    function renderInboxEntry(entry) {
+      var time = formatInboxTime(entry.ts);
+      var html = '<div class="team-agent-inbox-entry"><div class="team-agent-inbox-time">' + escapeHtml(time) + '</div>';
+      if (entry.type === 'delegation_decision') {
+        html += '<div class="team-agent-inbox-label">Delegated to ' + escapeHtml(agentNameById(entry.target)) + '</div>';
+        if (entry.reason) {
+          html += '<div class="team-agent-inbox-block"><strong>Reason:</strong><br>' + escapeHtml(entry.reason) + '</div>';
+        }
+        if (entry.candidates && entry.candidates.length) {
+          html += '<div class="team-agent-inbox-block"><strong>Candidate Agents:</strong><br>';
+          entry.candidates.forEach(function (c) {
+            var conf = Number(c.confidence);
+            var confTxt = isFinite(conf) ? conf.toFixed(2) : '0.00';
+            html += '- ' + escapeHtml(agentNameById(c.agentId)) + ' (' + confTxt + ')<br>';
+          });
+          html += '</div>';
+        }
+        if (entry.selected) {
+          html += '<div class="team-agent-inbox-block"><strong>Selected:</strong><br>' + escapeHtml(agentNameById(entry.selected)) + '</div>';
+        }
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'delegated_out') {
+        html += '<div class="team-agent-inbox-label">Delegated to ' + escapeHtml(agentNameById(entry.to)) + '</div>';
+        if (entry.task) html += '<div class="team-agent-inbox-block"><strong>Task:</strong><br>"' + escapeHtml(entry.task) + '"</div>';
+        if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'received_from') {
+        html += '<div class="team-agent-inbox-label">Received from ' + escapeHtml(agentNameById(entry.from)) + '</div>';
+        if (entry.task) html += '<div class="team-agent-inbox-block"><strong>Task:</strong><br>"' + escapeHtml(entry.task) + '"</div>';
+        if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'received') {
+        html += '<div class="team-agent-inbox-label">Received:</div>';
+        if (entry.task) html += '<div class="team-agent-inbox-block">' + escapeHtml(entry.task) + '</div>';
+        if (entry.context) html += '<div class="team-agent-inbox-block"><strong>Context:</strong><br>' + escapeHtml(entry.context) + '</div>';
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'skills') {
+        html += '<div class="team-agent-inbox-label">' + escapeHtml(entry.label || 'Using skills:') + '</div><ul class="team-agent-inbox-skills">';
+        entry.skills.forEach(function (s) {
+          html += '<li>' + escapeHtml(s) + '</li>';
+        });
+        html += '</ul></div>';
+        return html;
+      }
+      if (entry.type === 'returned') {
+        html += '<div class="team-agent-inbox-label">Returned response to ' + escapeHtml(agentNameById(entry.to)) + '</div>';
+        if (entry.result) html += '<div class="team-agent-inbox-block"><strong>Result:</strong><br>' + escapeHtml(entry.result) + '</div>';
+        html += '</div>';
+        return html;
+      }
+      if (entry.type === 'completed') {
+        html += '<div class="team-agent-inbox-label">Completed</div>';
+        if (entry.result) html += '<div class="team-agent-inbox-block"><strong>Result:</strong><br>' + escapeHtml(entry.result) + '</div>';
+        html += '</div>';
+        return html;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderAgentInbox() {
+      var list = document.getElementById('team-agent-inbox-list');
+      var titleEl = document.getElementById('team-agent-inbox-title');
+      var subEl = document.getElementById('team-agent-inbox-subtitle');
+      if (!list) return;
+      if (!selectedTeamInboxAgentId) {
+        if (titleEl) titleEl.textContent = 'Agent Inbox';
+        if (subEl) subEl.textContent = 'Click an agent above';
+        list.innerHTML = '<p class="team-agent-inbox-empty">Select an agent on the tree to view per-agent activity.</p>';
+        return;
+      }
+      var label = agentNameById(selectedTeamInboxAgentId);
+      if (titleEl) titleEl.textContent = label + ' — Inbox';
+      if (subEl) subEl.textContent = 'Per-agent activity';
+      var flows = buildAgentInboxFlows(selectedTeamInboxAgentId);
+      if (!flows.length) {
+        list.innerHTML = '<p class="team-agent-inbox-empty">No inbox activity for ' + escapeHtml(label) + ' yet.</p>';
+        return;
+      }
+      list.innerHTML = flows.map(function (flow) {
+        return '<div class="team-agent-inbox-flow">' +
+          flow.entries.map(renderInboxEntry).join('') +
+        '</div>';
+      }).join('');
     }
 
     function formatTeamActivityText(event) {
@@ -4637,6 +4941,7 @@
         }
       } catch (_) {}
       renderTeamActivity();
+      renderAgentInbox();
     }
 
     function startTeamActivityFeed() {

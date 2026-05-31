@@ -79,6 +79,12 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
+    name: 'Team page includes agent inbox below map',
+    ok: html.includes('id="team-agent-inbox"') &&
+      html.includes('team-agent-inbox-list') &&
+      html.includes('selectTeamInboxAgent'),
+  },
+  {
     name: 'Team activity renders delegation decision confidence details',
     ok: html.includes("type === 'delegation_decision'") &&
       html.includes('<strong>Reason:</strong>') &&

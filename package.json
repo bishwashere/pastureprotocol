@@ -48,6 +48,7 @@
     "test:home-assistant-format": "node scripts/test/test-home-assistant-format.js",
     "test:e2e-expect": "node scripts/test/test-e2e-expect.js",
     "test:team-activity": "node scripts/test/test-team-activity.js",
+    "test:team-inbox": "node scripts/test/test-team-inbox.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",
