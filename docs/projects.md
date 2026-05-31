@@ -42,14 +42,14 @@ Stored at `$COWCODE_STATE_DIR/projects.db` (default: `~/.cowcode/projects.db`) u
 ### Schema
 
 ```sql
-projects  - id, name, description, created_at, updated_at
+projects  - id, name, url (optional), description, created_at, updated_at
 updates   - id, project_id, branch_id (null = main track), parent_update_id, text, created_at
 branches  - id, project_id, parent_update_id (which update it branches from), name, created_at
 ```
 
 ## How to use
 
-1. **Add a project** - type a name (and optional description) in the toolbar, click **+ Add Project**.
+1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.
 2. **Add an update** - click **+ Add update** at the end of any chain. Type what was done, press **⌘/Ctrl + Enter** or click **Save**.
 3. **Branch off** - click **+ Branch** inside any update node. Give the branch a name (e.g. "Marketing"). A new horizontal chain appears below the main track.
 4. **Edit an update** - click **✏ Edit** inside any node.
@@ -63,8 +63,8 @@ All routes require the `x-projects-token` header (obtained from `POST /api/proje
 |--------|------|-------------|
 | `POST` | `/api/projects/auth` | Login → returns `{ token }` |
 | `GET` | `/api/projects` | List all projects |
-| `POST` | `/api/projects` | Create project `{ name, description }` |
-| `PATCH` | `/api/projects/:id` | Update project name/description |
+| `POST` | `/api/projects` | Create project `{ name, url?, description? }` |
+| `PATCH` | `/api/projects/:id` | Update project name, url, and/or description |
 | `DELETE` | `/api/projects/:id` | Delete project + all data |
 | `GET` | `/api/projects/:id/graph` | Full graph for one project |
 | `POST` | `/api/projects/:id/updates` | Add update `{ text, branch_id?, parent_update_id? }` |

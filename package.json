@@ -54,6 +54,7 @@
     "test:agent-metrics": "node scripts/test/test-agent-metrics.js",
     "test:goals": "node scripts/test/test-goals.js",
     "test:initiatives": "node scripts/test/test-initiatives.js",
+    "test:projects": "node scripts/test/test-projects-db.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",

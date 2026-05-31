@@ -2003,6 +2003,7 @@
     .proj-new-form input:focus { outline: none; border-color: var(--accent); }
     .proj-new-form input.proj-name-input { width: 160px; }
     .proj-new-form input.proj-desc-input { width: 260px; }
+    .proj-new-form input.proj-url-input { width: 220px; }
 
     /* Canvas: scrollable area that holds project rows */
     .proj-canvas { overflow-x: auto; overflow-y: visible; padding-bottom: 2rem; }
@@ -2211,6 +2212,7 @@
     .proj-toolbar input:focus { outline: none; border-color: var(--accent); }
     .proj-toolbar input#proj-new-name { width: 180px; }
     .proj-toolbar input#proj-new-desc { width: 260px; }
+    .proj-toolbar input#proj-new-url { width: 220px; }
     .proj-toolbar button { background: var(--accent); color: #fff; border: none; padding: 0.45rem 0.9rem; border-radius: 6px; font: inherit; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
     .proj-toolbar button:hover { filter: brightness(1.12); }
     .proj-toolbar .proj-logout { background: none; color: var(--muted); border: 1px solid var(--border); margin-left: auto; }
@@ -2226,6 +2228,9 @@
     .proj-root { flex-shrink: 0; width: 200px; background: var(--card); border: 1px solid var(--accent); border-radius: 10px; padding: 0.85rem 1rem; position: relative; z-index: 1; }
     .proj-root-name { font-weight: 600; font-size: 0.95rem; color: var(--text); margin-bottom: 0.2rem; word-break: break-word; }
     .proj-root-desc { font-size: 0.78rem; color: var(--muted); word-break: break-word; }
+    .proj-root-url { font-size: 0.78rem; margin-top: 0.25rem; word-break: break-all; }
+    .proj-root-url a { color: var(--accent); text-decoration: none; }
+    .proj-root-url a:hover { text-decoration: underline; }
     .proj-root-actions { display: flex; gap: 0.4rem; margin-top: 0.55rem; }
     .proj-root-actions button { background: none; border: none; color: var(--muted); font-size: 0.72rem; cursor: pointer; padding: 0.15rem 0.3rem; border-radius: 3px; }
     .proj-root-actions button:hover { color: var(--red); background: rgba(239,68,68,0.08); }
@@ -2946,6 +2951,7 @@
       <div class="proj-workspace">
         <div class="proj-toolbar">
           <input id="proj-new-name" type="text" placeholder="Project name…" />
+          <input id="proj-new-url" type="url" placeholder="URL (optional)…" />
           <input id="proj-new-desc" type="text" placeholder="Description (optional)…" />
           <button id="proj-add-btn">+ Add Project</button>
           <button class="proj-logout" id="proj-logout-btn">Sign out</button>
@@ -7176,7 +7182,11 @@
         // Root box
         var root = document.createElement('div');
         root.className = 'proj-root';
+        var urlHtml = project.url
+          ? '<div class="proj-root-url"><a href="' + esc(project.url) + '" target="_blank" rel="noopener noreferrer">' + esc(project.url) + '</a></div>'
+          : '';
         root.innerHTML = '<div class="proj-root-name">' + esc(project.name) + '</div>'
+          + urlHtml
           + (project.description ? '<div class="proj-root-desc">' + esc(project.description) + '</div>' : '');
         var rootActions = document.createElement('div');
         rootActions.className = 'proj-root-actions';
@@ -7434,24 +7444,29 @@
       // ── Add project ──
       document.getElementById('proj-add-btn').addEventListener('click', async function () {
         var name = document.getElementById('proj-new-name').value.trim();
+        var url = document.getElementById('proj-new-url').value.trim();
         var desc = document.getElementById('proj-new-desc').value.trim();
         if (!name) { document.getElementById('proj-new-name').focus(); return; }
         var r = await projFetch('/projects', {
           method: 'POST',
-          body: JSON.stringify({ name, description: desc }),
+          body: JSON.stringify({ name, url, description: desc }),
         });
         if (!r) return;
         var proj = await r.json();
         document.getElementById('proj-new-name').value = '';
+        document.getElementById('proj-new-url').value = '';
         document.getElementById('proj-new-desc').value = '';
         var canvas = document.getElementById('proj-canvas');
         var empty = canvas.querySelector('.proj-empty');
         if (empty) empty.remove();
         await loadAndRenderProject(proj.id, canvas);
       });
-      document.getElementById('proj-new-name').addEventListener('keydown', function (e) {
+      function projNewEnterSubmit(e) {
         if (e.key === 'Enter') document.getElementById('proj-add-btn').click();
-      });
+      }
+      document.getElementById('proj-new-name').addEventListener('keydown', projNewEnterSubmit);
+      document.getElementById('proj-new-url').addEventListener('keydown', projNewEnterSubmit);
+      document.getElementById('proj-new-desc').addEventListener('keydown', projNewEnterSubmit);
 
       function esc(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
