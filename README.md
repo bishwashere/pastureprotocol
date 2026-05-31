@@ -81,7 +81,7 @@ curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
 ```
 
 This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode`.

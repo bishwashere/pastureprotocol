@@ -26,8 +26,8 @@ const IS_WIN = process.platform === 'win32';
 
 function installHint() {
   if (IS_WIN) {
-    console.error('  irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
-    console.error('  Or: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
+    console.error('  iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
+    console.error('  Or: irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
   } else {
     console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
   }
