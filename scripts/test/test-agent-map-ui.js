@@ -134,6 +134,15 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
+    name: 'Active context panel shows goal thought waiting and last action',
+    ok: html.includes('Current Goal:') &&
+      html.includes('Current Thought:') &&
+      html.includes('Waiting On:') &&
+      html.includes('Last Action:') &&
+      html.includes('resolveAgentContextDisplay') &&
+      html.includes('currentThought'),
+  },
+  {
     name: 'Team page has View Active Only toggle',
     ok: html.includes('id="team-view-active-only"') &&
       html.includes('View Active Only') &&
@@ -152,7 +161,8 @@ const checks = [
     ok: html.includes('id="team-current-mission"') &&
       html.includes('class="team-cards-mission-row"') &&
       html.includes('renderCurrentMission') &&
-      html.includes('getCurrentMissionGoal') &&
+      html.includes('getCurrentMission') &&
+      html.includes('getLiveMissionFromTeamContext') &&
       html.includes('missionSubgoalIcon') &&
       /\.team-cards-mission-row[\s\S]*\.team-current-mission/.test(html),
   },

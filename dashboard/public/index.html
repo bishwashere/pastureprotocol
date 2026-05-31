@@ -731,8 +731,27 @@
       font-size: 0.76rem;
       font-weight: 600;
     }
+    .team-agent-context-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.45rem;
+      margin-bottom: 0.45rem;
+    }
+    .team-agent-context-card-head h4 {
+      margin: 0;
+    }
     .team-agent-context-row {
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.4rem;
+    }
+    .team-agent-context-value {
+      margin: 0.12rem 0 0 0;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .team-agent-context-value.muted {
+      color: var(--muted);
     }
     .team-agent-context-row strong {
       font-weight: 600;
@@ -5436,6 +5455,7 @@
       renderAgentInbox();
       renderAgentContext();
       renderAgentMetrics();
+      renderCurrentMission();
     }
 
     function setTeamViewTab(mode) {
@@ -5506,6 +5526,74 @@
       return agentNameById(goal && goal.ownerAgentId ? goal.ownerAgentId : 'main');
     }
 
+    function activeGoalLabelForAgent(agentId) {
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      var owned = goals.filter(function (g) {
+        return String(g.ownerAgentId || '') === String(agentId || '') &&
+          String(g.status || 'active').toLowerCase() === 'active';
+      });
+      if (!owned.length) return '';
+      owned.sort(function (a, b) {
+        if (!!b.running !== !!a.running) return (b.running ? 1 : 0) - (a.running ? 1 : 0);
+        return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+      });
+      var g = owned[0];
+      return String(g.title || '').trim() || String(g.objective || '').trim();
+    }
+
+    function isAgentContextActive(ctx) {
+      var s = String(ctx && ctx.state || 'idle').toLowerCase();
+      return s === 'working' || s === 'waiting' || s === 'error';
+    }
+
+    function pickLiveMissionAgentId() {
+      var map = teamAgentContextSnapshot.agents || {};
+      var candidates = [];
+      function add(id) {
+        var key = String(id || '').trim();
+        if (!key || candidates.indexOf(key) >= 0) return;
+        if (!isAgentContextActive(map[key])) return;
+        candidates.push(key);
+      }
+      add(selectedTeamInboxAgentId);
+      add('main');
+      Object.keys(map).forEach(add);
+      if (!candidates.length) return '';
+      candidates.sort(function (a, b) {
+        return (Number(map[b] && map[b].updatedAt) || 0) - (Number(map[a] && map[a].updatedAt) || 0);
+      });
+      return candidates[0];
+    }
+
+    function getLiveMissionFromTeamContext() {
+      var agentId = pickLiveMissionAgentId();
+      if (!agentId) return null;
+      var ctx = (teamAgentContextSnapshot.agents || {})[agentId] || {};
+      var goalLabel = String(ctx.currentGoal || '').trim() || activeGoalLabelForAgent(agentId);
+      var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
+      var waitingFor = String(ctx.waitingFor || '').trim();
+      var lastAction = String(ctx.lastAction || '').trim();
+      if (!goalLabel && !thought && !waitingFor && !lastAction) return null;
+      if (!goalLabel) goalLabel = 'Active team work';
+      var subgoals = [];
+      if (thought) subgoals.push({ title: thought, status: 'doing' });
+      if (waitingFor) {
+        subgoals.push({
+          title: 'Waiting on ' + agentNameById(waitingFor),
+          status: 'todo',
+        });
+      }
+      if (lastAction) subgoals.push({ title: lastAction, status: 'done' });
+      return {
+        live: true,
+        title: goalLabel,
+        objective: thought,
+        ownerAgentId: agentId,
+        progressLabel: 'In progress',
+        subgoals: subgoals,
+      };
+    }
+
     function getCurrentMissionGoal() {
       var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals.slice() : [];
       if (!goals.length) return null;
@@ -5527,6 +5615,14 @@
       }
       goals.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
       return goals[0] || null;
+    }
+
+    function getCurrentMission() {
+      var live = getLiveMissionFromTeamContext();
+      if (live) return { kind: 'live', mission: live };
+      var stored = getCurrentMissionGoal();
+      if (stored) return { kind: 'stored', goal: stored };
+      return null;
     }
 
     function missionSubgoalIcon(status) {
@@ -5559,17 +5655,22 @@
     function renderCurrentMission() {
       var panel = document.getElementById('team-current-mission');
       if (!panel) return;
-      var goal = getCurrentMissionGoal();
-      if (!goal) {
+      var current = getCurrentMission();
+      if (!current) {
         panel.innerHTML = '' +
           '<h3 class="team-current-mission-title">Current Mission</h3>' +
-          '<p class="team-current-mission-empty">No active mission. Create a goal under Goals.</p>';
+          '<p class="team-current-mission-empty">No active mission. Team is idle — create a goal under Goals or send a task in chat.</p>';
         return;
       }
+      var goal = current.kind === 'live' ? current.mission : current.goal;
       var goalLabel = String(goal.title || '').trim() || String(goal.objective || '').trim() || 'Untitled goal';
-      var pct = normalizeSubgoalProgress(goal.progress && goal.progress.pct);
+      var progressText = goal.progressLabel
+        ? String(goal.progressLabel)
+        : (normalizeSubgoalProgress(goal.progress && goal.progress.pct) + '%');
       var owner = goalOwnerLabel(goal);
-      var subgoals = flattenMissionSubgoals(Array.isArray(goal.subgoals) ? goal.subgoals : [], [], 0);
+      var subgoals = current.kind === 'live'
+        ? (Array.isArray(goal.subgoals) ? goal.subgoals : [])
+        : flattenMissionSubgoals(Array.isArray(goal.subgoals) ? goal.subgoals : [], [], 0);
       var subgoalsHtml = subgoals.length
         ? '<ul class="team-current-mission-subgoal-list">' + subgoals.map(function (sg) {
           var title = String(sg.title || '').trim() || 'Untitled subgoal';
@@ -5581,7 +5682,7 @@
       panel.innerHTML = '' +
         '<h3 class="team-current-mission-title">Current Mission</h3>' +
         '<p class="team-current-mission-meta"><strong>Goal:</strong> ' + escapeHtml(goalLabel) + '</p>' +
-        '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</p>' +
+        '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(progressText) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Owner:</strong> ' + escapeHtml(owner) + '</p>' +
         '<div class="team-current-mission-subgoals">' +
           '<h4>Subgoals</h4>' +
@@ -5998,26 +6099,37 @@
       return '<span class="team-agent-context-state ' + info.className + '">' + escapeHtml(info.text) + '</span>';
     }
 
+    function resolveAgentContextDisplay(agentId, ctx) {
+      var row = ctx || { state: 'idle' };
+      var goal = String(row.currentGoal || '').trim() || activeGoalLabelForAgent(agentId);
+      var thought = String(row.currentThought || row.currentStep || '').trim();
+      if (!thought && String(row.state || '') === 'idle') thought = 'Standing by for the next task.';
+      var waitingOn = String(row.waitingFor || '').trim()
+        ? agentNameById(row.waitingFor)
+        : 'None';
+      var lastAction = String(row.lastAction || '').trim() || 'None';
+      return { goal: goal, thought: thought, waitingOn: waitingOn, lastAction: lastAction, state: row.state };
+    }
+
+    function renderAgentContextField(label, value, mutedWhenNone) {
+      var text = String(value || '').trim() || 'None';
+      var muted = mutedWhenNone && text === 'None';
+      return '<div class="team-agent-context-row"><strong>' + escapeHtml(label) + '</strong>' +
+        '<div class="team-agent-context-value' + (muted ? ' muted' : '') + '">' + escapeHtml(text) + '</div></div>';
+    }
+
     function renderAgentContextCard(agentId, ctx) {
       var label = agentNameById(agentId);
-      var row = ctx || { state: 'idle' };
-      var html = '<div class="team-agent-context-card"><h4>' + escapeHtml(label) + '</h4>';
-      if (row.currentGoal) {
-        html += '<div class="team-agent-context-row"><strong>Current Goal:</strong><br>' + escapeHtml(row.currentGoal) + '</div>';
-      }
-      if (row.currentStep) {
-        html += '<div class="team-agent-context-row"><strong>Current Step:</strong><br>' + escapeHtml(row.currentStep) + '</div>';
-      }
-      if (row.waitingFor) {
-        html += '<div class="team-agent-context-row"><strong>Waiting For:</strong><br>' + escapeHtml(agentNameById(row.waitingFor)) + '</div>';
-      }
-      if (row.context && row.context.length) {
-        html += '<div class="team-agent-context-row"><strong>Current Context:</strong>' + renderAgentContextBullets(row.context) + '</div>';
-      }
-      if (row.knownFacts && row.knownFacts.length) {
-        html += '<div class="team-agent-context-row"><strong>Known Facts:</strong>' + renderAgentContextBullets(row.knownFacts) + '</div>';
-      }
-      html += '<div class="team-agent-context-row"><strong>State:</strong> ' + formatContextStateBadge(row.state) + '</div>';
+      var display = resolveAgentContextDisplay(agentId, ctx);
+      var html = '<div class="team-agent-context-card">' +
+        '<div class="team-agent-context-card-head">' +
+          '<h4>' + escapeHtml(label) + '</h4>' +
+          formatContextStateBadge(display.state) +
+        '</div>';
+      html += renderAgentContextField('Current Goal:', display.goal, true);
+      html += renderAgentContextField('Current Thought:', display.thought, false);
+      html += renderAgentContextField('Waiting On:', display.waitingOn, true);
+      html += renderAgentContextField('Last Action:', display.lastAction, true);
       html += '</div>';
       return html;
     }
@@ -6034,19 +6146,16 @@
         var id = String(a && a.id || '');
         var ctx = (teamAgentContextSnapshot.agents || {})[id] || { state: 'idle' };
         var label = agentDisplayLabel(a);
-        var state = String(ctx.state || 'idle');
-        if (state === 'blocked') state = 'waiting';
-        var detail = '';
-        if (state === 'waiting' && ctx.waitingFor) {
-          detail = ' — waiting for ' + agentNameById(ctx.waitingFor);
-        } else if (state === 'working' && ctx.currentStep) {
-          detail = ' — ' + ctx.currentStep;
-        } else if (state === 'working' && ctx.currentGoal) {
-          detail = ' — ' + ctx.currentGoal;
-        } else if (state === 'error' && ctx.currentStep) {
-          detail = ' — ' + ctx.currentStep;
+        var display = resolveAgentContextDisplay(id, ctx);
+        var bits = [];
+        if (display.goal) bits.push(display.goal);
+        if (display.thought && display.thought !== 'Standing by for the next task.') {
+          bits.push(display.thought);
+        } else if (display.waitingOn !== 'None') {
+          bits.push('Waiting on ' + display.waitingOn);
         }
-        return '<span class="accent">' + escapeHtml(label) + '</span>: ' + escapeHtml(formatAgentStateDisplay(state).text) + escapeHtml(detail);
+        var detail = bits.length ? ' — ' + bits.join(' · ') : '';
+        return '<span class="accent">' + escapeHtml(label) + '</span>' + escapeHtml(detail);
       }).join('<br>');
     }
 
@@ -6471,6 +6580,7 @@
       } catch (_) {}
       renderAgentContext();
       renderTeamAgentCards();
+      renderCurrentMission();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
     }
 
@@ -6499,6 +6609,7 @@
         };
       } catch (_) {}
       renderGoalsList();
+      renderAgentContext();
     }
 
     async function fetchInitiativesSnapshot() {

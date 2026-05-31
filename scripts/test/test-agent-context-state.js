@@ -31,6 +31,8 @@ async function main() {
     let main = readAgentContext('main');
     assert(main.state === 'working', 'main working on turn start');
     assert(main.currentGoal === 'Generate marketing ideas', `goal: ${main.currentGoal}`);
+    assert(main.currentThought && main.currentThought.includes('Reviewing'), `thought: ${main.currentThought}`);
+    assert(main.lastAction === 'Received user message', `lastAction: ${main.lastAction}`);
     assert(main.context.some((c) => c.includes('User asking')), 'main has user context');
 
     onAgentWaitingFor({
@@ -43,8 +45,11 @@ async function main() {
     const marketer = readAgentContext('marketer');
     assert(main.state === 'waiting', 'main waiting while waiting');
     assert(main.waitingFor === 'marketer', 'main waiting for marketer');
+    assert(main.lastAction && main.lastAction.includes('Delegated'), `delegation action: ${main.lastAction}`);
+    assert(main.currentThought && main.currentThought.includes('Waiting'), `waiting thought: ${main.currentThought}`);
     assert(marketer.state === 'working', 'marketer working');
     assert(marketer.currentGoal === 'Generate marketing ideas', 'marketer goal set');
+    assert(marketer.lastAction && marketer.lastAction.includes('Received delegated'), `marketer last: ${marketer.lastAction}`);
 
     onAgentTurnStart({
       agentId: 'marketer',
@@ -54,11 +59,14 @@ async function main() {
     onAgentSkillStart({ agentId: 'marketer', skillId: 'search' });
     const marketerSearch = readAgentContext('marketer');
     assert(marketerSearch.currentStep === 'Running search', `step: ${marketerSearch.currentStep}`);
+    assert(marketerSearch.currentThought && marketerSearch.currentThought.includes('Gathering'), `search thought: ${marketerSearch.currentThought}`);
 
     onAgentTurnDone({ agentId: 'marketer' });
     onAgentDelegationDone({ callerAgentId: 'main', targetAgentId: 'marketer' });
     assert(readAgentContext('marketer').state === 'idle', 'marketer idle after delegation');
-    assert(readAgentContext('main').currentStep === 'Synthesizing team reply', 'main synthesizing');
+    const mainSynth = readAgentContext('main');
+    assert(mainSynth.currentThought && mainSynth.currentThought.includes('Combining'), `main thought: ${mainSynth.currentThought}`);
+    assert(mainSynth.lastAction && mainSynth.lastAction.includes('Received reply'), `main last: ${mainSynth.lastAction}`);
 
     onAgentDelegationError({
       callerAgentId: 'main',
