@@ -45,7 +45,13 @@ function checkInstallPs1() {
   if (!src.includes('cowcode.cmd')) {
     return { ok: false, detail: 'install.ps1 must create cowcode.cmd launcher' };
   }
-  return { ok: true, detail: 'install.ps1 order and launcher OK' };
+  if (src.includes('$ErrorActionPreference = "Stop"')) {
+    return { ok: false, detail: 'install.ps1 must not use Stop (breaks npm/tar on PS 5.1)' };
+  }
+  if (!src.includes('Exit-Install') || !src.includes('npm')) {
+    return { ok: false, detail: 'install.ps1 must preflight npm and pause on failure' };
+  }
+  return { ok: true, detail: 'install.ps1 order, launcher, and PS5.1-safe errors OK' };
 }
 
 function checkDaemonLog() {
