@@ -109,9 +109,7 @@ const checks = [
   },
   {
     name: 'Team page uses right-side split layout',
-    ok: html.includes('class="team-page-body"') &&
-      html.includes('class="team-roster-side"') &&
-      /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
+    ok: html.includes('class="team-page-body"') && /\.team-activity-wrap\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {
     name: 'Team agent panel tabs wrap so Outbox is visible',
@@ -122,12 +120,12 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
-    name: 'Team agent panel sits below activity on the right',
-    ok: html.includes('class="team-roster-side"') &&
-      /class="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-agent-panel"/.test(html) &&
+    name: 'Team page includes agent inbox below map',
+    ok: html.includes('id="team-agent-panel"') &&
       html.includes('team-agent-inbox-list') &&
       html.includes('team-agent-outbox-list') &&
-      html.includes('selectTeamInboxAgent'),
+      html.includes('selectTeamInboxAgent') &&
+      /class="team-map-wrap"[\s\S]*id="team-agent-panel"/.test(html),
   },
   {
     name: 'Team page includes separate inbox and outbox tabs',
