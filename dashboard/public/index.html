@@ -744,10 +744,19 @@
       min-height: 0;
       display: flex;
       flex-direction: column;
-      border: none;
-      border-radius: 0;
-      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
       overflow: hidden;
+    }
+    .team-agent-panel-slot {
+      display: none;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .team-roster-side.expanded .team-agent-panel-slot {
+      display: flex;
+      flex: 1 1 0;
     }
     .team-agent-panel-tabs {
       flex-shrink: 0;
@@ -945,10 +954,7 @@
     .team-rail-wrap.collapsed .team-activity-title,
     .team-rail-wrap.collapsed .team-activity-status,
     .team-rail-wrap.collapsed .team-rail-body,
-    .team-rail-wrap.collapsed .team-activity-list,
-    .team-rail-wrap.collapsed .team-agent-panel-tabs,
-    .team-rail-wrap.collapsed .team-agent-panel-ranges,
-    .team-rail-wrap.collapsed .team-agent-panel-body {
+    .team-rail-wrap.collapsed .team-activity-list {
       display: none;
     }
     .team-rail-wrap.collapsed .team-rail-head,
@@ -2816,13 +2822,7 @@
                 </div>
               </div>
             </div>
-            <div id="team-agent-panel-wrap" class="team-rail-wrap team-agent-panel-wrap collapsed">
-              <div class="team-rail-shell">
-                <div class="team-rail-head team-activity-head">
-                  <h3 class="team-rail-title">Agent details</h3>
-                  <button type="button" id="team-agent-panel-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand agent details panel">Agent</button>
-                </div>
-                <div id="team-agent-panel" class="team-agent-panel team-rail-body">
+            <div id="team-agent-panel" class="team-agent-panel team-agent-panel-slot">
               <div class="team-agent-panel-tabs" role="tablist">
                 <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
                 <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
@@ -2875,8 +2875,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-            </div>
             </div>
           </div>
         </div>
@@ -5740,7 +5738,7 @@
       renderAgentMetrics();
       renderCurrentMission();
       renderTeamTaskSummary();
-      if (selectedTeamInboxAgentId) setTeamAgentPanelExpanded(true);
+      if (selectedTeamInboxAgentId) syncTeamRosterSide();
     }
 
     function setTeamViewTab(mode) {
@@ -7136,12 +7134,11 @@
     }
 
     var teamActivityExpanded = false;
-    var teamAgentPanelExpanded = false;
 
     function syncTeamRosterSide() {
       var side = document.getElementById('team-roster-side');
       if (!side) return;
-      side.classList.toggle('expanded', teamActivityExpanded || teamAgentPanelExpanded);
+      side.classList.toggle('expanded', teamActivityExpanded || !!selectedTeamInboxAgentId);
     }
 
     function setTeamActivityExpanded(nextExpanded) {
@@ -7154,19 +7151,6 @@
       toggle.setAttribute('aria-expanded', teamActivityExpanded ? 'true' : 'false');
       toggle.textContent = teamActivityExpanded ? 'Collapse' : 'Activity';
       toggle.title = teamActivityExpanded ? 'Collapse live activity panel' : 'Expand live activity panel';
-      syncTeamRosterSide();
-    }
-
-    function setTeamAgentPanelExpanded(nextExpanded) {
-      teamAgentPanelExpanded = !!nextExpanded;
-      var wrap = document.getElementById('team-agent-panel-wrap');
-      var toggle = document.getElementById('team-agent-panel-toggle');
-      if (!wrap || !toggle) return;
-      wrap.classList.toggle('expanded', teamAgentPanelExpanded);
-      wrap.classList.toggle('collapsed', !teamAgentPanelExpanded);
-      toggle.setAttribute('aria-expanded', teamAgentPanelExpanded ? 'true' : 'false');
-      toggle.textContent = teamAgentPanelExpanded ? 'Collapse' : 'Agent';
-      toggle.title = teamAgentPanelExpanded ? 'Collapse agent details panel' : 'Expand agent details panel';
       syncTeamRosterSide();
     }
 
@@ -7385,14 +7369,6 @@
       });
     }
     setTeamActivityExpanded(false);
-
-    var teamAgentPanelToggleEl = document.getElementById('team-agent-panel-toggle');
-    if (teamAgentPanelToggleEl) {
-      teamAgentPanelToggleEl.addEventListener('click', function () {
-        setTeamAgentPanelExpanded(!teamAgentPanelExpanded);
-      });
-    }
-    setTeamAgentPanelExpanded(false);
 
     function stopTeamActivityFeed() {
       if (!teamActivityPollTimer) return;

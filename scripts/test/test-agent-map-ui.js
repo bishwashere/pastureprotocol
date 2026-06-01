@@ -122,18 +122,13 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
-    name: 'Team agent panel rail sits below activity on the right',
-    ok: html.includes('id="team-agent-panel-wrap"') &&
-      html.includes('id="team-agent-panel-toggle"') &&
-      html.includes('setTeamAgentPanelExpanded') &&
-      /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-agent-panel-wrap"/.test(html) &&
+    name: 'Team agent panel sits below activity on the right',
+    ok: html.includes('id="team-agent-panel" class="team-agent-panel team-agent-panel-slot"') &&
+      html.includes('syncTeamRosterSide') &&
+      /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-agent-panel"/.test(html) &&
+      !html.includes('id="team-agent-panel-toggle"') &&
       html.includes('team-agent-inbox-list') &&
       html.includes('selectTeamInboxAgent'),
-  },
-  {
-    name: 'Team agent panel rail defaults to collapsed',
-    ok: html.includes('id="team-agent-panel-wrap" class="team-rail-wrap team-agent-panel-wrap collapsed"') &&
-      html.includes('setTeamAgentPanelExpanded(false);'),
   },
   {
     name: 'Team page includes separate inbox and outbox tabs',
