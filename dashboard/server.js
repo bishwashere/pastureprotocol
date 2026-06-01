@@ -472,7 +472,13 @@ app.get('/api/team/context', (req, res) => {
 app.get('/api/team/metrics', (req, res) => {
   try {
     const agentId = String(req.query?.agentId || '').trim();
-    const snapshot = readAgentMetrics({ agentId: agentId || undefined });
+    const since = Number(req.query?.since);
+    const until = Number(req.query?.until);
+    const snapshot = readAgentMetrics({
+      agentId: agentId || undefined,
+      since: Number.isFinite(since) ? since : undefined,
+      until: Number.isFinite(until) ? until : undefined,
+    });
     res.json({ ...snapshot, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });

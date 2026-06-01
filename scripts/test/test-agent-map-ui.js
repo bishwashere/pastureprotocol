@@ -135,6 +135,16 @@ const checks = [
       html.includes("setTeamAgentPanelTab('outbox')"),
   },
   {
+    name: 'Team agent panel has time range submenu',
+    ok: html.includes('id="team-agent-panel-ranges"') &&
+      html.includes('team-agent-panel-range') &&
+      html.includes('data-range="today"') &&
+      html.includes('data-range="yesterday"') &&
+      html.includes('data-range="last7"') &&
+      html.includes('setTeamAgentPanelRange') &&
+      html.includes('filterFlowsByTeamAgentRange'),
+  },
+  {
     name: 'Active Context is first agent panel tab',
     ok: (() => {
       var contextIdx = html.indexOf('id="team-agent-tab-context"');
@@ -177,14 +187,20 @@ const checks = [
       html.includes('setTeamViewTab'),
   },
   {
-    name: 'Team roster cards view has Current Mission beside agent cards',
+    name: 'Team page head has Current Mission and task summary below top tabs',
     ok: html.includes('id="team-current-mission"') &&
-      html.includes('class="team-cards-mission-row"') &&
+      html.includes('class="team-page-summary"') &&
+      html.includes('id="team-task-summary"') &&
       html.includes('renderCurrentMission') &&
+      html.includes('renderTeamTaskSummary') &&
+      html.includes('computeTeamTaskSummary') &&
       html.includes('getCurrentMission') &&
       html.includes('getLiveMissionFromTeamContext') &&
       html.includes('missionSubgoalIcon') &&
-      /\.team-cards-mission-row[\s\S]*\.team-current-mission/.test(html),
+      html.includes('Current Focus:') &&
+      html.includes('Completed Today') &&
+      /\.team-page-summary[\s\S]*\.team-current-mission/.test(html) &&
+      /\.team-task-summary[\s\S]*\.team-task-badge/.test(html),
   },
   {
     name: 'Team agent cards show step and today',

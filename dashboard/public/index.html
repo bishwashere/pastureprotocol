@@ -167,26 +167,90 @@
     .team-cards-view {
       flex-shrink: 0;
     }
-    .team-cards-mission-row {
+    .team-page-summary {
+      flex-shrink: 0;
       display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-      gap: 0.65rem;
-      min-width: 0;
-    }
-    .team-cards-mission-row .team-agent-cards-row {
-      flex: 1 1 0;
-      min-width: 0;
+      flex-direction: column;
+      gap: 0.45rem;
+      margin-bottom: 0.45rem;
     }
     .team-current-mission {
-      flex: 0 0 12.5rem;
-      max-width: 14rem;
-      padding: 0.5rem 0.55rem 0.45rem;
+      padding: 0.5rem 0.65rem 0.45rem;
       border: 1px solid var(--border);
       border-radius: 6px;
       background: rgba(167, 139, 250, 0.04);
       font-size: 0.68rem;
       line-height: 1.4;
+    }
+    .team-task-summary {
+      padding: 0.45rem 0.65rem 0.4rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.12);
+      font-size: 0.68rem;
+      line-height: 1.45;
+    }
+    .team-task-summary-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    .team-task-summary-title {
+      margin: 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .team-task-summary-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .team-task-badge {
+      display: inline-block;
+      padding: 0.12rem 0.42rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.64rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .team-task-badge.active {
+      border-color: rgba(34, 197, 94, 0.45);
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .team-task-badge.waiting {
+      border-color: rgba(234, 179, 8, 0.45);
+      color: #eab308;
+      background: rgba(234, 179, 8, 0.08);
+    }
+    .team-task-badge.blocked {
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .team-task-badge.completed {
+      border-color: rgba(99, 102, 241, 0.45);
+      color: var(--accent);
+      background: rgba(99, 102, 241, 0.08);
+    }
+    .team-task-summary-line {
+      margin: 0 0 0.18rem 0;
+      color: var(--muted);
+    }
+    .team-task-summary-line:last-child {
+      margin-bottom: 0;
+    }
+    .team-task-summary-line strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .team-task-summary-line.empty {
+      color: var(--muted);
+      font-style: italic;
     }
     .team-current-mission-title {
       margin: 0 0 0.4rem 0;
@@ -694,6 +758,36 @@
       color: var(--text);
       background: var(--card);
       border-color: var(--border);
+    }
+    .team-agent-panel-ranges {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      padding: 0.35rem 0.55rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.12);
+    }
+    .team-agent-panel-range {
+      margin: 0;
+      padding: 0.22rem 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.66rem;
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .team-agent-panel-range:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .team-agent-panel-range.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.12);
     }
     .team-agent-panel-body {
       flex: 1 1 0;
@@ -2653,6 +2747,21 @@
           <button type="button" id="team-top-tab-initiatives" class="team-top-tab" data-team-top="initiatives" role="tab" aria-selected="false">Initiatives</button>
         </div>
         <p id="team-top-tab-desc" class="skill-meta" style="margin:0 0 0.45rem 0;">Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.</p>
+        <div class="team-page-summary">
+          <aside id="team-current-mission" class="team-current-mission" aria-label="Current mission">
+            <h3 class="team-current-mission-title">Current Mission</h3>
+            <p class="team-current-mission-empty">Loading mission…</p>
+          </aside>
+          <section id="team-task-summary" class="team-task-summary" aria-label="Task summary">
+            <div class="team-task-summary-head">
+              <h3 class="team-task-summary-title">Tasks</h3>
+              <div id="team-task-summary-badges" class="team-task-summary-badges"></div>
+            </div>
+            <p id="team-task-focus" class="team-task-summary-line"><strong>Current Focus:</strong> …</p>
+            <p id="team-task-next" class="team-task-summary-line"><strong>Next:</strong> …</p>
+            <p id="team-task-blocked" class="team-task-summary-line"><strong>Blocked:</strong> …</p>
+          </section>
+        </div>
       </div>
       <div class="team-page-body">
         <div id="team-roster-view" class="team-roster-view">
@@ -2668,14 +2777,8 @@
               </label>
             </div>
             <div id="team-cards-view" class="team-cards-view">
-              <div class="team-cards-mission-row">
-                <div id="team-agent-cards" class="team-agent-cards-row">
-                  <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
-                </div>
-                <aside id="team-current-mission" class="team-current-mission" aria-label="Current mission">
-                  <h3 class="team-current-mission-title">Current Mission</h3>
-                  <p class="team-current-mission-empty">Loading mission…</p>
-                </aside>
+              <div id="team-agent-cards" class="team-agent-cards-row">
+                <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
               </div>
             </div>
             <div id="team-tree-view" class="team-tree-view" hidden>
@@ -2694,6 +2797,13 @@
                 <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
                 <button type="button" id="team-agent-tab-outbox" class="team-agent-panel-tab" data-tab="outbox" role="tab" aria-selected="false">Outbox</button>
                 <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
+              </div>
+              <div class="team-agent-panel-ranges" id="team-agent-panel-ranges" role="group" aria-label="Time range">
+                <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
               </div>
               <div class="team-agent-panel-body">
                 <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel">
@@ -3049,6 +3159,7 @@
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
     var teamAgentPanelTab = 'context';
+    var teamAgentPanelRange = 'today';
     var teamTopTab = 'roster';
     var teamViewMode = 'cards';
     var teamViewActiveOnly = false;
@@ -5516,6 +5627,76 @@
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
 
+    var TEAM_AGENT_RANGE_LABELS = {
+      today: 'Today',
+      yesterday: 'Yesterday',
+      last7: 'Last week',
+      last30: 'Last 30 days',
+      all: 'All time',
+    };
+
+    function startOfLocalDayMs(ts) {
+      var d = new Date(Number(ts) || Date.now());
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+
+    function getTeamAgentRangeWindow(range) {
+      var key = String(range || 'today').trim();
+      if (key === 'all') return null;
+      var now = Date.now();
+      var todayStart = startOfLocalDayMs(now);
+      if (key === 'today') return { since: todayStart, until: now };
+      if (key === 'yesterday') {
+        return { since: todayStart - 86400000, until: todayStart - 1 };
+      }
+      if (key === 'last7') return { since: todayStart - 7 * 86400000, until: now };
+      if (key === 'last30') return { since: todayStart - 30 * 86400000, until: now };
+      return { since: todayStart, until: now };
+    }
+
+    function teamAgentRangeLabel(range) {
+      return TEAM_AGENT_RANGE_LABELS[String(range || 'today')] || 'Today';
+    }
+
+    function eventTsInTeamAgentRange(ts, range) {
+      var window = getTeamAgentRangeWindow(range);
+      if (!window) return true;
+      var n = Number(ts) || 0;
+      return n >= window.since && n <= window.until;
+    }
+
+    function teamActivityEventsForRange(range) {
+      var events = teamActivityEvents || [];
+      if (!getTeamAgentRangeWindow(range)) return events.slice();
+      return events.filter(function (event) {
+        return eventTsInTeamAgentRange(event && event.ts, range);
+      });
+    }
+
+    function filterFlowsByTeamAgentRange(flows, range) {
+      if (!getTeamAgentRangeWindow(range)) return flows;
+      return flows.filter(function (flow) {
+        return eventTsInTeamAgentRange(flow && flow.ts, range);
+      });
+    }
+
+    function setTeamAgentPanelRange(range) {
+      var key = String(range || 'today').trim();
+      if (!TEAM_AGENT_RANGE_LABELS[key]) key = 'today';
+      teamAgentPanelRange = key;
+      document.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
+        var active = btn.getAttribute('data-range') === teamAgentPanelRange;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      fetchTeamMetricsFeed();
+      renderAgentContext();
+      renderAgentInbox();
+      renderAgentOutbox();
+      renderAgentMetrics();
+    }
+
     function selectTeamInboxAgent(agentId) {
       selectedTeamInboxAgentId = String(agentId || '').trim();
       document.querySelectorAll('#team-map-nodes .agent-map-node').forEach(function (n) {
@@ -5529,6 +5710,7 @@
       renderAgentContext();
       renderAgentMetrics();
       renderCurrentMission();
+      renderTeamTaskSummary();
     }
 
     function setTeamViewTab(mode) {
@@ -5783,6 +5965,151 @@
         noteHtml;
     }
 
+    function collectSubgoalsByStatus(subgoals, acc) {
+      var out = acc || { todo: [], doing: [], blocked: [] };
+      (subgoals || []).forEach(function (sg) {
+        if (!sg || typeof sg !== 'object') return;
+        var title = String(sg.title || '').trim();
+        var status = normalizeSubgoalStatus(sg.status);
+        if (title) {
+          if (status === 'todo') out.todo.push(title);
+          else if (status === 'doing') out.doing.push(title);
+          else if (status === 'blocked') out.blocked.push(title);
+        }
+        collectSubgoalsByStatus(sg.subgoals, out);
+      });
+      return out;
+    }
+
+    function countCompletedTasksToday() {
+      var todayStart = startOfLocalDayMs(Date.now());
+      var count = 0;
+      (teamActivityEvents || []).forEach(function (event) {
+        if (String(event.type || '') !== 'turn_done') return;
+        var ts = Number(event.ts) || 0;
+        if (ts >= todayStart) count++;
+      });
+      return count;
+    }
+
+    function computeTeamTaskSummary() {
+      var agents = teamAgentContextSnapshot.agents || {};
+      var active = 0;
+      var waiting = 0;
+      var blocked = 0;
+      var workingAgents = [];
+      var waitingAgents = [];
+      Object.keys(agents).forEach(function (id) {
+        var ctx = agents[id] || {};
+        var s = String(ctx.state || 'idle').toLowerCase();
+        if (s === 'working') {
+          active++;
+          workingAgents.push({ id: id, ctx: ctx });
+        } else if (s === 'waiting') {
+          waiting++;
+          waitingAgents.push({ id: id, ctx: ctx });
+        } else if (s === 'error') {
+          blocked++;
+        }
+      });
+
+      var subgoals = { todo: [], doing: [], blocked: [] };
+      var blockedReasons = [];
+      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
+        var status = String(g.status || '').toLowerCase();
+        if (status === 'blocked') {
+          blocked++;
+          var reason = String(g.blockedReason || g.title || g.objective || '').trim();
+          if (reason) blockedReasons.push(reason);
+        }
+        collectSubgoalsByStatus(g.subgoals, subgoals);
+      });
+      blocked += subgoals.blocked.length;
+
+      var currentFocus = '';
+      workingAgents.sort(function (a, b) {
+        return (Number(b.ctx.updatedAt) || 0) - (Number(a.ctx.updatedAt) || 0);
+      });
+      if (workingAgents.length) {
+        var wctx = workingAgents[0].ctx;
+        currentFocus = String(wctx.currentStep || wctx.currentThought || wctx.currentGoal || '').trim();
+      }
+      if (!currentFocus && subgoals.doing.length) currentFocus = subgoals.doing[0];
+      if (!currentFocus) {
+        var mission = getCurrentMission();
+        if (mission) {
+          var goal = mission.kind === 'live' ? mission.mission : mission.goal;
+          var doing = (Array.isArray(goal.subgoals) ? goal.subgoals : []).find(function (sg) {
+            return normalizeSubgoalStatus(sg.status) === 'doing';
+          });
+          if (doing && doing.title) currentFocus = String(doing.title).trim();
+        }
+      }
+
+      var nextTask = '';
+      if (subgoals.todo.length) {
+        nextTask = subgoals.todo[0];
+      } else {
+        var currentMission = getCurrentMission();
+        if (currentMission) {
+          var mGoal = currentMission.kind === 'live' ? currentMission.mission : currentMission.goal;
+          var todo = (Array.isArray(mGoal.subgoals) ? mGoal.subgoals : []).find(function (sg) {
+            return normalizeSubgoalStatus(sg.status) === 'todo';
+          });
+          if (todo && todo.title) nextTask = String(todo.title).trim();
+        }
+      }
+
+      var blockedLabel = '';
+      if (subgoals.blocked.length) blockedLabel = subgoals.blocked[0];
+      else if (blockedReasons.length) blockedLabel = blockedReasons[0];
+      else if (waitingAgents.length) {
+        waitingAgents.sort(function (a, b) {
+          return (Number(b.ctx.updatedAt) || 0) - (Number(a.ctx.updatedAt) || 0);
+        });
+        var w = waitingAgents[0].ctx;
+        var waitFor = String(w.waitingFor || '').trim();
+        if (waitFor) blockedLabel = 'Waiting for ' + agentNameById(waitFor) + ' response';
+        else blockedLabel = String(w.currentThought || w.currentStep || w.currentGoal || '').trim();
+      }
+
+      return {
+        active: active,
+        waiting: waiting,
+        blocked: blocked,
+        completedToday: countCompletedTasksToday(),
+        currentFocus: currentFocus,
+        next: nextTask,
+        blockedLabel: blockedLabel,
+      };
+    }
+
+    function renderTeamTaskSummary() {
+      var badgesEl = document.getElementById('team-task-summary-badges');
+      var focusEl = document.getElementById('team-task-focus');
+      var nextEl = document.getElementById('team-task-next');
+      var blockedEl = document.getElementById('team-task-blocked');
+      if (!badgesEl || !focusEl || !nextEl || !blockedEl) return;
+      var summary = computeTeamTaskSummary();
+      badgesEl.innerHTML = '' +
+        '<span class="team-task-badge active">[' + escapeHtml(String(summary.active)) + ' Active]</span>' +
+        '<span class="team-task-badge waiting">[' + escapeHtml(String(summary.waiting)) + ' Waiting]</span>' +
+        '<span class="team-task-badge blocked">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</span>' +
+        '<span class="team-task-badge completed">[' + escapeHtml(String(summary.completedToday)) + ' Completed Today]</span>';
+      focusEl.innerHTML = summary.currentFocus
+        ? '<strong>Current Focus:</strong> ' + escapeHtml(summary.currentFocus)
+        : '<strong>Current Focus:</strong> <span class="empty">None — team is idle</span>';
+      focusEl.classList.toggle('empty', !summary.currentFocus);
+      nextEl.innerHTML = summary.next
+        ? '<strong>Next:</strong> ' + escapeHtml(summary.next)
+        : '<strong>Next:</strong> <span class="empty">Nothing queued</span>';
+      nextEl.classList.toggle('empty', !summary.next);
+      blockedEl.innerHTML = summary.blockedLabel
+        ? '<strong>Blocked:</strong> ' + escapeHtml(summary.blockedLabel)
+        : '<strong>Blocked:</strong> <span class="empty">None</span>';
+      blockedEl.classList.toggle('empty', !summary.blockedLabel);
+    }
+
     function normalizeSubgoalStatus(status) {
       var s = String(status || '').toLowerCase();
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
@@ -5895,6 +6222,7 @@
         wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>';
         renderGoalDetail(null);
         renderCurrentMission();
+        renderTeamTaskSummary();
         return;
       }
       if (!selectedTeamGoalId || !goals.some(function (g) { return String(g.id || '') === selectedTeamGoalId; })) {
@@ -5939,6 +6267,7 @@
       }).join('');
       renderGoalDetail(goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; }) || goals[0]);
       renderCurrentMission();
+      renderTeamTaskSummary();
 
       wrap.querySelectorAll('button[data-goal-run]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {
@@ -6263,23 +6592,55 @@
       }).join('<br>');
     }
 
+    function renderAgentContextHistory(agentId, events) {
+      var id = String(agentId || '').trim();
+      var rows = (events || []).filter(function (event) {
+        var aid = String(event.agentId || '').trim();
+        var target = String(event.targetAgentId || '').trim();
+        return aid === id || target === id;
+      }).slice().sort(function (a, b) {
+        return (Number(b.ts) || 0) - (Number(a.ts) || 0);
+      });
+      if (!rows.length) {
+        return '<p class="team-agent-inbox-empty">No recorded activity for this agent in ' +
+          escapeHtml(teamAgentRangeLabel(teamAgentPanelRange).toLowerCase()) + '.</p>';
+      }
+      var html = '<div class="team-agent-context-card"><h4>Activity in range</h4><ul class="team-agent-context-bullets">';
+      rows.slice(0, 40).forEach(function (event) {
+        var time = formatInboxTime(event.ts);
+        var line = formatTeamActivityText(event);
+        html += '<li><span class="skill-meta">' + escapeHtml(time) + '</span> — ' + line + '</li>';
+      });
+      html += '</ul></div>';
+      return html;
+    }
+
     function renderAgentContext() {
       renderAgentContextOverview();
       var detail = document.getElementById('team-agent-context-detail');
       var titleEl = document.getElementById('team-agent-context-title');
       var subEl = document.getElementById('team-agent-context-subtitle');
+      var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange);
       if (!detail) return;
       if (!selectedTeamInboxAgentId) {
         if (titleEl) titleEl.textContent = 'Active Context';
-        if (subEl) subEl.textContent = 'Present working memory — team overview above';
+        if (subEl) subEl.textContent = rangeLabel + ' — present working memory';
         detail.innerHTML = '<p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>';
         return;
       }
       var label = agentNameById(selectedTeamInboxAgentId);
       if (titleEl) titleEl.textContent = label + ' — Active Context';
-      if (subEl) subEl.textContent = 'What this agent is thinking about right now';
-      var ctx = (teamAgentContextSnapshot.agents || {})[selectedTeamInboxAgentId] || { state: 'idle' };
-      detail.innerHTML = renderAgentContextCard(selectedTeamInboxAgentId, ctx);
+      if (teamAgentPanelRange === 'today') {
+        if (subEl) subEl.textContent = 'What this agent is thinking about right now';
+        var ctx = (teamAgentContextSnapshot.agents || {})[selectedTeamInboxAgentId] || { state: 'idle' };
+        detail.innerHTML = renderAgentContextCard(selectedTeamInboxAgentId, ctx);
+        return;
+      }
+      if (subEl) subEl.textContent = rangeLabel + ' — activity from team log';
+      detail.innerHTML = renderAgentContextHistory(
+        selectedTeamInboxAgentId,
+        teamActivityEventsForRange(teamAgentPanelRange)
+      );
     }
 
     function renderAgentMetricsCard(agentId, metrics) {
@@ -6318,15 +6679,16 @@
       var titleEl = document.getElementById('team-agent-stats-title');
       var subEl = document.getElementById('team-agent-stats-subtitle');
       if (!detail) return;
+      var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange);
       if (!selectedTeamInboxAgentId) {
         if (titleEl) titleEl.textContent = 'Agent Metrics';
-        if (subEl) subEl.textContent = 'Historical performance';
+        if (subEl) subEl.textContent = rangeLabel + ' — historical performance';
         detail.innerHTML = '<p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>';
         return;
       }
       var label = agentNameById(selectedTeamInboxAgentId);
       if (titleEl) titleEl.textContent = label + ' — Stats';
-      if (subEl) subEl.textContent = 'Tasks, delegation, and skill usage';
+      if (subEl) subEl.textContent = rangeLabel + ' — tasks, delegation, and skill usage';
       var metrics = (teamAgentMetricsSnapshot.agents || {})[selectedTeamInboxAgentId] || null;
       if (!metrics) {
         detail.innerHTML = '<p class="team-agent-inbox-empty">Loading stats for ' + escapeHtml(label) + '…</p>';
@@ -6387,7 +6749,7 @@
     function buildAgentInboxFlows(agentId) {
       var id = String(agentId || '').trim();
       if (!id) return [];
-      var events = (teamActivityEvents || []).slice().sort(function (a, b) {
+      var events = teamActivityEventsForRange(teamAgentPanelRange).slice().sort(function (a, b) {
         return (Number(a.ts) || 0) - (Number(b.ts) || 0);
       });
       var flows = [];
@@ -6652,11 +7014,16 @@
         return;
       }
       var label = agentNameById(selectedTeamInboxAgentId);
+      var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange);
       if (titleEl) titleEl.textContent = label + ' — ' + opts.panelLabel;
-      if (subEl) subEl.textContent = opts.panelSubtitle;
-      var flows = filterFlowsForMailbox(buildAgentInboxFlows(selectedTeamInboxAgentId), opts.direction);
+      if (subEl) subEl.textContent = rangeLabel + ' — ' + opts.panelSubtitle;
+      var flows = filterFlowsByTeamAgentRange(
+        filterFlowsForMailbox(buildAgentInboxFlows(selectedTeamInboxAgentId), opts.direction),
+        teamAgentPanelRange
+      );
       if (!flows.length) {
-        list.innerHTML = '<p class="team-agent-inbox-empty">' + escapeHtml(opts.noActivityText.replace('{agent}', label)) + '</p>';
+        list.innerHTML = '<p class="team-agent-inbox-empty">' +
+          escapeHtml(opts.noActivityText.replace('{agent}', label).replace('{range}', rangeLabel.toLowerCase())) + '</p>';
         return;
       }
       list.innerHTML = flows.map(function (flow) {
@@ -6677,7 +7044,7 @@
         panelLabel: 'Inbox',
         panelSubtitle: 'Incoming tasks, assignments, and routing when chosen',
         selectPrompt: 'Select an agent to view incoming activity.',
-        noActivityText: 'No inbox activity for {agent} yet.',
+        noActivityText: 'No inbox activity for {agent} in {range}.',
       });
     }
 
@@ -6690,9 +7057,9 @@
         emptyTitle: 'Agent Outbox',
         emptySubtitle: 'Delegations and replies sent',
         panelLabel: 'Outbox',
-        panelSubtitle: 'Outgoing delegations, routing decisions, and replies',
+        panelSubtitle: 'outgoing delegations, routing decisions, and replies',
         selectPrompt: 'Select an agent to view outgoing activity.',
-        noActivityText: 'No outbox activity for {agent} yet.',
+        noActivityText: 'No outbox activity for {agent} in {range}.',
       });
     }
 
@@ -6834,6 +7201,8 @@
       renderTeamActivity();
       renderAgentInbox();
       renderAgentOutbox();
+      renderAgentContext();
+      renderTeamTaskSummary();
     }
 
     async function fetchTeamContextFeed() {
@@ -6849,12 +7218,19 @@
       renderAgentContext();
       renderTeamAgentCards();
       renderCurrentMission();
+      renderTeamTaskSummary();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
     }
 
     async function fetchTeamMetricsFeed() {
       try {
-        var r = await fetch(API + '/api/team/metrics');
+        var q = '';
+        var window = getTeamAgentRangeWindow(teamAgentPanelRange);
+        if (window) {
+          q = '?since=' + encodeURIComponent(String(window.since)) +
+            '&until=' + encodeURIComponent(String(window.until));
+        }
+        var r = await fetch(API + '/api/team/metrics' + q);
         if (!r.ok) return;
         var d = await r.json().catch(function () { return {}; });
         teamAgentMetricsSnapshot = {
@@ -6926,7 +7302,13 @@
     if (teamAgentTabStatsEl) {
       teamAgentTabStatsEl.addEventListener('click', function () { setTeamAgentPanelTab('stats'); });
     }
+    document.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setTeamAgentPanelRange(btn.getAttribute('data-range'));
+      });
+    });
     setTeamAgentPanelTab('context');
+    setTeamAgentPanelRange('today');
 
     var teamViewTabCardsEl = document.getElementById('team-view-tab-cards');
     var teamViewTabTreeEl = document.getElementById('team-view-tab-tree');

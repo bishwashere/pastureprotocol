@@ -106,6 +106,10 @@ async function main() {
     assert(snapshot.agent.tasksHandled >= 1, 'readAgentMetrics returns main stats');
     assert(snapshot.agents.main, 'snapshot includes all agents');
 
+    const future = Date.now() + 86400000;
+    const emptyRange = readAgentMetrics({ agentId: 'main', since: future, until: future + 1 });
+    assert(emptyRange.agent.tasksHandled === 0, 'readAgentMetrics respects since/until window');
+
     console.log('agent-metrics tests passed');
   } finally {
     try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}
