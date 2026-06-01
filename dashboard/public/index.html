@@ -382,13 +382,17 @@
     .team-agent-card-active {
       color: var(--muted);
     }
-    .team-page-card .team-cards-view + .team-agent-panel,
-    .team-page-card .team-tree-view + .team-agent-panel {
-      flex: 1 1 0;
-      min-height: 9rem;
-    }
-    .team-page-card .team-cards-view ~ .team-agent-panel {
-      max-height: none;
+    .team-roster-side {
+      flex: 0 0 min(34vw, 26rem);
+      width: min(34vw, 26rem);
+      min-width: 18rem;
+      max-width: 26rem;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      border-left: 1px solid var(--border);
+      padding-left: 0.55rem;
     }
     .team-goals-main {
       flex: 1 1 0;
@@ -717,9 +721,8 @@
       font-size: 0.72rem;
     }
     .team-agent-panel {
-      flex: 1 1 55%;
+      flex: 1 1 0;
       min-height: 9rem;
-      max-height: 52%;
       display: flex;
       flex-direction: column;
       border: 1px solid var(--border);
@@ -903,23 +906,22 @@
       padding-left: 1.1rem;
     }
     .team-activity-wrap {
-      flex: 0 0 2.4rem;
-      width: 2.4rem;
-      min-width: 2.4rem;
+      flex: 0 0 auto;
+      width: 100%;
+      min-width: 0;
       min-height: 0;
       overflow: hidden;
-      border-left: 1px solid var(--border);
-      padding-left: 0.55rem;
-      transition: width 0.2s ease, flex-basis 0.2s ease;
+      transition: flex 0.2s ease, max-height 0.2s ease;
     }
     .team-activity-wrap.expanded {
-      flex-basis: min(34vw, 26rem);
-      width: min(34vw, 26rem);
-      min-width: 18rem;
+      flex: 0 1 42%;
+      min-height: 8rem;
+      max-height: 50%;
     }
     .team-activity-shell {
       height: 100%;
       min-height: 0;
+      max-height: 100%;
       display: flex;
       flex-direction: column;
       background: var(--bg);
@@ -928,9 +930,7 @@
       padding: 0.35rem;
     }
     .team-activity-wrap.collapsed .team-activity-shell {
-      align-items: center;
-      justify-content: flex-start;
-      padding: 0.35rem 0.2rem;
+      padding: 0.35rem;
     }
     .team-activity-wrap.collapsed .team-activity-title,
     .team-activity-wrap.collapsed .team-activity-status,
@@ -960,13 +960,7 @@
       color: var(--accent);
     }
     .team-activity-wrap.collapsed .team-activity-toggle {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      min-height: 5rem;
-      padding: 0.45rem 0.2rem;
       font-size: 0.72rem;
-      letter-spacing: 0.04em;
-      white-space: nowrap;
     }
     .team-activity-wrap.expanded .team-activity-toggle {
       min-width: 1.7rem;
@@ -2782,6 +2776,20 @@
               </div>
             </div>
             </div>
+          </div>
+          <div class="team-roster-side">
+            <div id="team-activity-wrap" class="team-activity-wrap collapsed">
+            <div class="team-activity-shell">
+              <div class="team-activity-head">
+                <h3 class="team-activity-title">Live agent activity</h3>
+                <span id="team-activity-status" class="team-activity-status">Idle</span>
+                <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
+              </div>
+              <div id="team-activity-list" class="team-activity-list">
+                <p class="team-activity-empty">No activity yet.</p>
+              </div>
+            </div>
+            </div>
             <div id="team-agent-panel" class="team-agent-panel">
               <div class="team-agent-panel-tabs" role="tablist">
                 <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
@@ -2834,18 +2842,6 @@
                     <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-          <div id="team-activity-wrap" class="team-activity-wrap collapsed">
-            <div class="team-activity-shell">
-              <div class="team-activity-head">
-                <h3 class="team-activity-title">Live agent activity</h3>
-                <span id="team-activity-status" class="team-activity-status">Idle</span>
-                <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
-              </div>
-              <div id="team-activity-list" class="team-activity-list">
-                <p class="team-activity-empty">No activity yet.</p>
               </div>
             </div>
           </div>
