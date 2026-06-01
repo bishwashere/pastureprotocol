@@ -116,6 +116,11 @@ const checks = [
       /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {
+    name: 'Expanded team rail takes full right side alone',
+    ok: /\.team-roster-side:has\(\.team-rail-wrap\.expanded\)[\s\S]*\.team-rail-wrap\.collapsed\s*\{[^}]*display:\s*none/s.test(html) &&
+      html.includes('teamRailExpanded[k] = k === key'),
+  },
+  {
     name: 'Team page has activity feed polling hooks',
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },

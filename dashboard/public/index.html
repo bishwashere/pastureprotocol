@@ -399,9 +399,11 @@
       transition: width 0.2s ease, flex-basis 0.2s ease;
     }
     .team-roster-side:has(.team-rail-wrap.expanded) {
-      flex-basis: min(20vw, 14rem);
-      width: min(20vw, 14rem);
-      min-width: 11rem;
+      flex: 1 1 0;
+      flex-basis: min(36vw, 28rem);
+      width: min(36vw, 28rem);
+      min-width: 14rem;
+      max-width: 32rem;
     }
     .team-rail-wrap {
       flex: 0 0 auto;
@@ -412,9 +414,12 @@
       display: flex;
       flex-direction: column;
     }
+    .team-roster-side:has(.team-rail-wrap.expanded) .team-rail-wrap.collapsed {
+      display: none;
+    }
     .team-roster-side:has(.team-rail-wrap.expanded) .team-rail-wrap.expanded {
       flex: 1 1 0;
-      min-height: 6rem;
+      min-height: 0;
     }
     .team-rail-wrap.expanded .team-rail-body,
     .team-rail-wrap.expanded .team-activity-list {
@@ -7156,18 +7161,28 @@
 
     function setTeamRailExpanded(key, nextExpanded) {
       if (!Object.prototype.hasOwnProperty.call(teamRailExpanded, key)) return;
-      teamRailExpanded[key] = !!nextExpanded;
-      var wrap = document.getElementById('team-' + key + '-wrap');
-      var toggle = document.getElementById('team-' + key + '-toggle');
-      if (!wrap || !toggle) return;
-      var label = TEAM_RAIL_LABELS[key] || key;
-      wrap.classList.toggle('expanded', teamRailExpanded[key]);
-      wrap.classList.toggle('collapsed', !teamRailExpanded[key]);
-      toggle.setAttribute('aria-expanded', teamRailExpanded[key] ? 'true' : 'false');
-      toggle.textContent = teamRailExpanded[key] ? 'Collapse' : label;
-      toggle.title = teamRailExpanded[key]
-        ? ('Collapse ' + label.toLowerCase() + ' panel')
-        : ('Expand ' + label.toLowerCase() + ' panel');
+      var opening = !!nextExpanded;
+      if (opening) {
+        Object.keys(teamRailExpanded).forEach(function (k) {
+          teamRailExpanded[k] = k === key;
+        });
+      } else {
+        teamRailExpanded[key] = false;
+      }
+      Object.keys(TEAM_RAIL_LABELS).forEach(function (k) {
+        var wrap = document.getElementById('team-' + k + '-wrap');
+        var toggle = document.getElementById('team-' + k + '-toggle');
+        if (!wrap || !toggle) return;
+        var expanded = !!teamRailExpanded[k];
+        var label = TEAM_RAIL_LABELS[k] || k;
+        wrap.classList.toggle('expanded', expanded);
+        wrap.classList.toggle('collapsed', !expanded);
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        toggle.textContent = expanded ? 'Collapse' : label;
+        toggle.title = expanded
+          ? ('Collapse ' + label.toLowerCase() + ' panel')
+          : ('Expand ' + label.toLowerCase() + ' panel');
+      });
     }
 
     function setTeamActivityExpanded(nextExpanded) {
