@@ -6165,10 +6165,12 @@
       return html;
     }
 
-    function buildAgentInboxFlows(agentId) {
+    function buildAgentInboxFlows(agentId, rangeOverride) {
       var id = String(agentId || '').trim();
       if (!id) return [];
-      var events = teamActivityEventsForRange(teamAgentPanelRange).slice().sort(function (a, b) {
+      var rangeKey = String(rangeOverride || '').trim();
+      if (!TEAM_AGENT_RANGE_LABELS[rangeKey]) rangeKey = teamAgentPanelRange;
+      var events = teamActivityEventsForRange(rangeKey).slice().sort(function (a, b) {
         return (Number(a.ts) || 0) - (Number(b.ts) || 0);
       });
       var flows = [];
@@ -7436,7 +7438,7 @@
       var flows = [];
       var activeRange = String(range || teamAgentPanelRange || 'today').trim();
       mc2MailboxAgentIds().forEach(function (agentId) {
-        filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction).forEach(function (flow) {
+        filterFlowsForMailbox(buildAgentInboxFlows(agentId, activeRange), direction).forEach(function (flow) {
           flows.push({ ts: flow.ts, agentId: agentId, entries: flow.entries || [] });
         });
       });
@@ -7474,8 +7476,7 @@
         '</div>';
       }).join('');
       if (usedAllTimeFallback) {
-        var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange).toLowerCase();
-        el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' in ' + escapeHtml(rangeLabel) + '; showing all time.</p>' + rows;
+        el.innerHTML = rows;
         mc2SyncTimelineHighlightForScroll();
         return;
       }
