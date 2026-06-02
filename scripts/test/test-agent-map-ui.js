@@ -245,8 +245,16 @@ const checks = [
       html.includes('id="mc2-inbox-agent-filter"') &&
       html.includes('id="mc2-context-agent-filter"') &&
       html.includes('id="mc2-stats-agent-filter"') &&
+      html.includes('class="team-agent-panel-ranges mc2-range-controls"') &&
+      html.includes('data-range="today"') &&
+      html.includes('data-range="yesterday"') &&
+      html.includes('data-range="last7"') &&
+      html.includes('data-range="last30"') &&
+      html.includes('data-range="all"') &&
       html.includes('Filter inbox by agent') &&
       html.includes('mc2InboxAgentFilter') &&
+      html.includes('setTeamAgentPanelRange') &&
+      html.includes('renderMissionControl();') &&
       html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
       html.includes("mc2RenderMailbox(mc2ActiveView)") &&
       html.includes('mc2MailboxFlows') &&

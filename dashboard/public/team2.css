@@ -595,6 +595,13 @@ body.dashboard-team2-active > nav {
   font-size: 0.66rem;
 }
 
+.mc2-range-controls {
+  margin: 0 0 0.45rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
 /* ── Mission Control visual pass (closer to reference) ────────────────── */
 
 body.dashboard-team2-active {
