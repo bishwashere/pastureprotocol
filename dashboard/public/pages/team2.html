@@ -16,6 +16,9 @@
           <button type="button" class="mc-nav-item" data-mc-nav="initiatives" aria-label="Initiatives">
             <span class="mc-nav-icon">ϟ</span><span class="mc-nav-label">Initiatives</span>
           </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="projects" aria-label="Projects">
+            <span class="mc-nav-icon">◫</span><span class="mc-nav-label">Projects</span>
+          </button>
           <button type="button" class="mc-nav-item" data-mc-nav="inbox" aria-label="Inbox">
             <span class="mc-nav-icon">□</span><span class="mc-nav-label">Inbox</span><span class="mc-nav-badge" id="mc2-inbox-badge">3</span>
           </button>
@@ -31,6 +34,12 @@
           <button type="button" class="mc-nav-item" data-mc-nav="stats" aria-label="Reports">
             <span class="mc-nav-icon">▥</span><span class="mc-nav-label">Reports</span>
           </button>
+          <div class="mc-sidebar-projects-wrap">
+            <div class="mc-sidebar-projects-label">Projects</div>
+            <div id="mc2-sidebar-projects" class="mc-sidebar-projects" aria-label="Project shortcuts">
+              <span class="mc-sidebar-projects-empty">Loading…</span>
+            </div>
+          </div>
           <div style="margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border);margin-bottom:0.35rem;"></div>
           <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Settings">
             <span class="mc-nav-icon">⚙</span><span class="mc-nav-label">Settings</span>
@@ -219,6 +228,37 @@
           <p class="mc-section-title">INITIATIVES</p>
           <div id="mc2-initiatives-list" style="display:flex;flex-direction:column;gap:0.45rem;">
             <p style="color:var(--muted);font-size:0.66rem;">Loading initiatives…</p>
+          </div>
+        </div>
+
+        <!-- Projects view -->
+        <div id="mc2-view-projects" class="mc-view" hidden>
+          <div id="mc2-proj-login" class="mc2-proj-login" style="display:none;">
+            <div class="proj-login card">
+              <h2>Projects — Sign In</h2>
+              <div id="mc2-proj-login-err" class="proj-login-err" style="display:none;"></div>
+              <input type="text" id="mc2-proj-user" placeholder="Username" autocomplete="username" />
+              <input type="password" id="mc2-proj-pass" placeholder="Password" autocomplete="current-password" />
+              <button type="button" id="mc2-proj-login-btn">Sign In</button>
+              <p id="mc2-proj-default-hint" class="proj-default-hint" style="display:none;">
+                Default credentials: <strong>admin</strong> / <strong>cowcode</strong>
+              </p>
+            </div>
+          </div>
+          <div id="mc2-proj-workspace" style="display:none;">
+            <div class="mc-activity-toolbar">
+              <p class="mc-section-title">PROJECTS</p>
+              <a href="#projects" class="mc-panel-link">Open full editor →</a>
+            </div>
+            <div class="proj-toolbar mc2-proj-toolbar">
+              <input id="mc2-proj-new-name" type="text" placeholder="Project name…" />
+              <input id="mc2-proj-new-url" type="url" placeholder="URL (optional)…" />
+              <input id="mc2-proj-new-desc" type="text" placeholder="Description (optional)…" />
+              <button type="button" id="mc2-proj-add-btn">+ Add Project</button>
+            </div>
+            <div id="mc2-proj-canvas" class="proj-canvas mc2-proj-canvas">
+              <div class="proj-empty">No projects yet. Add one above.</div>
+            </div>
           </div>
         </div>
 

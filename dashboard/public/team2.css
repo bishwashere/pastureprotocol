@@ -126,6 +126,86 @@ body.dashboard-team2-active > nav {
 }
 .mc-nav-badge[hidden] { display: none; }
 
+.mc-sidebar-projects-wrap {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border);
+}
+
+.mc-sidebar-projects-label {
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding: 0 0.15rem 0.35rem;
+}
+
+.mc-sidebar-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  max-height: 7.5rem;
+  overflow-y: auto;
+}
+
+.mc-sidebar-project {
+  margin: 0;
+  padding: 0.28rem 0.35rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.56rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc-sidebar-project:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mc-sidebar-project.active {
+  color: var(--accent);
+  background: rgba(167, 139, 250, 0.12);
+}
+
+.mc-sidebar-projects-empty {
+  display: block;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.54rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.mc2-proj-canvas {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100dvh - 11rem);
+}
+
+.mc2-proj-toolbar {
+  flex-shrink: 0;
+}
+
+.mc2-proj-login {
+  max-width: 340px;
+  margin: 2rem auto;
+}
+
+#mc2-proj-workspace {
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+}
+
 .mc-sidebar-footer {
   flex-shrink: 0;
   padding: 0.45rem 0.15rem 0.15rem;
@@ -825,6 +905,32 @@ body.dashboard-team2-active {
   font-size: 0.55rem;
   background: rgba(148, 163, 184, 0.16);
   color: #dbeafe;
+}
+
+.mc-sidebar-projects-wrap {
+  border-top-color: rgba(129, 140, 248, 0.12);
+}
+
+.mc-sidebar-projects-label {
+  color: #7f8eaa;
+}
+
+.mc-sidebar-project {
+  color: #94a3b8;
+}
+
+.mc-sidebar-project:hover {
+  color: #e5edf9;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.mc-sidebar-project.active {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.mc-sidebar-projects-empty {
+  color: #7f8eaa;
 }
 
 .mc-sidebar-footer {

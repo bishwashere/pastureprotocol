@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>cowCode Dashboard</title>
-  <link rel="stylesheet" href="team2.css?v=3">
+  <link rel="stylesheet" href="team2.css?v=4">
   <style>
     :root {
       --bg: #0f0f12;
@@ -7170,6 +7170,8 @@
     var mc2ActiveView = 'mission';
     var mc2InboxAgentFilter = '';
     var mc2TasksAgentFilter = '';
+    var mc2SelectedProjectId = '';
+    var mc2SidebarProjectsTimer = 0;
     var mc2TimelineScrollRaf = 0;
     var mc2TimelineHighlightKey = '';
     var mc2TimelineSpyEnabled = false;
@@ -7321,7 +7323,7 @@
     function mc2SetView(view) {
       mc2ActiveView = view;
       var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
-      ['mission', 'agents', 'tasks', 'context', 'goals', 'initiatives', 'activity', 'stats'].forEach(function (v) {
+      ['mission', 'agents', 'tasks', 'context', 'goals', 'initiatives', 'projects', 'activity', 'stats'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
@@ -7332,11 +7334,101 @@
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'goals') mc2RenderGoals();
       if (view === 'initiatives') mc2RenderInitiatives();
+      if (view === 'projects') mc2RenderProjects();
       if (view === 'context') mc2RenderContext();
       if (view === 'stats') mc2RenderStats();
       if (view === 'agents') mc2RenderAgentsDetail();
       if (view === 'tasks') mc2RenderTasks();
       mc2SyncTimelineHighlightForScroll();
+    }
+
+    function mc2ScrollToProject(pid) {
+      var id = String(pid || '').trim();
+      if (!id) return;
+      mc2SelectedProjectId = id;
+      setTimeout(function () {
+        var row = document.getElementById('proj-row-' + id);
+        if (row) {
+          try { row.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+        }
+        mc2RenderSidebarProjects();
+      }, 120);
+    }
+
+    async function mc2RenderProjects() {
+      var api = window.cowCodeProjectsApi;
+      var loginEl = mc2El('mc2-proj-login');
+      var workspaceEl = mc2El('mc2-proj-workspace');
+      if (!api) {
+        if (loginEl) loginEl.style.display = '';
+        if (workspaceEl) workspaceEl.style.display = 'none';
+        return;
+      }
+      api.syncToken();
+      if (!api.syncToken()) {
+        if (loginEl) loginEl.style.display = '';
+        if (workspaceEl) workspaceEl.style.display = 'none';
+        try {
+          var hintR = await fetch('/api/projects/credentials-info');
+          var hintD = await hintR.json();
+          var hintEl = mc2El('mc2-proj-default-hint');
+          if (hintEl) hintEl.style.display = hintD.isDefault ? 'block' : 'none';
+        } catch (_) {}
+        return;
+      }
+      if (loginEl) loginEl.style.display = 'none';
+      if (workspaceEl) workspaceEl.style.display = 'flex';
+      var canvas = mc2El('mc2-proj-canvas');
+      if (canvas) await api.loadProjects(canvas);
+      if (mc2SelectedProjectId) mc2ScrollToProject(mc2SelectedProjectId);
+      mc2RenderSidebarProjects();
+    }
+
+    async function mc2RenderSidebarProjects() {
+      var el = mc2El('mc2-sidebar-projects');
+      if (!el) return;
+      var api = window.cowCodeProjectsApi;
+      if (!api || !api.syncToken()) {
+        el.innerHTML = '<button type="button" class="mc-sidebar-project mc-sidebar-project-signin">Sign in</button>';
+        var signInBtn = el.querySelector('.mc-sidebar-project-signin');
+        if (signInBtn && !signInBtn._wired) {
+          signInBtn._wired = true;
+          signInBtn.addEventListener('click', function () { mc2SetView('projects'); });
+        }
+        return;
+      }
+      var projects = await api.listProjects();
+      if (!projects) {
+        el.innerHTML = '<span class="mc-sidebar-projects-empty">Unavailable</span>';
+        return;
+      }
+      if (!projects.length) {
+        el.innerHTML = '<span class="mc-sidebar-projects-empty">No projects</span>';
+        return;
+      }
+      el.innerHTML = projects.map(function (p) {
+        var id = String(p.id || '');
+        var name = String(p.name || 'Untitled');
+        var active = id === mc2SelectedProjectId ? ' active' : '';
+        return '<button type="button" class="mc-sidebar-project' + active + '" data-project-id="' + escapeHtml(id) + '" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>';
+      }).join('');
+      el.querySelectorAll('.mc-sidebar-project[data-project-id]').forEach(function (btn) {
+        if (btn._wired) return;
+        btn._wired = true;
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          mc2SelectedProjectId = btn.getAttribute('data-project-id') || '';
+          mc2SetView('projects');
+          mc2ScrollToProject(mc2SelectedProjectId);
+        });
+      });
+    }
+
+    function mc2ScheduleSidebarProjects() {
+      clearTimeout(mc2SidebarProjectsTimer);
+      mc2SidebarProjectsTimer = setTimeout(function () {
+        mc2RenderSidebarProjects();
+      }, 250);
     }
 
     function mc2InferRangeFromTs(ts) {
@@ -8006,9 +8098,11 @@
       mc2RenderMovement();
       mc2RenderAttention();
       mc2UpdateLiveBadge();
+      mc2ScheduleSidebarProjects();
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'goals') mc2RenderGoals();
       if (mc2ActiveView === 'initiatives') mc2RenderInitiatives();
+      if (mc2ActiveView === 'projects') mc2RenderProjects();
       if (mc2ActiveView === 'context') mc2RenderContext();
       if (mc2ActiveView === 'stats') mc2RenderStats();
       if (mc2ActiveView === 'tasks') mc2RenderTasks();
@@ -8067,6 +8161,52 @@
         mc2SetTimelineHighlight(range);
       });
     });
+    (function wireMc2Projects() {
+      var loginBtn = mc2El('mc2-proj-login-btn');
+      if (loginBtn && !loginBtn._wired) {
+        loginBtn._wired = true;
+        loginBtn.addEventListener('click', async function () {
+          var api = window.cowCodeProjectsApi;
+          if (!api) return;
+          var u = (mc2El('mc2-proj-user') || {}).value || '';
+          var p = (mc2El('mc2-proj-pass') || {}).value || '';
+          var err = mc2El('mc2-proj-login-err');
+          if (err) err.style.display = 'none';
+          var result = await api.login(String(u).trim(), p);
+          if (!result || !result.ok) {
+            if (err) { err.textContent = 'Invalid credentials.'; err.style.display = 'block'; }
+            return;
+          }
+          await mc2RenderProjects();
+        });
+      }
+      var passEl = mc2El('mc2-proj-pass');
+      if (passEl && !passEl._wired) {
+        passEl._wired = true;
+        passEl.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && loginBtn) loginBtn.click();
+        });
+      }
+      var addBtn = mc2El('mc2-proj-add-btn');
+      if (addBtn && !addBtn._wired) {
+        addBtn._wired = true;
+        addBtn.addEventListener('click', function () {
+          var api = window.cowCodeProjectsApi;
+          if (!api) return;
+          api.addProjectFromForm('mc2-proj-new-name', 'mc2-proj-new-url', 'mc2-proj-new-desc', 'mc2-proj-canvas');
+        });
+      }
+      function mc2ProjEnterSubmit(e) {
+        if (e.key === 'Enter' && addBtn) addBtn.click();
+      }
+      ['mc2-proj-new-name', 'mc2-proj-new-url', 'mc2-proj-new-desc'].forEach(function (id) {
+        var el = mc2El(id);
+        if (el && !el._wired) {
+          el._wired = true;
+          el.addEventListener('keydown', mc2ProjEnterSubmit);
+        }
+      });
+    })();
     function mc2BindTimelineScrollSpy(viewEl) {
       if (!viewEl) return;
       viewEl.addEventListener('scroll', function () {
@@ -8246,11 +8386,19 @@
       document.getElementById('proj-logout-btn').addEventListener('click', projLogout);
 
       // ── Load + render all projects ──
-      async function loadProjects() {
+      function activeProjectsCanvas() {
+        var mc2View = document.getElementById('mc2-view-projects');
+        var mc2Canvas = document.getElementById('mc2-proj-canvas');
+        if (mc2View && !mc2View.hidden && mc2Canvas) return mc2Canvas;
+        return document.getElementById('proj-canvas');
+      }
+
+      async function loadProjects(canvas) {
+        canvas = canvas || activeProjectsCanvas();
+        if (!canvas) return;
         var r = await projFetch('/projects');
         if (!r) return;
         var projects = await r.json();
-        var canvas = document.getElementById('proj-canvas');
         canvas.innerHTML = '';
         if (!projects.length) {
           canvas.innerHTML = '<div class="proj-empty">No projects yet. Add one above.</div>';
@@ -8546,10 +8694,11 @@
         if (!confirm('Delete this project and all its data?')) return;
         await projFetch('/projects/' + pid, { method: 'DELETE' });
         document.getElementById('proj-row-' + pid)?.remove();
-        var canvas = document.getElementById('proj-canvas');
-        if (!canvas.querySelector('.proj-row')) {
+        var canvas = activeProjectsCanvas();
+        if (canvas && !canvas.querySelector('.proj-row')) {
           canvas.innerHTML = '<div class="proj-empty">No projects yet. Add one above.</div>';
         }
+        if (typeof mc2RenderSidebarProjects === 'function') mc2RenderSidebarProjects();
       }
 
       async function deleteUpdate(uid, pid) {
@@ -8565,8 +8714,10 @@
       }
 
       async function refreshProject(pid) {
-        var canvas = document.getElementById('proj-canvas');
+        var canvas = activeProjectsCanvas();
+        if (!canvas) return;
         await loadAndRenderProject(pid, canvas);
+        if (typeof mc2RenderSidebarProjects === 'function') mc2RenderSidebarProjects();
       }
 
       var projectEditModalId = null;
@@ -8670,24 +8821,33 @@
       });
 
       // ── Add project ──
-      document.getElementById('proj-add-btn').addEventListener('click', async function () {
-        var name = document.getElementById('proj-new-name').value.trim();
-        var url = document.getElementById('proj-new-url').value.trim();
-        var desc = document.getElementById('proj-new-desc').value.trim();
-        if (!name) { document.getElementById('proj-new-name').focus(); return; }
+      async function addProjectFromForm(nameInputId, urlInputId, descInputId, canvasId) {
+        var nameEl = document.getElementById(nameInputId);
+        var urlEl = document.getElementById(urlInputId);
+        var descEl = document.getElementById(descInputId);
+        var name = nameEl ? nameEl.value.trim() : '';
+        var url = urlEl ? urlEl.value.trim() : '';
+        var desc = descEl ? descEl.value.trim() : '';
+        if (!name) { if (nameEl) nameEl.focus(); return; }
         var r = await projFetch('/projects', {
           method: 'POST',
-          body: JSON.stringify({ name, url, description: desc }),
+          body: JSON.stringify({ name: name, url: url, description: desc }),
         });
         if (!r) return;
         var proj = await r.json();
-        document.getElementById('proj-new-name').value = '';
-        document.getElementById('proj-new-url').value = '';
-        document.getElementById('proj-new-desc').value = '';
-        var canvas = document.getElementById('proj-canvas');
+        if (nameEl) nameEl.value = '';
+        if (urlEl) urlEl.value = '';
+        if (descEl) descEl.value = '';
+        var canvas = canvasId ? document.getElementById(canvasId) : activeProjectsCanvas();
+        if (!canvas) return;
         var empty = canvas.querySelector('.proj-empty');
         if (empty) empty.remove();
         await loadAndRenderProject(proj.id, canvas);
+        if (typeof mc2RenderSidebarProjects === 'function') mc2RenderSidebarProjects();
+      }
+
+      document.getElementById('proj-add-btn').addEventListener('click', function () {
+        addProjectFromForm('proj-new-name', 'proj-new-url', 'proj-new-desc', 'proj-canvas');
       });
       function projNewEnterSubmit(e) {
         if (e.key === 'Enter') document.getElementById('proj-add-btn').click();
@@ -8695,6 +8855,39 @@
       document.getElementById('proj-new-name').addEventListener('keydown', projNewEnterSubmit);
       document.getElementById('proj-new-url').addEventListener('keydown', projNewEnterSubmit);
       document.getElementById('proj-new-desc').addEventListener('keydown', projNewEnterSubmit);
+
+      async function projectsLogin(username, password) {
+        var res = await fetch('/api/projects/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, password: password }),
+        });
+        if (!res.ok) return { ok: false };
+        var d = await res.json();
+        token = d.token;
+        sessionStorage.setItem(TOKEN_KEY, token);
+        return { ok: true };
+      }
+
+      window.cowCodeProjectsApi = {
+        TOKEN_KEY: TOKEN_KEY,
+        syncToken: function () {
+          token = sessionStorage.getItem(TOKEN_KEY) || '';
+          return !!token;
+        },
+        login: projectsLogin,
+        logout: projLogout,
+        fetch: projFetch,
+        loadProjects: loadProjects,
+        listProjects: async function () {
+          if (!token) return null;
+          var r = await projFetch('/projects');
+          if (!r) return null;
+          return r.json();
+        },
+        activeCanvas: activeProjectsCanvas,
+        addProjectFromForm: addProjectFromForm,
+      };
 
       function esc(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
