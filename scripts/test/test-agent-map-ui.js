@@ -281,6 +281,14 @@ const checks = [
     name: 'Legacy #agents hash redirects to team route',
     ok: /if \(name === 'agents'\) name = 'team';/.test(html),
   },
+  {
+    name: 'Team page has full screen toggle',
+    ok: html.includes('id="team-page-fullscreen-btn"') &&
+      html.includes('setTeamPageFullscreen') &&
+      html.includes('toggleTeamPageFullscreen') &&
+      html.includes('body.team-page-fullscreen') &&
+      html.includes("sessionStorage.getItem('teamPageFullscreen')"),
+  },
 ];
 
 let failed = 0;

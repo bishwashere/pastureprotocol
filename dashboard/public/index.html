@@ -53,6 +53,21 @@
       overflow: hidden;
       padding: 0.65rem 1rem 0.5rem;
     }
+    body.team-page-fullscreen {
+      padding: 0 !important;
+    }
+    body.team-page-fullscreen > h1,
+    body.team-page-fullscreen > nav {
+      display: none !important;
+    }
+    body.team-page-fullscreen #page-team.active {
+      height: 100dvh;
+    }
+    body.team-page-fullscreen .team-page-card {
+      border-radius: 0;
+      border: none;
+      height: 100%;
+    }
     #page-home.active,
     #page-team.active {
       flex: 1 1 0;
@@ -2770,7 +2785,13 @@
       <div class="team-page-head">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
-          <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <button type="button" id="team-page-fullscreen-btn" class="agent-team-ext-btn" title="Full screen" aria-label="Full screen" aria-pressed="false">
+              <svg id="team-page-fullscreen-enter-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm13 0a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1 0-1h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+              <svg id="team-page-fullscreen-exit-icon" viewBox="0 0 16 16" aria-hidden="true" hidden><path d="M5.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 5.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm4 0h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 1 0v-3A1.5 1.5 0 0 0 10.5 0h-3a.5.5 0 0 1 0 1zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+            </button>
+            <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          </div>
         </div>
         <div class="team-top-tabs" role="tablist">
           <button type="button" id="team-top-tab-roster" class="team-top-tab active" data-team-top="roster" role="tab" aria-selected="true">Roster</button>
@@ -3235,6 +3256,7 @@
     var teamInitiativesSnapshot = { initiatives: [], updatedAt: 0 };
     var selectedTeamGoalId = '';
     var selectedTeamInitiativeId = '';
+    var teamPageFullscreen = false;
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -3266,6 +3288,11 @@
         setTeamTopTab('roster');
         setTeamRailExpanded('context', false);
         startTeamActivityFeed();
+        try {
+          setTeamPageFullscreen(sessionStorage.getItem('teamPageFullscreen') === '1');
+        } catch (e) {
+          setTeamPageFullscreen(false);
+        }
         fetchAgentMapData().then(function () {
           if (teamAgentId) {
             selectTeamInboxAgent(teamAgentId);
@@ -3277,6 +3304,7 @@
         });
       } else {
         stopTeamActivityFeed();
+        setTeamPageFullscreen(false);
       }
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
@@ -4065,6 +4093,29 @@
 
     function openTeamPage() {
       location.hash = '#team';
+    }
+
+    function setTeamPageFullscreen(on) {
+      teamPageFullscreen = !!on;
+      document.body.classList.toggle('team-page-fullscreen', teamPageFullscreen);
+      var btn = document.getElementById('team-page-fullscreen-btn');
+      var enterIcon = document.getElementById('team-page-fullscreen-enter-icon');
+      var exitIcon = document.getElementById('team-page-fullscreen-exit-icon');
+      if (btn) {
+        btn.setAttribute('aria-pressed', teamPageFullscreen ? 'true' : 'false');
+        btn.title = teamPageFullscreen ? 'Exit full screen' : 'Full screen';
+        btn.setAttribute('aria-label', btn.title);
+      }
+      if (enterIcon) enterIcon.hidden = teamPageFullscreen;
+      if (exitIcon) exitIcon.hidden = !teamPageFullscreen;
+      try {
+        if (teamPageFullscreen) sessionStorage.setItem('teamPageFullscreen', '1');
+        else sessionStorage.removeItem('teamPageFullscreen');
+      } catch (e) {}
+    }
+
+    function toggleTeamPageFullscreen() {
+      setTeamPageFullscreen(!teamPageFullscreen);
     }
 
     async function loadTeamAgentPage(agentId) {
@@ -7619,6 +7670,9 @@
     document.getElementById('team-page-create-btn').addEventListener('click', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
+    document.getElementById('team-page-fullscreen-btn').addEventListener('click', function () {
+      toggleTeamPageFullscreen();
+    });
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
     document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
       submitAgentCreateModal(true);
@@ -7670,6 +7724,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && agentEditModalOpen) closeAgentEditModal();
       else if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
+      else if (e.key === 'Escape' && teamPageFullscreen) setTeamPageFullscreen(false);
     });
     document.getElementById('chat-new-btn').addEventListener('click', function () {
       closeChatHistory();
