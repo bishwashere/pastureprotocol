@@ -4,36 +4,7 @@ A visual project tracker built into the cowCode dashboard. Track work across mul
 
 ## Access
 
-Open the dashboard (`cowcode dashboard` or `pnpm run dashboard`) and click **Projects** in the nav.
-
-You'll be prompted to sign in.
-
-## Auth - default credentials
-
-| Field | Default | Override |
-|-------|---------|----------|
-| Username | `admin` | `COWCODE_PROJECTS_USERNAME` env var, or `config.json → dashboard.projects.username` |
-| Password | `cowcode` | `COWCODE_PROJECTS_PASSWORD` env var, or `config.json → dashboard.projects.password` |
-
-To change credentials, add to `~/.cowcode/.env`:
-```
-COWCODE_PROJECTS_USERNAME=yourname
-COWCODE_PROJECTS_PASSWORD=yourpassword
-```
-
-Or in `~/.cowcode/config.json`:
-```json
-{
-  "dashboard": {
-    "projects": {
-      "username": "yourname",
-      "password": "yourpassword"
-    }
-  }
-}
-```
-
-Sessions last 24 hours and are stored in the browser's `sessionStorage` (cleared on tab close).
+Open the dashboard (`cowcode dashboard` or `pnpm run dashboard`) and click **Projects** in the nav, or open **Projects** from Mission Control (team2).
 
 ## Database
 
@@ -64,11 +35,10 @@ Questions like "what is this about?" / "find out" are **not** a separate "projec
 
 ## API
 
-All routes require the `x-projects-token` header (obtained from `POST /api/projects/auth`).
+All routes are open on the local dashboard (same as other dashboard pages).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/projects/auth` | Login → returns `{ token }` |
 | `GET` | `/api/projects` | List all projects |
 | `POST` | `/api/projects` | Create project `{ name, url?, description? }` |
 | `PATCH` | `/api/projects/:id` | Update project name, url, and/or description |

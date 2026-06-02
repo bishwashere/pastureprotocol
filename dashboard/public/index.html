@@ -7357,27 +7357,9 @@
 
     async function mc2RenderProjects() {
       var api = window.cowCodeProjectsApi;
-      var loginEl = mc2El('mc2-proj-login');
       var workspaceEl = mc2El('mc2-proj-workspace');
-      if (!api) {
-        if (loginEl) loginEl.style.display = '';
-        if (workspaceEl) workspaceEl.style.display = 'none';
-        return;
-      }
-      api.syncToken();
-      if (!api.syncToken()) {
-        if (loginEl) loginEl.style.display = '';
-        if (workspaceEl) workspaceEl.style.display = 'none';
-        try {
-          var hintR = await fetch('/api/projects/credentials-info');
-          var hintD = await hintR.json();
-          var hintEl = mc2El('mc2-proj-default-hint');
-          if (hintEl) hintEl.style.display = hintD.isDefault ? 'block' : 'none';
-        } catch (_) {}
-        return;
-      }
-      if (loginEl) loginEl.style.display = 'none';
-      if (workspaceEl) workspaceEl.style.display = 'flex';
+      if (!api || !workspaceEl) return;
+      workspaceEl.style.display = 'flex';
       var canvas = mc2El('mc2-proj-canvas');
       if (canvas) await api.loadProjects(canvas);
       if (mc2SelectedProjectId) mc2ScrollToProject(mc2SelectedProjectId);
@@ -7388,13 +7370,8 @@
       var el = mc2El('mc2-sidebar-projects');
       if (!el) return;
       var api = window.cowCodeProjectsApi;
-      if (!api || !api.syncToken()) {
-        el.innerHTML = '<button type="button" class="mc-sidebar-project mc-sidebar-project-signin">Sign in</button>';
-        var signInBtn = el.querySelector('.mc-sidebar-project-signin');
-        if (signInBtn && !signInBtn._wired) {
-          signInBtn._wired = true;
-          signInBtn.addEventListener('click', function () { mc2SetView('projects'); });
-        }
+      if (!api) {
+        el.innerHTML = '<span class="mc-sidebar-projects-empty">Unavailable</span>';
         return;
       }
       var projects = await api.listProjects();
@@ -8162,31 +8139,6 @@
       });
     });
     (function wireMc2Projects() {
-      var loginBtn = mc2El('mc2-proj-login-btn');
-      if (loginBtn && !loginBtn._wired) {
-        loginBtn._wired = true;
-        loginBtn.addEventListener('click', async function () {
-          var api = window.cowCodeProjectsApi;
-          if (!api) return;
-          var u = (mc2El('mc2-proj-user') || {}).value || '';
-          var p = (mc2El('mc2-proj-pass') || {}).value || '';
-          var err = mc2El('mc2-proj-login-err');
-          if (err) err.style.display = 'none';
-          var result = await api.login(String(u).trim(), p);
-          if (!result || !result.ok) {
-            if (err) { err.textContent = 'Invalid credentials.'; err.style.display = 'block'; }
-            return;
-          }
-          await mc2RenderProjects();
-        });
-      }
-      var passEl = mc2El('mc2-proj-pass');
-      if (passEl && !passEl._wired) {
-        passEl._wired = true;
-        passEl.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' && loginBtn) loginBtn.click();
-        });
-      }
       var addBtn = mc2El('mc2-proj-add-btn');
       if (addBtn && !addBtn._wired) {
         addBtn._wired = true;
@@ -8319,73 +8271,24 @@
 
     // ── Projects ────────────────────────────────────────────────────────────
     (function () {
-      var TOKEN_KEY = 'proj_token';
-      var token = sessionStorage.getItem(TOKEN_KEY) || '';
       var projData = {}; // projectId -> graph { project, updates, branches }
 
       function projHeaders() {
-        return { 'Content-Type': 'application/json', 'x-projects-token': token };
+        return { 'Content-Type': 'application/json' };
       }
 
       async function projFetch(path, opts) {
-        var res = await fetch('/api' + path, Object.assign({ headers: projHeaders() }, opts));
-        if (res.status === 401) { projLogout(); return null; }
-        return res;
-      }
-
-      function projLogout() {
-        token = '';
-        sessionStorage.removeItem(TOKEN_KEY);
-        showProjLogin();
-      }
-
-      async function showProjLogin() {
-        document.getElementById('proj-main').style.display = 'none';
-        document.getElementById('proj-login-screen').style.display = 'block';
-        // show default creds hint if not customised
-        try {
-          var r = await fetch('/api/projects/credentials-info');
-          var d = await r.json();
-          document.getElementById('proj-default-hint').style.display = d.isDefault ? 'block' : 'none';
-        } catch (_) {}
+        return fetch('/api' + path, Object.assign({ headers: projHeaders() }, opts));
       }
 
       function showProjMain() {
-        document.getElementById('proj-login-screen').style.display = 'none';
         document.getElementById('proj-main').style.display = 'block';
         loadProjects();
       }
 
       async function initProjectsPage() {
-        if (!token) { showProjLogin(); return; }
-        var r = await projFetch('/projects');
-        if (!r) return; // 401 → redirected to login
         showProjMain();
       }
-
-      // ── Login ──
-      document.getElementById('proj-login-btn').addEventListener('click', async function () {
-        var u = document.getElementById('proj-user').value.trim();
-        var p = document.getElementById('proj-pass').value;
-        var err = document.getElementById('proj-login-err');
-        err.style.display = 'none';
-        var res = await fetch('/api/projects/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: u, password: p }),
-        });
-        if (!res.ok) { err.textContent = 'Invalid credentials.'; err.style.display = 'block'; return; }
-        var d = await res.json();
-        token = d.token;
-        sessionStorage.setItem(TOKEN_KEY, token);
-        showProjMain();
-      });
-      document.getElementById('proj-pass').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') document.getElementById('proj-login-btn').click();
-      });
-      document.getElementById('proj-logout-btn').addEventListener('click', projLogout);
-
-      // ── Load + render all projects ──
       function activeProjectsCanvas() {
         var mc2View = document.getElementById('mc2-view-projects');
         var mc2Canvas = document.getElementById('mc2-proj-canvas');
@@ -8397,7 +8300,7 @@
         canvas = canvas || activeProjectsCanvas();
         if (!canvas) return;
         var r = await projFetch('/projects');
-        if (!r) return;
+        if (!r || !r.ok) return;
         var projects = await r.json();
         canvas.innerHTML = '';
         if (!projects.length) {
@@ -8856,33 +8759,12 @@
       document.getElementById('proj-new-url').addEventListener('keydown', projNewEnterSubmit);
       document.getElementById('proj-new-desc').addEventListener('keydown', projNewEnterSubmit);
 
-      async function projectsLogin(username, password) {
-        var res = await fetch('/api/projects/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username, password: password }),
-        });
-        if (!res.ok) return { ok: false };
-        var d = await res.json();
-        token = d.token;
-        sessionStorage.setItem(TOKEN_KEY, token);
-        return { ok: true };
-      }
-
       window.cowCodeProjectsApi = {
-        TOKEN_KEY: TOKEN_KEY,
-        syncToken: function () {
-          token = sessionStorage.getItem(TOKEN_KEY) || '';
-          return !!token;
-        },
-        login: projectsLogin,
-        logout: projLogout,
         fetch: projFetch,
         loadProjects: loadProjects,
         listProjects: async function () {
-          if (!token) return null;
           var r = await projFetch('/projects');
-          if (!r) return null;
+          if (!r || !r.ok) return null;
           return r.json();
         },
         activeCanvas: activeProjectsCanvas,

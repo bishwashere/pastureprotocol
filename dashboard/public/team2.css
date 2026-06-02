@@ -201,6 +201,7 @@ body.dashboard-team2-active > nav {
 }
 
 #mc2-proj-workspace {
+  display: flex;
   flex-direction: column;
   min-height: 0;
   gap: 0;

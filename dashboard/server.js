@@ -37,7 +37,6 @@ import {
   listProjects, getProject, createProject, updateProject, deleteProject,
   getProjectGraph, createUpdate, editUpdate, deleteUpdate,
   createBranch, deleteBranch,
-  projectsLogin, validateProjectsToken, getProjectsCredentials,
 } from '../lib/projects-db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1669,42 +1668,11 @@ app.patch('/api/groups/:id/md/:key', (req, res) => {
 
 // ── Projects API ──────────────────────────────────────────────────────────────
 
-function requireProjectsAuth(req, res, next) {
-  const token = req.headers['x-projects-token'] || '';
-  if (!validateProjectsToken(token)) {
-    res.status(401).json({ error: 'Projects auth required' });
-    return;
-  }
-  next();
-}
-
-function loadDashboardConfig() {
-  try {
-    return JSON.parse(readFileSync(getConfigPath(), 'utf8'));
-  } catch (_) { return {}; }
-}
-
-app.post('/api/projects/auth', (req, res) => {
-  const { username, password } = req.body || {};
-  const config = loadDashboardConfig();
-  const token = projectsLogin(username, password, config);
-  if (!token) { res.status(401).json({ error: 'Invalid credentials' }); return; }
-  res.json({ token });
-});
-
-app.get('/api/projects/credentials-info', (_req, res) => {
-  // Returns whether credentials are customised (not the actual values).
-  const config = loadDashboardConfig();
-  const creds = getProjectsCredentials(config);
-  const isDefault = creds.username === 'admin' && creds.password === 'cowcode';
-  res.json({ isDefault });
-});
-
-app.get('/api/projects', requireProjectsAuth, (_req, res) => {
+app.get('/api/projects', (_req, res) => {
   try { res.json(listProjects()); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/projects', requireProjectsAuth, (req, res) => {
+app.post('/api/projects', (req, res) => {
   const { name, description, url } = req.body || {};
   if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
   try {
@@ -1717,7 +1685,7 @@ app.post('/api/projects', requireProjectsAuth, (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.patch('/api/projects/:id', requireProjectsAuth, (req, res) => {
+app.patch('/api/projects/:id', (req, res) => {
   const { name, description, url } = req.body || {};
   const id = Number(req.params.id);
   const existing = getProject(id);
@@ -1735,12 +1703,12 @@ app.patch('/api/projects/:id', requireProjectsAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/projects/:id', requireProjectsAuth, (req, res) => {
+app.delete('/api/projects/:id', (req, res) => {
   try { deleteProject(Number(req.params.id)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/projects/:id/graph', requireProjectsAuth, (req, res) => {
+app.get('/api/projects/:id/graph', (req, res) => {
   try {
     const g = getProjectGraph(Number(req.params.id));
     if (!g) { res.status(404).json({ error: 'Not found' }); return; }
@@ -1748,7 +1716,7 @@ app.get('/api/projects/:id/graph', requireProjectsAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/projects/:id/updates', requireProjectsAuth, (req, res) => {
+app.post('/api/projects/:id/updates', (req, res) => {
   const { branch_id, parent_update_id, text } = req.body || {};
   if (!text || !String(text).trim()) { res.status(400).json({ error: 'text required' }); return; }
   try {
@@ -1761,19 +1729,19 @@ app.post('/api/projects/:id/updates', requireProjectsAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.patch('/api/projects/updates/:id', requireProjectsAuth, (req, res) => {
+app.patch('/api/projects/updates/:id', (req, res) => {
   const { text } = req.body || {};
   if (!text || !String(text).trim()) { res.status(400).json({ error: 'text required' }); return; }
   try { res.json(editUpdate(Number(req.params.id), { text: String(text).trim() })); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/projects/updates/:id', requireProjectsAuth, (req, res) => {
+app.delete('/api/projects/updates/:id', (req, res) => {
   try { deleteUpdate(Number(req.params.id)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/projects/:id/branches', requireProjectsAuth, (req, res) => {
+app.post('/api/projects/:id/branches', (req, res) => {
   const { parent_update_id, name } = req.body || {};
   if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
   try {
@@ -1785,7 +1753,7 @@ app.post('/api/projects/:id/branches', requireProjectsAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/projects/branches/:id', requireProjectsAuth, (req, res) => {
+app.delete('/api/projects/branches/:id', (req, res) => {
   try { deleteBranch(Number(req.params.id)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
