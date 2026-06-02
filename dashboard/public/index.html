@@ -7119,7 +7119,7 @@
     function mc2SetView(view) {
       mc2ActiveView = view;
       var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
-      ['mission', 'agents', 'goals', 'activity'].forEach(function (v) {
+      ['mission', 'agents', 'goals', 'initiatives', 'activity'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
@@ -7129,6 +7129,7 @@
       });
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'goals') mc2RenderGoals();
+      if (view === 'initiatives') mc2RenderInitiatives();
       if (view === 'agents') mc2RenderAgentsDetail();
     }
 
@@ -7437,6 +7438,37 @@
       }).join('');
     }
 
+    function mc2RenderInitiatives() {
+      var el = mc2El('mc2-initiatives-list');
+      if (!el) return;
+      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
+      initiatives.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (!initiatives.length) {
+        el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No initiatives yet. They appear here when reflection or team activity suggests follow-up work.</p>';
+        return;
+      }
+      el.innerHTML = initiatives.map(function (it) {
+        var status = String(it.status || 'open').toLowerCase();
+        var confidence = Math.round((Number(it.confidence) || 0) * 100);
+        var relatedGoals = Array.isArray(it.relatedGoalIds) ? it.relatedGoalIds : [];
+        var relatedLabel = relatedGoals.length ? relatedGoals.map(function (gid) {
+          var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
+          return goal ? String(goal.title || goal.objective || gid) : String(gid);
+        }).join(', ') : 'None';
+        return '<div class="mc-progress-card" style="cursor:default;">' +
+          '<div class="mc-progress-head">' +
+            '<h3>' + escapeHtml(String(it.title || 'Untitled initiative')) + '</h3>' +
+            '<span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div class="team-goal-meta"><span class="team-initiative-type">' + escapeHtml(String(it.type || 'observation')) + '</span></div>' +
+          '<div class="team-goal-meta"><strong>Confidence:</strong> ' + escapeHtml(String(confidence)) + '%</div>' +
+          '<div class="team-goal-meta"><strong>Source:</strong> ' + escapeHtml(String(it.source || '')) + '</div>' +
+          '<div class="team-goal-meta"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
+          '<div class="team-goal-meta">' + escapeHtml(String(it.description || '').slice(0, 220)) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
     function mc2RenderAgentsDetail() {
       mc2RenderAgentsOverview();
     }
@@ -7465,6 +7497,7 @@
       mc2UpdateLiveBadge();
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'goals') mc2RenderGoals();
+      if (mc2ActiveView === 'initiatives') mc2RenderInitiatives();
     }
 
     /* Wire MC sidebar nav */

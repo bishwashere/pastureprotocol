@@ -221,10 +221,17 @@ const checks = [
   {
     name: 'Team2 presents saved goals as missions',
     ok: html.includes('id="mc2-mission-select"') &&
+      html.includes('data-mc-nav="initiatives"') &&
+      html.includes('id="mc2-view-initiatives"') &&
+      html.includes('id="mc2-initiatives-list"') &&
+      html.includes('renderInitiatives') &&
+      html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&
       html.includes('aria-label="Missions"') &&
       html.includes('MISSIONS') &&
+      html.includes('INITIATIVES') &&
       html.includes('Loading missions') &&
+      html.includes('Loading initiatives') &&
       html.includes('No missions yet') &&
       html.includes('Untitled mission') &&
       html.includes('Active mission'),
