@@ -259,7 +259,7 @@ const checks = [
       html.includes('mc2MailboxFlows') &&
       html.includes('mc2MailboxFlows(direction, range)') &&
       html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId, activeRange), direction)') &&
-      html.includes('var allTimeFlows = mc2MailboxFlows(direction, \'all\').slice(0, 60);') &&
+      html.includes('mc2MailboxFlows(direction, \'all\')') &&
       html.includes('flow.entries.map(renderInboxEntry)') &&
       html.includes('mc2RenderContext') &&
       html.includes('renderAgentContextCard') &&
@@ -270,6 +270,7 @@ const checks = [
       html.includes('mc2InferRangeFromTs') &&
       html.includes('mc2SetTimelineHighlight') &&
       html.includes('mc2SyncTimelineHighlightForScroll') &&
+      html.includes('mc2ScrollToRange') &&
       html.includes('mc2FirstVisibleTsInActivityView') &&
       html.includes('data-ts=') &&
       html.includes('mc2EventMatchesAgent'),

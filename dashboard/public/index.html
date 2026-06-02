@@ -6750,6 +6750,7 @@
     });
     document.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        if (btn.closest('#page-team2')) return;
         setTeamAgentPanelRange(btn.getAttribute('data-range'));
       });
     });
@@ -7066,6 +7067,8 @@
     var mc2ActiveView = 'mission';
     var mc2InboxAgentFilter = '';
     var mc2TimelineScrollRaf = 0;
+    var mc2TimelineHighlightKey = '';
+    var mc2TimelineSpyEnabled = false;
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -7144,20 +7147,33 @@
 
     function mc2InferRangeFromTs(ts) {
       var n = Number(ts) || 0;
-      if (!n) return 'all';
+      if (!n) return 'today';
       if (eventTsInTeamAgentRange(n, 'today')) return 'today';
       if (eventTsInTeamAgentRange(n, 'yesterday')) return 'yesterday';
       if (eventTsInTeamAgentRange(n, 'last7')) return 'last7';
-      if (eventTsInTeamAgentRange(n, 'last30')) return 'last30';
-      return 'all';
+      return 'last30';
     }
 
     function mc2SetTimelineHighlight(rangeKey) {
       var key = TEAM_AGENT_RANGE_LABELS[String(rangeKey || '').trim()] ? String(rangeKey) : 'today';
-      document.querySelectorAll('#page-team2 .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
-        var active = btn.getAttribute('data-range') === key;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      var changed = key !== mc2TimelineHighlightKey;
+      mc2TimelineHighlightKey = key;
+      document.querySelectorAll('#page-team2 .mc2-range-controls').forEach(function (group) {
+        var activeBtn = null;
+        group.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
+          var active = btn.getAttribute('data-range') === key;
+          btn.classList.toggle('active', active);
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+          if (active) activeBtn = btn;
+        });
+        if (changed && activeBtn) {
+          try {
+            activeBtn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+          } catch (_) {
+            var left = activeBtn.offsetLeft - Math.max(0, Math.round((group.clientWidth - activeBtn.clientWidth) / 2));
+            group.scrollLeft = Math.max(0, left);
+          }
+        }
       });
     }
 
@@ -7178,12 +7194,12 @@
     }
 
     function mc2SyncTimelineHighlightForScroll() {
-      if (teamAgentPanelRange !== 'all') {
+      if (!(mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox')) {
         mc2SetTimelineHighlight(teamAgentPanelRange);
         return;
       }
-      if (!(mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox')) {
-        mc2SetTimelineHighlight('all');
+      if (!mc2TimelineSpyEnabled) {
+        mc2SetTimelineHighlight(teamAgentPanelRange);
         return;
       }
       var ts = mc2FirstVisibleTsInActivityView();
@@ -7389,6 +7405,7 @@
         mc2RenderMailbox(mc2ActiveView);
         return;
       }
+      mc2TimelineSpyEnabled = false;
       var titleEl = mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = 'LIVE ACTIVITY';
       mc2SyncInboxAgentFilter();
@@ -7396,21 +7413,24 @@
         return mc2EventMatchesAgent(ev, mc2InboxAgentFilter);
       }).slice().reverse().slice(0, 60);
       if (!events.length) {
+        mc2TimelineSpyEnabled = false;
         var emptyLabel = mc2InboxAgentFilter ? (' for ' + agentNameById(mc2InboxAgentFilter)) : '';
         el.innerHTML = '<p class="mc-kanban-empty">No activity' + escapeHtml(emptyLabel) + ' yet.</p>';
         return;
       }
+      mc2TimelineSpyEnabled = true;
       el.innerHTML = events.map(function (ev) {
         var ts = Number(ev.ts) || 0;
         var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
         var agentId = String(ev.agentId || '');
         var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
-        return '<div class="mc-movement-item">' +
+        return '<div class="mc-movement-item" data-ts="' + escapeHtml(String(ts)) + '">' +
           '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
           mc2AvatarHtml(a) +
           '<span>' + text + '</span>' +
         '</div>';
       }).join('');
+      mc2SyncTimelineHighlightForScroll();
     }
 
     function mc2MailboxAgentIds() {
@@ -7453,20 +7473,14 @@
       var titleEl = mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = direction === 'outbox' ? 'OUTBOX' : 'INBOX';
       mc2SyncInboxAgentFilter();
-      var flows = mc2MailboxFlows(direction).slice(0, 60);
+      var flows = mc2MailboxFlows(direction, 'all').slice(0, 200);
       var label = mc2InboxAgentFilter ? agentNameById(mc2InboxAgentFilter) : 'all agents';
-      var usedAllTimeFallback = false;
-      if (!flows.length && teamAgentPanelRange !== 'all') {
-        var allTimeFlows = mc2MailboxFlows(direction, 'all').slice(0, 60);
-        if (allTimeFlows.length) {
-          flows = allTimeFlows;
-          usedAllTimeFallback = true;
-        }
-      }
       if (!flows.length) {
+        mc2TimelineSpyEnabled = false;
         el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' yet.</p>';
         return;
       }
+      mc2TimelineSpyEnabled = true;
       var showAgent = !mc2InboxAgentFilter;
       var rows = flows.map(function (flow) {
         var flowTs = Number(flow && flow.ts) || 0;
@@ -7475,13 +7489,35 @@
           flow.entries.map(renderInboxEntry).join('') +
         '</div>';
       }).join('');
-      if (usedAllTimeFallback) {
-        el.innerHTML = rows;
-        mc2SyncTimelineHighlightForScroll();
-        return;
-      }
       el.innerHTML = rows;
       mc2SyncTimelineHighlightForScroll();
+    }
+
+    function mc2ScrollToRange(rangeKey) {
+      var key = TEAM_AGENT_RANGE_LABELS[String(rangeKey || '').trim()] ? String(rangeKey) : 'today';
+      var view = mc2El('mc2-view-activity');
+      var feed = mc2El('mc2-activity-feed');
+      if (!view || view.hidden || !feed) return;
+      var markers = feed.querySelectorAll('[data-ts]');
+      if (!markers.length) {
+        mc2SetTimelineHighlight(key);
+        return;
+      }
+      var target = null;
+      for (var i = 0; i < markers.length; i++) {
+        var ts = Number(markers[i].getAttribute('data-ts')) || 0;
+        if (mc2InferRangeFromTs(ts) === key) {
+          target = markers[i];
+          break;
+        }
+      }
+      if (!target && key === 'last30') target = markers[markers.length - 1];
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+      } else {
+        view.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      mc2SetTimelineHighlight(key);
     }
 
     function mc2SetAgentFilter(agentId, nextView) {
@@ -7688,6 +7724,17 @@
     document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {
       selectEl.addEventListener('change', function () {
         mc2SetAgentFilter(selectEl.value || '');
+      });
+    });
+    document.querySelectorAll('#page-team2 .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var range = btn.getAttribute('data-range') || 'today';
+        if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') {
+          mc2ScrollToRange(range);
+          return;
+        }
+        setTeamAgentPanelRange(range);
+        mc2SetTimelineHighlight(range);
       });
     });
     var mc2ActivityViewEl = document.getElementById('mc2-view-activity');

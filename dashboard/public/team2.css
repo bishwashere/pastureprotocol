@@ -597,9 +597,25 @@ body.dashboard-team2-active > nav {
 
 .mc2-range-controls {
   margin: 0 0 0.45rem 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+  padding: 0.35rem 0.45rem;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(7, 11, 23, 0.9);
+  backdrop-filter: blur(2px);
+}
+
+.mc2-range-controls .team-agent-panel-range {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 /* ── Mission Control visual pass (closer to reference) ────────────────── */
