@@ -1269,6 +1269,15 @@
       height: 1rem;
       fill: currentColor;
     }
+    .agent-team-ext-btn #team-page-fullscreen-exit-icon {
+      display: none;
+    }
+    body.team-page-fullscreen .agent-team-ext-btn #team-page-fullscreen-enter-icon {
+      display: none;
+    }
+    body.team-page-fullscreen .agent-team-ext-btn #team-page-fullscreen-exit-icon {
+      display: block;
+    }
     .agent-map-node-meta {
       font-size: 0.68rem;
       color: var(--muted);
@@ -2788,7 +2797,7 @@
           <div style="display:flex; align-items:center; gap:0.35rem;">
             <button type="button" id="team-page-fullscreen-btn" class="agent-team-ext-btn" title="Full screen" aria-label="Full screen" aria-pressed="false">
               <svg id="team-page-fullscreen-enter-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm13 0a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1 0-1h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
-              <svg id="team-page-fullscreen-exit-icon" viewBox="0 0 16 16" aria-hidden="true" hidden><path d="M5.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 5.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm4 0h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 1 0v-3A1.5 1.5 0 0 0 10.5 0h-3a.5.5 0 0 1 0 1zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+              <svg id="team-page-fullscreen-exit-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 5.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm4 0h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 1 0v-3A1.5 1.5 0 0 0 10.5 0h-3a.5.5 0 0 1 0 1zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
             </button>
             <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
           </div>
@@ -4099,15 +4108,11 @@
       teamPageFullscreen = !!on;
       document.body.classList.toggle('team-page-fullscreen', teamPageFullscreen);
       var btn = document.getElementById('team-page-fullscreen-btn');
-      var enterIcon = document.getElementById('team-page-fullscreen-enter-icon');
-      var exitIcon = document.getElementById('team-page-fullscreen-exit-icon');
       if (btn) {
         btn.setAttribute('aria-pressed', teamPageFullscreen ? 'true' : 'false');
         btn.title = teamPageFullscreen ? 'Exit full screen' : 'Full screen';
         btn.setAttribute('aria-label', btn.title);
       }
-      if (enterIcon) enterIcon.hidden = teamPageFullscreen;
-      if (exitIcon) exitIcon.hidden = !teamPageFullscreen;
       try {
         if (teamPageFullscreen) sessionStorage.setItem('teamPageFullscreen', '1');
         else sessionStorage.removeItem('teamPageFullscreen');
