@@ -7197,12 +7197,102 @@
       return '<div class="mc-agent-avatar">' + escapeHtml(initials) + '</div>';
     }
 
+    function mc2NormalizeTaskPrompt(raw) {
+      var prompt = String(raw || '').trim();
+      prompt = prompt.replace(/^\[Retry with tools\]\s*/i, '').trim();
+      prompt = prompt.replace(/^The user asked:\s*["“]?/i, '').replace(/["”]\.\s*Use available tools.*$/i, '').trim();
+      prompt = prompt.replace(/^Completed turn — /i, '').trim();
+      return prompt;
+    }
+
+    function mc2GenericTaskNoise(text) {
+      var t = String(text || '').trim();
+      if (!t) return true;
+      if (/^Handled in \d+/i.test(t)) return true;
+      if (/^Completed turn/i.test(t)) return true;
+      if (isEphemeralGoalLabel(t)) return true;
+      if (/\b(standing by|idle|standby|next task|no active task|processing request|received user message|starting turn|waiting for|in progress)\b/i.test(t)) return true;
+      return false;
+    }
+
+    function mc2LatestOpenTaskPrompt(agentId) {
+      var id = String(agentId || '').trim();
+      if (!id) return '';
+      var list = teamActivityEvents || [];
+      var openStart = null;
+      for (var i = list.length - 1; i >= 0; i--) {
+        var e = list[i];
+        if (String(e.agentId || '') !== id) continue;
+        var type = String(e.type || '');
+        if (type === 'turn_done') return '';
+        if (type === 'turn_start') {
+          openStart = e;
+          break;
+        }
+      }
+      if (!openStart) return '';
+      var inbox = openStart.details && openStart.details.inbox;
+      var raw = (inbox && inbox.task) || openStart.message || '';
+      var prompt = mc2NormalizeTaskPrompt(raw);
+      if (mc2GenericTaskNoise(prompt)) return '';
+      return prompt.slice(0, 160);
+    }
+
+    function mc2KanbanTaskTitle(agentId, ctx) {
+      ctx = ctx || {};
+      var state = String(ctx.state || 'idle').toLowerCase();
+
+      var fromActivity = mc2LatestOpenTaskPrompt(agentId);
+      if (fromActivity) return fromActivity;
+
+      var contexts = Array.isArray(ctx.context) ? ctx.context : [];
+      for (var i = contexts.length - 1; i >= 0; i--) {
+        var c = String(contexts[i] || '').trim();
+        var userMatch = c.match(/^User asking:\s*(.+)$/i);
+        if (userMatch && !mc2GenericTaskNoise(userMatch[1])) return userMatch[1].slice(0, 160);
+        var delMatch = c.match(/^Delegated:\s*(.+)$/i);
+        if (delMatch && !mc2GenericTaskNoise(delMatch[1])) return delMatch[1].slice(0, 160);
+      }
+
+      var thought = String(ctx.currentThought || '').trim();
+      var quoted = thought.match(/["“]([^"”]{4,160})["”]/);
+      if (quoted && !mc2GenericTaskNoise(quoted[1])) return quoted[1];
+
+      var lastAction = String(ctx.lastAction || '').trim();
+      var delegated = lastAction.match(/^Delegated\s+(.+?)\s+to\s+/i);
+      if (delegated && !mc2GenericTaskNoise(delegated[1])) return delegated[1].slice(0, 160);
+      if (lastAction && !mc2GenericTaskNoise(lastAction) && lastAction.length > 8) {
+        return mc2NormalizeTaskPrompt(lastAction).slice(0, 160);
+      }
+
+      var goal = missionLabelForAgent(agentId, ctx);
+      if (goal && !mc2GenericTaskNoise(goal)) return goal;
+
+      if (state === 'idle') {
+        var queued = String(ctx.currentGoal || ctx.currentStep || '').trim();
+        if (queued && !mc2GenericTaskNoise(queued)) return queued;
+      }
+
+      var step = String(ctx.currentStep || '').trim();
+      if (step && !mc2GenericTaskNoise(step) && !/^Running /i.test(step)) return step;
+
+      if (state === 'waiting') {
+        var waitFor = String(ctx.waitingFor || '').trim();
+        if (waitFor) return 'Awaiting ' + agentNameById(waitFor);
+        return 'Waiting';
+      }
+      if (state === 'error') {
+        return (thought && !mc2GenericTaskNoise(thought) ? thought : 'Blocked').slice(0, 160);
+      }
+      if (state === 'working') return 'In progress';
+      return 'Ready';
+    }
+
     function mc2KanbanCard(a, ctx) {
       var id = String(a.id || '');
       var name = escapeHtml(agentCardShortName(a));
       var state = String(ctx.state || 'idle').toLowerCase();
-      var goal = missionLabelForAgent(id, ctx);
-      var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
+      var taskTitle = mc2KanbanTaskTitle(id, ctx);
       var lastTs = Number(ctx.updatedAt) || 0;
       var isBlocked = state === 'error';
       var pct = 0;
@@ -7212,14 +7302,13 @@
       var progressHtml = (state === 'working' && pct > 0)
         ? '<div class="mc-kanban-card-progress"><span style="width:' + pct + '%"></span></div>'
         : '';
-      var goalLine = state === 'idle' ? (goal || 'Standing by') : (goal || thought || 'Standing by');
       var waitingFor = String(ctx.waitingFor || '').trim();
       return '<div class="mc-kanban-card" data-mc-agent="' + escapeHtml(id) + '">' +
-        '<div class="mc-kanban-card-head">' +
+        '<div class="mc-kanban-card-title">' + escapeHtml(taskTitle) + '</div>' +
+        '<div class="mc-kanban-card-meta mc-kanban-card-agent">' +
           mc2AvatarHtml(a) +
-          '<span class="mc-agent-role">' + name + '</span>' +
+          '<span>' + name + '</span>' +
         '</div>' +
-        '<div class="mc-kanban-card-title">' + escapeHtml(goalLine || 'Standing by') + '</div>' +
         progressHtml +
         (state === 'waiting' && waitingFor
           ? '<div class="mc-kanban-card-meta">Next: ' + escapeHtml(agentNameById(waitingFor)) + ' approval</div>'
@@ -7426,19 +7515,18 @@
           var metrics = (teamAgentMetricsSnapshot.agents || {})[id] || {};
           var name = escapeHtml(agentCardShortName(a));
           var s = String(ctx.state || 'idle').toLowerCase();
-          var focus = String(ctx.currentGoal || ctx.currentStep || ctx.currentThought || '').trim();
-          if (!focus && s === 'idle') focus = 'Idle';
+          var taskTitle = mc2KanbanTaskTitle(id, ctx);
           var active = agentCardActiveCount(ctx, metrics);
           var done = Number(metrics.totalHandled || 0);
           var waitingCount = s === 'waiting' ? 1 : 0;
           var lastTs = Number(ctx.updatedAt) || 0;
           return '<div class="mc-agent-overview-card" data-mc-agent="' + escapeHtml(id) + '">' +
-            '<div class="mc-kanban-card-head">' +
+            '<div class="mc-agent-overview-title">' + escapeHtml(taskTitle) + '</div>' +
+            '<div class="mc-kanban-card-meta mc-kanban-card-agent">' +
               mc2AvatarHtml(a) +
-              '<span class="mc-agent-role">' + name + '</span>' +
+              '<span>' + name + '</span>' +
               '<span class="mc-agent-state-dot ' + escapeHtml(s) + '" aria-label="' + escapeHtml(s) + '"></span>' +
             '</div>' +
-            '<div class="mc-agent-overview-focus">Focus: ' + escapeHtml(focus.slice(0, 40)) + '</div>' +
             '<div class="mc-agent-overview-stats">' +
               '<span class="active">' + active + ' Active</span>' +
               '<span>' + done + ' Done</span>' +
