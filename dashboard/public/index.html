@@ -5312,6 +5312,33 @@
       return String(g.title || '').trim() || String(g.objective || '').trim();
     }
 
+    var EPHEMERAL_GOAL_LABELS = {
+      'Answer user question': 1,
+      'Handle delegated task': 1,
+      'Improve onboarding conversion': 1,
+      'Analyze product metrics': 1,
+      'Fix nginx issue': 1,
+      'Fix technical issue': 1,
+      'Generate marketing ideas': 1,
+    };
+
+    function isEphemeralGoalLabel(label) {
+      var g = String(label || '').trim();
+      return !g || !!EPHEMERAL_GOAL_LABELS[g];
+    }
+
+    function missionLabelForAgent(agentId, ctx) {
+      var row = ctx || {};
+      var state = String(row.state || 'idle').toLowerCase();
+      var stored = String(row.currentGoal || '').trim();
+      if (state === 'idle') {
+        return activeGoalLabelForAgent(agentId) || '';
+      }
+      if (stored && !isEphemeralGoalLabel(stored)) return stored;
+      var fromGoals = activeGoalLabelForAgent(agentId);
+      return fromGoals || stored || '';
+    }
+
     function isAgentContextActive(ctx) {
       var s = String(ctx && ctx.state || 'idle').toLowerCase();
       return s === 'working' || s === 'waiting' || s === 'error';
@@ -5340,7 +5367,7 @@
       var agentId = pickLiveMissionAgentId();
       if (!agentId) return null;
       var ctx = (teamAgentContextSnapshot.agents || {})[agentId] || {};
-      var goalLabel = String(ctx.currentGoal || '').trim() || activeGoalLabelForAgent(agentId);
+      var goalLabel = missionLabelForAgent(agentId, ctx);
       var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
       var waitingFor = String(ctx.waitingFor || '').trim();
       var lastAction = String(ctx.lastAction || '').trim();
@@ -5953,7 +5980,8 @@
 
     function resolveAgentContextDisplay(agentId, ctx) {
       var row = ctx || { state: 'idle' };
-      var goal = String(row.currentGoal || '').trim() || activeGoalLabelForAgent(agentId);
+      var state = String(row.state || 'idle').toLowerCase();
+      var goal = missionLabelForAgent(agentId, row);
       var thought = String(row.currentThought || row.currentStep || '').trim();
       if (!thought && String(row.state || '') === 'idle') thought = 'Standing by for the next task.';
       var waitingOn = String(row.waitingFor || '').trim()
@@ -7108,7 +7136,7 @@
       var id = String(a.id || '');
       var name = escapeHtml(agentCardShortName(a));
       var state = String(ctx.state || 'idle').toLowerCase();
-      var goal = String(ctx.currentGoal || ctx.currentStep || '').trim();
+      var goal = missionLabelForAgent(id, ctx);
       var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
       var lastTs = Number(ctx.updatedAt) || 0;
       var isBlocked = state === 'error';
@@ -7119,7 +7147,7 @@
       var progressHtml = (state === 'working' && pct > 0)
         ? '<div class="mc-kanban-card-progress"><span style="width:' + pct + '%"></span></div>'
         : '';
-      var goalLine = goal || thought;
+      var goalLine = state === 'idle' ? (goal || 'Standing by') : (goal || thought || 'Standing by');
       var waitingFor = String(ctx.waitingFor || '').trim();
       return '<div class="mc-kanban-card" data-mc-agent="' + escapeHtml(id) + '">' +
         '<div class="mc-kanban-card-head">' +

@@ -63,8 +63,12 @@ async function main() {
     assert(marketerSearch.currentThought && marketerSearch.currentThought.includes('Gathering'), `search thought: ${marketerSearch.currentThought}`);
 
     onAgentTurnDone({ agentId: 'marketer' });
+    const marketerIdle = readAgentContext('marketer');
+    assert(marketerIdle.state === 'idle', 'marketer idle after delegation');
+    assert(marketerIdle.currentGoal === '', `marketer goal cleared when idle: ${marketerIdle.currentGoal}`);
+
     onAgentDelegationDone({ callerAgentId: 'main', targetAgentId: 'marketer' });
-    assert(readAgentContext('marketer').state === 'idle', 'marketer idle after delegation');
+    assert(readAgentContext('marketer').state === 'idle', 'marketer idle after delegation done');
     const mainSynth = readAgentContext('main');
     assert(mainSynth.currentThought && mainSynth.currentThought.includes('Combining'), `main thought: ${mainSynth.currentThought}`);
     assert(mainSynth.lastAction && mainSynth.lastAction.includes('Received reply'), `main last: ${mainSynth.lastAction}`);
@@ -89,7 +93,44 @@ async function main() {
     assert(dev.currentStep === 'Reading files', `dev step: ${dev.currentStep}`);
 
     onAgentTurnDone({ agentId: 'developer' });
-    assert(readAgentContext('developer').state === 'idle', 'developer idle after turn');
+    const devIdle = readAgentContext('developer');
+    assert(devIdle.state === 'idle', 'developer idle after turn');
+    assert(devIdle.currentGoal === '', `developer goal cleared when idle: ${devIdle.currentGoal}`);
+
+    onAgentTurnStart({
+      agentId: 'main',
+      userText: 'Check NextPostAI growth',
+      ctx: { jid: 'user@local' },
+    });
+    onAgentTurnDone({ agentId: 'main' });
+    const mainIdle = readAgentContext('main');
+    assert(mainIdle.currentGoal === '', `stale Answer user question cleared: ${mainIdle.currentGoal}`);
+    assert(mainIdle.currentThought.includes('Standing by'), `main idle thought: ${mainIdle.currentThought}`);
+
+    const { writeFileSync, mkdirSync } = await import('fs');
+    const { dirname } = await import('path');
+    const { getAgentContextStatePath } = await import('../../lib/paths.js');
+    const stalePath = getAgentContextStatePath();
+    mkdirSync(dirname(stalePath), { recursive: true });
+    writeFileSync(stalePath, JSON.stringify({
+      agents: {
+        main: {
+          agentId: 'main',
+          state: 'idle',
+          currentGoal: 'Answer user question',
+          currentThought: 'Standing by for the next task.',
+          currentStep: '',
+          waitingFor: '',
+          lastAction: 'Completed turn',
+          context: [],
+          knownFacts: [],
+          updatedAt: Date.now(),
+        },
+      },
+      updatedAt: Date.now(),
+    }), 'utf8');
+    const staleRead = readAgentContext('main');
+    assert(staleRead.currentGoal === '', `read sanitizes stale idle goal: ${staleRead.currentGoal}`);
 
     const all = readAllAgentContext();
     assert(all.agents.main, 'snapshot includes main');
