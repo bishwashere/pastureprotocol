@@ -292,6 +292,7 @@ body.dashboard-team2-active > nav {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.45rem;
+  align-items: stretch;
 }
 
 @media (max-width: 1100px) {
@@ -304,6 +305,11 @@ body.dashboard-team2-active > nav {
   background: rgba(0,0,0,0.18);
   padding: 0.5rem 0.55rem;
   min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 100%;
 }
 
 button.mc-stat-card-action {
@@ -312,6 +318,9 @@ button.mc-stat-card-action {
   font: inherit;
   color: inherit;
   width: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 button.mc-stat-card-action:hover {
@@ -520,11 +529,15 @@ button.mc-stat-card-action:focus-visible {
   font-size: 0.64rem;
   cursor: pointer;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 .mc-task-card:hover { border-color: #60a5fa; }
 .mc-task-card-title {
-  margin: 0.25rem 0 0.35rem;
-  font-size: 0.66rem;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
   line-height: 1.35;
   color: var(--text);
   display: -webkit-box;
@@ -535,9 +548,21 @@ button.mc-stat-card-action:focus-visible {
 .mc-task-card-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem 0.45rem;
   font-size: 0.58rem;
   color: var(--muted);
+}
+.mc-task-card-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+}
+.mc-task-card-agent .mc-agent-avatar {
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.48rem;
 }
 .mc-task-card-meta .done-tag { color: #60a5fa; }
 
@@ -912,9 +937,11 @@ body.dashboard-team2-active {
 .mc-stat-grid {
   grid-template-columns: repeat(5, minmax(6.2rem, 1fr));
   margin-top: 0.35rem;
+  align-items: stretch;
 }
 
-.mc-stat-card {
+.mc-stat-card,
+button.mc-stat-card.mc-stat-card-action {
   position: relative;
   min-height: 4.9rem;
   padding: 0.5rem 0.55rem;
@@ -923,6 +950,22 @@ body.dashboard-team2-active {
   background:
     radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18), transparent 3.8rem),
     rgba(10, 17, 34, 0.94);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 100%;
+}
+
+button.mc-stat-card.mc-stat-card-action {
+  margin: 0;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 
 .mc-stat-card:nth-child(1) { background-color: rgba(5, 46, 22, 0.28); }

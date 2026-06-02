@@ -287,7 +287,7 @@ const checks = [
       html.includes('id="mc2-tasks-list"') &&
       html.includes('id="mc2-tasks-agent-filter"') &&
       html.includes('mc2RenderTasks') &&
-      html.includes('listCompletedTasks') &&
+      html.includes('mc2TaskDisplayTitle') &&
       html.includes('mc-task-card') &&
       html.includes('View tasks completed today'),
   },

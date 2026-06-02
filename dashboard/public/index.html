@@ -7458,22 +7458,28 @@
       render('mc2-agents-detail');
     }
 
+    function mc2TaskDisplayTitle(task) {
+      var prompt = String(task && task.prompt || '').trim();
+      if (prompt && !/^Handled in \d+/i.test(prompt) && !/^Completed turn/i.test(prompt)) {
+        return prompt.slice(0, 160);
+      }
+      var summary = String(task && task.summary || '').trim();
+      if (summary && !/^Handled in \d+/i.test(summary)) return summary.slice(0, 160);
+      return 'Completed task';
+    }
+
     function mc2TaskCard(task) {
       var agentId = String(task.agentId || '');
       var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
       var name = escapeHtml(agentCardShortName(a));
-      var title = escapeHtml(String(task.prompt || task.summary || 'Completed task').slice(0, 160));
+      var title = escapeHtml(mc2TaskDisplayTitle(task));
       var when = mc2RelTime(Number(task.ts) || Date.now());
       var skills = Number(task.skillCount) || 0;
       var skillsLabel = skills ? (skills + ' skill' + (skills === 1 ? '' : 's')) : 'No tools';
       return '<div class="mc-task-card" data-mc-task-agent="' + escapeHtml(agentId) + '" data-ts="' + escapeHtml(String(task.ts || '')) + '">' +
-        '<div class="mc-kanban-card-head">' +
-          mc2AvatarHtml(a) +
-          '<span class="mc-agent-role">' + name + '</span>' +
-          '<span class="mc-agent-state-dot idle" aria-hidden="true"></span>' +
-        '</div>' +
         '<div class="mc-task-card-title">' + title + '</div>' +
         '<div class="mc-task-card-meta">' +
+          '<span class="mc-task-card-agent">' + mc2AvatarHtml(a) + '<span>' + name + '</span></span>' +
           '<span class="done-tag">Done</span>' +
           '<span>' + escapeHtml(when) + '</span>' +
           '<span>' + escapeHtml(skillsLabel) + '</span>' +
