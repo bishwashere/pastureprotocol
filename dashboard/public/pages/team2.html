@@ -169,7 +169,15 @@
 
         <!-- Activity view -->
         <div id="mc2-view-activity" class="mc-view" hidden>
-          <p class="mc-section-title">LIVE ACTIVITY</p>
+          <div class="mc-activity-toolbar">
+            <p class="mc-section-title">LIVE ACTIVITY</p>
+            <label class="mc-agent-filter" for="mc2-inbox-agent-filter">
+              <span>Agent</span>
+              <select id="mc2-inbox-agent-filter" aria-label="Filter inbox by agent">
+                <option value="">All agents</option>
+              </select>
+            </label>
+          </div>
           <div id="mc2-activity-feed" style="display:flex;flex-direction:column;gap:0.2rem;">
             <p style="color:var(--muted);font-size:0.66rem;">No activity yet.</p>
           </div>
