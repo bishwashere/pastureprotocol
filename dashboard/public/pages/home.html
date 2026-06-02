@@ -1,0 +1,69 @@
+<div id="page-home" class="page active">
+    <div class="chat-page-split">
+      <div class="chat-upper">
+        <div class="chat-upper-left card">
+          <div>
+            <span id="chat-status-dot" class="status-dot stopped"></span>
+            <span id="chat-status-text">Checking…</span>
+          </div>
+          <div class="url-box">
+            Dashboard: <strong id="chat-dashboard-url">—</strong>
+          </div>
+          <div class="overview-grid">
+            <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="chat-overview-uptime">—</span></div>
+            <div class="overview-item"><span class="overview-label">Crons activated</span><span id="chat-overview-crons">—</span></div>
+            <div class="overview-item"><span class="overview-label">Skills activated</span><span id="chat-overview-skills">—</span></div>
+            <div class="overview-item"><span class="overview-label">Group restrictions</span><span id="chat-overview-group-skills">—</span></div>
+            <div class="overview-item"><span class="overview-label">Priority model</span><span id="chat-overview-model">—</span></div>
+            <div class="overview-item"><span class="overview-label">Time zone</span><span id="chat-overview-timezone">—</span></div>
+            <div class="overview-item"><span class="overview-label">Time format</span><span id="chat-overview-time-format">—</span></div>
+          </div>
+          <div class="home-soul-section">
+            <span class="overview-label">Identity & memory</span>
+            <div class="soul-tiles-grid" id="home-identity-tiles"></div>
+          </div>
+        </div>
+        <div class="chat-upper-right card">
+          <div class="chat-upper-right-head">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+              <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
+              <div style="display:flex; align-items:center; gap:0.35rem;">
+                <button type="button" id="agent-team-ext-btn" class="agent-team-ext-btn" title="Open full team page" aria-label="Open full team page">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8a2 2 0 0 1 2 2v1h1.5a.5.5 0 0 1 .4.8l-2.2 2.93a.5.5 0 0 1-.4.2H12v4.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13.5V2zm1 0v11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V7a.5.5 0 0 1 .5-.5h1.29L13.6 5H12a1 1 0 0 1-1-1V3H5zm2.75 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5z"/></svg>
+                </button>
+                <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+              </div>
+            </div>
+            <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click to chat. Tree shows hierarchy; dashed arrows show message-passing links.</p>
+          </div>
+          <div id="agent-map-canvas" class="agent-map-canvas">
+            <div id="agent-map-scaler" class="agent-map-scaler">
+              <div id="agent-map-canvas-inner" class="agent-map-canvas-inner">
+                <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+                <div id="agent-map-nodes" class="agent-map-nodes"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-lower">
+        <div class="chat-layout card" style="padding:0;">
+          <div class="chat-toolbar" style="position:relative;">
+            <span class="skill-meta" style="margin:0;">Agent</span>
+            <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
+            <button type="button" id="chat-agent-create-btn" class="chat-toolbar-btn" title="Create a new agent">+ Agent</button>
+            <button type="button" id="chat-new-btn" class="chat-toolbar-btn" title="Start a new conversation">New</button>
+            <button type="button" id="chat-history-btn" class="chat-toolbar-btn" title="Browse past conversations">History</button>
+            <div id="chat-history-panel" class="chat-history-panel"></div>
+          </div>
+          <div id="chat-messages" class="chat-messages">
+            <div id="chat-messages-inner" class="chat-messages-inner"></div>
+          </div>
+          <div class="chat-input-area">
+            <textarea id="chat-input" placeholder="Message the LLM…" rows="1"></textarea>
+            <button type="button" id="chat-send">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

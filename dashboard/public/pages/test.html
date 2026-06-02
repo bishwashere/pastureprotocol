@@ -1,0 +1,30 @@
+<div id="page-test" class="page">
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:0.65rem 0.75rem; border-bottom:1px solid var(--border);">
+        <h2 style="margin:0; font-size:1rem;">Skill tests</h2>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
+          <button type="button" id="test-run-skill" style="font-size:0.8rem;" disabled title="Run E2E for the selected skill">Run skill</button>
+          <button type="button" id="test-run-all" style="font-size:0.8rem;">Run all</button>
+        </div>
+      </div>
+      <div id="test-overview-tiles" class="test-overview-tiles"></div>
+      <div class="test-master-detail">
+        <div id="test-sidebar" class="test-sidebar"></div>
+        <div id="test-detail-area" class="test-detail-area">
+          <div class="test-detail-pane">
+            <div class="test-detail-pane-header">Input</div>
+            <div id="test-detail-input" class="test-detail-pane-body">
+              <div class="test-detail-empty">Select a test from the list</div>
+            </div>
+          </div>
+          <div class="test-detail-pane">
+            <div class="test-detail-pane-header">Output</div>
+            <div id="test-detail-output" class="test-detail-pane-body">
+              <div class="test-detail-empty">Select a test from the list</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

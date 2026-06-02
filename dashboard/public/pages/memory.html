@@ -1,0 +1,107 @@
+<div id="page-memory" class="page">
+
+    <!-- Tile row -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="memory-tiles" id="memory-tiles">
+        <button type="button" class="memory-tile active" data-tile="today">
+          <span class="memory-tile-icon">📅</span>
+          <div class="memory-tile-title">Today</div>
+          <div class="memory-tile-stat" id="mtile-today-stat">Loading…</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="yesterday">
+          <span class="memory-tile-icon">🗓</span>
+          <div class="memory-tile-title">Yesterday</div>
+          <div class="memory-tile-stat" id="mtile-yesterday-stat">—</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="longterm">
+          <span class="memory-tile-icon">🧠</span>
+          <div class="memory-tile-title">Long-term</div>
+          <div class="memory-tile-stat">MEMORY.md</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="history">
+          <span class="memory-tile-icon">💬</span>
+          <div class="memory-tile-title">History</div>
+          <div class="memory-tile-stat" id="mtile-history-stat">—</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="notes">
+          <span class="memory-tile-icon">📝</span>
+          <div class="memory-tile-title">Notes</div>
+          <div class="memory-tile-stat" id="mtile-notes-stat">—</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Today panel -->
+    <div id="mem-panel-today" class="mem-panel card active">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.5rem;">
+        <h2 style="margin:0; font-size:1rem;">Today</h2>
+        <span class="skill-meta" id="mem-today-date-label"></span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.65rem 0;">Read-only conversation log for today.</p>
+      <textarea id="mem-today-textarea" class="mem-log-textarea" readonly placeholder="No conversations today yet."></textarea>
+    </div>
+
+    <!-- Yesterday panel -->
+    <div id="mem-panel-yesterday" class="mem-panel card">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.5rem;">
+        <h2 style="margin:0; font-size:1rem;">Yesterday</h2>
+        <span class="skill-meta" id="mem-yesterday-date-label"></span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.65rem 0;">Read-only conversation log for yesterday.</p>
+      <textarea id="mem-yesterday-textarea" class="mem-log-textarea" readonly placeholder="No conversations yesterday."></textarea>
+    </div>
+
+    <!-- Long-term panel -->
+    <div id="mem-panel-longterm" class="mem-panel card">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.4rem;">
+        <h2 style="margin:0; font-size:1rem;">Long-term memory</h2>
+        <span class="skill-meta">MEMORY.md</span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Persistent notes the agent keeps about you — preferences, facts, important decisions. Fully editable.</p>
+      <textarea id="mem-longterm-textarea" class="mem-edit-textarea" spellcheck="false" placeholder="Nothing saved yet. Ask the agent to remember something."></textarea>
+      <div style="margin-top:0.6rem; display:flex; align-items:center; gap:0.75rem;">
+        <button id="mem-longterm-save" type="button">Save</button>
+        <span id="mem-longterm-saved" style="color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
+      </div>
+    </div>
+
+    <!-- History panel (split layout) -->
+    <div id="mem-panel-history" class="mem-panel">
+      <div class="groups-layout">
+        <div class="groups-sidebar card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Chat history</h2>
+          <p class="skill-meta" style="margin:0 0 0.6rem 0;">All conversation days, newest first.</p>
+          <ul id="mem-history-list" class="groups-ul"></ul>
+        </div>
+        <div class="groups-main">
+          <div class="groups-detail card">
+            <h2 style="margin:0 0 0.4rem 0; font-size:1rem;" id="mem-history-detail-title">Select a day</h2>
+            <p class="skill-meta" id="mem-history-detail-meta" style="margin:0 0 0.5rem 0;"></p>
+            <textarea id="mem-history-textarea" class="mem-log-textarea" readonly placeholder="Select a day from the list to view the conversation."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes panel (split layout) -->
+    <div id="mem-panel-notes" class="mem-panel">
+      <div class="groups-layout">
+        <div class="groups-sidebar card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Notes</h2>
+          <p class="skill-meta" style="margin:0 0 0.6rem 0;">Custom memory files like preferences.md.</p>
+          <ul id="mem-notes-list" class="groups-ul"></ul>
+        </div>
+        <div class="groups-main">
+          <div class="groups-detail card">
+            <h2 style="margin:0 0 0.4rem 0; font-size:1rem;" id="mem-notes-detail-title">Select a file</h2>
+            <textarea id="mem-notes-textarea" class="mem-edit-textarea" spellcheck="false" placeholder="Select a file from the list."></textarea>
+            <div id="mem-notes-actions" style="margin-top:0.6rem; display:none; align-items:center; gap:0.75rem;">
+              <button id="mem-notes-save" type="button">Save</button>
+              <span id="mem-notes-saved" style="color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>

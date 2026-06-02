@@ -1,0 +1,33 @@
+<div id="page-tide" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Tide checklist</h2>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Each item runs as one agent turn (same LLM and skills as chat), executed in order. Requires <code>tide.enabled</code> for automatic runs.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:0.75rem; align-items:center;">
+        <label><input type="checkbox" id="tide-enabled"> Tide enabled</label>
+        <label><input type="checkbox" id="tide-checklist-enabled"> Checklist enabled</label>
+        <button type="button" id="tide-checklist-run">Run now</button>
+        <span id="tide-checklist-run-status" class="skill-meta"></span>
+      </div>
+      <p class="overview-label" style="margin:0 0 0.35rem 0;">Triggers</p>
+      <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:0.75rem;">
+        <label><input type="checkbox" id="tide-trigger-restart"> On daemon restart</label>
+        <label><input type="checkbox" id="tide-trigger-cycle"> On health-check cycle</label>
+        <label><input type="checkbox" id="tide-trigger-followup"> On follow-up (per chat)</label>
+      </div>
+      <button type="button" id="tide-checklist-save-triggers">Save Tide settings</button>
+      <span id="tide-checklist-saved" style="color: var(--green); font-size:0.85rem; display:none; margin-left:0.5rem;">Saved.</span>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Checklist items</h3>
+      <div id="tide-checklist-items"></div>
+      <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+        <input type="text" id="tide-new-label" placeholder="Short label" />
+        <textarea id="tide-new-prompt" placeholder="Prompt for the agent (what to check). Defaults to label if empty." rows="2" style="width:100%; font-family:inherit;"></textarea>
+        <button type="button" id="tide-checklist-add" style="align-self:flex-start;">Add item</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Last run</h3>
+      <pre id="tide-checklist-last" class="config-json-editable" style="min-height:4rem; font-size:0.78rem;">—</pre>
+    </div>
+  </div>

@@ -1,0 +1,36 @@
+<div id="page-agents" class="page">
+    <div class="groups-layout">
+      <div class="groups-sidebar card">
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Agents</h2>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Default <code>main</code> exists automatically. Create additional agents here.</p>
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
+          <input id="agent-create-name" type="text" placeholder="Agent name (e.g. Alex, Backend Bot)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
+          <button id="agent-create-btn" type="button" style="margin-top:0;">Create</button>
+        </div>
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
+          <button id="agent-delete-btn" type="button" style="margin-top:0; background:var(--red); color:#fff;">Delete selected</button>
+        </div>
+        <ul id="agents-list" class="groups-ul"></ul>
+      </div>
+      <div class="groups-main">
+        <div class="card">
+          <h2 id="agent-detail-title" style="margin:0 0 0.5rem 0; font-size:1rem;">Select an agent</h2>
+          <p id="agent-detail-meta" class="skill-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="agent-skills-list"></div>
+          <button id="agent-skills-save" style="display:none;">Save skills</button>
+        </div>
+        <div class="card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Identity files</h2>
+          <div id="agent-md-files" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;"></div>
+          <div id="agent-md-editor" style="display:none;">
+            <div id="agent-md-label" class="skill-meta" style="margin-bottom:0.4rem;"></div>
+            <textarea id="agent-md-textarea" spellcheck="false" style="width:100%; min-height:14rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.75rem; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+            <div>
+              <button id="agent-md-save" type="button">Save file</button>
+              <span id="agent-md-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

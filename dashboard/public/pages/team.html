@@ -1,0 +1,204 @@
+<div id="page-team" class="page">
+    <div class="card team-page-card">
+      <div class="team-page-head">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+          <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <button type="button" id="team-page-fullscreen-btn" class="agent-team-ext-btn" title="Full screen" aria-label="Full screen" aria-pressed="false">
+              <svg id="team-page-fullscreen-enter-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm13 0a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1 0-1h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+              <svg id="team-page-fullscreen-exit-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 5.5 0h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5zm4 0h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 1 0v-3A1.5 1.5 0 0 0 10.5 0h-3a.5.5 0 0 1 0 1zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1 14.5zm14 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+            </button>
+            <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          </div>
+        </div>
+        <div class="team-top-tabs" role="tablist">
+          <button type="button" id="team-top-tab-roster" class="team-top-tab active" data-team-top="roster" role="tab" aria-selected="true">Roster</button>
+          <button type="button" id="team-top-tab-goals" class="team-top-tab" data-team-top="goals" role="tab" aria-selected="false">Goals</button>
+          <button type="button" id="team-top-tab-initiatives" class="team-top-tab" data-team-top="initiatives" role="tab" aria-selected="false">Initiatives</button>
+        </div>
+        <p id="team-top-tab-desc" class="skill-meta" style="margin:0 0 0.45rem 0;">Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.</p>
+        <div class="team-page-summary">
+          <aside id="team-current-mission" class="team-current-mission" aria-label="Current mission">
+            <h3 class="team-current-mission-title">Current Mission</h3>
+            <p class="team-current-mission-empty">Loading mission…</p>
+          </aside>
+          <section id="team-task-summary" class="team-task-summary" aria-label="Task summary">
+            <div class="team-task-summary-head">
+              <h3 class="team-task-summary-title">Tasks</h3>
+              <div id="team-task-summary-badges" class="team-task-summary-badges"></div>
+            </div>
+            <p id="team-task-blocked" class="team-task-summary-line"><strong>Blocked:</strong> …</p>
+          </section>
+        </div>
+      </div>
+      <div class="team-page-body">
+        <div id="team-roster-view" class="team-roster-view">
+          <div class="team-map-wrap">
+            <div class="team-view-toolbar">
+              <div class="team-view-tabs" role="tablist">
+                <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
+                <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+              </div>
+              <label class="team-view-active-toggle" for="team-view-active-only">
+                <input type="checkbox" id="team-view-active-only">
+                View Active Only
+              </label>
+            </div>
+            <div id="team-cards-view" class="team-cards-view">
+              <div id="team-agent-cards" class="team-agent-cards-row">
+                <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">Loading agents…</p>
+              </div>
+            </div>
+            <div id="team-tree-view" class="team-tree-view" hidden>
+            <div id="team-map-canvas" class="agent-map-canvas">
+              <div id="team-map-scaler" class="agent-map-scaler">
+                <div id="team-map-canvas-inner" class="agent-map-canvas-inner">
+                  <svg id="team-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+                  <div id="team-map-nodes" class="agent-map-nodes"></div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div id="team-roster-side" class="team-roster-side">
+            <div id="team-activity-wrap" class="team-rail-wrap team-activity-wrap collapsed">
+              <div class="team-rail-shell team-activity-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title team-activity-title">Live agent activity</h3>
+                  <span id="team-activity-status" class="team-activity-status">Idle</span>
+                  <button type="button" id="team-activity-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
+                </div>
+                <div id="team-activity-list" class="team-rail-body team-activity-list">
+                  <p class="team-activity-empty">No activity yet.</p>
+                </div>
+              </div>
+            </div>
+            <div id="team-context-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Active Context</h3>
+                  <button type="button" id="team-context-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand active context panel">Context</button>
+                </div>
+                <div class="team-rail-body">
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-context-title">Active Context</h3>
+                    <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
+                  </div>
+                  <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
+                  <div id="team-agent-context-detail" class="team-agent-context-list team-agent-rail-scroll">
+                    <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="team-inbox-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Inbox</h3>
+                  <button type="button" id="team-inbox-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand inbox panel">Inbox</button>
+                </div>
+                <div class="team-rail-body">
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-inbox-title">Agent Inbox</h3>
+                    <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Tasks and assignments received</span>
+                  </div>
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Inbox time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-inbox-list" class="team-agent-inbox-list team-agent-rail-scroll">
+                    <p class="team-agent-inbox-empty">Select an agent to view incoming activity.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="team-outbox-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Outbox</h3>
+                  <button type="button" id="team-outbox-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand outbox panel">Outbox</button>
+                </div>
+                <div class="team-rail-body">
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-outbox-title">Agent Outbox</h3>
+                    <span id="team-agent-outbox-subtitle" class="team-agent-inbox-sub">Delegations and replies sent</span>
+                  </div>
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Outbox time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-outbox-list" class="team-agent-inbox-list team-agent-rail-scroll">
+                    <p class="team-agent-inbox-empty">Select an agent to view outgoing activity.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="team-stats-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Stats</h3>
+                  <button type="button" id="team-stats-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand stats panel">Stats</button>
+                </div>
+                <div class="team-rail-body">
+                  <div class="team-agent-inbox-head">
+                    <h3 id="team-agent-stats-title">Agent Metrics</h3>
+                    <span id="team-agent-stats-subtitle" class="team-agent-inbox-sub">Historical performance</span>
+                  </div>
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Stats time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-stats-detail" class="team-agent-metrics-list team-agent-rail-scroll">
+                    <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="team-goals-view" class="team-goals-view" hidden>
+          <div class="team-goals-main">
+            <div class="team-goals-head">
+              <h3 style="margin:0; font-size:0.9rem;">Goals</h3>
+              <button type="button" id="team-goals-refresh" class="secondary" style="margin:0;">Refresh</button>
+            </div>
+            <div class="team-goals-new">
+              <input id="team-goal-title" type="text" placeholder="Goal title (optional)">
+              <input id="team-goal-objective" type="text" placeholder="High-level objective">
+              <select id="team-goal-owner"></select>
+              <button type="button" id="team-goal-create" style="margin:0;">New Goal</button>
+            </div>
+            <div id="team-goals-list" class="team-goals-list">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>
+            </div>
+            <div id="team-goal-detail" class="team-goal-detail">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a goal to view details and subgoals.</p>
+            </div>
+          </div>
+        </div>
+        <div id="team-initiatives-view" class="team-initiatives-view" hidden>
+          <div class="team-initiatives-main">
+            <div class="team-goals-head">
+              <h3 style="margin:0; font-size:0.9rem;">Initiatives</h3>
+              <button type="button" id="team-initiatives-refresh" class="secondary" style="margin:0;">Refresh</button>
+            </div>
+            <div id="team-initiatives-list" class="team-initiatives-list">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>
+            </div>
+            <div id="team-initiative-detail" class="team-initiative-detail">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

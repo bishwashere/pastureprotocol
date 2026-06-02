@@ -7,7 +7,16 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const htmlPath = path.join(__dirname, '../../dashboard/public/index.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
+const publicDir = path.dirname(htmlPath);
+const pagesDir = path.join(publicDir, 'pages');
+const pageFragments = fs.existsSync(pagesDir)
+  ? fs.readdirSync(pagesDir)
+    .filter((name) => name.endsWith('.html'))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(pagesDir, name), 'utf8'))
+    .join('\n')
+  : '';
+const html = fs.readFileSync(htmlPath, 'utf8') + '\n' + pageFragments;
 
 const checks = [
   {

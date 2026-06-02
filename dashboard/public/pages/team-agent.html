@@ -1,0 +1,52 @@
+<div id="page-team-agent" class="page">
+    <div class="card team-agent-page">
+      <div class="team-agent-page-head">
+        <button type="button" id="team-agent-back" class="secondary" style="margin:0;">← Team</button>
+        <h2 id="team-agent-heading">Agent</h2>
+      </div>
+      <p class="skill-meta" style="margin:0 0 1rem 0;">Identity, skills, and team links for this agent.</p>
+      <div class="agent-edit-basics">
+        <div class="field">
+          <label for="team-agent-id">Agent id</label>
+          <input id="team-agent-id" type="text" readonly disabled>
+        </div>
+        <div class="field">
+          <label for="team-agent-title">Title <span class="skill-meta">(optional)</span></label>
+          <input id="team-agent-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Identity files</label>
+        <p class="field-hint" style="margin:0;">Soul, WhoAmI, MyHuman, group rules, and memory for this agent.</p>
+        <div id="team-agent-md-files" class="agent-edit-md-files"></div>
+        <div id="team-agent-md-editor" style="display:none; margin-top:0.65rem;">
+          <div id="team-agent-md-label" class="skill-meta" style="margin-bottom:0.35rem;"></div>
+          <textarea id="team-agent-md-textarea" class="agent-edit-md-textarea" spellcheck="false"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button type="button" id="team-agent-md-save" class="secondary" style="margin-top:0;">Save file</button>
+            <span id="team-agent-md-saved">Saved.</span>
+          </div>
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Skills</label>
+        <p class="field-hint" style="margin:0;">Click tiles to enable or disable skills for this agent.</p>
+        <div id="team-agent-skills" class="agent-edit-tiles-grid"></div>
+      </div>
+      <div class="agent-edit-messaging-block">
+        <div id="team-agent-links-wrap" class="field agent-edit-section">
+          <div id="team-agent-inbound-wrap" class="field" style="display:none; margin-bottom:0.65rem;">
+            <label>Receives delegation from</label>
+            <p id="team-agent-inbound" class="skill-meta" style="margin:0;"></p>
+          </div>
+          <label>Can delegate to</label>
+          <p class="field-hint" style="margin:0;">Outbound team links. Other agents that link here show ← on the map (reply path is automatic).</p>
+          <div id="team-agent-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
+        </div>
+      </div>
+      <p id="team-agent-error" class="modal-error" role="alert"></p>
+      <div style="margin-top:0.75rem;">
+        <button type="button" id="team-agent-save">Save</button>
+      </div>
+    </div>
+  </div>

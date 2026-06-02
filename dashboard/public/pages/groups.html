@@ -1,0 +1,38 @@
+<div id="page-groups" class="page">
+    <div class="groups-layout">
+      <div class="groups-sidebar card">
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Groups</h2>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Assign each group to an agent, then apply additional restrictions for that group.</p>
+        <ul id="groups-list" class="groups-ul"></ul>
+      </div>
+      <div class="groups-main">
+        <div id="groups-detail-content" class="groups-detail card">
+          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Select a group</h2>
+          <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="groups-detail-sub-nav" class="group-sub-nav" style="display:none;">
+            <button type="button" data-group-tab="skills" class="active">Restrictions</button>
+            <button type="button" data-group-tab="agent">Agent</button>
+            <button type="button" data-group-tab="history">History</button>
+          </div>
+          <div id="groups-detail-skills" class="group-sub-panel active">
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Additional restrictions for this group only. This is a deny list layered on top of the selected agent.</p>
+            <div id="group-skills-list"></div>
+            <button id="group-skills-save" style="display:none;">Save restrictions</button>
+          </div>
+          <div id="groups-detail-agent" class="group-sub-panel">
+            <p class="skill-meta" style="margin:0 0 0.75rem 0;">Choose which agent serves this group.</p>
+            <div class="field" style="margin-top:0.25rem;">
+              <label>Agent</label>
+              <select id="group-agent-select" style="width:100%; max-width:24rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.9rem;"></select>
+            </div>
+            <button id="group-agent-save" type="button">Save agent</button>
+            <span id="group-agent-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+          </div>
+          <div id="groups-detail-history" class="group-sub-panel">
+            <div id="history-stats" class="history-stats"></div>
+            <div id="history-log-files" class="history-log-files"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

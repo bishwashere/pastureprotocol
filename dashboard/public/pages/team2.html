@@ -1,0 +1,174 @@
+<div id="page-team2" class="page">
+    <div class="card mc-shell">
+      <!-- Sidebar -->
+      <nav class="mc-sidebar" aria-label="Mission Control navigation">
+        <div class="mc-sidebar-logo" aria-hidden="true">♞</div>
+        <div class="mc-sidebar-nav">
+          <button type="button" class="mc-nav-item active" data-mc-nav="mission" aria-label="Mission">
+            <span class="mc-nav-icon">⌂</span><span class="mc-nav-label">Mission</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Agents">
+            <span class="mc-nav-icon">♙</span><span class="mc-nav-label">Agents</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Initiatives">
+            <span class="mc-nav-icon">ϟ</span><span class="mc-nav-label">Initiatives</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Inbox">
+            <span class="mc-nav-icon">□</span><span class="mc-nav-label">Inbox</span><span class="mc-nav-badge" id="mc2-inbox-badge">3</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Outbox">
+            <span class="mc-nav-icon">⇄</span><span class="mc-nav-label">Outbox</span><span class="mc-nav-badge" id="mc2-outbox-badge">2</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Activity">
+            <span class="mc-nav-icon">⌁</span><span class="mc-nav-label">Activity</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Goals">
+            <span class="mc-nav-icon">◎</span><span class="mc-nav-label">Goals</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Reports">
+            <span class="mc-nav-icon">▥</span><span class="mc-nav-label">Reports</span>
+          </button>
+          <div style="margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border);margin-bottom:0.35rem;"></div>
+          <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Settings">
+            <span class="mc-nav-icon">⚙</span><span class="mc-nav-label">Settings</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="back" aria-label="Back to old Team view" title="Back to classic Team view">
+            <span class="mc-nav-icon">←</span><span class="mc-nav-label">Classic</span>
+          </button>
+        </div>
+        <div class="mc-sidebar-footer">
+          <strong id="mc2-actions-rate">—</strong>
+          actions/min
+        </div>
+      </nav>
+
+      <!-- Main content -->
+      <div class="mc-main">
+        <!-- Header -->
+        <header class="mc-header">
+          <h1 class="mc-header-title">MISSION CONTROL</h1>
+          <span class="mc-header-pulse" aria-hidden="true">〜</span>
+          <div class="mc-mission-select-wrap">
+            <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission / goal">
+              <option value="">No active mission</option>
+            </select>
+          </div>
+          <div class="mc-header-actions">
+            <span class="mc-live-badge" id="mc2-live-badge">
+              <span class="mc-live-dot"></span>Live <span class="mc-mini-pulse" aria-hidden="true">⌁</span>
+            </span>
+            <button type="button" class="mc-icon-btn" aria-label="Notifications">♢</button>
+            <span class="mc-profile-dot" aria-hidden="true">BM</span>
+            <button type="button" id="mc2-add-agent-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          </div>
+        </header>
+
+        <!-- Mission view -->
+        <div id="mc2-view-mission" class="mc-view" role="main">
+          <!-- Progress row -->
+          <div class="mc-progress-row">
+            <div class="mc-progress-card">
+              <div class="mc-progress-head">
+                <h3>MISSION PROGRESS</h3>
+                <span class="mc-progress-meta" id="mc2-progress-label">— / — tasks completed</span>
+                <span class="mc-progress-meta" id="mc2-eta-label"></span>
+              </div>
+              <div class="mc-progress-bar"><span id="mc2-progress-bar-fill" style="width:0%"></span></div>
+              <div class="mc-stat-grid">
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Active</div>
+                  <div class="mc-stat-value active" id="mc2-stat-active">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Waiting</div>
+                  <div class="mc-stat-value waiting" id="mc2-stat-waiting">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Blocked</div>
+                  <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Done Today</div>
+                  <div class="mc-stat-value done" id="mc2-stat-done">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Team Pace</div>
+                  <div class="mc-stat-value pace" id="mc2-stat-pace">—/hr</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kanban columns -->
+          <div class="mc-kanban">
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">NOW <span class="mc-kanban-col-count" id="mc2-col-count-working">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-working"><p class="mc-kanban-empty">No active work</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">NEXT <span class="mc-kanban-col-count" id="mc2-col-count-next">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-next"><p class="mc-kanban-empty">Nothing queued</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">WAITING <span class="mc-kanban-col-count" id="mc2-col-count-waiting">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-waiting"><p class="mc-kanban-empty">No agents waiting</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">BLOCKED <span class="mc-kanban-col-count" id="mc2-col-count-blocked">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-blocked"><p class="mc-kanban-empty">All clear</p></div>
+            </div>
+          </div>
+
+          <!-- Agents overview -->
+          <div>
+            <p class="mc-section-title">AGENTS OVERVIEW</p>
+            <div class="mc-agents-overview" id="mc2-agents-overview">
+              <p style="color:var(--muted);font-size:0.66rem;">Loading agents…</p>
+            </div>
+          </div>
+
+          <!-- Bottom row -->
+          <div class="mc-bottom-row">
+            <div class="mc-panel">
+              <p class="mc-section-title">RECENT MOVEMENT</p>
+              <div class="mc-panel-body" id="mc2-recent-movement">
+                <p class="mc-kanban-empty">No activity yet.</p>
+              </div>
+              <button type="button" class="mc-panel-link" data-mc-nav="activity">View all activity →</button>
+            </div>
+            <div class="mc-panel">
+              <p class="mc-section-title">ATTENTION NEEDED</p>
+              <div class="mc-panel-body" id="mc2-attention">
+                <p class="mc-kanban-empty">All clear.</p>
+              </div>
+              <button type="button" class="mc-panel-link" data-mc-nav="agents">View all blockers →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agents view -->
+        <div id="mc2-view-agents" class="mc-view" hidden>
+          <p class="mc-section-title">ALL AGENTS</p>
+          <div class="mc-agents-overview" id="mc2-agents-detail">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading agents…</p>
+          </div>
+        </div>
+
+        <!-- Goals view -->
+        <div id="mc2-view-goals" class="mc-view" hidden>
+          <p class="mc-section-title">GOALS</p>
+          <div id="mc2-goals-list" style="display:flex;flex-direction:column;gap:0.45rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading goals…</p>
+          </div>
+        </div>
+
+        <!-- Activity view -->
+        <div id="mc2-view-activity" class="mc-view" hidden>
+          <p class="mc-section-title">LIVE ACTIVITY</p>
+          <div id="mc2-activity-feed" style="display:flex;flex-direction:column;gap:0.2rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">No activity yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

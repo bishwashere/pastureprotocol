@@ -1,0 +1,30 @@
+<div id="page-projects" class="page">
+    <!-- Login screen (shown when not authenticated) -->
+    <div id="proj-login-screen" style="display:none; padding:1rem;">
+      <div class="proj-login card">
+        <h2>Projects — Sign In</h2>
+        <div id="proj-login-err" class="proj-login-err" style="display:none;"></div>
+        <input type="text" id="proj-user" placeholder="Username" autocomplete="username" />
+        <input type="password" id="proj-pass" placeholder="Password" autocomplete="current-password" />
+        <button id="proj-login-btn">Sign In</button>
+        <p id="proj-default-hint" class="proj-default-hint" style="display:none;">
+          Default credentials: <strong>admin</strong> / <strong>cowcode</strong>
+        </p>
+      </div>
+    </div>
+    <!-- Main workspace (shown when authenticated) -->
+    <div id="proj-main" style="display:none;">
+      <div class="proj-workspace">
+        <div class="proj-toolbar">
+          <input id="proj-new-name" type="text" placeholder="Project name…" />
+          <input id="proj-new-url" type="url" placeholder="URL (optional)…" />
+          <input id="proj-new-desc" type="text" placeholder="Description (optional)…" />
+          <button id="proj-add-btn">+ Add Project</button>
+          <button class="proj-logout" id="proj-logout-btn">Sign out</button>
+        </div>
+        <div class="proj-canvas" id="proj-canvas">
+          <div class="proj-empty" id="proj-empty">No projects yet. Add one above.</div>
+        </div>
+      </div>
+    </div>
+  </div>
