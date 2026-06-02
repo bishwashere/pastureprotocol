@@ -6659,6 +6659,277 @@
       return escapeHtml(type || 'event');
     }
 
+    function formatTeamActivitySubline(event) {
+      var type = String(event && event.type || '');
+      var agent = agentNameById(String(event && event.agentId || ''));
+      var target = agentNameById(String(event && event.targetAgentId || ''));
+      var skill = String(event && event.skillId || '');
+      var action = String(event && event.action || '');
+      var msg = String(event && event.message || '');
+      if (type === 'skill_start') {
+        var task = action ? (skill + ':' + action) : skill;
+        return 'Started <span class="accent">' + escapeHtml(task || 'task') + '</span>.';
+      }
+      if (type === 'skill_done') {
+        var doneLabel = action ? (skill + ':' + action) : skill;
+        return 'Completed <span class="accent">' + escapeHtml(doneLabel || 'task') + '</span>.';
+      }
+      if (type === 'skill_error') {
+        return 'Failed <span class="accent">' + escapeHtml(skill || 'task') + '</span>: ' + escapeHtml(msg || 'Error');
+      }
+      if (type === 'turn_start') {
+        return 'New task: ' + escapeHtml(msg || 'request');
+      }
+      if (type === 'turn_done') {
+        return 'Finished the task. ' + escapeHtml(msg || '');
+      }
+      if (type === 'delegation_decision') {
+        return 'Delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.';
+      }
+      if (type === 'delegation_start') {
+        var routeNote = msg ? (' — ' + escapeHtml(msg)) : '';
+        return 'Delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + routeNote;
+      }
+      if (type === 'delegation_done') {
+        var doneNote = msg ? (' — ' + escapeHtml(msg)) : '';
+        return 'Reply from <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + doneNote;
+      }
+      if (type === 'delegation_error') {
+        return 'Delegation to <span class="accent">' + escapeHtml(target || 'agent') + '</span> failed: ' + escapeHtml(msg || 'Error');
+      }
+      if (msg) return escapeHtml(msg);
+      return escapeHtml(type || 'event');
+    }
+
+    function activityLineKey(line) {
+      return String(line || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    function pushUniqueActivityLine(group, line) {
+      if (!line) return;
+      if (!group._keys) group._keys = {};
+      var key = activityLineKey(line);
+      if (!key || group._keys[key]) return;
+      group._keys[key] = true;
+      group.lines.push(line);
+    }
+
+    function compressTurnSkillEvents(events) {
+      var out = [];
+      for (var i = 0; i < events.length; i++) {
+        var ev = events[i];
+        var type = String(ev && ev.type || '');
+        if (type === 'skill_start') {
+          var next = events[i + 1];
+          if (next && String(next.type || '') === 'skill_done' && String(next.skillId || '') === String(ev.skillId || '')) {
+            continue;
+          }
+        }
+        out.push(ev);
+      }
+      return out;
+    }
+
+    function groupTeamActivityEvents(events) {
+      var sorted = (events || []).slice().sort(function (a, b) {
+        return (Number(a && a.ts) || 0) - (Number(b && b.ts) || 0);
+      });
+      var groups = [];
+      var openTurn = {}; // agentId -> group index
+
+      function closeTurn(agentId) {
+        delete openTurn[String(agentId || '')];
+      }
+
+      function startTurn(ev) {
+        var aid = String(ev.agentId || '');
+        closeTurn(aid);
+        var group = {
+          ts: Number(ev.ts) || 0,
+          agentId: aid,
+          events: [ev],
+          lines: [],
+          _keys: {},
+        };
+        pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+        openTurn[aid] = groups.length;
+        groups.push(group);
+        return group;
+      }
+
+      function appendToTurn(ev, group) {
+        group.events.push(ev);
+        group.ts = Math.max(group.ts || 0, Number(ev.ts) || 0);
+        pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+      }
+
+      function appendSkillToTurn(ev) {
+        var aid = String(ev.agentId || '');
+        var idx = openTurn[aid];
+        if (idx === undefined) return false;
+        var group = groups[idx];
+        group.events.push(ev);
+        group.ts = Math.max(group.ts || 0, Number(ev.ts) || 0);
+        return true;
+      }
+
+      function flushSkillBuffer(buffer) {
+        if (!buffer.length) return;
+        var first = buffer[0];
+        var aid = String(first.agentId || '');
+        var group = {
+          ts: Math.max.apply(null, buffer.map(function (e) { return Number(e.ts) || 0; })),
+          agentId: aid,
+          events: buffer.slice(),
+          lines: [],
+          _keys: {},
+        };
+        compressTurnSkillEvents(buffer).forEach(function (ev) {
+          pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+        });
+        if (group.lines.length) groups.push(group);
+      }
+
+      var skillBuffer = [];
+      var skillBufferAgent = '';
+      var skillBufferBucket = -1;
+
+      function skillBucket(ts) {
+        return Math.floor((Number(ts) || 0) / 60000);
+      }
+
+      function flushSkillBufferIfNeeded(ev) {
+        if (!skillBuffer.length) return;
+        var aid = String(ev && ev.agentId || '');
+        var bucket = skillBucket(ev && ev.ts);
+        if (aid !== skillBufferAgent || bucket !== skillBufferBucket) {
+          flushSkillBuffer(skillBuffer);
+          skillBuffer = [];
+          skillBufferAgent = '';
+          skillBufferBucket = -1;
+        }
+      }
+
+      sorted.forEach(function (ev) {
+        var type = String(ev && ev.type || '');
+        var aid = String(ev && ev.agentId || '');
+
+        if (type === 'turn_start') {
+          flushSkillBufferIfNeeded(ev);
+          flushSkillBuffer(skillBuffer);
+          skillBuffer = [];
+          startTurn(ev);
+          return;
+        }
+
+        if (type === 'turn_done') {
+          flushSkillBufferIfNeeded(ev);
+          flushSkillBuffer(skillBuffer);
+          skillBuffer = [];
+          var idx = openTurn[aid];
+          if (idx !== undefined) {
+            appendToTurn(ev, groups[idx]);
+            closeTurn(aid);
+          } else {
+            var solo = {
+              ts: Number(ev.ts) || 0,
+              agentId: aid,
+              events: [ev],
+              lines: [],
+              _keys: {},
+            };
+            pushUniqueActivityLine(solo, formatTeamActivitySubline(ev));
+            groups.push(solo);
+          }
+          return;
+        }
+
+        if (type === 'skill_start' || type === 'skill_done' || type === 'skill_error') {
+          if (appendSkillToTurn(ev)) return;
+          flushSkillBufferIfNeeded(ev);
+          var bucket = skillBucket(ev.ts);
+          if (skillBuffer.length && (aid !== skillBufferAgent || bucket !== skillBufferBucket)) {
+            flushSkillBuffer(skillBuffer);
+            skillBuffer = [];
+          }
+          skillBuffer.push(ev);
+          skillBufferAgent = aid;
+          skillBufferBucket = bucket;
+          return;
+        }
+
+        flushSkillBufferIfNeeded(ev);
+        flushSkillBuffer(skillBuffer);
+        skillBuffer = [];
+        closeTurn(aid);
+        var standalone = {
+          ts: Number(ev.ts) || 0,
+          agentId: aid,
+          events: [ev],
+          lines: [],
+          _keys: {},
+        };
+        pushUniqueActivityLine(standalone, formatTeamActivityText(ev));
+        groups.push(standalone);
+      });
+
+      flushSkillBuffer(skillBuffer);
+
+      groups.forEach(function (group) {
+        if (group.events.length > 1) {
+          var compressed = compressTurnSkillEvents(group.events);
+          if (compressed.length !== group.events.length) {
+            group.lines = [];
+            group._keys = {};
+            compressed.forEach(function (ev) {
+              pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+            });
+          }
+        }
+        delete group._keys;
+        delete group.events;
+      });
+
+      return groups.sort(function (a, b) {
+        return (Number(b.ts) || 0) - (Number(a.ts) || 0);
+      });
+    }
+
+    function renderTeamActivityGroupRow(group, opts) {
+      opts = opts || {};
+      var ts = Number(group && group.ts) || 0;
+      var agentId = String(group && group.agentId || '');
+      var lines = Array.isArray(group && group.lines) ? group.lines : [];
+      if (!lines.length) return '';
+      var timeHtml = opts.timeHtml;
+      if (timeHtml === undefined) {
+        timeHtml = escapeHtml(new Date(ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+      var agentLabel = escapeHtml(agentNameById(agentId) || 'agent');
+      var linesHtml = lines.map(function (line) {
+        return '<div class="mc-activity-line">' + line + '</div>';
+      }).join('');
+      if (opts.style === 'team') {
+        return '<div class="team-activity-item" data-ts="' + escapeHtml(String(ts)) + '">' +
+          '<div class="team-activity-time">' + timeHtml + '</div>' +
+          '<div class="team-activity-text">' +
+            '<div class="mc-activity-agent"><span class="accent">' + agentLabel + '</span></div>' +
+            '<div class="mc-activity-lines">' + linesHtml + '</div>' +
+          '</div>' +
+        '</div>';
+      }
+      var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
+      var avatarHtml = typeof mc2AvatarHtml === 'function' ? mc2AvatarHtml(a) : '';
+      return '<div class="mc-movement-item mc-activity-group" data-ts="' + escapeHtml(String(ts)) + '">' +
+        '<span class="mc-movement-time">' + timeHtml + '</span>' +
+        avatarHtml +
+        '<div class="mc-activity-body">' +
+          '<div class="mc-activity-agent"><span class="accent">' + agentLabel + '</span></div>' +
+          '<div class="mc-activity-lines">' + linesHtml + '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
     function renderTeamActivity() {
       var list = document.getElementById('team-activity-list');
       var statusEl = document.getElementById('team-activity-status');
@@ -6673,12 +6944,10 @@
         var ageMs = Math.max(0, Date.now() - recentTs);
         statusEl.textContent = ageMs < 6000 ? 'Live' : 'Waiting';
       }
-      var rows = teamActivityEvents.slice(-40).reverse().map(function (event) {
-        var time = new Date(event.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        return '<div class="team-activity-item">' +
-          '<div class="team-activity-time">' + escapeHtml(time) + '</div>' +
-          '<div class="team-activity-text">' + formatTeamActivityText(event) + '</div>' +
-        '</div>';
+      var groups = groupTeamActivityEvents(teamActivityEvents.slice(-120)).slice(0, 40);
+      var rows = groups.map(function (group) {
+        var time = new Date(group.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return renderTeamActivityGroupRow(group, { style: 'team', timeHtml: escapeHtml(time) });
       }).join('');
       list.innerHTML = rows || '<p class="team-activity-empty">No activity yet.</p>';
     }
