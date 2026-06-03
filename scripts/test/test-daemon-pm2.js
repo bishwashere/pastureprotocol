@@ -85,6 +85,9 @@ function checkWindowsPs1(filename, opts) {
   if (opts.npmCmd && !src.includes('Get-CowcodeToolPath')) {
     return { ok: false, detail: `${filename} must use npm.cmd (execution policy safe)` };
   }
+  if (opts.npmCmd && !src.includes('Test-CowcodeSupportedNode')) {
+    return { ok: false, detail: `${filename} must reject unsupported Node versions` };
+  }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }
 

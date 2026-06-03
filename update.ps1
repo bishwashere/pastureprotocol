@@ -62,6 +62,38 @@ function Get-CowcodeToolPath {
     return $null
 }
 
+function Get-CowcodeNodeVersion {
+    param([string]$NodePath)
+    try {
+        $out = if ($NodePath) { & $NodePath -v 2>$null } else { node -v 2>$null }
+        if ($LASTEXITCODE -eq 0 -and $out -match '^v?(\d+)\.') {
+            return [pscustomobject]@{
+                Major = [int]$Matches[1]
+                Raw   = "$out"
+            }
+        }
+    } catch { }
+    return $null
+}
+
+function Get-CowcodeToolNodeVersion {
+    param([string]$ToolPath)
+    if ($ToolPath) {
+        $toolDir = Split-Path $ToolPath -Parent
+        $adjacentNode = Join-Path $toolDir "node.exe"
+        if (Test-Path -LiteralPath $adjacentNode) {
+            return Get-CowcodeNodeVersion $adjacentNode
+        }
+    }
+    return Get-CowcodeNodeVersion $null
+}
+
+function Test-CowcodeSupportedNode {
+    param([object]$Version)
+    if (-not $Version) { return $false }
+    return ($Version.Major -ge 18 -and $Version.Major -le 22)
+}
+
 function Test-CowcodeBranchName {
     param([Parameter(Mandatory = $true)][string]$Branch)
     if ([string]::IsNullOrWhiteSpace($Branch)) { return $false }
@@ -277,6 +309,14 @@ try {
         $pnpmCmd = Get-CowcodeToolPath "pnpm"
         if (-not $npmCmd -and -not $pnpmCmd) {
             Write-Host "  [X] npm.cmd not found. Install Node.js from https://nodejs.org/"
+            Exit-Update 1
+        }
+        $packageManagerNode = if ($pnpmCmd) { Get-CowcodeToolNodeVersion $pnpmCmd } else { Get-CowcodeToolNodeVersion $npmCmd }
+        if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
+            $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
+            Write-Host "  [X] Unsupported Node.js version used by npm/pnpm: $found"
+            Write-Host "  cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+            Write-Host "  Install Node.js LTS from https://nodejs.org/ then open a new PowerShell."
             Exit-Update 1
         }
         if (Test-Path "node_modules") {

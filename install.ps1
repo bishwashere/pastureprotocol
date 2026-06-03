@@ -117,6 +117,38 @@ function Get-CowcodeToolPath {
     return $null
 }
 
+function Get-CowcodeNodeVersion {
+    param([string]$NodePath)
+    try {
+        $out = if ($NodePath) { & $NodePath -v 2>$null } else { node -v 2>$null }
+        if ($LASTEXITCODE -eq 0 -and $out -match '^v?(\d+)\.') {
+            return [pscustomobject]@{
+                Major = [int]$Matches[1]
+                Raw   = "$out"
+            }
+        }
+    } catch { }
+    return $null
+}
+
+function Get-CowcodeToolNodeVersion {
+    param([string]$ToolPath)
+    if ($ToolPath) {
+        $toolDir = Split-Path $ToolPath -Parent
+        $adjacentNode = Join-Path $toolDir "node.exe"
+        if (Test-Path -LiteralPath $adjacentNode) {
+            return Get-CowcodeNodeVersion $adjacentNode
+        }
+    }
+    return Get-CowcodeNodeVersion $null
+}
+
+function Test-CowcodeSupportedNode {
+    param([object]$Version)
+    if (-not $Version) { return $false }
+    return ($Version.Major -ge 18 -and $Version.Major -le 22)
+}
+
 function Test-CowcodePm2 {
     Refresh-NodeToolPath
     return [bool](Get-CowcodeToolPath "pm2")
@@ -373,6 +405,11 @@ $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
     Offer-CowcodeNodeJs "Node.js was not found on PATH."
 }
+$nodeVersion = Get-CowcodeNodeVersion $nodeCmd.Source
+if (-not (Test-CowcodeSupportedNode $nodeVersion)) {
+    $found = if ($nodeVersion) { $nodeVersion.Raw } else { "unknown" }
+    Offer-CowcodeNodeJs "Unsupported Node.js version found ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+}
 
 $npmCmd = Get-CowcodeToolPath "npm"
 $pnpmCmd = Get-CowcodeToolPath "pnpm"
@@ -384,6 +421,11 @@ if (-not $hasPnpm -and -not $hasNpm) {
         $reason = "Node from Cursor was found, but that build does not include npm."
     }
     Offer-CowcodeNodeJs $reason
+}
+$packageManagerNode = if ($hasPnpm) { Get-CowcodeToolNodeVersion $pnpmCmd } else { Get-CowcodeToolNodeVersion $npmCmd }
+if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
+    $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
+    Offer-CowcodeNodeJs "npm/pnpm is using unsupported Node.js ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
 }
 
 if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
