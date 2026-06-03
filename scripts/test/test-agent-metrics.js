@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-agent-metrics-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-agent-metrics-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { logTeamActivity } = await import('../../lib/team-activity.js');
     const { computeAgentMetrics, readAgentMetrics } = await import('../../lib/agent-metrics.js');

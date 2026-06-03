@@ -18,7 +18,7 @@ import {
 import { appendExchange, readLastPrivateExchanges } from '../../lib/chat-log.js';
 
 function setup() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-session-test-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-session-test-'));
   const workspaceDir = join(stateDir, 'workspace');
   mkdirSync(workspaceDir, { recursive: true });
   writeFileSync(
@@ -28,7 +28,7 @@ function setup() {
     }, null, 2),
     'utf8'
   );
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
   return { stateDir, workspaceDir };
 }
 

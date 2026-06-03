@@ -1,11 +1,11 @@
-# E2E: install.ps1, cowcode CLI, update.ps1, update --force (Windows)
+# E2E: install.ps1, pasture CLI, update.ps1, update --force (Windows)
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-install-update-win.ps1
 
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 
 $Repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$TestRoot = Join-Path $env:TEMP ("cowcode-win-e2e-" + [guid]::NewGuid().ToString('n').Substring(0, 8))
+$TestRoot = Join-Path $env:TEMP ("pasture-win-e2e-" + [guid]::NewGuid().ToString('n').Substring(0, 8))
 $InstallDir = Join-Path $TestRoot 'install'
 $NodeDir = Join-Path $TestRoot 'node-portable'
 $Results = @()
@@ -63,8 +63,8 @@ function Refresh-NodeToolPathLocal {
 function Cleanup-Test {
     param([string]$LauncherBackup)
     $pm2 = Get-Command pm2.cmd -ErrorAction SilentlyContinue
-    if ($pm2) { & $pm2.Source delete cowcode 2>$null | Out-Null }
-    $launcher = Join-Path $env:USERPROFILE '.local\bin\cowcode.cmd'
+    if ($pm2) { & $pm2.Source delete pasture 2>$null | Out-Null }
+    $launcher = Join-Path $env:USERPROFILE '.local\bin\pasture.cmd'
     if ($LauncherBackup -and (Test-Path $LauncherBackup)) {
         Copy-Item $LauncherBackup $launcher -Force -ErrorAction SilentlyContinue
     } elseif ((Test-Path $launcher) -and (Get-Content $launcher -Raw -ErrorAction SilentlyContinue) -match [regex]::Escape($InstallDir)) {
@@ -76,17 +76,17 @@ function Cleanup-Test {
 }
 
 Write-Host ""
-Write-Host "  cowCode Windows E2E: install + CLI + update"
+Write-Host "  Pasture Protocol Windows E2E: install + CLI + update"
 Write-Host "  Test root: $TestRoot"
 Write-Host ""
 
-$env:COWCODE_NONINTERACTIVE = "1"
+$env:PASTURE_NONINTERACTIVE = "1"
 
 New-Item -ItemType Directory -Path $TestRoot, $InstallDir -Force | Out-Null
-$launcher = Join-Path $env:USERPROFILE '.local\bin\cowcode.cmd'
+$launcher = Join-Path $env:USERPROFILE '.local\bin\pasture.cmd'
 $launcherBackup = $null
 if (Test-Path $launcher) {
-    $launcherBackup = Join-Path $TestRoot 'cowcode.cmd.bak'
+    $launcherBackup = Join-Path $TestRoot 'pasture.cmd.bak'
     Copy-Item $launcher $launcherBackup -Force
 }
 
@@ -99,7 +99,7 @@ if (-not (Ensure-PortableNode22)) {
 } else {
     Add-Case 'setup' 'Node22 + tar + npm.cmd' ("node $(node -v)") $true
 
-    $env:COWCODE_INSTALL_DIR = $InstallDir
+    $env:PASTURE_INSTALL_DIR = $InstallDir
     $installLog = Join-Path $TestRoot 'install.log'
     & (Join-Path $Repo 'install.ps1') -SkipSetup 2>&1 | Out-File $installLog
     $installOk = ($LASTEXITCODE -eq 0) -and (Test-Path (Join-Path $InstallDir 'node_modules\dotenv'))
@@ -108,32 +108,32 @@ if (-not (Ensure-PortableNode22)) {
     if ($installOk) {
         $binDir = Join-Path $env:USERPROFILE '.local\bin'
         $env:Path = "$binDir;$env:Path"
-        $env:COWCODE_INSTALL_DIR = $InstallDir
+        $env:PASTURE_INSTALL_DIR = $InstallDir
         $cli = Join-Path $InstallDir 'cli.js'
 
         & node $cli status 2>&1 | Out-Null
-        Add-Case 'cowcode status' 'before start' "exit=$LASTEXITCODE" ($LASTEXITCODE -ne 0 -or $LASTEXITCODE -eq 0)
+        Add-Case 'pasture status' 'before start' "exit=$LASTEXITCODE" ($LASTEXITCODE -ne 0 -or $LASTEXITCODE -eq 0)
 
         & node $cli start 2>&1 | Out-File (Join-Path $TestRoot 'start.log')
         $startOk = ($LASTEXITCODE -eq 0)
-        Add-Case 'cowcode start' 'pm2 daemon' "exit=$LASTEXITCODE" $startOk
+        Add-Case 'pasture start' 'pm2 daemon' "exit=$LASTEXITCODE" $startOk
 
         & node $cli status 2>&1 | Out-File (Join-Path $TestRoot 'status.log')
-        $statusOk = ($LASTEXITCODE -eq 0) -and ((Get-Content (Join-Path $TestRoot 'status.log') -Raw -ErrorAction SilentlyContinue) -match 'online|cowcode')
-        Add-Case 'cowcode status' 'after start' "exit=$LASTEXITCODE online=$statusOk" $statusOk
+        $statusOk = ($LASTEXITCODE -eq 0) -and ((Get-Content (Join-Path $TestRoot 'status.log') -Raw -ErrorAction SilentlyContinue) -match 'online|pasture')
+        Add-Case 'pasture status' 'after start' "exit=$LASTEXITCODE online=$statusOk" $statusOk
 
         & node $cli restart 2>&1 | Out-Null
-        Add-Case 'cowcode restart' 'pm2 restart' "exit=$LASTEXITCODE" ($LASTEXITCODE -eq 0)
+        Add-Case 'pasture restart' 'pm2 restart' "exit=$LASTEXITCODE" ($LASTEXITCODE -eq 0)
 
         & node $cli stop 2>&1 | Out-Null
-        Add-Case 'cowcode stop' 'pm2 stop' "exit=$LASTEXITCODE" ($LASTEXITCODE -eq 0)
+        Add-Case 'pasture stop' 'pm2 stop' "exit=$LASTEXITCODE" ($LASTEXITCODE -eq 0)
 
         $pkgPath = Join-Path $InstallDir 'package.json'
         $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
         $pkg.version = '0.0.1-test-old'
         $pkg | ConvertTo-Json -Depth 10 | Set-Content $pkgPath -Encoding UTF8
 
-        $env:COWCODE_ROOT = $InstallDir
+        $env:PASTURE_ROOT = $InstallDir
         & (Join-Path $Repo 'update.ps1') -Force 2>&1 | Out-File (Join-Path $TestRoot 'update-force.log')
         $verAfterForce = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version
         Add-Case 'update.ps1 -Force' 'v0.0.1-test-old' "exit=$LASTEXITCODE ver=$verAfterForce" (($LASTEXITCODE -eq 0) -and ($verAfterForce -eq '2.0.0'))
@@ -148,10 +148,10 @@ if (-not (Ensure-PortableNode22)) {
         $pkg | ConvertTo-Json -Depth 10 | Set-Content $pkgPath -Encoding UTF8
         & node $cli update --force 2>&1 | Out-File (Join-Path $TestRoot 'cli-update-force.log')
         $verCli = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version
-        Add-Case 'cowcode update --force' 'cli.js -> update.ps1' "exit=$LASTEXITCODE ver=$verCli" (($LASTEXITCODE -eq 0) -and ($verCli -eq '2.0.0'))
+        Add-Case 'pasture update --force' 'cli.js -> update.ps1' "exit=$LASTEXITCODE ver=$verCli" (($LASTEXITCODE -eq 0) -and ($verCli -eq '2.0.0'))
     } else {
         Get-Content $installLog -Tail 6 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
-        foreach ($n in @('cowcode start', 'cowcode status', 'cowcode restart', 'cowcode stop', 'update.ps1 -Force', 'update.ps1', 'cowcode update --force')) {
+        foreach ($n in @('pasture start', 'pasture status', 'pasture restart', 'pasture stop', 'update.ps1 -Force', 'update.ps1', 'pasture update --force')) {
             Add-Case $n 'skipped' 'install failed' $false
         }
     }

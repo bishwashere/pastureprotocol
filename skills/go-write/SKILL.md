@@ -12,7 +12,7 @@ Call `run_skill` with **skill: "go-write"**. Set **command** or **arguments.acti
 
 ## Commands (allowlist)
 
-- **cp** - Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`. **Recursive directory copies** (e.g. a whole project folder) use `rsync` under the hood and **omit** dependency trees and common caches by default: `node_modules`, `.git`, `.cursor`, a **root-level** `verify/` folder (Cursor/local verification scratch), virtualenvs, `.next` / `dist` / `build` / `target`, IDE/build tool dirs, etc. **Do not** copy those unless the user clearly asks for a complete mirror. When they want **everything** (including `node_modules`, `.git`, caches), set **`fullCopy: true`** on the tool arguments, or put **`--cowcode-full-copy`** as the **first** entry in `argv` (then the usual flags and paths follow).
+- **cp** - Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`. **Recursive directory copies** (e.g. a whole project folder) use `rsync` under the hood and **omit** dependency trees and common caches by default: `node_modules`, `.git`, `.cursor`, a **root-level** `verify/` folder (Cursor/local verification scratch), virtualenvs, `.next` / `dist` / `build` / `target`, IDE/build tool dirs, etc. **Do not** copy those unless the user clearly asks for a complete mirror. When they want **everything** (including `node_modules`, `.git`, caches), set **`fullCopy: true`** on the tool arguments, or put **`--pasture-full-copy`** as the **first** entry in `argv` (then the usual flags and paths follow).
 - **mv** - Move/rename. argv: `["source", "dest"]`
 - **rm** - Remove. argv: `["path"]` or `["-r", "path"]`
 - **touch** - Create empty file or update mtime. argv: `["path"]`
@@ -29,7 +29,7 @@ Call `run_skill` with **skill: "go-write"**. Set **command** or **arguments.acti
 - **arguments.command** or **arguments.action** (required) - One of: cp, mv, rm, touch, chmod, mkdir, rsync
 - **arguments.argv** (required) - Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) - Working directory. Defaults to workspace.
-- **arguments.fullCopy** (optional) - For **`cp`** of a directory with `-r` / `-a`: if true, copy the full tree (no default excludes). Same as leading **`--cowcode-full-copy`** in `argv`.
+- **arguments.fullCopy** (optional) - For **`cp`** of a directory with `-r` / `-a`: if true, copy the full tree (no default excludes). Same as leading **`--pasture-full-copy`** in `argv`.
 
 ## When to use
 

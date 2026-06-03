@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 import { listMemoryFiles, listChatLogFiles } from '../../lib/memory-index.js';
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), 'cowcode-memidx-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pasture-memidx-'));
   const workspaceDir = join(dir, 'workspace');
   mkdirSync(join(workspaceDir, 'memory'), { recursive: true });
   mkdirSync(join(workspaceDir, 'chat-log', 'private'), { recursive: true });

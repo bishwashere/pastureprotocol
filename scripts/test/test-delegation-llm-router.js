@@ -15,7 +15,7 @@ function assert(condition, message) {
 async function run() {
   const stateDir = createTempStateDir();
   await setupAgentTeamFixture(stateDir);
-  process.env.COWCODE_LLM_DELEGATION_ROUTER = '1';
+  process.env.PASTURE_LLM_DELEGATION_ROUTER = '1';
 
   const { getAgentWorkspaceDir } = await import('../../lib/paths.js');
   writeFileSync(
@@ -95,7 +95,7 @@ async function run() {
   });
   assert(merged.recommendation.llmAction === 'handle-in-main', 'llm meta on handle-in-main');
 
-  process.env.COWCODE_LLM_DELEGATION_ROUTER = '0';
+  process.env.PASTURE_LLM_DELEGATION_ROUTER = '0';
   const keywordOnly = await buildDelegationContext({
     agentId: 'main',
     userText: 'Check NextPostAI growth',

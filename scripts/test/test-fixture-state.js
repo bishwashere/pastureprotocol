@@ -4,7 +4,7 @@
  * so all skills have something to work on. Committed; not created at test time.
  *
  * Use prepareStateFromFixture() to get a state dir that has fixture data + your
- * config/.env from ~/.cowcode (so LLM and skills work). Returns a temp dir path.
+ * config/.env from ~/.pasture (so LLM and skills work). Returns a temp dir path.
  */
 
 import { mkdirSync, copyFileSync, existsSync, cpSync, readFileSync, writeFileSync } from 'fs';
@@ -17,7 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Absolute path to the fixed fixture state dir (workspace + cron dummy data). */
 export const FIXTURE_STATE_DIR = join(__dirname, 'fixtures', 'state');
 
-const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 /**
  * Prepare a state dir for tests: copy default config and .env to a temp dir,
@@ -26,7 +26,7 @@ const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cow
  * @returns {string} Absolute path to the prepared state dir
  */
 export function prepareStateFromFixture() {
-  const stateDir = join(tmpdir(), 'cowcode-e2e-fixture-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-e2e-fixture-' + Date.now());
   mkdirSync(stateDir, { recursive: true });
 
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
@@ -34,10 +34,10 @@ export function prepareStateFromFixture() {
   }
   if (existsSync(join(DEFAULT_STATE_DIR, '.env'))) {
     let env = readFileSync(join(DEFAULT_STATE_DIR, '.env'), 'utf8');
-    env = env.split('\n').filter((l) => !/^\s*COWCODE_STATE_DIR\s*=/.test(l)).join('\n');
-    writeFileSync(join(stateDir, '.env'), env.trimEnd() + '\nCOWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
+    env = env.split('\n').filter((l) => !/^\s*PASTURE_STATE_DIR\s*=/.test(l)).join('\n');
+    writeFileSync(join(stateDir, '.env'), env.trimEnd() + '\nPASTURE_STATE_DIR=' + stateDir + '\n', 'utf8');
   } else {
-    writeFileSync(join(stateDir, '.env'), 'COWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
+    writeFileSync(join(stateDir, '.env'), 'PASTURE_STATE_DIR=' + stateDir + '\n', 'utf8');
   }
 
   const fixtureWorkspace = join(FIXTURE_STATE_DIR, 'workspace');

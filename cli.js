@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI entry: auth, start/stop/status/restart, update, and skill add/remove.
- * Usage: cowcode auth | cowcode start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode remove <skill-id> | cowcode update [--force]
+ * Usage: pasture auth | pasture start|stop|status|restart | pasture logs | pasture add <skill-id> | pasture remove <skill-id> | pasture update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -14,8 +14,8 @@ import { runPm2DaemonAction } from './lib/daemon-pm2.js';
 import { runUninstall as runWindowsUninstall } from './lib/uninstall-win.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR
-  ? resolve(process.env.COWCODE_INSTALL_DIR)
+const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
+  ? resolve(process.env.PASTURE_INSTALL_DIR)
   : __dirname;
 
 const args = process.argv.slice(2);
@@ -26,10 +26,10 @@ const IS_WIN = process.platform === 'win32';
 
 function installHint() {
   if (IS_WIN) {
-    console.error('  iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
-    console.error('  Or: irm https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex');
+    console.error('  iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex');
+    console.error('  Or: irm https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex');
   } else {
-    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.sh | bash');
   }
 }
 
@@ -41,7 +41,7 @@ function restartDaemonSync() {
   if (!existsSync(daemonScript)) return 1;
   const r = spawnSync('bash', [daemonScript, 'restart'], {
     stdio: 'inherit',
-    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     cwd: INSTALL_DIR,
   });
   return r.status ?? 1;
@@ -56,10 +56,10 @@ function restartBotAfterSkillChange() {
     if (code === 0) {
       console.log('  ✓ Bot restarted.');
     } else {
-      console.error('  ✗ Auto-restart failed. Run: cowcode restart');
+      console.error('  ✗ Auto-restart failed. Run: pasture restart');
     }
   } else {
-    console.log('Restart skipped (daemon script not found). Run: cowcode restart');
+    console.log('Restart skipped (daemon script not found). Run: pasture restart');
   }
 }
 
@@ -71,12 +71,12 @@ async function runSkillCommand(action, skillArg) {
       ? await mod.runSkillRemove(skillArg, INSTALL_DIR)
       : await mod.runSkillInstall(skillArg, INSTALL_DIR);
     if (!result.ok) {
-      console.error('cowCode:', result.message);
+      console.error('pasture:', result.message);
       process.exit(1);
     }
     restartBotAfterSkillChange();
   } catch (err) {
-    console.error(`cowCode: skills ${action} failed.`, err?.message || err);
+    console.error(`pasture: skills ${action} failed.`, err?.message || err);
     process.exit(1);
   }
 }
@@ -89,22 +89,22 @@ function runPostUpdateRestartAndDashboard() {
   if (restartCode === 0) {
     console.log('  ✓ Restarted.');
   } else {
-    console.error('  ✗ Restart had issues. You can run: cowcode restart');
+    console.error('  ✗ Restart had issues. You can run: pasture restart');
   }
   const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
   if (existsSync(serverPath)) {
     const dashResult = spawnSync(process.execPath, [join(INSTALL_DIR, 'cli.js'), 'dashboard'], {
       stdio: 'inherit',
-      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
       cwd: INSTALL_DIR,
     });
     if (dashResult.status === 0) {
       console.log('  ✓ Dashboard started.');
     } else {
-      console.error('  ✗ Dashboard failed to start. You can run: cowcode dashboard');
+      console.error('  ✗ Dashboard failed to start. You can run: pasture dashboard');
     }
   } else {
-    console.log('  (dashboard not found; run cowcode dashboard if needed)');
+    console.log('  (dashboard not found; run pasture dashboard if needed)');
   }
   console.log('');
 }
@@ -115,14 +115,14 @@ function runDaemonAction(action) {
   }
   const script = join(INSTALL_DIR, 'scripts', 'daemon.sh');
   if (!existsSync(script)) {
-    console.error('cowCode: installation incomplete or corrupted.');
+    console.error('pasture: installation incomplete or corrupted.');
     console.error('  Re-run the installer:');
     installHint();
     process.exit(1);
   }
   const child = spawn('bash', [script, action], {
     stdio: 'inherit',
-    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
@@ -134,11 +134,11 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   (async () => {
     const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
     if (!existsSync(serverPath)) {
-      console.error('cowCode: dashboard not found. Re-run the installer or run from repo.');
+      console.error('pasture: dashboard not found. Re-run the installer or run from repo.');
       process.exit(1);
     }
-    const port = process.env.COWCODE_DASHBOARD_PORT || '3847';
-    const host = process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
+    const port = process.env.PASTURE_DASHBOARD_PORT || process.env.COWCODE_DASHBOARD_PORT || '3847';
+    const host = process.env.PASTURE_DASHBOARD_HOST || process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
     const url = `http://${host}:${port}`;
     try {
       const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
@@ -159,7 +159,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     const child = spawn(process.execPath, [serverPath], {
       stdio: 'ignore',
       detached: true,
-      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
       cwd: INSTALL_DIR,
     });
     child.unref();
@@ -180,13 +180,13 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'update') {
-  const branch = process.env.COWCODE_BRANCH || 'master';
-  const env = { ...process.env, COWCODE_ROOT: INSTALL_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR };
+  const branch = process.env.PASTURE_BRANCH || 'master';
+  const env = { ...process.env, PASTURE_ROOT: INSTALL_DIR, PASTURE_INSTALL_DIR: INSTALL_DIR };
 
   if (IS_WIN) {
     const psScript = join(INSTALL_DIR, 'update.ps1');
     if (!existsSync(psScript)) {
-      console.error('cowCode: update.ps1 not found. Re-run the installer.');
+      console.error('pasture: update.ps1 not found. Re-run the installer.');
       installHint();
       process.exit(1);
     }
@@ -203,19 +203,19 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     });
   } else if (isForceUpdate) {
     // Run latest update.sh from GitHub so --force works even when installed script is old
-    const url = `https://raw.githubusercontent.com/bishwashere/cowCode/${branch}/update.sh?t=${Date.now()}`;
-    const tmpScript = join(tmpdir(), `cowcode-update-${Date.now()}.sh`);
+    const url = `https://raw.githubusercontent.com/bishwashere/pastureprotocol/${branch}/update.sh?t=${Date.now()}`;
+    const tmpScript = join(tmpdir(), `pasture-update-${Date.now()}.sh`);
     const curl = spawnSync('curl', ['-fsSL', '-H', 'Cache-Control: no-cache', url, '-o', tmpScript], {
       encoding: 'utf8',
       stdio: 'inherit',
     });
     if (curl.status !== 0) {
-      console.error('cowCode: failed to fetch update script from GitHub.');
+      console.error('pasture: failed to fetch update script from GitHub.');
       process.exit(1);
     }
     const child = spawn('bash', [tmpScript, '--force'], {
       stdio: 'inherit',
-      env: { ...env, COWCODE_ROOT: INSTALL_DIR },
+      env: { ...env, PASTURE_ROOT: INSTALL_DIR },
       cwd: INSTALL_DIR,
     });
     child.on('close', (code) => {
@@ -232,7 +232,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   } else {
     const script = join(INSTALL_DIR, 'update.sh');
     if (!existsSync(script)) {
-      console.error('cowCode: update.sh not found. Re-run the installer.');
+      console.error('pasture: update.sh not found. Re-run the installer.');
       installHint();
       process.exit(1);
     }
@@ -255,21 +255,21 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   }
   const script = join(INSTALL_DIR, 'uninstall.sh');
   if (!existsSync(script)) {
-    console.error('cowCode: uninstall.sh not found. Re-run the installer.');
+    console.error('pasture: uninstall.sh not found. Re-run the installer.');
     installHint();
     process.exit(1);
   }
   const child = spawn('bash', [script], {
     stdio: 'inherit',
-    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'logs') {
-  const stateDir = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+  const stateDir = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
   const logPath = join(stateDir, 'daemon.log');
   if (process.platform === 'win32') {
-    const child = spawn('pm2', ['logs', 'cowcode'], {
+    const child = spawn('pm2', ['logs', 'pasture'], {
       stdio: 'inherit',
       env: process.env,
       cwd: INSTALL_DIR,
@@ -277,7 +277,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     child.on('close', (code) => process.exit(code ?? 0));
   } else {
     if (!existsSync(logPath)) {
-      console.error('cowCode: no log file yet. Start the bot with: cowcode start');
+      console.error('pasture: no log file yet. Start the bot with: pasture start');
       process.exit(1);
     }
     const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
@@ -286,24 +286,24 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
 } else if (sub === 'tide') {
   const tideScript = join(INSTALL_DIR, 'scripts', 'tide-cli.js');
   if (!existsSync(tideScript)) {
-    console.error('cowcode: scripts/tide-cli.js not found.');
+    console.error('pasture: scripts/tide-cli.js not found.');
     process.exit(1);
   }
   const child = spawn(process.execPath, [tideScript, ...args.slice(1)], {
     stdio: 'inherit',
-    env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+    env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'index') {
   const indexScript = join(INSTALL_DIR, 'scripts', 'index-cli.js');
   if (!existsSync(indexScript)) {
-    console.error('cowcode: scripts/index-cli.js not found.');
+    console.error('pasture: scripts/index-cli.js not found.');
     process.exit(1);
   }
   const child = spawn(process.execPath, [indexScript, ...args.slice(1)], {
     stdio: 'inherit',
-    env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+    env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
@@ -311,8 +311,8 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   const kind = (args[1] || '').toLowerCase();
   const name = args.slice(2).join(' ').trim();
   if (kind !== 'agent' || !name) {
-    console.log('Usage: cowcode create agent <name>');
-    console.log('Example: cowcode create agent alex');
+    console.log('Usage: pasture create agent <name>');
+    console.log('Example: pasture create agent alex');
     process.exit((args[1] || args[2]) ? 1 : 0);
   }
   (async () => {
@@ -327,7 +327,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       }
       console.log('You can assign groups to this agent from Dashboard -> Groups.');
     } catch (err) {
-      console.error('cowCode: failed to create agent.', err?.message || err);
+      console.error('pasture: failed to create agent.', err?.message || err);
       process.exit(1);
     }
   })();
@@ -336,8 +336,8 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   const name = args.slice(2).filter((a) => a !== '--yes' && a !== '-y').join(' ').trim();
   const forceYes = args.includes('--yes') || args.includes('-y');
   if (kind !== 'agent' || !name) {
-    console.log('Usage: cowcode delete agent <name> [--yes]');
-    console.log('Example: cowcode delete agent alex');
+    console.log('Usage: pasture delete agent <name> [--yes]');
+    console.log('Example: pasture delete agent alex');
     process.exit((args[1] || args[2]) ? 1 : 0);
   }
   (async () => {
@@ -367,16 +367,16 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         console.log('Reassigned', result.reassignedGroups, 'group config(s) to main.');
       }
     } catch (err) {
-      console.error('cowCode: failed to delete agent.', err?.message || err);
+      console.error('pasture: failed to delete agent.', err?.message || err);
       process.exit(1);
     }
   })();
 } else if (sub === 'server') {
   /**
-   * cowcode server add <host> <name> [--user <user>] [--alias <alias>]
-   * cowcode server use <name>
-   * cowcode server list
-   * cowcode server remove <name>
+   * pasture server add <host> <name> [--user <user>] [--alias <alias>]
+   * pasture server use <name>
+   * pasture server list
+   * pasture server remove <name>
    */
   const serverSub = (args[1] || '').toLowerCase();
   (async () => {
@@ -387,23 +387,23 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       if (serverSub === 'use') {
         const name = args[2];
         if (!name) {
-          console.log('Usage: cowcode server use <name>');
-          console.log('Example: cowcode server use prod');
+          console.log('Usage: pasture server use <name>');
+          console.log('Example: pasture server use prod');
           process.exit(1); return;
         }
         const result = mod.setActiveServer(name);
-        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
         console.log('✓', result.message);
 
       } else if (serverSub === 'add') {
         const host = args[2];
         const nameArg = (args[3] && !args[3].startsWith('--')) ? args[3] : undefined;
         if (!host || !nameArg) {
-          console.log('Usage: cowcode server add <host> <name> [--user <user>] [--alias <alias>]');
+          console.log('Usage: pasture server add <host> <name> [--user <user>] [--alias <alias>]');
           console.log('  user defaults to: root');
-          console.log('Example: cowcode server add 203.0.113.5 prod');
-          console.log('         cowcode server add 203.0.113.5 staging --user ubuntu');
-          console.log('         cowcode server add 192.168.1.166 atlas --user root --alias "home assistant"');
+          console.log('Example: pasture server add 203.0.113.5 prod');
+          console.log('         pasture server add 203.0.113.5 staging --user ubuntu');
+          console.log('         pasture server add 192.168.1.166 atlas --user root --alias "home assistant"');
           process.exit(1);
           return;
         }
@@ -415,14 +415,14 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         const key = keyIdx >= 0 ? args[keyIdx + 1] : undefined;
         const alias = aliasIdx >= 0 ? args[aliasIdx + 1] : undefined;
         const result = mod.registerServer(name, host, { user, key, alias });
-        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
         console.log('✓', result.message);
 
       } else if (serverSub === 'list') {
         const servers = mod.listServers();
         if (!servers.length) {
           console.log('No servers registered yet.');
-          console.log('Run: cowcode server add <host> [user] [name]');
+          console.log('Run: pasture server add <host> [user] [name]');
         } else {
           console.log('Registered servers:');
           for (const s of servers) {
@@ -437,22 +437,22 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       } else if (serverSub === 'remove') {
         const name = args[2];
         if (!name) {
-          console.log('Usage: cowcode server remove <name>');
+          console.log('Usage: pasture server remove <name>');
           process.exit(1); return;
         }
         const result = mod.removeServer(name);
-        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
         console.log('✓', result.message);
 
       } else {
-        console.log('Usage: cowcode server add <host> <name> [--user <user>]');
-        console.log('       cowcode server use <name>');
-        console.log('       cowcode server list');
-        console.log('       cowcode server remove <name>');
+        console.log('Usage: pasture server add <host> <name> [--user <user>]');
+        console.log('       pasture server use <name>');
+        console.log('       pasture server list');
+        console.log('       pasture server remove <name>');
         process.exit(serverSub ? 1 : 0);
       }
     } catch (err) {
-      console.error('cowCode: server command failed.', err?.message || err);
+      console.error('pasture: server command failed.', err?.message || err);
       process.exit(1);
     }
   })();
@@ -466,34 +466,34 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   } else if (wantsRemove) {
     runSkillCommand('remove', skillArg);
   } else {
-    console.log('Usage: cowcode add <skill-id>');
-    console.log('       cowcode remove <skill-id>');
-    console.log('   or: cowcode skills install <skill-id>');
-    console.log('   or: cowcode skills remove <skill-id>');
-    console.log('  Example: cowcode add speech');
-    console.log('  Example: cowcode remove github');
+    console.log('Usage: pasture add <skill-id>');
+    console.log('       pasture remove <skill-id>');
+    console.log('   or: pasture skills install <skill-id>');
+    console.log('   or: pasture skills remove <skill-id>');
+    console.log('  Example: pasture add speech');
+    console.log('  Example: pasture remove github');
     console.log('  add: enables a skill and prompts for credentials.');
     console.log('  remove: disables a skill; optionally clears saved credentials.');
     process.exit((sub === 'add' || sub === 'remove' || skillSub === 'install' || skillSub === 'remove') ? 1 : 0);
   }
 } else {
-  console.log('Usage: cowcode start | stop | status | restart');
-  console.log('       cowcode logs');
-  console.log('       cowcode dashboard');
-  console.log('       cowcode tide checklist list|add|remove|run|triggers|enable|disable');
-  console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
-  console.log('       cowcode auth [options]');
-  console.log('       cowcode create agent <name>');
-  console.log('       cowcode delete agent <name> [--yes]');
-  console.log('       cowcode add <skill-id>');
-  console.log('       cowcode remove <skill-id>');
-  console.log('       cowcode skills install <skill-id>');
-  console.log('       cowcode skills remove <skill-id>');
-  console.log('       cowcode server add <host> <name> [--user <user>] [--alias <alias>]');
-  console.log('       cowcode server use <name>');
-  console.log('       cowcode server list');
-  console.log('       cowcode server remove <name>');
-  console.log('       cowcode update [--force]');
-  console.log('       cowcode uninstall');
+  console.log('Usage: pasture start | stop | status | restart');
+  console.log('       pasture logs');
+  console.log('       pasture dashboard');
+  console.log('       pasture tide checklist list|add|remove|run|triggers|enable|disable');
+  console.log('       pasture index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
+  console.log('       pasture auth [options]');
+  console.log('       pasture create agent <name>');
+  console.log('       pasture delete agent <name> [--yes]');
+  console.log('       pasture add <skill-id>');
+  console.log('       pasture remove <skill-id>');
+  console.log('       pasture skills install <skill-id>');
+  console.log('       pasture skills remove <skill-id>');
+  console.log('       pasture server add <host> <name> [--user <user>] [--alias <alias>]');
+  console.log('       pasture server use <name>');
+  console.log('       pasture server list');
+  console.log('       pasture server remove <name>');
+  console.log('       pasture update [--force]');
+  console.log('       pasture uninstall');
   process.exit(sub ? 1 : 0);
 }

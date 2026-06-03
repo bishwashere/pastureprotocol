@@ -25,7 +25,7 @@ The dashboard shell is `../index.html` (small). Everything else loads from here.
 ## Edit workflow
 
 1. Change the relevant `js/NN-*.js` or `css/*.css` file.
-2. Run `pnpm run test:dashboard-boot` and `pnpm run test:agent-map-ui`.
-3. Hard-refresh the browser after `cowcode update` (bump `?v=` on CSS in `index.html` if caches are sticky).
+2. Run `` and `pnpm run test:agent-map-ui`.
+3. Hard-refresh the browser after `pasture update` (bump `?v=` on CSS in `index.html` if caches are sticky).
 
 Scripts load in numeric order; all share the same global scope as before.

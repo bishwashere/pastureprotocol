@@ -400,7 +400,7 @@
     async function mc2RenderGoals() {
       var el = mc2El('mc2-goals-list');
       if (!el) return;
-      var api = window.cowCodeProjectsApi;
+      var api = window.pastureProjectsApi;
       if (api && typeof api.listProjects === 'function') {
         try {
           var projList = await api.listProjects();

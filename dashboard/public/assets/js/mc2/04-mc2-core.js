@@ -3,7 +3,6 @@
     function mc2RenderLiveChrome() {
       mc2UpdateLiveBadge();
       mc2UpdateApprovalsBadge();
-      mc2RenderActionBanner();
       mc2RenderPendingApprovalsBanner();
       mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
@@ -174,7 +173,7 @@
       if (addBtn && !addBtn._wired) {
         addBtn._wired = true;
         addBtn.addEventListener('click', function () {
-          var api = window.cowCodeProjectsApi;
+          var api = window.pastureProjectsApi;
           if (!api) return;
           api.addProjectFromForm('mc2-proj-new-name', 'mc2-proj-new-url', 'mc2-proj-new-desc', 'mc2-proj-canvas');
         });

@@ -13,8 +13,8 @@ function loadCompletedTasksDisplay() {
   const sandbox = { globalThis: {} };
   sandbox.globalThis.window = sandbox.globalThis;
   // eslint-disable-next-line no-new-func
-  new Function('globalThis', code + '\nreturn globalThis.cowCodeCompletedTasks;')(sandbox.globalThis);
-  return sandbox.globalThis.cowCodeCompletedTasks;
+  new Function('globalThis', code + '\nreturn globalThis.pastureCompletedTasks;')(sandbox.globalThis);
+  return sandbox.globalThis.pastureCompletedTasks;
 }
 
 function assert(condition, message) {

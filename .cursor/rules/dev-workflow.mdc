@@ -9,11 +9,11 @@ alwaysApply: true
 
 When the user reports a bug, error, or unexpected behavior, **before responding**, inspect the following log paths:
 
-- `~/.cowcode/daemon.log` — main runtime output (`$COWCODE_STATE_DIR/daemon.log` if the env var is set)
-- `~/.cowcode/daemon.err` — daemon stderr / crash output (`$COWCODE_STATE_DIR/daemon.err` if the env var is set)
-- `pm2 logs cowcode` — Windows / pm2-managed process logs
+- `~/.pasture/daemon.log` — main runtime output (`$PASTURE_STATE_DIR/daemon.log` if the env var is set; legacy `$COWCODE_STATE_DIR` / `~/.cowcode` still work)
+- `~/.pasture/daemon.err` — daemon stderr / crash output (`$PASTURE_STATE_DIR/daemon.err` if the env var is set)
+- `pm2 logs pasture` — Windows / pm2-managed process logs
 
-Use `tail -n 100 ~/.cowcode/daemon.log` or `tail -n 100 ~/.cowcode/daemon.err` to surface recent entries. Quote the relevant log lines in your reply so the user can see exactly what was captured.
+Use `tail -n 100 ~/.pasture/daemon.log` or `tail -n 100 ~/.pasture/daemon.err` to surface recent entries. Quote the relevant log lines in your reply so the user can see exactly what was captured.
 
 ## 2. Adding or Editing a Feature — Tests Are Mandatory
 

@@ -166,7 +166,7 @@ function loadConfig(options = {}) {
 /** Call Anthropic Messages API and return a Response-like with OpenAI-shaped JSON. */
 async function callAnthropic(messages, { apiKey, model, maxTokens }, tools) {
   if (!apiKey || apiKey === 'not-needed' || String(apiKey).trim() === '') {
-    return { ok: false, status: 401, text: () => Promise.resolve(JSON.stringify({ error: { message: 'Anthropic API key not set (set LLM_3_API_KEY in ~/.cowcode/.env)' } })) };
+    return { ok: false, status: 401, text: () => Promise.resolve(JSON.stringify({ error: { message: 'Anthropic API key not set (set LLM_3_API_KEY in ~/.pasture/.env)' } })) };
   }
   const url = 'https://api.anthropic.com/v1/messages';
   let system = '';

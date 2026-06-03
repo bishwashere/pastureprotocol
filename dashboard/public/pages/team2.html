@@ -4,11 +4,11 @@
       <nav class="mc-sidebar" aria-label="Mission Control navigation">
         <div class="mc-sidebar-logo" aria-hidden="true">♞</div>
         <div class="mc-sidebar-nav">
-          <button type="button" class="mc-nav-item" data-mc-nav="tasks" aria-label="Tasks">
-            <span class="mc-nav-icon">☑</span><span class="mc-nav-label">Tasks</span>
-          </button>
           <button type="button" class="mc-nav-item active" data-mc-nav="mission" aria-label="Home">
             <span class="mc-nav-icon">⌂</span><span class="mc-nav-label">Home</span>
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="tasks" aria-label="Tasks">
+            <span class="mc-nav-icon">☑</span><span class="mc-nav-label">Tasks</span>
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Agents">
             <span class="mc-nav-icon">♙</span><span class="mc-nav-label">Agents</span>
@@ -62,7 +62,7 @@
       <div class="mc-main">
         <!-- Header -->
         <header class="mc-header">
-          <h1 class="mc-header-title">cowCode</h1>
+          <h1 class="mc-header-title">Pasture Protocol</h1>
           <span class="mc-header-pulse" aria-hidden="true">〜</span>
           <div class="mc-mission-select-wrap">
             <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission">
@@ -80,14 +80,6 @@
         </header>
 
         <div id="mc2-pending-approvals" class="mc-pending-approvals" hidden aria-live="polite"></div>
-
-        <div id="mc2-action-banner" class="mc-action-banner" hidden aria-live="polite" aria-label="Actions required">
-          <div class="mc-action-banner-head">
-            <span class="mc-action-banner-label">ACTION REQUIRED</span>
-            <span class="mc-action-banner-count" id="mc2-action-banner-count">0</span>
-          </div>
-          <div class="mc-action-banner-items" id="mc2-action-banner-items"></div>
-        </div>
 
         <!-- MC2 page views (loaded from pages/mc2/*.html) -->
         <div id="mc2-views-root">

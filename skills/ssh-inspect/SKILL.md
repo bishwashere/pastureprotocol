@@ -6,7 +6,7 @@ description: Read-only inspection of a remote Linux/Unix host over SSH. Use when
 
 # SSH inspect
 
-Run **read-only** commands on a remote host from the cowCode machine via `ssh`. The executor spawns the local `ssh` binary; commands execute **on the remote** and output returns here. No writes, no package installs, no interactive shell.
+Run **read-only** commands on a remote host from the Pasture Protocol machine via `ssh`. The executor spawns the local `ssh` binary; commands execute **on the remote** and output returns here. No writes, no package installs, no interactive shell.
 
 ## How to call
 
@@ -28,7 +28,7 @@ Run **read-only** commands on a remote host from the cowCode machine via `ssh`. 
 4. If no server can be inferred from context → omit `host` entirely; the executor will auto-select the only registered server if there is one, or use the active server.
 5. Only ask for clarification if truly ambiguous (e.g. multiple servers mentioned and it's unclear which applies).
 
-**Never** respond saying the server isn't configured or ask the user to run `cowcode server use` - always attempt the tool call first with the inferred host. The executor will return a clear error if the server genuinely isn't registered.
+**Never** respond saying the server isn't configured or ask the user to run `pasture server use` - always attempt the tool call first with the inferred host. The executor will return a clear error if the server genuinely isn't registered.
 
 ## Health checks
 
@@ -112,41 +112,41 @@ Inspect a container:
 **This skill is not enabled by default** and must be explicitly enabled - it is never active in group chats.
 To enable it, either:
 - Add `"ssh-inspect"` to `skills.enabled` in your dashboard (Skills tab), or
-- Run `cowcode skills install ssh-inspect` from the terminal, or
-- Manually add `"ssh-inspect"` to `skills.enabled` in `~/.cowcode/config.json` and restart.
+- Run `pasture skills install ssh-inspect` from the terminal, or
+- Manually add `"ssh-inspect"` to `skills.enabled` in `~/.pasture/config.json` and restart.
 
 Set up SSH key-based auth to the remote host (`ssh-copy-id` or `authorized_keys`).
-Optionally set `SSH_INSPECT_USER=ubuntu` in `~/.cowcode/.env` as a default remote user.
-Optionally set `SSH_INSPECT_IDENTITY=/path/to/key` in `~/.cowcode/.env` to use a specific private key.
-Optionally set `SSH_INSPECT_TIMEOUT=30` in `~/.cowcode/.env` to change the timeout in seconds.
+Optionally set `SSH_INSPECT_USER=ubuntu` in `~/.pasture/.env` as a default remote user.
+Optionally set `SSH_INSPECT_IDENTITY=/path/to/key` in `~/.pasture/.env` to use a specific private key.
+Optionally set `SSH_INSPECT_TIMEOUT=30` in `~/.pasture/.env` to change the timeout in seconds.
 
 ## Server registry
 
 Register named servers so you can say "check disk on prod" instead of typing an IP each time.
-Entries are stored in `~/.cowcode/config.json` under `skills["ssh-inspect"].hosts`.
+Entries are stored in `~/.pasture/config.json` under `skills["ssh-inspect"].hosts`.
 
 **Register a server:**
 ```
-cowcode server add 203.0.113.5 prod
-cowcode server add 203.0.113.5 staging --user ubuntu
-cowcode server add 192.168.1.166 atlas --user root --alias "home assistant"
+pasture server add 203.0.113.5 prod
+pasture server add 203.0.113.5 staging --user ubuntu
+pasture server add 192.168.1.166 atlas --user root --alias "home assistant"
 ```
 `host` and `name` are required. User defaults to `root`; override with `--user`. `--alias` sets a human-readable label shown alongside the server name in replies (e.g. `atlas (home assistant)`).
 
 **Set the active server (default for all SSH commands):**
 ```
-cowcode server use prod
+pasture server use prod
 ```
 Once set, you can ask things like "check disk" or "list /var/log" without ever mentioning the server - it uses `prod` automatically.
 
 **List registered servers:**
 ```
-cowcode server list
+pasture server list
 ```
 
 **Remove a server:**
 ```
-cowcode server remove staging
+pasture server remove staging
 ```
 
 The executor resolves the name → hostname (and user/key) from the registry before connecting.

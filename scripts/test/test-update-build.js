@@ -1,5 +1,5 @@
 /**
- * Build label helpers for cowcode update (version + git short SHA).
+ * Build label helpers for pasture update (version + git short SHA).
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -18,7 +18,7 @@ function assert(cond, msg) {
   }
 }
 
-const dir = mkdtempSync(join(tmpdir(), 'cowcode-build-test-'));
+const dir = mkdtempSync(join(tmpdir(), 'pasture-build-test-'));
 const root = join(dir, 'install');
 mkdirSync(root, { recursive: true });
 writeFileSync(join(root, BUILD_FILE), 'abc1234\n', 'utf8');

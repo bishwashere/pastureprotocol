@@ -14,7 +14,7 @@
  *
  * Prerequisites:
  *   - ssh-inspect in skills.enabled
- *   - At least one server registered (cowcode server add ...)
+ *   - At least one server registered (pasture server add ...)
  *   - SSH key access to each server
  *
  * Run:
@@ -32,7 +32,7 @@ import { skipSuiteIf } from './e2e-skip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 // ─── preflight ───────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ function ensureSshInspectEnabled() {
   const servers = loadRegisteredServers();
   if (servers.length === 0) {
     throw new Error(
-      'No servers registered. Add one with:\n  cowcode server add <ip> <name>'
+      'No servers registered. Add one with:\n  pasture server add <ip> <name>'
     );
   }
   return servers;
@@ -77,7 +77,7 @@ function ensureSshInspectEnabled() {
 // ─── runner ──────────────────────────────────────────────────────────────────
 
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-server-inspect-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-server-inspect-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -90,7 +90,7 @@ function createTempStateDir() {
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['index.js', '--test', userMessage], {
       cwd: ROOT,

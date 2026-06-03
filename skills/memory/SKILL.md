@@ -1,7 +1,7 @@
 ---
 id: memory
 name: Memory
-description: Semantic search over notes (MEMORY.md, memory/*.md), chat log, and filesystem index. When user ran "cowcode index --source filesystem", use memory_search for "what files do I have?" with query like "directory contents". Tools: memory_search, memory_get, memory_save. See SKILL.md.
+description: Semantic search over notes (MEMORY.md, memory/*.md), chat log, and filesystem index. When user ran "pasture index --source filesystem", use memory_search for "what files do I have?" with query like "directory contents". Tools: memory_search, memory_get, memory_save. See SKILL.md.
 ---
 
 # Memory
@@ -10,7 +10,7 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and optional **
 
 **Search log (built-in)** - Chat is stored in `workspace/chat-log/YYYY-MM-DD.jsonl` and can be searched. **Only use memory_search to search chat history when the user explicitly asks**, e.g. "what did we talk about yesterday?", "search my logs", "last time we chatted", "what did I ask you before?", "our previous conversation". Do not search logs for general queries; only when the user clearly mentions past conversations, yesterday, or logs.
 
-**Filesystem index** - If the user has run `cowcode index --source filesystem`, the same memory index contains **directory listings** (one chunk per directory). Results can have path `filesystem/` or `filesystem/rel/path` and snippet text like "Directory: /path\nContents: file1, file2, subdir/, ...". When the user asks "what files do I have?", "list my files", "what's in my workspace?", "search my memory for files", use **memory_search** with a query that matches directory/listings, e.g. "directory contents", "list of files and folders", "files and directories". Then report the path and snippet from any results whose path starts with `filesystem/` - the snippet is the directory listing. Do not use memory_get for paths starting with `filesystem/` (only notes and chat-log paths are readable that way).
+**Filesystem index** - If the user has run `pasture index --source filesystem`, the same memory index contains **directory listings** (one chunk per directory). Results can have path `filesystem/` or `filesystem/rel/path` and snippet text like "Directory: /path\nContents: file1, file2, subdir/, ...". When the user asks "what files do I have?", "list my files", "what's in my workspace?", "search my memory for files", use **memory_search** with a query that matches directory/listings, e.g. "directory contents", "list of files and folders", "files and directories". Then report the path and snippet from any results whose path starts with `filesystem/` - the snippet is the directory listing. Do not use memory_get for paths starting with `filesystem/` (only notes and chat-log paths are readable that way).
 
 **Auto-indexing** - Notes (MEMORY.md, memory/*.md) and chat-log files are synced when you run memory_search. No manual "moo index" needed.
 
@@ -52,4 +52,4 @@ memory_save
 ## Config
 
 - Add `"memory"` to `skills.enabled`. Embedding: if an OpenAI key is available (e.g. `OPENAI_API_KEY` or an OpenAI model in LLM config), OpenAI is used; otherwise local (Ollama, `nomic-embed-text`) is used. You can override with `memory.embedding` in config.
-- Workspace: `~/.cowcode/workspace/`. Create `MEMORY.md` and optionally `memory/*.md`. Chat logs live in `workspace/chat-log/` and are created automatically.
+- Workspace: `~/.pasture/workspace/`. Create `MEMORY.md` and optionally `memory/*.md`. Chat logs live in `workspace/chat-log/` and are created automatically.

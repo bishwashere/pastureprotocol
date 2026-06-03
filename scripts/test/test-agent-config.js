@@ -11,14 +11,14 @@ import { tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 
 function createStateDir() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-agent-config-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-agent-config-'));
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   writeFileSync(
     join(stateDir, 'config.json'),
     JSON.stringify({ agents: { defaults: { userTimezone: 'UTC' } } }, null, 2),
     'utf8',
   );
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
   return stateDir;
 }
 

@@ -14,14 +14,14 @@ import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-go-write-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-go-write-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -34,7 +34,7 @@ function createTempStateDir() {
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['index.js', '--test', userMessage], {
       cwd: ROOT,

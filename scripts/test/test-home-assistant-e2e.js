@@ -10,7 +10,7 @@
  * - CLI performs the real HA API call and returns the list to the user
  * No mocks: uses your real config and real Home Assistant. If HA is not configured or unreachable, the test fails.
  *
- * Prerequisites: home-assistant in skills.enabled, HA_URL/HA_TOKEN in ~/.cowcode/.env, HA reachable.
+ * Prerequisites: home-assistant in skills.enabled, HA_URL/HA_TOKEN in ~/.pasture/.env, HA reachable.
  * Run: node scripts/test/test-home-assistant-e2e.js
  * Or:  pnpm run test:home-assistant-e2e
  */
@@ -28,8 +28,8 @@ import { getEnvPath } from '../../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const INSTALL_ROOT = process.env.COWCODE_INSTALL_DIR ? resolve(process.env.COWCODE_INSTALL_DIR) : ROOT;
-const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
+const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
@@ -59,7 +59,7 @@ function runE2E(userMessage) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(INSTALL_ROOT, 'index.js'), '--test', userMessage], {
       cwd: INSTALL_ROOT,
-      env: { ...process.env, COWCODE_STATE_DIR: DEFAULT_STATE_DIR },
+      env: { ...process.env, PASTURE_STATE_DIR: DEFAULT_STATE_DIR },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -98,7 +98,7 @@ function runE2E(userMessage) {
 async function main() {
   skipSuiteIf('home-assistant-e2e', () => {
     dotenv.config({ path: getEnvPath() });
-    if (!process.env.HA_TOKEN?.trim()) return 'HA_TOKEN not set in ~/.cowcode/.env';
+    if (!process.env.HA_TOKEN?.trim()) return 'HA_TOKEN not set in ~/.pasture/.env';
     try {
       ensureHomeAssistantEnabled();
     } catch (e) {

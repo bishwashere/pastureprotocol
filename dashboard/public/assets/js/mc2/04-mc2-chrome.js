@@ -122,7 +122,6 @@
       } catch (_) {}
       mc2UpdateApprovalsBadge();
       mc2RenderPendingApprovalsBanner();
-      mc2RenderActionBanner();
       mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
       if (mc2ActiveView === 'mission' && !(typeof shouldPauseTeamDashboardRefresh === 'function' && shouldPauseTeamDashboardRefresh())) {
@@ -148,9 +147,9 @@
         await fetchMc2PendingApprovals();
         await fetchGoalsSnapshot();
         await fetchInitiativesSnapshot();
-        if (window.cowCodeProjectsApi && typeof window.cowCodeProjectsApi.listProjects === 'function') {
+        if (window.pastureProjectsApi && typeof window.pastureProjectsApi.listProjects === 'function') {
           try {
-            mc2ProjectsSnapshot = await window.cowCodeProjectsApi.listProjects();
+            mc2ProjectsSnapshot = await window.pastureProjectsApi.listProjects();
           } catch (_) {}
         }
         if (mc2ActiveView === 'projects') mc2RenderProjects();

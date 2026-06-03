@@ -15,11 +15,11 @@ import {
 import { startNewSession } from '../../lib/chat-session.js';
 
 function setupWorkspace() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-chat-history-state-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-chat-history-state-'));
   const workspaceDir = join(stateDir, 'workspace');
   mkdirSync(join(workspaceDir, 'chat-log', 'private'), { recursive: true });
   writeFileSync(join(stateDir, 'config.json'), '{}', 'utf8');
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
   return workspaceDir;
 }
 

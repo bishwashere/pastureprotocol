@@ -1,14 +1,14 @@
 ---
 id: home-assistant
 name: Home Assistant
-description: Control and query home appliances and sensors via Home Assistant. Uses HA_URL and HA_TOKEN from ~/.cowcode/.env. Use for anything inside the home (devices, appliances, sensors, automations). For outdoor/weather info use web search. Commands: "list lights", "search kitchen", "on light.xyz", "list automations", "search <name>", "state <entity_id>", etc.
+description: Control and query home appliances and sensors via Home Assistant. Uses HA_URL and HA_TOKEN from ~/.pasture/.env. Use for anything inside the home (devices, appliances, sensors, automations). For outdoor/weather info use web search. Commands: "list lights", "search kitchen", "on light.xyz", "list automations", "search <name>", "state <entity_id>", etc.
 ---
 
 # Home Assistant
 
 Control and query your **Home Assistant** instance with simple commands. You do not need to say "entities", "domain", or "state"-use the command phrases below and the skill will run the right action.
 
-**Config:** Set **HA_TOKEN** in `~/.cowcode/.env` (e.g. via `cowcode skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`. Add `"home-assistant"` to `skills.enabled` in config.
+**Config:** Set **HA_TOKEN** in `~/.pasture/.env` (e.g. via `pasture skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`. Add `"home-assistant"` to `skills.enabled` in config.
 
 ## How to use
 

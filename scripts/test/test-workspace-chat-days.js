@@ -12,7 +12,7 @@ import {
 } from '../../lib/chat-log.js';
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), 'cowcode-chatday-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pasture-chatday-'));
   const workspaceDir = join(dir, 'workspace');
   mkdirSync(join(workspaceDir, 'chat-log', 'private'), { recursive: true });
   const day = '2026-05-27';

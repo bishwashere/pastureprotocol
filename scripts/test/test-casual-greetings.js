@@ -6,7 +6,7 @@
  * E2E: index.js --test — no search/browse, no dictionary-style citations.
  *
  * Run: pnpm run test:casual-greetings
- * Skip E2E: COWCODE_SKIP_GREETING_E2E=1 pnpm run test:casual-greetings
+ * Skip E2E: PASTURE_SKIP_GREETING_E2E=1 pnpm run test:casual-greetings
  */
 
 import { runSkillTests } from './skill-test-runner.js';
@@ -117,8 +117,8 @@ async function runUnitTests() {
 }
 
 async function runE2ETests() {
-  if (process.env.COWCODE_SKIP_GREETING_E2E === '1') {
-    console.log('Skipping greeting E2E (COWCODE_SKIP_GREETING_E2E=1)\n');
+  if (process.env.PASTURE_SKIP_GREETING_E2E === '1') {
+    console.log('Skipping greeting E2E (PASTURE_SKIP_GREETING_E2E=1)\n');
     return { passed: 0, failed: 0 };
   }
 

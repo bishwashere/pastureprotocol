@@ -11,15 +11,15 @@ import { homedir, tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(__dirname, '..', '..');
-export const INSTALL_ROOT = process.env.COWCODE_INSTALL_DIR ? process.env.COWCODE_INSTALL_DIR : ROOT;
-export const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+export const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? process.env.PASTURE_INSTALL_DIR : ROOT;
+export const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 export const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 export const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 export const PER_TEST_TIMEOUT_MS = 120_000;
 
 export function createTempStateDir() {
-  const stateDir = join(tmpdir(), `cowcode-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const stateDir = join(tmpdir(), `pasture-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -54,7 +54,7 @@ function parseE2EStdout(stdout) {
  */
 export function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   if (opts.secondMessage) env.TEST_MESSAGE_2 = opts.secondMessage;
   const timeoutMs = opts.timeoutMs || PER_TEST_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
@@ -102,7 +102,7 @@ export function runE2E(userMessage, opts = {}) {
  */
 export function runDashboardE2E(message, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   const timeoutMs = opts.timeoutMs || PER_TEST_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(ROOT, 'scripts/chat-dashboard.js')], {

@@ -1,6 +1,6 @@
 /**
  * WhatsApp + configurable LLM. On incoming message → LLM reply → send back.
- * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
+ * Config and state live in ~/.pasture (or PASTURE_STATE_DIR).
  */
 
 import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir } from './lib/paths.js';
@@ -8,8 +8,8 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
 
-// Log to daemon.log so "tail -f" shows when the process actually started (after cowcode start/restart)
-console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] cowCode daemon started`);
+// Log to daemon.log so "tail -f" shows when the process actually started (after pasture start/restart)
+console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] Pasture Protocol daemon started`);
 
 import * as Baileys from '@whiskeysockets/baileys';
 
@@ -270,7 +270,7 @@ async function runAuthOnly(opts = {}) {
           console.log('Please send a message to your own number to get started.');
         } else {
           console.log('[connection] connection successful');
-          console.log('Linked. You can Ctrl+C and run cowcode start.');
+          console.log('Linked. You can Ctrl+C and run pasture start.');
         }
         resolve(sock);
         return;
@@ -419,7 +419,7 @@ async function main() {
 
   let sock;
   const channelsConfig = getChannelsConfig();
-  const envTelegramOnly = process.env.COWCODE_TELEGRAM_ONLY === '1' || process.env.COWCODE_TELEGRAM_ONLY === 'true';
+  const envTelegramOnly = process.env.PASTURE_TELEGRAM_ONLY === '1' || process.env.PASTURE_TELEGRAM_ONLY === 'true';
   const telegramOnlyMode = (envTelegramOnly || (channelsConfig.telegram.enabled && !channelsConfig.whatsapp.enabled)) && !!channelsConfig.telegram.botToken;
   const credsPath = join(getAuthDir(), 'creds.json');
   const needAuth = !existsSync(getAuthDir()) || !existsSync(credsPath);
@@ -612,7 +612,7 @@ async function main() {
           const child = spawn(process.execPath, ['cron/run-tide.js'], {
             cwd: __dirname,
             stdio: ['pipe', 'pipe', 'inherit'],
-            env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+            env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
           });
           let out = '';
           child.stdout.setEncoding('utf8');
@@ -759,7 +759,7 @@ async function main() {
   const GROUP_MD = 'group.md';
 
   const WORKSPACE_DEFAULT_FILES = [WHO_AM_I_MD, MY_HUMAN_MD, SOUL_MD, GROUP_MD];
-  const INSTALL_DIR = (process.env.COWCODE_INSTALL_DIR && resolve(process.env.COWCODE_INSTALL_DIR)) || __dirname;
+  const INSTALL_DIR = (process.env.PASTURE_INSTALL_DIR && resolve(process.env.PASTURE_INSTALL_DIR)) || __dirname;
   const DEFAULT_WORKSPACE_DIR = join(INSTALL_DIR, 'workspace-default');
 
   function readWorkspaceMd(filename) {

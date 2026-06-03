@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-reply-style-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-reply-style-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const {
       buildUserReplyStyleBlock,

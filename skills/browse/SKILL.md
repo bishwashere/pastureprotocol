@@ -21,7 +21,7 @@ Call **run_skill** with **skill: "browse"**. Set **command** or **arguments.acti
 - **click** - Go to **arguments.url** (or reuse current tab if already there), click an element, return the new page content. Set **arguments.selector** (CSS selector, e.g. `a[href*="tech"]`, `button.submit`, `[aria-label="Submit"]`). Use the "Current page" URL from the previous result when the user asks a follow-up on the same site.
 - **scroll** - On **arguments.url** (or current tab), scroll the page. Set **arguments.direction** to one of: **down**, **up**, **top**, **bottom** (default: down).
 - **fill** - On **arguments.url** (or current tab), fill a form field. Set **arguments.selector** and **arguments.value**.
-- **screenshot** - On **arguments.url** (or current tab), capture a screenshot. Optional **arguments.selector**. Saved under `~/.cowcode/browse-screenshots/`. After capture, the tool auto-runs vision to describe the screenshot and suggest a next action (e.g. scroll, click category); use that hint for follow-up if helpful.
+- **screenshot** - On **arguments.url** (or current tab), capture a screenshot. Optional **arguments.selector**. Saved under `~/.pasture/browse-screenshots/`. After capture, the tool auto-runs vision to describe the screenshot and suggest a next action (e.g. scroll, click category); use that hint for follow-up if helpful.
 
 ## Category selectors (deal/category sites)
 
@@ -75,7 +75,7 @@ browse_fill
     value: string
 
 browse_screenshot
-  description: Capture a screenshot. Optional selector. Saved under ~/.cowcode/browse-screenshots/.
+  description: Capture a screenshot. Optional selector. Saved under ~/.pasture/browse-screenshots/.
   parameters:
     url: string
     selector: string

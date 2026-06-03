@@ -53,11 +53,11 @@ function assertConfirmRequired(result) {
 // ── Setup: create a temp secrets.json with no token ───────────────────────────
 
 const savedToken = process.env.GITHUB_TOKEN;
-const savedStateDir = process.env.COWCODE_STATE_DIR;
+const savedStateDir = process.env.PASTURE_STATE_DIR;
 
 function getLiveToken() {
   if (savedToken) return savedToken;
-  const secretsPath = join(savedStateDir || homedir(), '.cowcode', 'secrets.json');
+  const secretsPath = join(savedStateDir || homedir(), '.pasture', 'secrets.json');
   try {
     if (existsSync(secretsPath)) {
       const secrets = JSON.parse(readFileSync(secretsPath, 'utf8'));
@@ -72,15 +72,15 @@ const liveToken = getLiveToken();
 
 function withNoToken(fn) {
   return async () => {
-    const tempDir = mkdtempSync(join(tmpdir(), 'cowcode-gh-test-'));
+    const tempDir = mkdtempSync(join(tmpdir(), 'pasture-gh-test-'));
     writeFileSync(join(tempDir, 'secrets.json'), JSON.stringify({}), 'utf8');
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({}), 'utf8');
     delete process.env.GITHUB_TOKEN;
-    process.env.COWCODE_STATE_DIR = tempDir;
+    process.env.PASTURE_STATE_DIR = tempDir;
     try {
       await fn();
     } finally {
-      process.env.COWCODE_STATE_DIR = savedStateDir || '';
+      process.env.PASTURE_STATE_DIR = savedStateDir || '';
       if (savedToken) process.env.GITHUB_TOKEN = savedToken;
     }
   };
@@ -99,12 +99,12 @@ await test('returns setup instructions when no token configured', withNoToken(as
 }));
 
 await test('reads token from secrets.json', async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), 'cowcode-gh-test-'));
+  const tempDir = mkdtempSync(join(tmpdir(), 'pasture-gh-test-'));
   const fakeToken = 'ghp_fake_token_for_test_1234567890abcd';
   writeFileSync(join(tempDir, 'secrets.json'), JSON.stringify({ github: { token: fakeToken } }), 'utf8');
   writeFileSync(join(tempDir, 'config.json'), JSON.stringify({}), 'utf8');
   delete process.env.GITHUB_TOKEN;
-  process.env.COWCODE_STATE_DIR = tempDir;
+  process.env.PASTURE_STATE_DIR = tempDir;
   try {
     // Will fail with auth error (not "token not configured")
     const result = await executeGithub({}, { repo: 'a/b' }, 'github_read_repo');
@@ -113,7 +113,7 @@ await test('reads token from secrets.json', async () => {
     if (obj.setup) throw new Error('Should not return setup instructions when token exists in secrets.json');
     if (obj.error && obj.error.includes('not configured')) throw new Error('Token not being read from secrets.json');
   } finally {
-    process.env.COWCODE_STATE_DIR = savedStateDir || '';
+    process.env.PASTURE_STATE_DIR = savedStateDir || '';
     if (savedToken) process.env.GITHUB_TOKEN = savedToken;
   }
 });

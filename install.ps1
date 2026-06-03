@@ -1,7 +1,7 @@
-# cowCode Windows installer
+# Pasture Protocol Windows installer
 # Download -> install -> deps -> setup -> start (pm2)
-# Code: %USERPROFILE%\.local\share\cowcode   State: %USERPROFILE%\.cowcode
-# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowcode/master/install.ps1 | iex
+# Code: %USERPROFILE%\.local\share\pastureprotocol   State: %USERPROFILE%\.pasture
+# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
 
 param(
     [switch]$SkipSetup
@@ -13,11 +13,11 @@ $ProgressPreference = "SilentlyContinue"
 
 $CowcodeNodeVersion = "v22.16.0"
 $CowcodeNodeZipName = "node-$CowcodeNodeVersion-win-x64"
-$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "cowcode\node"
+$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "pastureprotocol\node"
 $CowcodeNodeDir = Join-Path $CowcodeNodeRoot $CowcodeNodeZipName
 
 function Test-CowcodeInteractive {
-    if ($env:COWCODE_NONINTERACTIVE -eq "1") { return $false }
+    if ($env:PASTURE_NONINTERACTIVE -eq "1" -or $env:COWCODE_NONINTERACTIVE -eq "1") { return $false }
     return ($Host.Name -eq "ConsoleHost")
 }
 
@@ -56,10 +56,10 @@ function Use-CowcodeNodeRuntime {
 }
 
 function Install-CowcodeNodeRuntime {
-    Write-Host "  > Installing cowCode-managed Node.js 22 runtime..."
+    Write-Host "  > Installing Pasture Protocol-managed Node.js 22 runtime..."
     try {
         New-Item -ItemType Directory -Path $CowcodeNodeRoot -Force | Out-Null
-        $work = Join-Path ([System.IO.Path]::GetTempPath()) ("cowcode-node-" + [guid]::NewGuid().ToString("n"))
+        $work = Join-Path ([System.IO.Path]::GetTempPath()) ("pasture-node-" + [guid]::NewGuid().ToString("n"))
         New-Item -ItemType Directory -Path $work -Force | Out-Null
         $zip = Join-Path $work "node.zip"
         $url = "https://nodejs.org/dist/$CowcodeNodeVersion/$CowcodeNodeZipName.zip"
@@ -86,13 +86,13 @@ function Offer-CowcodeNodeJs {
     Write-Host ""
     Write-Host "  [X] $Reason"
     Write-Host ""
-    Write-Host "  cowCode needs Node.js 18, 20, or 22 on Windows because native"
+    Write-Host "  Pasture Protocol needs Node.js 18, 20, or 22 on Windows because native"
     Write-Host "  dependencies like better-sqlite3 do not have Node 24 prebuilds yet."
-    Write-Host "  The installer can install a private Node.js 22 runtime for cowCode."
+    Write-Host "  The installer can install a private Node.js 22 runtime for Pasture Protocol."
     Write-Host ""
     if (Test-CowcodeInteractive) {
         try {
-            $answer = Read-Host "  Install cowCode-managed Node.js 22 now? [Y/n]"
+            $answer = Read-Host "  Install Pasture Protocol-managed Node.js 22 now? [Y/n]"
             if ($answer -match '^[nN]') {
                 Write-Host "  Install Node.js 22 LTS manually, then open a new PowerShell and rerun this installer."
                 Exit-Install 1
@@ -194,14 +194,14 @@ function Ensure-CowcodePm2 {
         return $true
     }
     Write-Host ""
-    Write-Host "  pm2 is required to run cowCode in the background on Windows."
+    Write-Host "  pm2 is required to run Pasture Protocol in the background on Windows."
     Write-Host "  (Like Node.js, it is not needed to download the code, only to keep the bot running.)"
     Write-Host ""
     if (Test-CowcodeInteractive) {
         try {
             $answer = Read-Host "  Install pm2 globally now (npm install -g pm2)? [Y/n]"
             if ($answer -match '^[nN]') {
-                Write-Host "  Install manually, then run this installer again or: cowcode start"
+                Write-Host "  Install manually, then run this installer again or: pasture start"
                 Write-Host "    npm install -g pm2"
                 return $false
             }
@@ -249,7 +249,7 @@ function Enable-CowcodePm2AutoRestart {
     if (Test-CowcodeInteractive) {
         try {
             $wantAuto = $true
-            $answer = Read-Host "  Start cowCode automatically when you log in to Windows? [Y/n]"
+            $answer = Read-Host "  Start Pasture Protocol automatically when you log in to Windows? [Y/n]"
             if ($answer -match '^[nN]') { $wantAuto = $false }
         } catch { }
     }
@@ -279,19 +279,19 @@ function Show-CowcodePostInstallHelp {
     param(
         [bool]$Running = $false
     )
-    $stateDir = Join-Path $env:USERPROFILE ".cowcode"
+    $stateDir = Join-Path $env:USERPROFILE ".pasture"
     Write-Host ""
     Write-Host "  ------------------------------------------------"
     Write-Host "  Useful commands"
     Write-Host "  ------------------------------------------------"
-    Write-Host "  cowcode status       check if the bot is running"
+    Write-Host "  pasture status       check if the bot is running"
     Write-Host "  pm2 status           same (all pm2 processes)"
-    Write-Host "  cowcode logs         live log output"
-    Write-Host "  pm2 logs cowcode     same"
-    Write-Host "  cowcode stop         stop the background bot"
-    Write-Host "  cowcode restart      restart after config changes"
-    Write-Host "  cowcode dashboard    open the web dashboard"
-    Write-Host "  cowcode update       pull the latest version"
+    Write-Host "  pasture logs         live log output"
+    Write-Host "  pm2 logs pasture     same"
+    Write-Host "  pasture stop         stop the background bot"
+    Write-Host "  pasture restart      restart after config changes"
+    Write-Host "  pasture dashboard    open the web dashboard"
+    Write-Host "  pasture update       pull the latest version"
     Write-Host ""
     Write-Host "  Log files:"
     Write-Host "    $stateDir\daemon.log"
@@ -301,7 +301,7 @@ function Show-CowcodePostInstallHelp {
         Write-Host "  [OK] Bot is running in the background. You can close this window."
     } else {
         Write-Host ""
-        Write-Host "  Start the bot: cowcode start"
+        Write-Host "  Start the bot: pasture start"
     }
     Write-Host ""
 }
@@ -326,7 +326,7 @@ function Encode-GitHubBranchPath {
 function Get-CowcodeRequestHeaders {
     param([string]$Accept = "*/*")
     @{
-        "User-Agent"     = "cowcode-install/windows"
+        "User-Agent"     = "pasture-install/windows"
         "Cache-Control"  = "no-cache"
         "Pragma"         = "no-cache"
         "Accept"         = $Accept
@@ -392,11 +392,11 @@ function Invoke-CowcodeBuildInfo {
     if (-not (Test-Path -LiteralPath $buildJs)) { return }
     Push-Location $Root
     try {
-        $env:COWCODE_BRANCH = $Branch
+        $env:PASTURE_BRANCH = $Branch
         $null = node --input-type=module -e @"
 import { fetchRemoteBuild, writeBuild } from './lib/build-info.js';
 const root = process.cwd().replace(/\\/g, '/');
-const branch = process.env.COWCODE_BRANCH || 'master';
+const branch = process.env.PASTURE_BRANCH || 'master';
 const b = await fetchRemoteBuild(branch);
 if (b) writeBuild(root, b);
 "@ 2>$null
@@ -404,7 +404,7 @@ if (b) writeBuild(root, b);
         Write-Host "  [WARN] Build metadata skipped: $($_.Exception.Message)"
     } finally {
         Pop-Location
-        Remove-Item Env:COWCODE_BRANCH -ErrorAction SilentlyContinue
+        Remove-Item Env:PASTURE_BRANCH -ErrorAction SilentlyContinue
     }
 }
 
@@ -430,7 +430,7 @@ function Copy-CowcodeTree {
 }
 
 Write-Host ""
-Write-Host "  Welcome to cowCode - WhatsApp bot with your own LLM"
+Write-Host "  Welcome to Pasture Protocol - WhatsApp bot with your own LLM"
 Write-Host "  ------------------------------------------------"
 Write-Host ""
 
@@ -445,7 +445,7 @@ if (-not $nodeCmd) {
 $nodeVersion = Get-CowcodeNodeVersion $nodeCmd.Source
 if (-not (Test-CowcodeSupportedNode $nodeVersion)) {
     $found = if ($nodeVersion) { $nodeVersion.Raw } else { "unknown" }
-    Offer-CowcodeNodeJs "Unsupported Node.js version found ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+    Offer-CowcodeNodeJs "Unsupported Node.js version found ($found). Pasture Protocol needs Node.js 18, 20, or 22 LTS on Windows."
     Refresh-NodeToolPath
     $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
     $nodeVersion = Get-CowcodeNodeVersion $nodeCmd.Source
@@ -475,7 +475,7 @@ if (-not $hasPnpm -and -not $hasNpm) {
 $packageManagerNode = if ($hasPnpm) { Get-CowcodeToolNodeVersion $pnpmCmd } else { Get-CowcodeToolNodeVersion $npmCmd }
 if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
     $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
-    Offer-CowcodeNodeJs "npm/pnpm is using unsupported Node.js ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+    Offer-CowcodeNodeJs "npm/pnpm is using unsupported Node.js ($found). Pasture Protocol needs Node.js 18, 20, or 22 LTS on Windows."
     Refresh-NodeToolPath
     $npmCmd = Get-CowcodeToolPath "npm"
     $pnpmCmd = Get-CowcodeToolPath "pnpm"
@@ -494,22 +494,22 @@ if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
     Exit-Install 1
 }
 
-$Branch = if ($env:COWCODE_BRANCH) { $env:COWCODE_BRANCH.Trim() } else { "master" }
+$Branch = if ($env:PASTURE_BRANCH) { $env:PASTURE_BRANCH.Trim() } else { "master" }
 if (-not (Test-CowcodeBranchName $Branch)) {
-    Write-Host "  [X] Invalid branch name in COWCODE_BRANCH."
+    Write-Host "  [X] Invalid branch name in PASTURE_BRANCH."
     Exit-Install 1
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowcode/archive/refs/heads/$BranchPath.tar.gz"
+$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
 $Extracted = "cowCode-$Branch"
 
-$InstallDir = if ($env:COWCODE_INSTALL_DIR) { $env:COWCODE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\cowcode" }
+$InstallDir = if ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\pastureprotocol" }
 $BinDir = Join-Path $env:USERPROFILE ".local\bin"
-$Launcher = Join-Path $BinDir "cowcode.cmd"
+$Launcher = Join-Path $BinDir "pasture.cmd"
 
 # --- temp workspace ---
-$Work = Join-Path ([System.IO.Path]::GetTempPath()) ("cowcode-install-" + [guid]::NewGuid().ToString("n"))
+$Work = Join-Path ([System.IO.Path]::GetTempPath()) ("pasture-install-" + [guid]::NewGuid().ToString("n"))
 try {
     New-Item -ItemType Directory -Path $Work -Force | Out-Null
 } catch {
@@ -531,7 +531,7 @@ try {
     $Src = Join-Path $Work $Extracted
     if (-not (Test-Path -LiteralPath $Src)) {
         Write-Host "  [X] Extracted folder not found: $Src"
-        Write-Host "  [X] Check COWCODE_BRANCH (archive root must be cowCode-<branch>)."
+        Write-Host "  [X] Check PASTURE_BRANCH (archive root must be cowCode-<branch>)."
         Exit-Install 1
     }
 
@@ -562,12 +562,20 @@ try {
         }
         $cmdContent = @"
 @echo off
-set COWCODE_INSTALL_DIR=$InstallDir
-set COWCODE_NODE_DIR=$CowcodeNodeDir
+set PASTURE_INSTALL_DIR=$InstallDir
+set PASTURE_NODE_DIR=$CowcodeNodeDir
+if exist "%PASTURE_NODE_DIR%\node.exe" set PATH=%PASTURE_NODE_DIR%;%APPDATA%\npm;%PATH%
 if exist "%COWCODE_NODE_DIR%\node.exe" set PATH=%COWCODE_NODE_DIR%;%APPDATA%\npm;%PATH%
 node "$InstallDir\cli.js" %*
 "@
         Set-Content -Path $Launcher -Value $cmdContent -Encoding ASCII -ErrorAction Stop
+        $LegacyLauncher = Join-Path $BinDir "cowcode.cmd"
+        $legacyContent = @"
+@echo off
+echo cowcode is now pasture - update your scripts. 1>&2
+call "$Launcher" %*
+"@
+        Set-Content -Path $LegacyLauncher -Value $legacyContent -Encoding ASCII -ErrorAction SilentlyContinue
     } catch {
         Write-Host "  [X] Launcher install failed: $($_.Exception.Message)"
         Exit-Install 1
@@ -581,7 +589,7 @@ node "$InstallDir\cli.js" %*
             $newPath = if ($userPath) { "$BinDir;$userPath" } else { $BinDir }
             [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
             $env:Path = "$BinDir;$env:Path"
-            Write-Host "  > Added $BinDir to user PATH (open a new terminal if cowcode is not found)"
+            Write-Host "  > Added $BinDir to user PATH (open a new terminal if pasture is not found)"
         }
     } catch {
         Write-Host "  [WARN] Could not update user PATH: $($_.Exception.Message)"
@@ -641,7 +649,7 @@ node "$InstallDir\cli.js" %*
     Write-Host ""
     Write-Host "  ------------------------------------------------"
 
-    $env:COWCODE_INSTALL_DIR = $InstallDir
+    $env:PASTURE_INSTALL_DIR = $InstallDir
     $env:Path = "$BinDir;$env:Path"
     Refresh-NodeToolPath
 
@@ -650,7 +658,7 @@ node "$InstallDir\cli.js" %*
         Exit-Install 1
     }
 
-    Write-Host "  > Starting cowCode with pm2..."
+    Write-Host "  > Starting Pasture Protocol with pm2..."
     & node "$InstallDir\cli.js" start
     $started = ($LASTEXITCODE -eq 0)
 

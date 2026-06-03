@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Manual index runner: cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]
+ * Manual index runner: pasture index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]
  * full: index all sources with filesystem root = home directory (~). Same as --root ~ without having to expand.
  * Default (no --source): index all sources (memory + chat + filesystem).
  * --root ~ or --root /path: filesystem root (default: workspace). "~" is expanded to home directory.
@@ -53,7 +53,7 @@ const wantFilesystem = wantAll || sources.includes('filesystem');
 async function main() {
   const config = getMemoryConfig();
   if (!config) {
-    console.error('cowcode index: Memory is not enabled. Add "memory" to skills.enabled in config and set an embedding API key.');
+    console.error('pasture index: Memory is not enabled. Add "memory" to skills.enabled in config and set an embedding API key.');
     process.exit(1);
   }
 
@@ -76,11 +76,11 @@ async function main() {
   }
 
   if (!wantMemory && !wantFilesystem) {
-    console.log('cowcode index: No sources selected. Use --source memory and/or --source filesystem, or run without --source to index all.');
+    console.log('pasture index: No sources selected. Use --source memory and/or --source filesystem, or run without --source to index all.');
   }
 }
 
 main().catch((err) => {
-  console.error('cowcode index:', err && err.message ? err.message : err);
+  console.error('pasture index:', err && err.message ? err.message : err);
   process.exit(1);
 });

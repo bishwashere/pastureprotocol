@@ -119,7 +119,7 @@ async function main() {
   const shellOk = shellTest.status === 0 && shellOut.includes('INSTALL_OK');
   recordCase({
     name: 'test-install.sh',
-    input: 'bash install.sh -c which cowcode',
+    input: 'bash install.sh -c which pasture',
     output: shellOk ? 'INSTALL_OK' : shellOut.trim().slice(-300),
     status: shellOk ? 'pass' : 'fail',
   });

@@ -1,7 +1,7 @@
 ---
 id: github
 name: GitHub
-description: GitHub integration. Read repos, list/read issues and PRs, create branches, post comments, create PRs. Requires GitHub token in ~/.cowcode/secrets.json or GITHUB_TOKEN env var.
+description: GitHub integration. Read repos, list/read issues and PRs, create branches, post comments, create PRs. Requires GitHub token in ~/.pasture/secrets.json or GITHUB_TOKEN env var.
 ---
 
 # GitHub
@@ -18,11 +18,11 @@ Interact with GitHub via the REST API. Read repositories, issues, PRs, and files
    - **Minimum recommended scopes:** `repo`, `issues`, `pull_requests`
    - **Never** grant `admin:org`, `delete_repo`, or `workflow` unless you explicitly need them
 
-2. Save the token in `~/.cowcode/secrets.json` (gitignored, never committed):
+2. Save the token in `~/.pasture/secrets.json` (gitignored, never committed):
    ```json
    { "github": { "token": "ghp_your_token_here" } }
    ```
-   Or set `GITHUB_TOKEN` in `~/.cowcode/.env`.
+   Or set `GITHUB_TOKEN` in `~/.pasture/.env`.
 
 3. (Optional) Set a default repo in `config.json` so you don't repeat it each time:
    ```json

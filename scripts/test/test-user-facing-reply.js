@@ -9,11 +9,11 @@ async function main() {
 
   const cases = [
     {
-      input: '[CowCode] developer replied: [CowCode] You are working on nextpostai.',
+      input: '[Pasture] developer replied: [Pasture] You are working on nextpostai.',
       expect: 'You are working on nextpostai.',
     },
     {
-      input: '[CowCode] Alex replied: Hello there.',
+      input: '[Pasture] Alex replied: Hello there.',
       expect: 'Hello there.',
     },
     {
@@ -21,7 +21,7 @@ async function main() {
       expect: 'Plain body.',
     },
     {
-      input: '[CowCode] Hi Bishwas.',
+      input: '[Pasture] Hi Bishwas.',
       expect: 'Hi Bishwas.',
     },
     {

@@ -1,5 +1,5 @@
 // ── Chat session persistence ──────────────────────────────────────────
-    var SESSIONS_KEY = 'cowcode_chat_sessions_v1';
+    var SESSIONS_KEY = 'pasture_chat_sessions_v1';
     var MAX_SESSIONS = 20;
 
     function loadAllSessions() {
@@ -1284,8 +1284,8 @@
           skillCount: extractTurnDoneSkills(summary),
         });
       });
-      if (window.cowCodeCompletedTasks && typeof window.cowCodeCompletedTasks.consolidateCompletedTasks === 'function') {
-        out = window.cowCodeCompletedTasks.consolidateCompletedTasks(out);
+      if (window.pastureCompletedTasks && typeof window.pastureCompletedTasks.consolidateCompletedTasks === 'function') {
+        out = window.pastureCompletedTasks.consolidateCompletedTasks(out);
       }
       return out;
     }
@@ -3412,7 +3412,7 @@
     var teamUserInputDismissed = {};
     var teamUserInputModalWired = false;
     var teamUserInputSubmitBusy = false;
-    var TEAM_USER_INPUT_DISMISSED_KEY = 'cowcode_team_user_input_dismissed_v1';
+    var TEAM_USER_INPUT_DISMISSED_KEY = 'pasture_team_user_input_dismissed_v1';
 
     function loadTeamUserInputDismissed() {
       try {

@@ -76,7 +76,7 @@
       .sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
   }
 
-  root.cowCodeCompletedTasks = {
+  root.pastureCompletedTasks = {
     normalizeCompletedTaskPrompt: normalizeCompletedTaskPrompt,
     completedTaskMergeKey: completedTaskMergeKey,
     consolidateCompletedTasks: consolidateCompletedTasks,

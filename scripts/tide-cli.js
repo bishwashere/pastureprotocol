@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tide checklist CLI: cowcode tide checklist ...
+ * Tide checklist CLI: pasture tide checklist ...
  *   list | add | remove | enable | disable | run | triggers
  * Each checklist item runs as an agent turn (same LLM/tools path as chat).
  */
@@ -36,14 +36,14 @@ function parseFlags(argv) {
 
 function printUsage() {
   console.log('Tide checklist commands (each item = one agent/LLM turn with full skills):');
-  console.log('  cowcode tide checklist list');
-  console.log('  cowcode tide checklist add <label> [--prompt "what to check"]');
-  console.log('  cowcode tide checklist remove <id>');
-  console.log('  cowcode tide checklist enable <id>');
-  console.log('  cowcode tide checklist disable <id>');
-  console.log('  cowcode tide checklist run [--id <id>]');
-  console.log('  cowcode tide checklist triggers [--on-restart] [--no-on-cycle] [--on-follow-up] ...');
-  console.log('  cowcode tide checklist on|off');
+  console.log('  pasture tide checklist list');
+  console.log('  pasture tide checklist add <label> [--prompt "what to check"]');
+  console.log('  pasture tide checklist remove <id>');
+  console.log('  pasture tide checklist enable <id>');
+  console.log('  pasture tide checklist disable <id>');
+  console.log('  pasture tide checklist run [--id <id>]');
+  console.log('  pasture tide checklist triggers [--on-restart] [--no-on-cycle] [--on-follow-up] ...');
+  console.log('  pasture tide checklist on|off');
   console.log('');
   console.log('Requires tide.enabled for automatic runs. Items run one-by-one in order.');
 }
@@ -54,7 +54,7 @@ function printList() {
   console.log('Triggers:', JSON.stringify(checklist.triggers));
   const items = listChecklistItems();
   if (!items.length) {
-    console.log('No items. Example: cowcode tide checklist add "Time check" --prompt "What time is it locally?"');
+    console.log('No items. Example: pasture tide checklist add "Time check" --prompt "What time is it locally?"');
     return;
   }
   console.log('');

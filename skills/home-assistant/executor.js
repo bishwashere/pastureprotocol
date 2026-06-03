@@ -18,7 +18,7 @@ function getHaCliPath() {
 
 /** Install/repo root (so CLI can resolve ../../lib when run). */
 function getInstallRoot() {
-  return process.env.COWCODE_INSTALL_DIR || join(__dirname, '..', '..');
+  return process.env.PASTURE_INSTALL_DIR || join(__dirname, '..', '..');
 }
 
 /**
@@ -64,7 +64,7 @@ function runCli(argv) {
   return new Promise((resolve, reject) => {
     const cliPath = getHaCliPath();
     const cwd = getInstallRoot();
-    const env = { ...process.env, COWCODE_STATE_DIR: getStateDir() };
+    const env = { ...process.env, PASTURE_STATE_DIR: getStateDir() };
     const child = spawn(process.execPath, [cliPath, ...argv], {
       cwd,
       env,

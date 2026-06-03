@@ -33,7 +33,7 @@ const cases = [
       '',
       '✅ me: "What do you know about me?"',
       '  INPUT: What do you know about me?',
-      '  OUTPUT: Test User lives in Austin and works on cowCode.',
+      '  OUTPUT: Test User lives in Austin and works on Pasture Protocol.',
       '',
       '--- Result ---',
       'Passed: 1, Failed: 0',

@@ -19,7 +19,7 @@ Call **run_skill** with **skill: "vision"**. Set **command** or **arguments.acti
 - **arguments.action** - **"describe"** (default) or **"generate"**. Use **generate** to create an image from text and send it to the chat.
 - **arguments.image**, **arguments.url**, or **arguments.path** - **Required for describe** (unless **arguments.source** is **"webcam"**). Pass the image as one of these (all work the same): **image**, **url**, or **path**. Value can be:
   - **"webcam"** - Capture one frame from the default webcam (live camera). Use for "what do you see", "describe the room", etc.
-  - A **file path** (e.g. when the message says "Image file: /path/to/file.jpg", use that path as **arguments.image** or **arguments.path**; or browse screenshot under `~/.cowcode/browse-screenshots/`, or user upload under uploads), or
+  - A **file path** (e.g. when the message says "Image file: /path/to/file.jpg", use that path as **arguments.image** or **arguments.path**; or browse screenshot under `~/.pasture/browse-screenshots/`, or user upload under uploads), or
   - An **image URL** (http/https), or
   - A **data URI** (data:image/...;base64,...).
 - **arguments.source** - Optional. Set to **"webcam"** to use the live camera instead of **arguments.image**.
@@ -33,7 +33,7 @@ Call **run_skill** with **skill: "vision"**. Set **command** or **arguments.acti
 - **User sent an image in chat** - The message will include a file path where the image was saved (e.g. "Image file: /path/to/tg-123-78.jpg"). Call vision with **arguments.image** or **arguments.path** set to that path, and **arguments.prompt** to the user's caption (or "What's in this image?").
 - **Follow-up about the same image** (e.g. "re-parse the image", "what was the travel date?") - You do not need to pass an image. The agent automatically uses the **last image path from chat history** when you call vision without **arguments.image**/url/path, so the user can ask to re-parse or get more details without re-uploading. The file must still exist on disk (e.g. from the same session).
 - **"Show me what you see" / "What's in the room?"** - Use **arguments.image: "webcam"** (or **arguments.source: "webcam"**) to capture from the webcam and describe the scene.
-- **After a browse screenshot** - Screenshot details include a path under `~/.cowcode/browse-screenshots/`. Use vision with that path to describe or analyze the page; then chain with click/fill/scroll as needed. No need for the user to say "describe this then click."
+- **After a browse screenshot** - Screenshot details include a path under `~/.pasture/browse-screenshots/`. Use vision with that path to describe or analyze the page; then chain with click/fill/scroll as needed. No need for the user to say "describe this then click."
 - **Any image URL** - Pass the URL as **arguments.image** or **arguments.url** to have the vision model describe it.
 - **"Draw …" / "Generate an image of …" / "Create a picture of …"** - Use **arguments.action: "generate"** and **arguments.prompt** with the description. The image is created and **sent to the chat** automatically.
 

@@ -45,8 +45,8 @@ import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
 import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from '../lib/user-facing-reply.js';
 import { buildToolAuditRewriteInstruction } from '../lib/user-reply-style.js';
 
-// Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
-const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.COWCODE_DASHBOARD_HISTORY);
+// Match Telegram/WhatsApp default. Override via PASTURE_DASHBOARD_HISTORY env if needed.
+const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.PASTURE_DASHBOARD_HISTORY);
 
 dotenv.config({ path: getEnvPath() });
 

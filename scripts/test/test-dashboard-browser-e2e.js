@@ -33,7 +33,7 @@ function startDashboardServer(port) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['dashboard/server.js'], {
       cwd: ROOT,
-      env: { ...process.env, COWCODE_DASHBOARD_PORT: String(port), COWCODE_DASHBOARD_HOST: '127.0.0.1' },
+      env: { ...process.env, PASTURE_DASHBOARD_PORT: String(port), PASTURE_DASHBOARD_HOST: '127.0.0.1' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stderr = '';

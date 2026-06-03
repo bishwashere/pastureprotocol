@@ -5,8 +5,8 @@ import { tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-proj-wf-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-proj-wf-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { createProject, getProjectGraph } = await import('../../lib/projects-db.js');
     const { createGoal } = await import('../../lib/goals.js');

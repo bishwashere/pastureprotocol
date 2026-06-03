@@ -1,14 +1,14 @@
 # Projects - Dashboard Page
 
-A visual project tracker built into the cowCode dashboard. Track work across multiple projects with chained updates and named sub-tracks (branches).
+A visual project tracker built into the Pasture Protocol dashboard. Track work across multiple projects with chained updates and named sub-tracks (branches).
 
 ## Access
 
-Open the dashboard (`cowcode dashboard` or `pnpm run dashboard`) and click **Projects** in the nav, or open **Projects** from Mission Control (team2).
+Open the dashboard (`pasture dashboard` or `pnpm run dashboard`) and click **Projects** in the nav, or open **Projects** from Mission Control (team2).
 
 ## Database
 
-Stored at `$COWCODE_STATE_DIR/projects.db` (default: `~/.cowcode/projects.db`) using SQLite via `better-sqlite3`.
+Stored at `$PASTURE_STATE_DIR/projects.db` (default: `~/.pasture/projects.db`) using SQLite via `better-sqlite3`.
 
 ### Schema
 

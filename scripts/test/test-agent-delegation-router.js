@@ -12,7 +12,7 @@ function assert(condition, message) {
 
 async function run() {
   const stateDir = createTempStateDir();
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
   await setupAgentTeamFixture(stateDir);
 
   const { getEnabledSkillIds } = await import('../../skills/loader.js');

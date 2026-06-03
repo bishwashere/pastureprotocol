@@ -36,7 +36,7 @@
     }
 
     async function mc2RenderProjects() {
-      var api = window.cowCodeProjectsApi;
+      var api = window.pastureProjectsApi;
       var workspaceEl = mc2El('mc2-proj-workspace');
       if (!api || !workspaceEl) return;
       workspaceEl.style.display = 'flex';
@@ -55,7 +55,7 @@
     async function mc2RenderSidebarProjects() {
       var el = mc2El('mc2-sidebar-projects');
       if (!el) return;
-      var api = window.cowCodeProjectsApi;
+      var api = window.pastureProjectsApi;
       if (!api) {
         el.innerHTML = '<span class="mc-sidebar-projects-empty">Unavailable</span>';
         return;

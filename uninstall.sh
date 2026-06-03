@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Uninstall cowCode: stops the daemon, removes binaries, configs, and systemd/launchd services.
+# Uninstall pasture: stops the daemon, removes binaries, configs, and systemd/launchd services.
 
 set -e
 
-INSTALL_DIR="${COWCODE_INSTALL_DIR:-$HOME/.local/share/cowcode}"
-BIN_FILE="$HOME/.local/bin/cowcode"
-STATE_DIR="$HOME/.cowcode"
-SERVICE_NAME="cowcode"
-LAUNCHD_LABEL="ai.cowcode.bot"
+INSTALL_DIR="${PASTURE_INSTALL_DIR:-$HOME/.local/share/pastureprotocol}"
+BIN_FILE="$HOME/.local/bin/pasture"
+STATE_DIR="$HOME/.pasture"
+SERVICE_NAME="pasture"
+LAUNCHD_LABEL="ai.pastureprotocol.bot"
 
-echo "  cowCode Uninstaller"
+echo "  Pasture Protocol Uninstaller"
 echo "  -------------------"
 echo ""
 
@@ -62,12 +62,12 @@ fi
 remove_from_shell_config() {
   local f="$1"
   if [ -f "$f" ]; then
-    if grep -q "# cowCode" "$f"; then
+    if grep -q "# Pasture Protocol" "$f"; then
       echo "  ► Cleaning $f..."
-      # This removes the "# cowCode" line and the line immediately after it (the PATH export)
-      sed -i '/# cowCode/N; /# cowCode\nexport PATH="\$HOME\/\.local\/bin:\$PATH"/d' "$f"
+      # This removes the "# Pasture Protocol" line and the line immediately after it (the PATH export)
+      sed -i '/# Pasture Protocol/N; /# Pasture Protocol\nexport PATH="\$HOME\/\.local\/bin:\$PATH"/d' "$f"
       # Fallback if the newline match didn't work exactly as expected (e.g. slight variations)
-      sed -i '/# cowCode/d' "$f"
+      sed -i '/# Pasture Protocol/d' "$f"
       sed -i '/export PATH="\$HOME\/\.local\/bin:\$PATH"/d' "$f" 2>/dev/null || true
       echo "  ✓ Done."
     fi
@@ -81,7 +81,7 @@ remove_from_shell_config "$HOME/.profile"
 
 echo ""
 echo "  ------------------------------------------------"
-echo "  ✓ cowCode has been successfully uninstalled."
+echo "  ✓ Pasture Protocol has been successfully uninstalled."
 echo "  (Note: The current repository folder was not deleted.)"
 echo "  To start fresh, you can now run: ./install.sh"
 echo ""

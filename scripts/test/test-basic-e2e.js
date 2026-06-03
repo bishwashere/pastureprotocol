@@ -23,7 +23,7 @@ import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
+const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 // Phrases that indicate internal reasoning leaked into the reply
@@ -37,7 +37,7 @@ const INTERNAL_LEAK_PATTERNS = [
 ];
 
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-basic-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-basic-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -50,7 +50,7 @@ function createTempStateDir() {
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['index.js', '--test', userMessage], {
       cwd: ROOT,

@@ -18,9 +18,9 @@ import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-/** Use system install (all-users) when COWCODE_INSTALL_DIR is set; otherwise run from repo. */
-const INSTALL_ROOT = process.env.COWCODE_INSTALL_DIR ? resolve(process.env.COWCODE_INSTALL_DIR) : ROOT;
-const DEFAULT_STATE_DIR = join(homedir(), '.cowcode');
+/** Use system install (all-users) when PASTURE_INSTALL_DIR is set; otherwise run from repo. */
+const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
+const DEFAULT_STATE_DIR = join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
@@ -75,7 +75,7 @@ function assert(condition, message) {
  * @returns {{ stateDir: string, storePath: string }}
  */
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-cron-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-cron-e2e-' + Date.now());
   const cronDir = join(stateDir, 'cron');
   const storePath = join(cronDir, 'jobs.json');
   mkdirSync(cronDir, { recursive: true });
@@ -92,12 +92,12 @@ function createTempStateDir() {
 /**
  * Run the main app in --test mode with one message; return the reply text.
  * @param {string} userMessage
- * @param {object} [opts] - Optional. If opts.stateDir is set, use it as COWCODE_STATE_DIR so the cron store is isolated.
+ * @param {object} [opts] - Optional. If opts.stateDir is set, use it as PASTURE_STATE_DIR so the cron store is isolated.
  * @returns {Promise<string>} Reply text (what would be sent to the user).
  */
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(INSTALL_ROOT, 'index.js'), '--test', userMessage], {
       cwd: INSTALL_ROOT,
@@ -157,7 +157,7 @@ const RUN_JOB_TIMEOUT_MS = 30_000;
 
 /**
  * Force-execute a single cron job payload (same as runner does): run cron/run-job.js with message + jid.
- * Asserts output is valid JSON with textToSend (or error). Uses opts.stateDir for COWCODE_STATE_DIR so config/.env are loaded.
+ * Asserts output is valid JSON with textToSend (or error). Uses opts.stateDir for PASTURE_STATE_DIR so config/.env are loaded.
  * @param {string} message - Job message (prompt to LLM)
  * @param {object} [opts] - { stateDir } for isolated state (default: DEFAULT_STATE_DIR)
  * @returns {Promise<{ textToSend?: string, error?: string }>}
@@ -175,7 +175,7 @@ function runJobOnce(message, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(INSTALL_ROOT, 'cron', 'run-job.js')], {
       cwd: INSTALL_ROOT,
-      env: { ...process.env, COWCODE_STATE_DIR: stateDir },
+      env: { ...process.env, PASTURE_STATE_DIR: stateDir },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -274,7 +274,7 @@ async function runReport() {
 async function main() {
   console.log('E2E cron tests: intent → LLM → cron tool → reply.');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.');
-  if (INSTALL_ROOT !== ROOT) console.log('Using system install (COWCODE_INSTALL_DIR):', INSTALL_ROOT);
+  if (INSTALL_ROOT !== ROOT) console.log('Using system install (PASTURE_INSTALL_DIR):', INSTALL_ROOT);
   console.log('');
 
   const singleAddQuery = 'Remind me to check lock after two minutes';

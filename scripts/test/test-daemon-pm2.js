@@ -64,8 +64,8 @@ function checkWindowsPs1(filename, opts) {
       return { ok: false, detail: `${filename} must install dependencies before setup.js` };
     }
   }
-  if (opts.launcher && !src.includes('cowcode.cmd')) {
-    return { ok: false, detail: `${filename} must create cowcode.cmd launcher` };
+  if (opts.launcher && !src.includes('pasture.cmd')) {
+    return { ok: false, detail: `${filename} must create pasture.cmd launcher` };
   }
   if (opts.exitHelper && !src.includes(opts.exitHelper)) {
     return { ok: false, detail: `${filename} must define ${opts.exitHelper}` };
@@ -110,11 +110,11 @@ function checkUpdatePs1() {
 }
 
 function checkDaemonLog() {
-  const dir = mkdtempSync(join(tmpdir(), 'cowcode-daemon-log-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pasture-daemon-log-'));
   try {
     daemonLog(dir, 'test');
     const content = readFileSync(join(dir, 'daemon.log'), 'utf8');
-    if (!content.includes('cowcode test')) {
+    if (!content.includes('pasture test')) {
       return { ok: false, detail: 'daemonLog did not write expected line' };
     }
     return { ok: true, detail: 'daemonLog writes control lines' };

@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-gh-ctx-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-gh-ctx-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   writeFileSync(
     join(stateDir, 'config.json'),
     JSON.stringify({ skills: { enabled: ['github', 'read', 'go-read'] } }),

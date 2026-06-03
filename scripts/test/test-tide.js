@@ -1,13 +1,13 @@
 /**
  * Tide test: run one Tide cycle (cron/run-tide.js) with temp state and assert we get a valid response.
- * Uses your real config + .env from ~/.cowcode so the LLM runs; typically finishes in 10–30s.
+ * Uses your real config + .env from ~/.pasture so the LLM runs; typically finishes in 10–30s.
  *
  * Tide follow-up is scheduled when we reply to a private chat; after silenceCooldownMinutes
  * with no user reply we send one follow-up, then stay quiet until the user messages again.
  *
  * Usage:
  *   node scripts/test/test-tide.js
- *   COWCODE_STATE_DIR=/path node scripts/test/test-tide.js  (use that state dir instead of temp)
+ *   PASTURE_STATE_DIR=/path node scripts/test/test-tide.js  (use that state dir instead of temp)
  */
 
 import { spawn } from 'child_process';
@@ -18,11 +18,11 @@ import { homedir, tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const DEFAULT_STATE_DIR = join(homedir(), '.cowcode');
+const DEFAULT_STATE_DIR = join(homedir(), '.pasture');
 const TIDE_TEST_TIMEOUT_MS = 45_000;
 
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-tide-test-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-tide-test-' + Date.now());
   const workspaceDir = join(stateDir, 'workspace');
   const cronDir = join(stateDir, 'cron');
   mkdirSync(workspaceDir, { recursive: true });
@@ -64,7 +64,7 @@ function runTideOnce(opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [join(ROOT, 'cron', 'run-tide.js')], {
       cwd: ROOT,
-      env: { ...process.env, COWCODE_STATE_DIR: stateDir },
+      env: { ...process.env, PASTURE_STATE_DIR: stateDir },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -108,8 +108,8 @@ function runTideOnce(opts = {}) {
 }
 
 async function main() {
-  const useExisting = process.env.COWCODE_STATE_DIR && existsSync(process.env.COWCODE_STATE_DIR);
-  const stateDir = useExisting ? process.env.COWCODE_STATE_DIR : createTempStateDir().stateDir;
+  const useExisting = process.env.PASTURE_STATE_DIR && existsSync(process.env.PASTURE_STATE_DIR);
+  const stateDir = useExisting ? process.env.PASTURE_STATE_DIR : createTempStateDir().stateDir;
 
   console.log('Running one Tide cycle (run-tide.js)...');
   console.log('State dir:', stateDir);

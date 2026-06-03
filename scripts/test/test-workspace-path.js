@@ -20,7 +20,7 @@ function test(name, fn) {
   }
 }
 
-const ws = '/tmp/cowcode-ws';
+const ws = '/tmp/pasture-ws';
 
 console.log('\nworkspace-path tests\n');
 

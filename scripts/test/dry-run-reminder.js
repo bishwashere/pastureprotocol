@@ -127,7 +127,7 @@ function step4Print(storePath) {
 
   console.log('  - Cron executor (lib/executors/cron.js) calls cron/store.js: addJob(input, storePath).');
   console.log('  - addJob writes to: ' + storePath);
-  console.log('  - That file is ~/.cowcode/cron/jobs.json (or COWCODE_STATE_DIR/cron/jobs.json).');
+  console.log('  - That file is ~/.pasture/cron/jobs.json (or PASTURE_STATE_DIR/cron/jobs.json).');
   if (existsSync(storePath)) {
     const raw = readFileSync(storePath, 'utf8');
     console.log('\n  Current jobs.json (first 400 chars):');
@@ -208,7 +208,7 @@ async function main() {
   step1Print(userMessage);
 
   if (live) {
-    const tempDir = mkdtempSync(join(tmpdir(), 'cowcode-dry-run-'));
+    const tempDir = mkdtempSync(join(tmpdir(), 'pasture-dry-run-'));
     const tempStorePath = join(tempDir, 'cron', 'jobs.json');
     mkdirSync(join(tempDir, 'cron'), { recursive: true });
     writeFileSync(tempStorePath, JSON.stringify({ version: 1, jobs: [] }, null, 2), 'utf8');

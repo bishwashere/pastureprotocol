@@ -24,14 +24,14 @@ import {
 import { getConfigPath, getRetrospectiveMetricsPath } from '../../lib/paths.js';
 
 function setupStateDir() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-retro-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-retro-'));
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   writeFileSync(
     join(stateDir, 'config.json'),
     JSON.stringify({ skills: { enabled: ['memory'] } }, null, 2),
     'utf8',
   );
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
   return stateDir;
 }
 

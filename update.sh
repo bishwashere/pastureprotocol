@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Update cowCode in place: download latest code, keep your config, auth, and cron jobs.
-# Run from inside your cowCode folder:  cd cowCode && curl -fsSL ... | bash
-# Or:  cd cowCode && bash update.sh
+# Update Pasture Protocol in place: download latest code, keep your config, auth, and cron jobs.
+# Run from inside your Pasture Protocol folder:  cd Pasture Protocol && curl -fsSL ... | bash
+# Or:  cd Pasture Protocol && bash update.sh
 set -e
 
-BRANCH="${COWCODE_BRANCH:-master}"
-TARBALL="https://github.com/bishwashere/cowCode/archive/refs/heads/${BRANCH}.tar.gz"
+BRANCH="${PASTURE_BRANCH:-master}"
+TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
 EXTRACTED="cowCode-${BRANCH}"
 
 # Run from project root (where package.json and index.js exist)
-ROOT="${COWCODE_ROOT:-$PWD}"
+ROOT="${PASTURE_ROOT:-$PWD}"
 if [ ! -f "$ROOT/package.json" ] || [ ! -f "$ROOT/index.js" ]; then
   echo ""
-  echo "  Run from inside your cowCode folder, or use:  cowcode update"
-  echo "  Manual:  cd ~/.local/share/cowcode && curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/${BRANCH}/update.sh | bash"
+  echo "  Run from inside your Pasture Protocol folder, or use:  pasture update"
+  echo "  Manual:  cd ~/.local/share/pastureprotocol && curl -fsSL https://raw.githubusercontent.com/bishwashere/pastureprotocol/${BRANCH}/update.sh | bash"
   echo ""
   exit 1
 fi
@@ -78,7 +78,7 @@ if [ -z "$FORCE_UPDATE" ]; then
   LOCAL_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
   REMOTE_JSON="$WORK/remote_package.json"
   # Avoid cached package.json (raw.githubusercontent.com can serve stale)
-  if [ -n "$LOCAL_VER" ] && curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/bishwashere/cowCode/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null; then
+  if [ -n "$LOCAL_VER" ] && curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/bishwashere/pastureprotocol/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null; then
     REMOTE_VER=$(node -p "require('$REMOTE_JSON').version" 2>/dev/null || true)
     if [ -n "$REMOTE_VER" ] && [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
       LOCAL_BUILD=$(read_build)
@@ -96,7 +96,7 @@ fi
 # Show before/after so user sees the update applied
 BEFORE_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
 REMOTE_JSON="${REMOTE_JSON:-$WORK/remote_package.json}"
-[ ! -f "$REMOTE_JSON" ] && curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/bishwashere/cowCode/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null || true
+[ ! -f "$REMOTE_JSON" ] && curl -fsSL -H "Cache-Control: no-cache" "https://raw.githubusercontent.com/bishwashere/pastureprotocol/${BRANCH}/package.json?t=$(date +%s)" -o "$REMOTE_JSON" 2>/dev/null || true
 AFTER_VER=$(node -p "require('$REMOTE_JSON').version" 2>/dev/null || true)
 BEFORE_BUILD=$(read_build)
 AFTER_BUILD=$(fetch_remote_build)
@@ -109,7 +109,7 @@ if [ -z "$BEFORE_BUILD" ] && [ -d "$ROOT/.git" ]; then
 fi
 
 echo ""
-echo "  cowCode — Updating..."
+echo "  Pasture Protocol — Updating..."
 if [ -n "$BEFORE_VER" ] && [ -n "$AFTER_VER" ]; then
   echo "  From $(format_version_label "$BEFORE_VER" "$BEFORE_BUILD") → $(format_version_label "$AFTER_VER" "$AFTER_BUILD")"
 elif [ -n "$AFTER_VER" ]; then
@@ -119,11 +119,11 @@ echo "  ------------------------------------------------"
 echo ""
 
 # State dir: config/auth/cron live here (new installs and after migration)
-STATE_DIR="${COWCODE_STATE_DIR:-$HOME/.cowcode}"
+STATE_DIR="${PASTURE_STATE_DIR:-$HOME/.pasture}"
 mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
 
 # One-time migration only: if state dir has no config but ROOT has data, copy to state dir.
-# We never overwrite existing ~/.cowcode/config.json (user's priority and model choices are preserved on update).
+# We never overwrite existing ~/.pasture/config.json (user's priority and model choices are preserved on update).
 if [ ! -f "$STATE_DIR/config.json" ] && [ -f "$ROOT/config.json" ]; then
   echo "  ► Migrating config to $STATE_DIR"
   cp "$ROOT/config.json" "$STATE_DIR/"
@@ -165,7 +165,7 @@ if [ -n "$NOW_VER" ]; then
 else
   echo "  ✓ Update complete."
 fi
-echo "  Start the bot:  cowcode start"
-echo "  If already running, restart to use new version:  cowcode restart"
+echo "  Start the bot:  pasture start"
+echo "  If already running, restart to use new version:  pasture restart"
 echo "  (Config and skills are preserved; no fresh install needed.)"
 echo ""

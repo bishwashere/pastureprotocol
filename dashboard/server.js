@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * cowCode dashboard: web UI for status, crons, skills, LLM config.
- * Run: cowcode dashboard  (or pnpm run dashboard from repo)
- * Serves on port 3847 by default (COWCODE_DASHBOARD_PORT).
+ * Pasture Protocol dashboard: web UI for status, crons, skills, LLM config.
+ * Run: pasture dashboard  (or pnpm run dashboard from repo)
+ * Serves on port 3847 by default (PASTURE_DASHBOARD_PORT).
  */
 
 import dotenv from 'dotenv';
@@ -20,7 +20,7 @@ import { listGoals, createGoal, updateGoal, getGoal, runGoalTick, respondToGoalU
 import { listInitiatives, getInitiative, updateInitiative, promoteInitiativeToSubgoal } from '../lib/initiatives.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
-// Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
+// Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
@@ -46,9 +46,9 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR || ROOT;
-const PORT = Number(process.env.COWCODE_DASHBOARD_PORT) || 3847;
-const HOST = process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
+const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR || ROOT;
+const PORT = Number(process.env.PASTURE_DASHBOARD_PORT || process.env.COWCODE_DASHBOARD_PORT) || 3847;
+const HOST = process.env.PASTURE_DASHBOARD_HOST || process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -75,7 +75,7 @@ function getDaemonRunning() {
     }
     const child = spawn('bash', [DAEMON_SCRIPT, 'status'], {
       cwd: INSTALL_DIR,
-      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     });
     let out = '';
     child.stdout.on('data', (c) => { out += c; });
@@ -217,9 +217,9 @@ function getDaemonUptimeSeconds() {
 }
 
 // ---- API key auth (optional) ----
-// Set COWCODE_API_KEY in ~/.cowcode/.env to require Bearer token on all /api/* routes.
+// Set PASTURE_API_KEY in ~/.pasture/.env to require Bearer token on all /api/* routes.
 // Auth is enforced for remote access (e.g. Tailscale *.ts.net) but skipped for local dashboard use.
-const API_KEY = process.env.COWCODE_API_KEY || '';
+const API_KEY = process.env.PASTURE_API_KEY || process.env.COWCODE_API_KEY || '';
 if (API_KEY) {
   app.use('/api', (req, res, next) => {
     const host = req.headers.host || '';
@@ -1140,7 +1140,7 @@ app.post('/api/chat', (req, res) => {
   const child = spawn(process.execPath, [CHAT_SCRIPT], {
     cwd: INSTALL_DIR,
     stdio: ['pipe', 'pipe', 'inherit'],
-    env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR, PASTURE_INSTALL_DIR: INSTALL_DIR },
   });
   let childExited = false;
   res.on('close', () => {
@@ -1226,8 +1226,8 @@ const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
 
 /** Where test scripts run from (install dir, or repo override for dev). */
 function getTestRoot() {
-  if (process.env.COWCODE_TEST_ROOT) {
-    return resolve(process.env.COWCODE_TEST_ROOT);
+  if (process.env.PASTURE_TEST_ROOT || process.env.COWCODE_TEST_ROOT) {
+    return resolve(process.env.PASTURE_TEST_ROOT || process.env.COWCODE_TEST_ROOT);
   }
   const installMarker = join(INSTALL_DIR, 'scripts', 'test', 'e2e-report.js');
   if (existsSync(installMarker)) return INSTALL_DIR;
@@ -1271,7 +1271,7 @@ function runOneTest(testId) {
     return Promise.reject(
       new Error(
         `Script not found: ${test.script} (test root: ${testRoot}). ` +
-          'If you develop from a git clone, set COWCODE_TEST_ROOT to that repo or run cowcode update to refresh ~/.local/share/cowcode.',
+          'If you develop from a git clone, set PASTURE_TEST_ROOT to that repo or run pasture update to refresh ~/.local/share/pastureprotocol.',
       ),
     );
   }
@@ -1281,9 +1281,9 @@ function runOneTest(testId) {
       cwd: testRoot,
       env: {
         ...process.env,
-        COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR,
-        COWCODE_INSTALL_DIR: INSTALL_DIR,
-        COWCODE_TEST_ROOT: testRoot,
+        PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR,
+        PASTURE_INSTALL_DIR: INSTALL_DIR,
+        PASTURE_TEST_ROOT: testRoot,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -1854,7 +1854,7 @@ async function releasePort(port) {
 await releasePort(PORT);
 const server = app.listen(PORT, HOST, () => {
   console.log('');
-  console.log('  cowCode Dashboard');
+  console.log('  Pasture Protocol Dashboard');
   console.log('  ─────────────────');
   console.log(`  URL: http://${HOST}:${PORT}`);
   console.log('  (Use this URL to POST data for future features.)');
@@ -1865,7 +1865,7 @@ const server = app.listen(PORT, HOST, () => {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is in use. Set COWCODE_DASHBOARD_PORT to another port.`);
+    console.error(`Port ${PORT} is in use. Set PASTURE_DASHBOARD_PORT to another port.`);
   } else {
     console.error(err);
   }

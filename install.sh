@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Install flow: download → install → deps → setup → run
-# Code lives in ~/.local/share/cowcode; state in ~/.cowcode
+# Code lives in ~/.local/share/pastureprotocol; state in ~/.pasture
 set -e
 
 POST_INSTALL_CMD=
 [ "$1" = "-c" ] && [ -n "${2:-}" ] && POST_INSTALL_CMD="$2"
 
-BRANCH="${COWCODE_BRANCH:-master}"
-TARBALL="https://github.com/bishwashere/cowCode/archive/refs/heads/${BRANCH}.tar.gz"
+BRANCH="${PASTURE_BRANCH:-master}"
+TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
 EXTRACTED="cowCode-${BRANCH}"
 
-INSTALL_DIR="${COWCODE_INSTALL_DIR:-$HOME/.local/share/cowcode}"
+INSTALL_DIR="${PASTURE_INSTALL_DIR:-$HOME/.local/share/pastureprotocol}"
 BIN_DIR="$HOME/.local/bin"
 
 echo ""
-echo "  Welcome to cowCode — WhatsApp bot with your own LLM"
+echo "  Welcome to Pasture Protocol — WhatsApp bot with your own LLM"
 echo "  ------------------------------------------------"
 echo ""
 
@@ -62,14 +62,14 @@ echo ""
 
 mkdir -p "$BIN_DIR"
 
-cat > "$BIN_DIR/cowcode" <<LAUNCHER
+cat > "$BIN_DIR/pasture" <<LAUNCHER
 #!/usr/bin/env bash
-export COWCODE_INSTALL_DIR="$INSTALL_DIR"
+export PASTURE_INSTALL_DIR="$INSTALL_DIR"
 exec node "$INSTALL_DIR/cli.js" "\$@"
 LAUNCHER
-chmod +x "$BIN_DIR/cowcode"
+chmod +x "$BIN_DIR/pasture"
 
-echo "  ► Launcher installed: $BIN_DIR/cowcode"
+echo "  ► Launcher installed: $BIN_DIR/pasture"
 
 # --- PATH setup ----------------------------------------------------
 
@@ -81,18 +81,25 @@ add_path_to() {
   [ -f "$f" ] || touch "$f" 2>/dev/null || return 0
   grep -q '.local/bin' "$f" 2>/dev/null && return 0
   echo "" >> "$f"
-  echo "# cowCode" >> "$f"
+  echo "# Pasture Protocol" >> "$f"
   echo "$PATH_LINE" >> "$f"
   echo "  ► Added ~/.local/bin to PATH in $f"
   ADDED_PATH=1
 }
 
-if ! command -v cowcode >/dev/null 2>&1; then
+cat > "$BIN_DIR/cowcode" <<'SHIM'
+#!/usr/bin/env bash
+echo "cowcode is now pasture — update your scripts." >&2
+exec pasture "$@"
+SHIM
+chmod +x "$BIN_DIR/cowcode" 2>/dev/null || true
+
+if ! command -v pasture >/dev/null 2>&1; then
   add_path_to "${ZDOTDIR:-$HOME}/.zshrc"
   add_path_to "${ZDOTDIR:-$HOME}/.zprofile"
   add_path_to "$HOME/.bashrc"
   add_path_to "$HOME/.profile"
-  [ "$ADDED_PATH" = 1 ] && echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: cowcode start)"
+  [ "$ADDED_PATH" = 1 ] && echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: pasture start)"
 fi
 
 echo ""
@@ -128,7 +135,7 @@ if [ -n "$POST_INSTALL_CMD" ]; then
   echo "  ✓ Setup skipped (non-interactive -c mode)."
   echo ""
   echo "  ------------------------------------------------"
-  echo "  To start the bot:  cowcode start"
+  echo "  To start the bot:  pasture start"
   echo ""
 else
   echo "  ► Setting up (config + WhatsApp link)..."
@@ -152,13 +159,13 @@ else
   echo "  ------------------------------------------------"
 
   export PATH="$BIN_DIR:$PATH"
-  export COWCODE_INSTALL_DIR="$INSTALL_DIR"
+  export PASTURE_INSTALL_DIR="$INSTALL_DIR"
 
-  if "$BIN_DIR/cowcode" start; then
+  if "$BIN_DIR/pasture" start; then
     echo "  ► Bot is running in the background. You can close this terminal."
-    echo "  ► To see logs: cowcode logs"
+    echo "  ► To see logs: pasture logs"
   else
-    echo "  ► To start later: cowcode start"
+    echo "  ► To start later: pasture start"
   fi
 
   echo ""
@@ -171,6 +178,6 @@ if [ -n "$POST_INSTALL_CMD" ]; then
   echo "  ► Running in new shell: $POST_INSTALL_CMD"
   exec "${SHELL:-/bin/zsh}" -l -c "$POST_INSTALL_CMD"
 elif [ "$ADDED_PATH" = 1 ] && [ -t 0 ]; then
-  echo "  ► Restarting shell so cowcode is available..."
+  echo "  ► Restarting shell so pasture is available..."
   exec "${SHELL:-/bin/zsh}" -l
 fi

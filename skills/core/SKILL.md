@@ -18,7 +18,7 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **cat** - Output file contents. argv: `["/path/to/file"]`
 - **less** - View file (non-interactive, one screen). argv: `["/path/to/file"]` or with flags
 - **du** - Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
-- **cp** - Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`. Recursive **directory** copies skip `node_modules`, `.git`, `.cursor`, root-level `verify/`, typical caches/build outputs, etc., unless the user explicitly wants a full clone-then use **`fullCopy: true`** in arguments or **`--cowcode-full-copy`** as the first `argv` entry.
+- **cp** - Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`. Recursive **directory** copies skip `node_modules`, `.git`, `.cursor`, root-level `verify/`, typical caches/build outputs, etc., unless the user explicitly wants a full clone-then use **`fullCopy: true`** in arguments or **`--pasture-full-copy`** as the first `argv` entry.
 - **mv** - Move/rename. argv: `["source", "dest"]`
 - **rm** - Remove. argv: `["path"]` or `["-r", "path"]`
 - **touch** - Create empty file or update mtime. argv: `["path"]`
@@ -43,4 +43,4 @@ List workspace:
 `run_skill` with skill: "core", arguments: { command: "ls", argv: ["-la"] }
 
 Read a file:
-arguments: { command: "cat", argv: ["~/.cowcode/config.json"] }
+arguments: { command: "cat", argv: ["~/.pasture/config.json"] }

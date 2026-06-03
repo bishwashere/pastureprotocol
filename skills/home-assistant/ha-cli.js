@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Home Assistant CLI. Run from project root with COWCODE_STATE_DIR set so .env is found.
+ * Home Assistant CLI. Run from project root with PASTURE_STATE_DIR set so .env is found.
  * Usage:
  *   node ha-cli.js list [domain]       e.g. list lights, list automation
  *   node ha-cli.js search <query>      e.g. search kitchen
@@ -119,7 +119,7 @@ async function main() {
     }
     if (sub === 'help' || sub === '-h' || sub === '--help' || !sub) {
       out({
-        message: 'Home Assistant CLI. Set HA_TOKEN (and optionally HA_URL) in ~/.cowcode/.env or set COWCODE_STATE_DIR.',
+        message: 'Home Assistant CLI. Set HA_TOKEN (and optionally HA_URL) in ~/.pasture/.env or set PASTURE_STATE_DIR.',
         commands: {
           list: 'list [domain]  — list entities, e.g. list lights, list automation',
           search: 'search <query>  — find entities by name, e.g. search kitchen',

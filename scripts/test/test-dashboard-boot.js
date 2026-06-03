@@ -136,6 +136,7 @@ const checks = [
     ok: fs.existsSync(path.join(mc2PagesDir, 'view-home.html')) &&
       fs.existsSync(path.join(mc2PagesDir, 'view-tasks.html')) &&
       fullHtml.includes('id="mc2-views-root"') &&
+      fullHtml.includes('id="mc2-views-root"') &&
       fullHtml.includes('id="mc2-view-mission"') &&
       !fullHtml.includes('<!-- MC2_VIEWS -->'),
   },
@@ -177,6 +178,11 @@ const checks = [
       fullHtml.includes('id="mc2-col-discoveries"') &&
       missionControlJs.includes('mc2CollectKanbanCompletedItems') &&
       missionControlJs.includes('mc2CollectKanbanDiscoveryItems') &&
+      missionControlJs.includes('MC2_KANBAN_DISPLAY_LIMIT = 5') &&
+      missionControlJs.includes('Click to expand below for') &&
+      missionControlJs.includes('data-mc-kanban-expand') &&
+      missionControlJs.includes('mc2KanbanColExpanded') &&
+      /function mc2RenderKanbanCol\([\s\S]*expandKey/.test(missionControlJs) &&
       !fullHtml.includes('>NOW <'),
   },
   {
@@ -189,17 +195,17 @@ const checks = [
   },
   {
     name: 'mission view scrolls when kanban content is long',
-    ok: /#mc2-view-mission[\s\S]{0,260}overflow-y:\s*auto/.test(team2Css) &&
-      /#mc2-view-mission > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
+    ok: /#mc2-views-root > \.mc-view[\s\S]{0,320}overflow-y:\s*auto/.test(team2Css) &&
+      /#mc2-views-root > \.mc-view > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
       /#mc2-view-mission \.mc-bottom-row \.mc-panel-body[\s\S]{0,80}flex:\s*none/.test(team2Css) &&
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
-    name: 'action required banner renders structured attention items',
-    ok: fullHtml.includes('id="mc2-action-banner"') &&
-      fullHtml.includes('ACTION REQUIRED') &&
+    name: 'attention items use task titles and auto-promoted tags',
+    ok: !fullHtml.includes('id="mc2-action-banner"') &&
+      !fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectActionRequiredItems') &&
-      missionControlJs.includes('function mc2RenderActionBanner') &&
+      !missionControlJs.includes('function mc2RenderActionBanner') &&
       missionControlJs.includes("action: 'initiative-review'") &&
       missionControlJs.includes("tag: 'Auto-promoted'") &&
       missionControlJs.includes('function mc2TaskTitleForInitiative') &&
@@ -230,6 +236,7 @@ const checks = [
       !/id="mc2-view-mission" class="mc-view" role="main" hidden/.test(fullHtml) &&
       /class="mc-nav-item active"[\s\S]{0,80}data-mc-nav="mission"/.test(fullHtml) &&
       fullHtml.includes('mc-nav-label">Home</span>') &&
+      /data-mc-nav="mission"[\s\S]{0,220}data-mc-nav="tasks"/.test(fullHtml) &&
       missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
       missionControlJs.includes('mc2OpenTaskForInitiative') &&
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
@@ -283,7 +290,7 @@ async function waitForDashboard(url, timeoutMs = 15000) {
 async function testDashboardServerStarts() {
   const port = pickPort();
   const url = `http://127.0.0.1:${port}/`;
-  const stateDir = mkdtempSync(path.join(tmpdir(), 'cowcode-dashboard-boot-'));
+  const stateDir = mkdtempSync(path.join(tmpdir(), 'pasture-dashboard-boot-'));
   let child = null;
   let stderr = '';
   try {
@@ -291,9 +298,9 @@ async function testDashboardServerStarts() {
       cwd: ROOT,
       env: {
         ...process.env,
-        COWCODE_STATE_DIR: stateDir,
-        COWCODE_DASHBOARD_PORT: String(port),
-        COWCODE_DASHBOARD_HOST: '127.0.0.1',
+        PASTURE_STATE_DIR: stateDir,
+        PASTURE_DASHBOARD_PORT: String(port),
+        PASTURE_DASHBOARD_HOST: '127.0.0.1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

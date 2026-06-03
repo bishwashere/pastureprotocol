@@ -19,8 +19,8 @@ import { getEnvPath } from '../../lib/paths.js';
  * @returns {Promise<{ pass: boolean, reason?: string }>}
  */
 export async function judgeUserGotWhatTheyWanted(userMessage, botReply, stateDir, opts = {}) {
-  const prevStateDir = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const prevStateDir = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     dotenv.config({ path: getEnvPath() });
     const { chat } = await import('../../llm.js');
@@ -32,8 +32,8 @@ export async function judgeUserGotWhatTheyWanted(userMessage, botReply, stateDir
     const pass = trimmed.startsWith('YES');
     return { pass, reason: (response || '').trim().slice(0, 600) };
   } finally {
-    if (prevStateDir !== undefined) process.env.COWCODE_STATE_DIR = prevStateDir;
-    else delete process.env.COWCODE_STATE_DIR;
+    if (prevStateDir !== undefined) process.env.PASTURE_STATE_DIR = prevStateDir;
+    else delete process.env.PASTURE_STATE_DIR;
   }
 }
 

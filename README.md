@@ -1,10 +1,10 @@
-# cowCode
+# Pasture Protocol
 
 <div align="center">
-  <img width="320" height="320" alt="cowCode" src="https://github.com/user-attachments/assets/7d245e10-8172-4956-bc29-aaba9e30aa10" />
+  <img width="320" height="320" alt="Pasture Protocol" src="https://github.com/user-attachments/assets/7d245e10-8172-4956-bc29-aaba9e30aa10" />
 </div>
 
-**cowCode - your private AI companion**
+**Pasture Protocol - your private AI companion**
 
 Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud LLM of your choice. No external routing - your chats stay on your machine.
 
@@ -75,35 +75,35 @@ Runs on your computer. Connects to WhatsApp and Telegram. Uses a local or cloud 
 **Linux / macOS:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex
 ```
 
-This installs cowCode, registers the `cowcode` CLI command, and puts runtime data in `~/.cowcode`.
+This installs Pasture Protocol, registers the `pasture` CLI command, and puts runtime data in `~/.pasture`.
 
 After install:
 
 ```bash
-cowcode start      # start the bot
-cowcode dashboard  # open the local web dashboard
-cowcode logs       # tail daemon logs
-cowcode update     # pull the latest version
-cowcode uninstall  # remove cowCode
+pasture start      # start the bot
+pasture dashboard  # open the local web dashboard
+pasture logs       # tail daemon logs
+pasture update     # pull the latest version
+pasture uninstall  # remove Pasture Protocol
 ```
 
 <small>
 
-**Windows notes:** State and config live in `%USERPROFILE%\.cowcode`. The daemon uses pm2 (`cowcode logs` or `pm2 logs cowcode`).
+**Windows notes:** State and config live in `%USERPROFILE%\.pasture`. The daemon uses pm2 (`pasture logs` or `pm2 logs pasture`).
 
 If PowerShell blocks the install script (execution policy), run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex"
 ```
 
 On Windows with Git Bash, you can use the Linux/macOS one-liner instead (`install.sh`).
@@ -114,7 +114,7 @@ On Windows with Git Bash, you can use the Linux/macOS one-liner instead (`instal
 
 ```bash
 git clone https://github.com/bishwashere/cowCode.git
-cd cowCode
+cd Pasture Protocol
 pnpm install
 node setup.js      # interactive first-run setup
 ```
@@ -123,13 +123,13 @@ node setup.js      # interactive first-run setup
 
 ## WhatsApp Auth Setup (Baileys)
 
-cowCode uses [Baileys](https://github.com/WhiskeySockets/Baileys), a WhatsApp Web reverse-engineered client. Authentication uses WhatsApp's multi-device protocol and is stored in `~/.cowcode/auth_info/`.
+Pasture Protocol uses [Baileys](https://github.com/WhiskeySockets/Baileys), a WhatsApp Web reverse-engineered client. Authentication uses WhatsApp's multi-device protocol and is stored in `~/.pasture/auth_info/`.
 
 ### First-time linking
 
 ```bash
 # Using the installed CLI:
-cowcode auth
+pasture auth
 
 # Or directly from the repo:
 node index.js --auth-only
@@ -156,7 +156,7 @@ WhatsApp will send a pairing code to that number. Enter it in **Settings → Lin
 ### Auth file location
 
 ```
-~/.cowcode/auth_info/
+~/.pasture/auth_info/
 ├── creds.json           # identity keys and registration info
 └── *.json               # session, pre-keys, sender-key records
 ```
@@ -168,8 +168,8 @@ These files are your WhatsApp session. Back them up. Do not commit them to git (
 If your session expires or you get logged out, delete the auth files and run `--auth-only` again:
 
 ```bash
-rm -rf ~/.cowcode/auth_info/
-cowcode auth
+rm -rf ~/.pasture/auth_info/
+pasture auth
 ```
 
 ---
@@ -180,7 +180,7 @@ cowcode auth
 2. Add the token to your config:
 
 ```json
-// ~/.cowcode/config.json
+// ~/.pasture/config.json
 {
   "channels": {
     "telegram": {
@@ -191,7 +191,7 @@ cowcode auth
 }
 ```
 
-3. Start cowCode. The bot will begin polling for Telegram messages.
+3. Start Pasture Protocol. The bot will begin polling for Telegram messages.
 
 For group chats, add the bot to a Telegram group. The bot only responds to messages from the configured owner or groups it has been explicitly added to.
 
@@ -199,7 +199,7 @@ For group chats, add the bot to a Telegram group. The bot only responds to messa
 
 ## Configuration Reference
 
-All configuration lives in `~/.cowcode/config.json`. The full structure:
+All configuration lives in `~/.pasture/config.json`. The full structure:
 
 ```jsonc
 {
@@ -276,7 +276,7 @@ All configuration lives in `~/.cowcode/config.json`. The full structure:
 
 ### LLM model priority
 
-When multiple models are configured, cowCode selects in this order:
+When multiple models are configured, Pasture Protocol selects in this order:
 1. Any model with `"priority": true` - used first if the provider is reachable.
 2. Local providers (`lmstudio`, `ollama`) - used next as a privacy-preserving fallback.
 3. Other cloud models - used in order of appearance as further fallbacks.
@@ -297,7 +297,7 @@ When multiple models are configured, cowCode selects in this order:
 
 ## Environment Variables
 
-Environment variables live in `~/.cowcode/.env`. Keys referenced in `config.json` (e.g. `"apiKey": "LLM_1_API_KEY"`) are resolved from this file automatically.
+Environment variables live in `~/.pasture/.env`. Keys referenced in `config.json` (e.g. `"apiKey": "LLM_1_API_KEY"`) are resolved from this file automatically.
 
 ```env
 # LLM API keys (referenced by name in config.json)
@@ -312,7 +312,7 @@ BRAVE_API_KEY=BSA...           # Brave Search API key (for the search skill)
 TELEGRAM_BOT_TOKEN=123:ABC...  # Telegram bot token (referenced in config.json)
 
 # Optional overrides
-COWCODE_STATE_DIR=             # Override state dir (default: ~/.cowcode)
+PASTURE_STATE_DIR=             # Override state dir (default: ~/.pasture)
 OPENAI_MODEL=gpt-4o            # Override default model for a provider
 GROK_MODEL=grok-3              # Override default Grok model
 ANTHROPIC_MODEL=claude-3-haiku-20240307
@@ -325,25 +325,25 @@ ANTHROPIC_MODEL=claude-3-haiku-20240307
 ### CLI commands (after install)
 
 ```bash
-cowcode start       # Start the bot in the background
-cowcode stop        # Stop the background bot process
-cowcode restart     # Restart the bot
-cowcode status      # Show whether the bot is running
-cowcode logs        # Tail the daemon log
-cowcode auth        # WhatsApp QR/pairing auth (stops bot first)
-cowcode dashboard   # Open the local web dashboard
-cowcode update      # Pull and install the latest version
-cowcode uninstall   # Remove cowCode and the CLI command
+pasture start       # Start the bot in the background
+pasture stop        # Stop the background bot process
+pasture restart     # Restart the bot
+pasture status      # Show whether the bot is running
+pasture logs        # Tail the daemon log
+pasture auth        # WhatsApp QR/pairing auth (stops bot first)
+pasture dashboard   # Open the local web dashboard
+pasture update      # Pull and install the latest version
+pasture uninstall   # Remove Pasture Protocol and the CLI command
 
 # Tide checklist - see [Tide checklist](#tide-checklist-maintenance)
-cowcode tide checklist list|add|remove|run|on|off|triggers|enable|disable
+pasture tide checklist list|add|remove|run|on|off|triggers|enable|disable
 
 # Agents, skills, servers, memory index
-cowcode create agent <name>          # New agent persona
-cowcode delete agent <name> [--yes]
-cowcode add <skill-id>               # Install + enable a skill
-cowcode index [--source memory|filesystem] [--root <path>]
-cowcode server add|use|list|remove   # SSH inspect targets
+pasture create agent <name>          # New agent persona
+pasture delete agent <name> [--yes]
+pasture add <skill-id>               # Install + enable a skill
+pasture index [--source memory|filesystem] [--root <path>]
+pasture server add|use|list|remove   # SSH inspect targets
 ```
 
 ### What you can say to the bot
@@ -466,7 +466,7 @@ Skill files live in `skills/<id>/SKILL.md` and define the prompts and executor l
 
 ## GitHub Integration
 
-Connect cowCode to GitHub so the agent can read repositories, manage issues and PRs, create branches, post comments, and more - all through natural conversation.
+Connect Pasture Protocol to GitHub so the agent can read repositories, manage issues and PRs, create branches, post comments, and more - all through natural conversation.
 
 ### 1. Create a token
 
@@ -486,21 +486,21 @@ Go to **GitHub → Settings → Developer settings → Personal access tokens**.
 **Option A - `secrets.json`** (recommended, gitignored):
 
 ```json
-// ~/.cowcode/secrets.json
+// ~/.pasture/secrets.json
 { "github": { "token": "ghp_your_token_here" } }
 ```
 
 **Option B - `.env`** file:
 
 ```env
-# ~/.cowcode/.env
+# ~/.pasture/.env
 GITHUB_TOKEN=ghp_your_token_here
 ```
 
 ### 3. Optional: set a default repo
 
 ```json
-// ~/.cowcode/config.json  →  skills section
+// ~/.pasture/config.json  →  skills section
 "github": {
   "token": "GITHUB_TOKEN",
   "defaultRepo": "owner/repo"
@@ -539,7 +539,7 @@ All write operations (**create branch**, **post comment**, **create PR**, **merg
 
 ## Google Integration (Gmail & Calendar)
 
-Gmail and Calendar use the [`gog` CLI](https://gogcli.sh) - a Google Workspace command-line tool that handles OAuth. cowCode calls `gog` behind the scenes, so you only need to authenticate once.
+Gmail and Calendar use the [`gog` CLI](https://gogcli.sh) - a Google Workspace command-line tool that handles OAuth. Pasture Protocol calls `gog` behind the scenes, so you only need to authenticate once.
 
 ### 1. Install gog
 
@@ -558,7 +558,7 @@ gog auth
 ### 3. Set your account (optional)
 
 ```json
-// ~/.cowcode/config.json  →  skills section
+// ~/.pasture/config.json  →  skills section
 "gog": {
   "account": "you@gmail.com"
 }
@@ -615,7 +615,7 @@ Create, update, and delete actions **always** require explicit confirmation. For
 
 ## Multi-Agent (Agent Team)
 
-cowCode supports multiple **agent personas**. Each agent has its own identity files, skill set, and optionally its own LLM config. You can route different conversations to different specialists - a coding agent, a writing agent, a personal assistant, etc.
+Pasture Protocol supports multiple **agent personas**. Each agent has its own identity files, skill set, and optionally its own LLM config. You can route different conversations to different specialists - a coding agent, a writing agent, a personal assistant, etc.
 
 ### Concepts
 
@@ -640,7 +640,7 @@ cowCode supports multiple **agent personas**. Each agent has its own identity fi
 **From the CLI:**
 
 ```bash
-cowcode create agent backend-bot
+pasture create agent backend-bot
 ```
 
 ### Configuring an agent
@@ -717,7 +717,7 @@ main agent → invokes writer agent to draft → invokes backend-bot to create_p
 
 ### Per-agent config files
 
-Each agent's identity lives in `~/.cowcode/agents/<id>/workspace/`:
+Each agent's identity lives in `~/.pasture/agents/<id>/workspace/`:
 
 | File | Purpose |
 |---|---|
@@ -738,7 +738,7 @@ On the **Groups** page, select a group and assign it to an agent. You can also a
 Open the dashboard with:
 
 ```bash
-cowcode dashboard
+pasture dashboard
 # Opens http://127.0.0.1:3847
 ```
 
@@ -838,7 +838,7 @@ On the **Skills** page, `github` shows a credential badge:
 
 ## Cron / Reminder Store
 
-Reminders are stored in plain JSON at `~/.cowcode/cron/jobs.json` (no SQLite dependency for the scheduler). The store is human-readable and can be edited manually.
+Reminders are stored in plain JSON at `~/.pasture/cron/jobs.json` (no SQLite dependency for the scheduler). The store is human-readable and can be edited manually.
 
 ### Schema
 
@@ -876,7 +876,7 @@ Cron expressions use standard 5-field format: `minute hour day month weekday`. T
 
 Semantic memory is stored in a SQLite database with the [`sqlite-vec`](https://github.com/asg017/sqlite-vec) extension for vector similarity search.
 
-**Location:** `~/.cowcode/memory/` (or inside `workspace/memory/` depending on configuration)
+**Location:** `~/.pasture/memory/` (or inside `workspace/memory/` depending on configuration)
 
 ### How memory works
 
@@ -895,7 +895,7 @@ Semantic memory is stored in a SQLite database with the [`sqlite-vec`](https://g
 
 ### Chat logs
 
-Chat history is written to plain text files in `~/.cowcode/workspace/` so you can search them with any text tool. Private and group chats are stored separately.
+Chat history is written to plain text files in `~/.pasture/workspace/` so you can search them with any text tool. Private and group chats are stored separately.
 
 ### Chat sessions (backend)
 
@@ -903,7 +903,7 @@ LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group
 
 - **Daily reset** - New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
 - **Manual reset** - Say e.g. `start a new session`, `new session`, or `/new-session`. Context clears and the bot replies briefly (e.g. "New session started.").
-- **State file** - `~/.cowcode/chat-sessions/state.json`
+- **State file** - `~/.pasture/chat-sessions/state.json`
 - **Bootstrap (not in session history)** - On each **new session**, daemon **restart**, and every **Tide** follow-up, the model receives `MEMORY.md` plus **today and yesterday’s chat logs** (`chat-log/YYYY-MM-DD.jsonl` and, for private chats, `chat-log/private/<jid>.jsonl`). Chat session history stays scoped to the current session only.
 
 ---
@@ -913,7 +913,7 @@ LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group
 Tide sends a single AI-composed follow-up message when a conversation goes quiet. It reads the recent conversation context and generates a short, relevant nudge ("Tests passed - what's next?" / "Still no reply on that, should I follow up?").
 
 ```json
-// ~/.cowcode/config.json
+// ~/.pasture/config.json
 {
   "tide": {
     "enabled": true,
@@ -930,11 +930,11 @@ Tide never sends more than one follow-up per silence period, and never during th
 
 ### Tide checklist (maintenance)
 
-Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same skills and bootstrap context as chat)-executed **one by one** in order. Prior item results are passed as context to the next. Results are logged only (`~/.cowcode/tide-checklist-last.json`), not sent to the user.
+Tide can run a configurable **checklist** of prompts. Each item is **one agent turn** (same skills and bootstrap context as chat)-executed **one by one** in order. Prior item results are passed as context to the next. Results are logged only (`~/.pasture/tide-checklist-last.json`), not sent to the user.
 
 **Item schema:** `id`, `label`, `prompt`, `enabled`. The agent should end with `OK:` or `FAIL:`; anything else is treated as pass unless it starts with `FAIL`.
 
-**Automatic runs** need `tide.enabled` + `checklist.enabled` + the trigger on + outside quiet hours. **Manual runs** (`cowcode tide checklist run` or dashboard **Run now**) ignore those flags.
+**Automatic runs** need `tide.enabled` + `checklist.enabled` + the trigger on + outside quiet hours. **Manual runs** (`pasture tide checklist run` or dashboard **Run now**) ignore those flags.
 
 | Trigger | When it runs |
 |---|---|
@@ -962,13 +962,13 @@ Fresh installs get a default **Telegram polling health** item (disabled until yo
 **CLI**
 
 ```bash
-cowcode tide checklist list
-cowcode tide checklist add "Local time" --prompt "What is the current local time?"
-cowcode tide checklist remove <id>
-cowcode tide checklist enable|disable <id>
-cowcode tide checklist on|off
-cowcode tide checklist run [--id <id>]
-cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-on-cycle] [--on-follow-up|--no-on-follow-up]
+pasture tide checklist list
+pasture tide checklist add "Local time" --prompt "What is the current local time?"
+pasture tide checklist remove <id>
+pasture tide checklist enable|disable <id>
+pasture tide checklist on|off
+pasture tide checklist run [--id <id>]
+pasture tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-on-cycle] [--on-follow-up|--no-on-follow-up]
 ```
 
 **Dashboard:** **Tide** page - toggle Tide/checklist, edit triggers and items, run manually, view last results. Legacy `shell`/`http`/`builtin` config items are auto-converted to prompts on load.
@@ -977,10 +977,10 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 
 ## File and Directory Layout
 
-### Runtime state (`~/.cowcode/`)
+### Runtime state (`~/.pasture/`)
 
 ```
-~/.cowcode/
+~/.pasture/
 ├── config.json              # Main configuration
 ├── secrets.json             # Sensitive credentials (gitignored) - GitHub token, etc.
 ├── .env                     # API keys and env var overrides (gitignored)
@@ -1009,10 +1009,10 @@ cowcode tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 └── groups/                  # Per-group config (agent assignment, skill deny list)
 ```
 
-### Code (`~/.local/share/cowcode/` or clone root)
+### Code (`~/.local/share/pastureprotocol/` or clone root)
 
 ```
-cowCode/
+pastureprotocol/
 ├── index.js                 # Entry point - connects WhatsApp + Telegram, routes messages
 ├── llm.js                   # LLM provider loader and multi-model fallback logic
 ├── cli.js                   # CLI command dispatcher
@@ -1061,14 +1061,14 @@ cowCode/
 
 ## Running as a Daemon
 
-`cowcode start` launches the bot as a background daemon using the platform's process manager so it survives terminal sessions.
+`pasture start` launches the bot as a background daemon using the platform's process manager so it survives terminal sessions.
 
-Logs are written to `~/.cowcode/daemon.log` (stderr: `daemon.err`). Tail them with:
+Logs are written to `~/.pasture/daemon.log` (stderr: `daemon.err`). Tail them with:
 
 ```bash
-cowcode logs
+pasture logs
 # or:
-tail -f ~/.cowcode/daemon.log
+tail -f ~/.pasture/daemon.log
 ```
 
 ---
@@ -1077,7 +1077,7 @@ tail -f ~/.cowcode/daemon.log
 
 - Runs entirely on your machine.
 - WhatsApp and Telegram connect directly - no external proxy.
-- Config, auth, and chats live in `~/.cowcode` - not in the code directory.
+- Config, auth, and chats live in `~/.pasture` - not in the code directory.
 - Local models (LM Studio, Ollama) mean zero data leaves your device.
 - Cloud LLMs send only the current conversation context to the provider's API - no call history is ever sent unless it is in the active context window.
 - `git push` on this repo never uploads your chats, auth files, or API keys. The `.gitignore` excludes all common state layout names.

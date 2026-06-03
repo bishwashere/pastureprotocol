@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-agent-context-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-agent-context-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const {
       onAgentTurnStart,

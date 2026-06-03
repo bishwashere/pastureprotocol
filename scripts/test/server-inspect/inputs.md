@@ -6,7 +6,7 @@ Natural user messages only — see [E2E.md](../E2E.md).
 |--|--|
 | **Test file** | `../test-server-inspect-e2e.js` |
 
-Requires `ssh-inspect` in `skills.enabled` and at least one registered server (`cowcode server add ...`).
+Requires `ssh-inspect` in `skills.enabled` and at least one registered server (`pasture server add ...`).
 
 ## Inputs
 

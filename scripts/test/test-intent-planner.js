@@ -15,7 +15,7 @@ import { homedir } from 'os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
-dotenv.config({ path: join(homedir(), '.cowcode', '.env') });
+dotenv.config({ path: join(homedir(), '.pasture', '.env') });
 
 const { planIntent } = await import('../../lib/intent-planner.js');
 const { getEnabledSkillSummaries } = await import('../../skills/loader.js');

@@ -26,7 +26,7 @@ const WRITE_QUERIES = [
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['index.js', '--test', userMessage], {
       cwd: ROOT,

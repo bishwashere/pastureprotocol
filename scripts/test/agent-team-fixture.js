@@ -65,8 +65,8 @@ export async function patchAgentConfig(agentId, patch) {
  * @param {{ allow?: string[], renameMarketerToChloe?: boolean }} [opts]
  */
 export async function setupAgentTeamFixture(stateDir, opts = {}) {
-  process.env.COWCODE_STATE_DIR = stateDir;
-  process.env.COWCODE_LLM_DELEGATION_ROUTER = '0';
+  process.env.PASTURE_STATE_DIR = stateDir;
+  process.env.PASTURE_LLM_DELEGATION_ROUTER = '0';
   const { ensureMainAgentInitialized, createAgent, loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } =
     await import('../../lib/agent-config.js');
   const { getAgentWorkspaceDir } = await import('../../lib/paths.js');

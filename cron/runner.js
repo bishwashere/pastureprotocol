@@ -84,7 +84,7 @@ async function runJobOnce({ job, sock, selfJid }) {
     const child = spawn(process.execPath, ['cron/run-job.js'], {
       cwd: PROJECT_ROOT,
       stdio: ['pipe', 'pipe', 'inherit'],
-      env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+      env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
     });
     let out = '';
     child.stdout.setEncoding('utf8');

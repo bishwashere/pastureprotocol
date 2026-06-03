@@ -66,7 +66,7 @@ function section(title) {
 }
 function welcome() {
   console.log('');
-  console.log(C.green + '  Welcome to cowCode' + C.reset);
+  console.log(C.green + '  Welcome to Pasture Protocol' + C.reset);
   console.log(C.dim + '  WhatsApp + Telegram bot powered by your own LLM (local or cloud)' + C.reset);
   console.log('');
 }
@@ -234,23 +234,23 @@ function migrateFromRoot() {
   const rootCron = join(ROOT, 'cron', 'jobs.json');
   if (existsSync(rootConfig) && !existsSync(stateConfig)) {
     copyFileSync(rootConfig, stateConfig);
-    console.log(C.dim + '  ✓ Migrated config.json to ~/.cowcode' + C.reset);
+    console.log(C.dim + '  ✓ Migrated config.json to ~/.pasture' + C.reset);
   }
   if (existsSync(rootEnv) && !existsSync(stateEnv)) {
     copyFileSync(rootEnv, stateEnv);
-    console.log(C.dim + '  ✓ Migrated .env to ~/.cowcode' + C.reset);
+    console.log(C.dim + '  ✓ Migrated .env to ~/.pasture' + C.reset);
   }
   if (existsSync(rootAuth)) {
     const creds = join(rootAuth, 'creds.json');
     if (existsSync(creds) && !existsSync(join(stateAuth, 'creds.json'))) {
       cpSync(rootAuth, stateAuth, { recursive: true });
-      console.log(C.dim + '  ✓ Migrated auth_info to ~/.cowcode' + C.reset);
+      console.log(C.dim + '  ✓ Migrated auth_info to ~/.pasture' + C.reset);
     }
   }
   if (existsSync(rootCron) && !existsSync(stateCron)) {
     mkdirSync(dirname(stateCron), { recursive: true });
     copyFileSync(rootCron, stateCron);
-    console.log(C.dim + '  ✓ Migrated cron/jobs.json to ~/.cowcode' + C.reset);
+    console.log(C.dim + '  ✓ Migrated cron/jobs.json to ~/.pasture' + C.reset);
   }
 }
 
@@ -664,14 +664,14 @@ async function onboarding() {
   }
 
   console.log('');
-  console.log(C.dim + '  ✓ Config and .env saved to ~/.cowcode' + C.reset);
+  console.log(C.dim + '  ✓ Config and .env saved to ~/.pasture' + C.reset);
 }
 
 async function main() {
   if (!process.stdin.isTTY) {
     console.log('Setup needs an interactive terminal.');
-    console.log('Run: cd cowCode && node setup.js');
-    console.log('Or: cd cowCode && npm install && npm start\n');
+    console.log('Run: cd Pasture Protocol && node setup.js');
+    console.log('Or: cd Pasture Protocol && npm install && npm start\n');
     process.exit(0);
   }
   welcome();
@@ -683,7 +683,7 @@ async function main() {
 
   await onboarding();
 
-  // Skip messaging setup if both WhatsApp and Telegram are already in the system (only re-link via cowcode auth / token edit).
+  // Skip messaging setup if both WhatsApp and Telegram are already in the system (only re-link via pasture auth / token edit).
   const authDir = getAuthDir();
   const hasWhatsAppAuth = existsSync(authDir) && existsSync(join(authDir, 'creds.json'));
   const envPath = getEnvPath();
@@ -754,7 +754,7 @@ async function main() {
         env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
       });
       if (authResult.status !== 0) {
-        console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: cowcode auth' + C.reset);
+        console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: pasture auth' + C.reset);
       }
     } else {
       telegramOnly = true;
@@ -780,7 +780,7 @@ async function main() {
           env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
         });
         if (authResult.status !== 0) {
-          console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: cowcode auth' + C.reset);
+          console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: pasture auth' + C.reset);
         }
       } else {
         telegramOnly = true;
@@ -802,7 +802,7 @@ async function main() {
         env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
       });
       if (authResult.status !== 0) {
-        console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: cowcode auth' + C.reset);
+        console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: pasture auth' + C.reset);
       }
       console.log('');
       const addTg = await ask(q('Add Telegram too? (y/n)') + ' ');
@@ -821,10 +821,10 @@ async function main() {
     }
   }
 
-  section('Starting cowCode');
+  section('Starting Pasture Protocol');
   if (telegramOnly) {
     console.log('  Running in Telegram-only mode. Message your bot on Telegram to chat.');
-    console.log('  To add WhatsApp later: cowcode auth  then  cowcode start');
+    console.log('  To add WhatsApp later: pasture auth  then  pasture start');
   } else {
     console.log('  If this is your first time with WhatsApp, you\'ll see a QR code — scan it.');
     console.log('  Then send a message to your own number to start chatting.');
@@ -840,13 +840,13 @@ async function main() {
     env: {
       ...process.env,
       NODE_ENV: process.env.NODE_ENV || 'development',
-      ...(telegramOnly ? { COWCODE_TELEGRAM_ONLY: '1' } : {}),
+      ...(telegramOnly ? { PASTURE_TELEGRAM_ONLY: '1' } : {}),
     },
   });
   child.on('close', (code) => {
     console.log('');
     console.log('  ------------------------------------------------');
-    console.log('  To start the bot:  cowcode start');
+    console.log('  To start the bot:  pasture start');
     console.log('  (or from this folder:  npm start)');
     console.log('');
     process.exit(code ?? 0);

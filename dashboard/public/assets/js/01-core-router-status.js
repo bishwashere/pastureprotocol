@@ -281,8 +281,8 @@ const API = '';
 
     function dashboardBoot() {
       fetchStatus();
-      if (!window._cowcodeDashboardStatusPoll) {
-        window._cowcodeDashboardStatusPoll = setInterval(fetchStatus, 8000);
+      if (!window._pastureDashboardStatusPoll) {
+        window._pastureDashboardStatusPoll = setInterval(fetchStatus, 8000);
       }
       if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
     }

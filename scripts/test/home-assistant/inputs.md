@@ -12,4 +12,4 @@ Natural user messages only — see [E2E.md](../E2E.md).
 - What lights do I have?
 - List all my devices
 
-Prerequisites: `home-assistant` in `skills.enabled`, `HA_URL` / `HA_TOKEN` in `~/.cowcode/.env`, HA reachable.
+Prerequisites: `home-assistant` in `skills.enabled`, `HA_URL` / `HA_TOKEN` in `~/.pasture/.env`, HA reachable.

@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-delegated-tasks-'));
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-delegated-tasks-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { createGoal, getGoal } = await import('../../lib/goals.js');
     const {
@@ -133,7 +133,7 @@ async function main() {
     console.log('test-delegated-tasks: all assertions passed');
   } finally {
     rmSync(stateDir, { recursive: true, force: true });
-    delete process.env.COWCODE_STATE_DIR;
+    delete process.env.PASTURE_STATE_DIR;
   }
 }
 

@@ -1,7 +1,10 @@
 {
-  "name": "cowcode",
+  "name": "pastureprotocol",
   "version": "2.0.0",
-  "description": "WhatsApp + configurable local/cloud LLM. No tools, just reply.",
+  "description": "Pasture Protocol — private local AI agent crew with missions, dashboard, and WhatsApp/Telegram.",
+  "bin": {
+    "pasture": "./cli.js"
+  },
   "type": "module",
   "main": "index.js",
   "packageManager": "pnpm@9.15.0",
@@ -77,6 +80,7 @@
     "test:github-context": "node scripts/test/test-github-context.js",
     "test:delegation-routing-details": "node scripts/test/test-delegation-routing-details.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
+    "test:state-migration": "node scripts/test/test-state-migration.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",
     "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"

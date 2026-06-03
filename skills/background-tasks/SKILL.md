@@ -6,9 +6,9 @@ description: Run long work in the background without blocking chat. Spawn return
 
 # Background tasks
 
-Offload **long or heavy work** to a background agent turn. The user gets an immediate ack with a task id; you stay responsive in chat while the work runs. When the background turn finishes, cowCode **announces the result** in the same chat.
+Offload **long or heavy work** to a background agent turn. The user gets an immediate ack with a task id; you stay responsive in chat while the work runs. When the background turn finishes, Pasture Protocol **announces the result** in the same chat.
 
-This is the cowCode equivalent of OpenClaw sub-agents (`sessions_spawn`).
+This is the Pasture Protocol equivalent of OpenClaw sub-agents (`sessions_spawn`).
 
 **Always available in chat** — no skill toggle or setup. Use `/tasks` to check status.
 

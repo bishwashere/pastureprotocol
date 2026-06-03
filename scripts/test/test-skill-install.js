@@ -1,5 +1,5 @@
 /**
- * Tests for skill install onboarding (cowcode add).
+ * Tests for skill install onboarding (pasture add).
  */
 
 import { mkdtempSync, readFileSync, existsSync } from 'fs';
@@ -61,9 +61,9 @@ test('getSkillsToEnable keeps github as single skill', () => {
 });
 
 await testAsync('runSkillInstall saves GitHub token to secrets.json', async () => {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-install-'));
-  const prev = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-skill-install-'));
+  const prev = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const result = await runSkillInstall('github', ROOT, {
       ask: async () => 'bishwashere/cowCode',
@@ -82,14 +82,14 @@ await testAsync('runSkillInstall saves GitHub token to secrets.json', async () =
       throw new Error('defaultRepo not saved');
     }
   } finally {
-    process.env.COWCODE_STATE_DIR = prev || '';
+    process.env.PASTURE_STATE_DIR = prev || '';
   }
 });
 
 await testAsync('runSkillInstall saves Brave key to .env for search', async () => {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-install-'));
-  const prev = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-skill-install-'));
+  const prev = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const result = await runSkillInstall('search', ROOT, {
       ask: async () => '',
@@ -106,7 +106,7 @@ await testAsync('runSkillInstall saves Brave key to .env for search', async () =
     if (!config.skills.enabled.includes('search')) throw new Error('search not enabled');
     if (config.skills.search.apiKey !== 'BRAVE_API_KEY') throw new Error('search apiKey ref missing');
   } finally {
-    process.env.COWCODE_STATE_DIR = prev || '';
+    process.env.PASTURE_STATE_DIR = prev || '';
   }
 });
 
@@ -116,9 +116,9 @@ test('getSkillsToRemove keeps gmail-only when removing gmail', () => {
 });
 
 await testAsync('runSkillRemove disables github and clears credentials', async () => {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-remove-'));
-  const prev = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-skill-remove-'));
+  const prev = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     await runSkillInstall('github', ROOT, {
       ask: async () => '',
@@ -134,14 +134,14 @@ await testAsync('runSkillRemove disables github and clears credentials', async (
     const secrets = JSON.parse(readFileSync(join(stateDir, 'secrets.json'), 'utf8'));
     if (secrets.github) throw new Error('github token should be removed');
   } finally {
-    process.env.COWCODE_STATE_DIR = prev || '';
+    process.env.PASTURE_STATE_DIR = prev || '';
   }
 });
 
 await testAsync('runSkillRemove disables skill but keeps credentials by default', async () => {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-remove-'));
-  const prev = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-skill-remove-'));
+  const prev = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     await runSkillInstall('search', ROOT, {
       ask: async () => '',
@@ -159,7 +159,7 @@ await testAsync('runSkillRemove disables skill but keeps credentials by default'
       throw new Error('credentials should remain when not clearing');
     }
   } finally {
-    process.env.COWCODE_STATE_DIR = prev || '';
+    process.env.PASTURE_STATE_DIR = prev || '';
   }
 });
 

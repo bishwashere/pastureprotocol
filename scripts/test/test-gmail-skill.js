@@ -82,7 +82,7 @@ await test('unknown action returns error', async () => {
 });
 
 function getGogDefaultAccount() {
-  const configPath = join(process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode'), 'config.json');
+  const configPath = join(process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture'), 'config.json');
   try {
     if (!existsSync(configPath)) return '';
     const config = JSON.parse(readFileSync(configPath, 'utf8'));

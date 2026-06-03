@@ -1,4 +1,4 @@
-# cowCode Windows update - same flow as update.sh (no bash required)
+# Pasture Protocol Windows update - same flow as update.sh (no bash required)
 param(
     [switch]$Force
 )
@@ -8,7 +8,7 @@ $ProgressPreference = "SilentlyContinue"
 
 $CowcodeNodeVersion = "v22.16.0"
 $CowcodeNodeZipName = "node-$CowcodeNodeVersion-win-x64"
-$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "cowcode\node"
+$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "pastureprotocol\node"
 $CowcodeNodeDir = Join-Path $CowcodeNodeRoot $CowcodeNodeZipName
 
 function Exit-Update {
@@ -132,7 +132,7 @@ function Encode-GitHubBranchPath {
 function Get-CowcodeRequestHeaders {
     param([string]$Accept = "*/*")
     @{
-        "User-Agent"     = "cowcode-update/windows"
+        "User-Agent"     = "pasture-update/windows"
         "Cache-Control"  = "no-cache"
         "Pragma"         = "no-cache"
         "Accept"         = $Accept
@@ -212,11 +212,11 @@ function Invoke-CowcodeBuildInfo {
     if (-not (Test-Path -LiteralPath $buildJs)) { return $null }
     Push-Location $Root
     try {
-        $env:COWCODE_BRANCH = $Branch
+        $env:PASTURE_BRANCH = $Branch
         $out = node --input-type=module -e @"
 import { fetchRemoteBuild, writeBuild } from './lib/build-info.js';
 const root = process.cwd().replace(/\\/g, '/');
-const branch = process.env.COWCODE_BRANCH || 'master';
+const branch = process.env.PASTURE_BRANCH || 'master';
 const b = await fetchRemoteBuild(branch);
 if (b) writeBuild(root, b);
 if (b) console.log(b);
@@ -226,7 +226,7 @@ if (b) console.log(b);
         Write-Host "  [WARN] Build metadata skipped: $($_.Exception.Message)"
     } finally {
         Pop-Location
-        Remove-Item Env:COWCODE_BRANCH -ErrorAction SilentlyContinue
+        Remove-Item Env:PASTURE_BRANCH -ErrorAction SilentlyContinue
     }
     return $null
 }
@@ -251,27 +251,27 @@ function Copy-CowcodeTree {
     }
 }
 
-$Branch = if ($env:COWCODE_BRANCH) { $env:COWCODE_BRANCH.Trim() } else { "master" }
+$Branch = if ($env:PASTURE_BRANCH) { $env:PASTURE_BRANCH.Trim() } else { "master" }
 if (-not (Test-CowcodeBranchName $Branch)) {
-    Write-Host "  [X] Invalid branch name in COWCODE_BRANCH."
+    Write-Host "  [X] Invalid branch name in PASTURE_BRANCH."
     Exit-Update 1
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowcode/archive/refs/heads/$BranchPath.tar.gz"
+$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
 $Extracted = "cowCode-$Branch"
 
-$Root = if ($env:COWCODE_ROOT) { $env:COWCODE_ROOT } elseif ($env:COWCODE_INSTALL_DIR) { $env:COWCODE_INSTALL_DIR } else { $PSScriptRoot }
-$StateDir = if ($env:COWCODE_STATE_DIR) { $env:COWCODE_STATE_DIR } else { Join-Path $env:USERPROFILE ".cowcode" }
+$Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
+$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
 
 if (-not (Test-Path (Join-Path $Root "package.json")) -or -not (Test-Path (Join-Path $Root "index.js"))) {
     Write-Host ""
-    Write-Host "  Run from inside your cowCode folder, or use:  cowcode update"
+    Write-Host "  Run from inside your Pasture Protocol folder, or use:  pasture update"
     Write-Host ""
     Exit-Update 1
 }
 
-$Work = Join-Path ([System.IO.Path]::GetTempPath()) ("cowcode-update-" + [guid]::NewGuid().ToString("n"))
+$Work = Join-Path ([System.IO.Path]::GetTempPath()) ("pasture-update-" + [guid]::NewGuid().ToString("n"))
 try {
     New-Item -ItemType Directory -Path $Work -Force | Out-Null
 } catch {
@@ -284,7 +284,7 @@ try {
         $localVer = Read-PackageJsonVersion (Join-Path $Root "package.json")
         $remoteJson = Join-Path $Work "remote_package.json"
         $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowcode/$BranchPath/package.json?t=$ts"
+        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowCode/$BranchPath/package.json?t=$ts"
         if (Save-CowcodeDownload -Uri $pkgUri -OutFile $remoteJson -Label "Fetch remote package.json" `
             -MinBytes 16 -TimeoutSec 120 -AllowFail) {
             $remoteVer = Read-PackageJsonVersion $remoteJson
@@ -300,7 +300,7 @@ try {
     }
 
     Write-Host ""
-    Write-Host "  cowCode - Updating..."
+    Write-Host "  Pasture Protocol - Updating..."
     Write-Host "  ------------------------------------------------"
     Write-Host ""
 
@@ -333,7 +333,7 @@ try {
         if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
             $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
             Write-Host "  [X] Unsupported Node.js version used by npm/pnpm: $found"
-            Write-Host "  cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+            Write-Host "  Pasture Protocol needs Node.js 18, 20, or 22 LTS on Windows."
             Write-Host "  Install Node.js LTS from https://nodejs.org/ then open a new PowerShell."
             Exit-Update 1
         }
@@ -358,8 +358,8 @@ try {
     } else {
         Write-Host "  [OK] Update complete."
     }
-    Write-Host "  Start the bot:  cowcode start"
-    Write-Host "  If already running, restart:  cowcode restart"
+    Write-Host "  Start the bot:  pasture start"
+    Write-Host "  If already running, restart:  pasture restart"
     Write-Host ""
 } finally {
     if (Test-Path -LiteralPath $Work) {

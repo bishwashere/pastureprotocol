@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Daemon control: start | stop | status | restart
-# Uses COWCODE_INSTALL_DIR (set by cli.js). State dir: ~/.cowcode or COWCODE_STATE_DIR.
+# Uses PASTURE_INSTALL_DIR (set by cli.js). State dir: ~/.pasture or PASTURE_STATE_DIR.
 
 set -e
-ACTION="${1:?Usage: cowcode start|stop|status|restart}"
-INSTALL_DIR="${COWCODE_INSTALL_DIR:-.}"
-STATE_DIR="${COWCODE_STATE_DIR:-$HOME/.cowcode}"
+ACTION="${1:?Usage: pasture start|stop|status|restart}"
+INSTALL_DIR="${PASTURE_INSTALL_DIR:-.}"
+STATE_DIR="${PASTURE_STATE_DIR:-${COWCODE_STATE_DIR:-$HOME/.pasture}}"
 # Resolve INSTALL_DIR to absolute path
 if [ -d "$INSTALL_DIR" ]; then
   INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd)"
@@ -26,15 +26,15 @@ RUN_WITH_ENV="$INSTALL_DIR/scripts/run-with-env.sh"
 
 # Append a control line to daemon.log so "tail -f daemon.log" shows start/stop/restart
 daemon_log() {
-  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] cowcode $ACTION" >> "$STATE_DIR/daemon.log" 2>/dev/null || true
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] pasture $ACTION" >> "$STATE_DIR/daemon.log" 2>/dev/null || true
 }
 
 # macOS launchd
-LAUNCHD_LABEL="ai.cowcode.bot"
+LAUNCHD_LABEL="ai.pastureprotocol.bot"
 PLIST="$HOME/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 
 # Linux systemd user
-SERVICE_NAME="cowcode"
+SERVICE_NAME="pasture"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 SERVICE_FILE="$SYSTEMD_USER_DIR/${SERVICE_NAME}.service"
 
@@ -44,7 +44,7 @@ ensure_pm2() {
     return 0
   fi
 
-  echo "pm2 not found. It is required to manage the cowCode daemon."
+  echo "pm2 not found. It is required to manage the Pasture Protocol daemon."
 
   # Ensure npm is available
   if ! command -v npm >/dev/null 2>&1; then
@@ -75,7 +75,7 @@ ensure_pm2() {
 }
 
 ensure_plist() {
-  [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
+  [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from Pasture Protocol install directory."; exit 1; }
   mkdir -p "$(dirname "$PLIST")"
   if [ -f "$RUN_WITH_ENV" ]; then
     RUN_CMD="/bin/bash"
@@ -100,9 +100,9 @@ ensure_plist() {
   <string>${STATE_DIR}</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>COWCODE_STATE_DIR</key>
+    <key>PASTURE_STATE_DIR</key>
     <string>${STATE_DIR}</string>
-    <key>COWCODE_INSTALL_DIR</key>
+    <key>PASTURE_INSTALL_DIR</key>
     <string>${INSTALL_DIR}</string>
     <key>NODE</key>
     <string>${NODE}</string>
@@ -122,7 +122,7 @@ EOF
 }
 
 ensure_systemd_unit() {
-  [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
+  [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from Pasture Protocol install directory."; exit 1; }
   mkdir -p "$SYSTEMD_USER_DIR"
   if [ -f "$RUN_WITH_ENV" ]; then
     EXEC_START="/bin/bash ${RUN_WITH_ENV}"
@@ -131,12 +131,12 @@ ensure_systemd_unit() {
   fi
   cat > "$SERVICE_FILE" << EOF
 [Unit]
-Description=cowCode WhatsApp bot
+Description=Pasture Protocol WhatsApp bot
 After=network.target
 
 [Service]
 Type=simple
-Environment="COWCODE_STATE_DIR=${STATE_DIR}" "COWCODE_INSTALL_DIR=${INSTALL_DIR}"
+Environment="PASTURE_STATE_DIR=${STATE_DIR}" "PASTURE_INSTALL_DIR=${INSTALL_DIR}"
 ExecStart=${EXEC_START}
 WorkingDirectory=${STATE_DIR}
 Restart=always
@@ -156,23 +156,23 @@ case "$OS" in
     ensure_pm2
     case "$ACTION" in
       start)
-        pm2 start "$COWCODE_INSTALL_DIR/index.js" --name cowcode
-        echo "Started with pm2. To see logs: pm2 logs cowcode"
+        pm2 start "$PASTURE_INSTALL_DIR/index.js" --name pasture
+        echo "Started with pm2. To see logs: pm2 logs pasture"
         daemon_log
         ;;
       stop)
-        pm2 stop cowcode
+        pm2 stop pasture
         daemon_log
         ;;
       status)
-        pm2 status cowcode
+        pm2 status pasture
         ;;
       restart)
-        pm2 restart cowcode
+        pm2 restart pasture
         daemon_log
         ;;
       *)
-        echo "Usage: cowcode start|stop|status|restart"
+        echo "Usage: pasture start|stop|status|restart"
         ;;
     esac
     exit 0
@@ -189,7 +189,7 @@ case "$OS" in
           if launchctl load "$PLIST"; then
             echo "Daemon started. Logs: $STATE_DIR/daemon.log"
             daemon_log
-            echo "  (tail the log to see 'cowCode daemon started' when the bot is up)"
+            echo "  (tail the log to see 'Pasture Protocol daemon started' when the bot is up)"
           else
             echo "Daemon failed to start. Check the error above."
             exit 1
@@ -216,9 +216,9 @@ case "$OS" in
         launchctl load "$PLIST"
         echo "Daemon restarted."
         daemon_log
-        echo "  (tail $STATE_DIR/daemon.log to see 'cowCode daemon started' when the bot is up)"
+        echo "  (tail $STATE_DIR/daemon.log to see 'Pasture Protocol daemon started' when the bot is up)"
         ;;
-      *) echo "Usage: cowcode start|stop|status|restart"; exit 1 ;;
+      *) echo "Usage: pasture start|stop|status|restart"; exit 1 ;;
     esac
     ;;
   Linux*)
@@ -245,7 +245,7 @@ case "$OS" in
         echo "Daemon restarted."
         daemon_log
         ;;
-      *) echo "Usage: cowcode start|stop|status|restart"; exit 1 ;;
+      *) echo "Usage: pasture start|stop|status|restart"; exit 1 ;;
     esac
     ;;
   *)

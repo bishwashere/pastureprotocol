@@ -7,8 +7,8 @@
  * 1. Chat log written — one message → assert workspace/chat-log/YYYY-MM-DD.jsonl contains the exchange.
  * 2. Memory recall — store a phrase, ask "what did we talk about yesterday?", then use an LLM judge to decide
  *    whether the bot answered the user's question (no regex or pattern matching).
- * 3. Filesystem index — use real app state (~/.cowcode). Create test dir in workspace, run index CLI, then main app
- *    with a user message asking for file-related memory; assert reply contains indexed file/dir names. Uses ~/.cowcode/memory/index.db.
+ * 3. Filesystem index — use real app state (~/.pasture). Create test dir in workspace, run index CLI, then main app
+ *    with a user message asking for file-related memory; assert reply contains indexed file/dir names. Uses ~/.pasture/memory/index.db.
  */
 
 import { spawn, spawnSync } from 'child_process';
@@ -22,15 +22,15 @@ import { getEnvPath } from '../../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const INSTALL_ROOT = process.env.COWCODE_INSTALL_DIR ? resolve(process.env.COWCODE_INSTALL_DIR) : ROOT;
-const DEFAULT_STATE_DIR = join(homedir(), '.cowcode');
+const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
+const DEFAULT_STATE_DIR = join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 /** Phrase we store in the first message so the judge can verify the bot recalled it. */
-const STORED_PHRASE = 'COWCODE_E2E_MAGIC_42';
+const STORED_PHRASE = 'PASTURE_E2E_MAGIC_42';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -45,8 +45,8 @@ function assert(condition, message) {
  * @returns {Promise<{ pass: boolean, reason?: string }>}
  */
 async function judgeRecall(firstUserMessage, userQuestion, botReply, stateDir) {
-  const prevStateDir = process.env.COWCODE_STATE_DIR;
-  process.env.COWCODE_STATE_DIR = stateDir;
+  const prevStateDir = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
   try {
     dotenv.config({ path: getEnvPath() });
     const { chat } = await import('../../llm.js');
@@ -70,8 +70,8 @@ Did the bot answer the user's question? The bot has access to memory search over
     const pass = trimmed.startsWith('YES');
     return { pass, reason: (response || '').trim().slice(0, 500) };
   } finally {
-    if (prevStateDir !== undefined) process.env.COWCODE_STATE_DIR = prevStateDir;
-    else delete process.env.COWCODE_STATE_DIR;
+    if (prevStateDir !== undefined) process.env.PASTURE_STATE_DIR = prevStateDir;
+    else delete process.env.PASTURE_STATE_DIR;
   }
 }
 
@@ -82,7 +82,7 @@ Did the bot answer the user's question? The bot has access to memory search over
  * @throws {Error} If no config.json in default state or config has no LLM models (tests need a working LLM).
  */
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'cowcode-memory-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-memory-e2e-' + Date.now());
   const workspaceDir = join(stateDir, 'workspace');
   const memoryDir = join(stateDir, 'memory');
   mkdirSync(workspaceDir, { recursive: true });
@@ -118,11 +118,11 @@ function createTempStateDir() {
     let envContent = readFileSync(join(DEFAULT_STATE_DIR, '.env'), 'utf8');
     envContent = envContent
       .split('\n')
-      .filter((line) => !/^\s*COWCODE_STATE_DIR\s*=/.test(line))
+      .filter((line) => !/^\s*PASTURE_STATE_DIR\s*=/.test(line))
       .join('\n');
-    writeFileSync(join(stateDir, '.env'), envContent.trimEnd() + '\nCOWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
+    writeFileSync(join(stateDir, '.env'), envContent.trimEnd() + '\nPASTURE_STATE_DIR=' + stateDir + '\n', 'utf8');
   } else {
-    writeFileSync(join(stateDir, '.env'), 'COWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
+    writeFileSync(join(stateDir, '.env'), 'PASTURE_STATE_DIR=' + stateDir + '\n', 'utf8');
   }
   return { stateDir, workspaceDir };
 }
@@ -136,7 +136,7 @@ function createTempStateDir() {
  */
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
-  if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   if (opts.secondMessage) env.TEST_MESSAGE_2 = opts.secondMessage;
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(INSTALL_ROOT, 'index.js'), '--test', userMessage], {
@@ -222,7 +222,7 @@ function isNoLlmError(err) {
 async function main() {
   console.log('E2E memory tests: chat log written + memory recall (needs embedding for recall).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.');
-  if (INSTALL_ROOT !== ROOT) console.log('Using system install (COWCODE_INSTALL_DIR):', INSTALL_ROOT);
+  if (INSTALL_ROOT !== ROOT) console.log('Using system install (PASTURE_INSTALL_DIR):', INSTALL_ROOT);
   console.log('');
 
   const storeMessage = `Memory e2e test message at ${Date.now()}.`;
@@ -294,7 +294,7 @@ async function main() {
           [indexScript, 'index', '--source', 'filesystem', '--root', workspaceDir, '--limit', '25'],
           {
             cwd: INSTALL_ROOT,
-            env: { ...process.env, COWCODE_STATE_DIR: stateDir },
+            env: { ...process.env, PASTURE_STATE_DIR: stateDir },
             encoding: 'utf8',
             timeout: 60000,
           }

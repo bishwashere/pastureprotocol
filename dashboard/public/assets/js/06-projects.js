@@ -525,8 +525,8 @@
           grid.innerHTML = '<p class="mc2-proj-connectors-empty">No project selected.</p>';
           return;
         }
-        var projects = await (window.cowCodeProjectsApi && window.cowCodeProjectsApi.listProjects
-          ? window.cowCodeProjectsApi.listProjects()
+        var projects = await (window.pastureProjectsApi && window.pastureProjectsApi.listProjects
+          ? window.pastureProjectsApi.listProjects()
           : Promise.resolve([]));
         var project = (projects || []).find(function (p) { return String(p.id) === pid; });
         if (!project) {
@@ -624,7 +624,7 @@
       document.getElementById('proj-new-url').addEventListener('keydown', projNewEnterSubmit);
       document.getElementById('proj-new-desc').addEventListener('keydown', projNewEnterSubmit);
 
-      window.cowCodeProjectsApi = {
+      window.pastureProjectsApi = {
         fetch: projFetch,
         loadProjects: loadProjects,
         listProjects: async function () {

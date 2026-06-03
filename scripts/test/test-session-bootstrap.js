@@ -11,7 +11,7 @@ import {
 } from '../../lib/session-bootstrap.js';
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), 'cowcode-bootstrap-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pasture-bootstrap-'));
   const workspaceDir = join(dir, 'workspace');
   mkdirSync(join(workspaceDir, 'chat-log', 'private'), { recursive: true });
   writeFileSync(join(workspaceDir, 'MEMORY.md'), '# Notes\nRemember the API key.', 'utf8');

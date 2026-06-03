@@ -11,9 +11,9 @@ Read this before changing **Windows-specific** install, update, uninstall, or da
 | Concern | Linux / macOS | Windows (`process.platform === 'win32'`) |
 |---------|---------------|--------------------------------------------|
 | One-line install | `install.sh` | `install.ps1` |
-| Code dir | `~/.local/share/cowcode` | `%USERPROFILE%\.local\share\cowcode` |
-| State dir | `~/.cowcode` | `%USERPROFILE%\.cowcode` |
-| CLI launcher | `~/.local/bin/cowcode` (bash) | `%USERPROFILE%\.local\bin\cowcode.cmd` |
+| Code dir | `~/.local/share/pastureprotocol` | `%USERPROFILE%\.local\share\pastureprotocol` |
+| State dir | `~/.pasture` (legacy `~/.cowcode`) | `%USERPROFILE%\.pasture` (legacy `%USERPROFILE%\.cowcode`) |
+| CLI launcher | `~/.local/bin/pasture` (bash) + legacy `cowcode` shim | `%USERPROFILE%\.local\bin\pasture.cmd` + legacy `cowcode.cmd` shim |
 | Daemon | `bash scripts/daemon.sh` → launchd/systemd | `lib/daemon-pm2.js` → pm2 |
 | Update / uninstall | `update.sh` / `uninstall.sh` | `update.ps1` / `lib/uninstall-win.js` |
 
@@ -33,7 +33,7 @@ download → copy code → launcher + PATH → install deps → setup.js → sta
 
 ### Encoding & launchers
 
-- **`cowcode.cmd` must use ASCII**: `Set-Content -Encoding ASCII`. Default UTF-8 can write a BOM; `.cmd` then fails silently or mis-parses.
+- **`pasture.cmd` must use ASCII**: `Set-Content -Encoding ASCII`. Default UTF-8 can write a BOM; `.cmd` then fails silently or mis-parses.
 - **Do not use PowerShell here-strings (`@"..."@`) for `node -e` with install paths** — backslashes break. Use a single-line `-e "..."` and normalize paths: `$($InstallDir -replace '\\', '/')`.
 - **`file:///` URLs**: always forward slashes after `file:///`.
 
@@ -77,9 +77,9 @@ pnpm run test:daemon-pm2   # install.ps1 order, cli win32 routing, daemon-pm2 ex
 
 Check logs in order:
 
-- `%USERPROFILE%\.cowcode\daemon.log`
-- `%USERPROFILE%\.cowcode\daemon.err`
-- `pm2 logs cowcode`
+- `%USERPROFILE%\.pasture\daemon.log` (legacy `%USERPROFILE%\.cowcode\daemon.log`)
+- `%USERPROFILE%\.pasture\daemon.err`
+- `pm2 logs pasture`
 
 Common misreads:
 
@@ -87,7 +87,7 @@ Common misreads:
 |---------|----------------|
 | `Cannot find package 'dotenv'` | deps not installed before `setup.js` |
 | Daemon exits in ~100ms | same — process never loads |
-| `cowcode` not found | PATH not refreshed; new terminal needed |
+| `pasture` not found | PATH not refreshed; new terminal needed |
 | pm2 install fails | run PowerShell as Administrator or `npm install -g pm2` manually |
 
 ## README

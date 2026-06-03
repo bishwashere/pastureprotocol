@@ -6,7 +6,7 @@ description: Delegate a question or task to another configured agent and get its
 
 # Agent send
 
-Send a message to **another agent** running in this same cowCode and get its reply, so you can act as a coordinator over a team of specialist agents (the "PM to PM" pattern). The target agent runs a full turn with its own persona, skills, and memory, then returns text to you. Nothing is sent to WhatsApp/Telegram - the exchange is internal.
+Send a message to **another agent** running in this same Pasture Protocol and get its reply, so you can act as a coordinator over a team of specialist agents (the "PM to PM" pattern). The target agent runs a full turn with its own persona, skills, and memory, then returns text to you. Nothing is sent to WhatsApp/Telegram - the exchange is internal.
 
 When a related **Goal** is active, delegations create a **persistent assigned subgoal** on that mission (assignee, due date, expected output, status tracking). The target agent sees the assignment in their mission context; you can follow progress on the goal's subgoal tree.
 
@@ -25,7 +25,7 @@ Do **not** use it to talk to yourself, and do not use it in group chats (it is d
 
 Use the **agent_send_send** tool with:
 
-- **agent** (required) - the target agent **id** (e.g. `"backend"`) or display **title** (e.g. `"Marketer"`). Must be in your allow list. Prefer the canonical id from the Agent team block in your system prompt. You can also pass `"auto"` to let cowCode pick the best linked teammate by skill match.
+- **agent** (required) - the target agent **id** (e.g. `"backend"`) or display **title** (e.g. `"Marketer"`). Must be in your allow list. Prefer the canonical id from the Agent team block in your system prompt. You can also pass `"auto"` to let Pasture Protocol pick the best linked teammate by skill match.
 - **message** (required) - the full question/task. Include everything the target needs; it does not see your conversation with the user.
 
 Optional **persistent task assignment** fields (recommended when working on a Goal):

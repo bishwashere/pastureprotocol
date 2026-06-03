@@ -14,7 +14,7 @@ import {
 } from '../../lib/tide-checklist.js';
 
 function setupStateDir() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-tide-cl-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-tide-cl-'));
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(
     join(stateDir, 'config.json'),
@@ -30,7 +30,7 @@ function setupStateDir() {
     ),
     'utf8'
   );
-  process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.PASTURE_STATE_DIR = stateDir;
 }
 
 async function main() {
@@ -59,7 +59,7 @@ async function main() {
   if (!rm.ok) throw new Error(rm.message);
 
   console.log('Tide checklist test passed (CRUD + prompt normalization).');
-  console.log('Run agent items manually: cowcode tide checklist run');
+  console.log('Run agent items manually: pasture tide checklist run');
 }
 
 main().catch((e) => {

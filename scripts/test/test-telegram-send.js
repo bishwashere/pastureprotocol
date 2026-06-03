@@ -2,7 +2,7 @@
  * Real Telegram send test: sends one message via the Telegram Bot API.
  * Use to verify that sending to Telegram really works (no mocks).
  *
- * Requires: TELEGRAM_BOT_TOKEN and TEST_CHAT_ID in env or ~/.cowcode/.env.
+ * Requires: TELEGRAM_BOT_TOKEN and TEST_CHAT_ID in env or ~/.pasture/.env.
  * Run: pnpm run test:telegram-send
  * Or: TEST_CHAT_ID=123456789 node scripts/test/test-telegram-send.js
  */

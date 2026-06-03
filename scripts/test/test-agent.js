@@ -7,7 +7,7 @@
  * No extra tools. No memory injection. No pre-filled history. No system prompt hacks.
  * The agent runs on its own prompt, its own skills, its own memory.
  *
- * Uses a temp state dir (workspace/.cowcode-test) so cron can write without EPERM.
+ * Uses a temp state dir (workspace/.pasture-test) so cron can write without EPERM.
  * Memory scenario skipped by default (needs embeddings); run with TEST_MESSAGE="Search my memory..." to test.
  *
  * Usage:
@@ -24,8 +24,8 @@ import { homedir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');
-const defaultStateDir = join(homedir(), '.cowcode');
-const testStateDir = join(root, '.cowcode-test');
+const defaultStateDir = join(homedir(), '.pasture');
+const testStateDir = join(root, '.pasture-test');
 
 const SCENARIOS = [
   { name: 'cron add (clear)', message: 'Remind me to call Bishwas tomorrow at 5:30 p.m.' },
@@ -48,7 +48,7 @@ function ensureTestStateDir() {
 
 function runOne(message) {
   ensureTestStateDir();
-  const env = { ...process.env, COWCODE_STATE_DIR: testStateDir };
+  const env = { ...process.env, PASTURE_STATE_DIR: testStateDir };
   const result = spawnSync(process.execPath, ['index.js', '--test', message], {
     encoding: 'utf8',
     cwd: root,

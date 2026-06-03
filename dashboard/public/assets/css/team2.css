@@ -450,10 +450,36 @@ body.dashboard-team2-active > nav {
 
 /* ── View containers ──────────────────────────────────────────────────── */
 
+/* Views live inside #mc2-views-root (pages/mc2/*.html); this wrapper must
+   participate in the mc-main flex column or scroll breaks on /team. */
+#mc2-views-root {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#mc2-views-root > .mc-view {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Keep toolbars/filters fixed height; scroll the whole view (inbox, tasks, etc.). */
+#mc2-views-root > .mc-view > * {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
 .mc-view {
   flex: 1 1 0;
   min-height: 0;
-  overflow: auto;
   padding: 0.65rem 0.85rem 0.75rem;
   display: flex;
   flex-direction: column;
@@ -462,21 +488,7 @@ body.dashboard-team2-active > nav {
 
 .mc-view[hidden] { display: none !important; }
 
-/* Mission home scrolls as one page so long kanban lists don't squash bottom panels. */
-#mc2-view-mission {
-  flex: 1 1 0;
-  min-height: 0;
-  max-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-#mc2-view-mission > * {
-  flex: 0 0 auto;
-  min-height: auto;
-}
-
+/* Mission home — bottom panels keep full height while view scrolls. */
 #mc2-view-mission > .mc-bottom-row {
   align-items: start;
 }
@@ -752,6 +764,36 @@ button.mc-stat-card-action:focus-visible {
   font-size: 0.62rem;
   font-style: italic;
   padding: 0.35rem 0.1rem;
+}
+
+.mc-kanban-expand {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.38rem 0.45rem;
+  border: 1px dashed rgba(129, 140, 248, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.35);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6rem;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.mc-kanban-expand:hover {
+  border-color: rgba(129, 140, 248, 0.5);
+  color: var(--text);
+  background: rgba(30, 41, 59, 0.55);
+}
+
+.mc-kanban-expand.mc-kanban-collapse {
+  border-style: solid;
+  border-color: rgba(129, 140, 248, 0.18);
 }
 
 /* ── Section title ────────────────────────────────────────────────────── */
@@ -2187,105 +2229,10 @@ body.dashboard-team2-active {
   }
 }
 
-/* Action required banner */
-.mc-action-banner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  margin: 0 1rem 0.65rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid rgba(251, 191, 36, 0.45);
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(120, 53, 15, 0.42), rgba(69, 26, 3, 0.28));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-
-.mc-action-banner-head {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.mc-action-banner-label {
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: #fcd34d;
-}
-
-.mc-action-banner-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.35rem;
-  padding: 0.08rem 0.38rem;
-  border-radius: 999px;
-  background: rgba(251, 191, 36, 0.18);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  color: #fde68a;
-  font-size: 0.62rem;
-  font-weight: 700;
-}
-
-.mc-action-banner-count::before {
-  content: '(';
-}
-
-.mc-action-banner-count::after {
-  content: ')';
-}
-
-.mc-action-banner-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.45rem;
-}
-
-.mc-action-banner-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.12rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid rgba(251, 191, 36, 0.22);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.55);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.mc-action-banner-item:hover {
-  border-color: rgba(251, 191, 36, 0.55);
-  background: rgba(30, 41, 59, 0.72);
-  transform: translateY(-1px);
-}
-
-.mc-action-banner-item.error {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(69, 10, 10, 0.35);
-}
-
-.mc-action-banner-item-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #fef3c7;
-}
-
-.mc-action-banner-item-tag,
 .mc-attention-tag {
   font-size: 0.54rem !important;
   vertical-align: middle;
   margin-left: 0.25rem;
-}
-
-.mc-action-banner-item-sub {
-  font-size: 0.62rem;
-  line-height: 1.35;
-  color: #cbd5e1;
 }
 
 .mc-attention-item-structured {

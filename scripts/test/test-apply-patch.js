@@ -25,7 +25,7 @@ async function test(name, fn) {
 console.log('\napply-patch executor tests\n');
 
 await test('applies patch to workspace/ prefixed path', async () => {
-  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-patch-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-patch-'));
   const workspaceDir = join(stateDir, 'workspace');
   mkdirSync(workspaceDir, { recursive: true });
   writeFileSync(join(workspaceDir, 'target.txt'), 'a\nb\n', 'utf8');
