@@ -73,6 +73,15 @@ function checkWindowsPs1(filename, opts) {
   if (opts.offerNode && !src.includes('Offer-CowcodeNodeJs')) {
     return { ok: false, detail: `${filename} must offer Node.js install help` };
   }
+  if (opts.pm2Help && !src.includes('Ensure-CowcodePm2')) {
+    return { ok: false, detail: `${filename} must offer pm2 install help` };
+  }
+  if (opts.pm2Help && !src.includes('Show-CowcodePostInstallHelp')) {
+    return { ok: false, detail: `${filename} must show post-install commands` };
+  }
+  if (opts.pm2Help && !src.includes('Enable-CowcodePm2AutoRestart')) {
+    return { ok: false, detail: `${filename} must configure pm2 auto-start` };
+  }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }
 
@@ -82,6 +91,7 @@ function checkInstallPs1() {
     launcher: true,
     exitHelper: 'Exit-Install',
     offerNode: true,
+    pm2Help: true,
   });
 }
 

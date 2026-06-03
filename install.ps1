@@ -1,7 +1,7 @@
 # cowCode Windows installer
 # Download -> install -> deps -> setup -> start (pm2)
 # Code: %USERPROFILE%\.local\share\cowcode   State: %USERPROFILE%\.cowcode
-# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowcode/master/install.ps1 | iex
 
 param(
     [switch]$SkipSetup
@@ -68,6 +68,124 @@ function Offer-CowcodeNodeJs {
     }
     Write-Host "  Open a new PowerShell window after installing, then run the installer again."
     Exit-Install 1
+}
+
+function Refresh-NpmGlobalPath {
+    $npmGlobal = Join-Path $env:APPDATA "npm"
+    if ((Test-Path $npmGlobal) -and ($env:Path -notlike "*$npmGlobal*")) {
+        $env:Path = "$npmGlobal;$env:Path"
+    }
+}
+
+function Test-CowcodePm2 {
+    Refresh-NpmGlobalPath
+    return [bool](Get-Command pm2 -ErrorAction SilentlyContinue)
+}
+
+function Ensure-CowcodePm2 {
+    if (Test-CowcodePm2) {
+        return $true
+    }
+    Write-Host ""
+    Write-Host "  pm2 is required to run cowCode in the background on Windows."
+    Write-Host "  (Like Node.js, it is not needed to download the code, only to keep the bot running.)"
+    Write-Host ""
+    if ($Host.Name -eq "ConsoleHost") {
+        try {
+            $answer = Read-Host "  Install pm2 globally now (npm install -g pm2)? [Y/n]"
+            if ($answer -match '^[nN]') {
+                Write-Host "  Install manually, then run this installer again or: cowcode start"
+                Write-Host "    npm install -g pm2"
+                return $false
+            }
+        } catch {
+            Write-Host "  Install manually: npm install -g pm2"
+            return $false
+        }
+    } else {
+        Write-Host "  Install manually: npm install -g pm2"
+        return $false
+    }
+    Write-Host "  > Installing pm2 globally..."
+    Invoke-Native "npm install -g pm2" { npm install -g pm2 }
+    Refresh-NpmGlobalPath
+    if (-not (Test-CowcodePm2)) {
+        Write-Host "  [X] pm2 still not found. Close PowerShell, open a new window, and run:"
+        Write-Host "      npm install -g pm2"
+        return $false
+    }
+    Write-Host "  [OK] pm2 installed."
+    return $true
+}
+
+function Enable-CowcodePm2AutoRestart {
+    if (-not (Test-CowcodePm2)) { return $false }
+
+    Write-Host "  > Saving pm2 process list..."
+    & pm2 save 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [WARN] pm2 save failed."
+        return $false
+    }
+
+    $wantAuto = $true
+    if ($Host.Name -eq "ConsoleHost") {
+        try {
+            $answer = Read-Host "  Start cowCode automatically when you log in to Windows? [Y/n]"
+            if ($answer -match '^[nN]') { $wantAuto = $false }
+        } catch { }
+    }
+    if (-not $wantAuto) {
+        Write-Host "  Skipped auto-start. Enable later:"
+        Write-Host "    pm2 startup"
+        Write-Host "    pm2 save"
+        return $false
+    }
+
+    Write-Host "  > Configuring pm2 auto-start..."
+    $startupLines = @(& pm2 startup 2>&1)
+    foreach ($line in $startupLines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        Write-Host "  $line"
+    }
+    $adminCmd = ($startupLines | Where-Object { $_ -match 'pm2\.exe startup|PM2.*copy/paste|Run the following' } | Select-Object -First 1)
+    if ($adminCmd) {
+        Write-Host "  If pm2 printed an admin command above, run it in an elevated PowerShell, then: pm2 save"
+    }
+    & pm2 save 2>$null
+    Write-Host "  [OK] Auto-start configured (pm2 save)."
+    return $true
+}
+
+function Show-CowcodePostInstallHelp {
+    param(
+        [bool]$Running = $false
+    )
+    $stateDir = Join-Path $env:USERPROFILE ".cowcode"
+    Write-Host ""
+    Write-Host "  ------------------------------------------------"
+    Write-Host "  Useful commands"
+    Write-Host "  ------------------------------------------------"
+    Write-Host "  cowcode status       check if the bot is running"
+    Write-Host "  pm2 status           same (all pm2 processes)"
+    Write-Host "  cowcode logs         live log output"
+    Write-Host "  pm2 logs cowcode     same"
+    Write-Host "  cowcode stop         stop the background bot"
+    Write-Host "  cowcode restart      restart after config changes"
+    Write-Host "  cowcode dashboard    open the web dashboard"
+    Write-Host "  cowcode update       pull the latest version"
+    Write-Host ""
+    Write-Host "  Log files:"
+    Write-Host "    $stateDir\daemon.log"
+    Write-Host "    $stateDir\daemon.err"
+    if ($Running) {
+        Write-Host ""
+        Write-Host "  [OK] Bot is running in the background. You can close this window."
+    } else {
+        Write-Host ""
+        Write-Host "  Start the bot: cowcode start"
+    }
+    Write-Host ""
 }
 
 function Test-CowcodeBranchName {
@@ -226,7 +344,7 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
+$Tarball = "https://github.com/bishwashere/cowcode/archive/refs/heads/$BranchPath.tar.gz"
 $Extracted = "cowCode-$Branch"
 
 $InstallDir = if ($env:COWCODE_INSTALL_DIR) { $env:COWCODE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\cowcode" }
@@ -360,15 +478,25 @@ node "$InstallDir\cli.js" %*
 
     $env:COWCODE_INSTALL_DIR = $InstallDir
     $env:Path = "$BinDir;$env:Path"
+    Refresh-NpmGlobalPath
 
-    & node "$InstallDir\cli.js" start
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  > Bot is running in the background. You can close this window."
-        Write-Host "  > To see logs: cowcode logs"
-    } else {
-        Write-Host "  > To start later: cowcode start"
+    if (-not (Ensure-CowcodePm2)) {
+        Show-CowcodePostInstallHelp -Running $false
+        Exit-Install 1
     }
-    Write-Host ""
+
+    Write-Host "  > Starting cowCode with pm2..."
+    & node "$InstallDir\cli.js" start
+    $started = ($LASTEXITCODE -eq 0)
+
+    if ($started) {
+        $null = Enable-CowcodePm2AutoRestart
+    }
+
+    Show-CowcodePostInstallHelp -Running $started
+    if (-not $started) {
+        Exit-Install 1
+    }
 } finally {
     if (Test-Path -LiteralPath $Work) {
         Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue
