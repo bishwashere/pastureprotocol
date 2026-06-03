@@ -54,7 +54,7 @@ const checks = [
   },
   {
     name: 'nav partial exists with all main tabs',
-    ok: ['home', 'memory', 'crons', 'skills', 'team', 'projects'].every((p) =>
+    ok: ['home', 'memory', 'crons', 'skills', 'team', 'team2', 'projects'].every((p) =>
       fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="' + p + '"')),
   },
   {

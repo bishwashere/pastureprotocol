@@ -385,8 +385,10 @@ const checks = [
     ok: /buildInboundLinks\(agents\)/.test(html),
   },
   {
-    name: 'Top nav uses Team (no Agents tab)',
-    ok: html.includes('data-page="team"') && !html.includes('data-page="agents"'),
+    name: 'Top nav uses Team and Mission Control (no Agents tab)',
+    ok: html.includes('data-page="team2">Team</a>') &&
+      html.includes('data-page="team">Mission Control</a>') &&
+      !html.includes('data-page="agents"'),
   },
   {
     name: 'Legacy #agents hash redirects to team route',
