@@ -625,7 +625,7 @@ async function fetchCrons() {
     }
 
     function openTeamPage() {
-      location.hash = '#team2';
+      location.hash = '#team';
     }
 
     function setTeamPageFullscreen(on) {

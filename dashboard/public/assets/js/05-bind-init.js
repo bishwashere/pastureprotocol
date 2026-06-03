@@ -44,7 +44,7 @@ function mc2BindTimelineScrollSpy(viewEl) {
           showAgentEditorError(err.message || String(err), 'modal');
         }
       });
-      wireClick('team-agent-back', function () { location.hash = '#team2'; });
+      wireClick('team-agent-back', function () { location.hash = '#team'; });
       wireClick('team-agent-save', submitTeamAgentPage);
       wireClick('team-agent-md-save', async function () {
         var agentId = agentEditorState.page.agentId;
