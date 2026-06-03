@@ -1111,7 +1111,7 @@
     document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
-        if (nav === 'back') { location.hash = '#team'; return; }
+        if (nav === 'back') { location.hash = '#team2'; return; }
         mc2SetView(nav);
       });
     });

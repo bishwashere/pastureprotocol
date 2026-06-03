@@ -63,18 +63,25 @@ const API = '';
     function isMemoryWorkspaceFile(id) {
       return isMemoryNotesFile(id) || isMemoryChatLogFile(id);
     }
+    /** #team and #team2 URLs show the opposite page (team ↔ team2). */
+    function pageIdForRoute(routeName) {
+      if (routeName === 'team') return 'team2';
+      if (routeName === 'team2') return 'team';
+      return routeName;
+    }
     function setPage(name, memoryFileId, openIdentityFileId, teamAgentId) {
       if (name === 'chat' || name === 'status') name = 'home';
       if (!name || !validPages.includes(name)) name = 'home';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-      var page = document.getElementById('page-' + name);
+      var pageId = pageIdForRoute(name);
+      var page = document.getElementById('page-' + pageId);
       var link = document.querySelector('nav a[data-page="' + name + '"]');
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
-      document.body.classList.toggle('dashboard-team-active', name === 'team');
-      document.body.classList.toggle('dashboard-team2-active', name === 'team2');
+      document.body.classList.toggle('dashboard-team-active', pageId === 'team');
+      document.body.classList.toggle('dashboard-team2-active', pageId === 'team2');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
@@ -83,7 +90,7 @@ const API = '';
         if (typeof fetchChatAgents === 'function') fetchChatAgents();
         if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
       }
-      if (name === 'team') {
+      if (pageId === 'team') {
         setTeamTopTab('roster');
         setTeamRailExpanded('context', false);
         startTeamActivityFeed();
@@ -97,11 +104,11 @@ const API = '';
             selectTeamInboxAgent(teamAgentId);
             openAgentEditModal(teamAgentId);
             if (location.hash.indexOf('#team/') === 0) {
-              history.replaceState(null, '', '#team');
+              history.replaceState(null, '', '#team2');
             }
           }
         });
-      } else if (name === 'team2') {
+      } else if (pageId === 'team2') {
         startTeamActivityFeed();
         fetchAgentMapData().then(function () { renderMissionControl(); fetchMc2PendingApprovals(); });
       } else {
@@ -125,19 +132,22 @@ const API = '';
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
-      if (name === 'agents') name = 'team';
+      if (name === 'agents') name = 'team2';
       if (name === 'team') {
-        if (!subFile) {
-          return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
+        if (subFile) {
+          return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
         }
-        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
       }
       if (name === 'team2') {
+        if (subFile) {
+          return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+        }
         return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: null };
       }
       if (name === 'team-agent') {
         return {
-          name: 'team',
+          name: 'team2',
           memoryFile: null,
           openIdentity: null,
           teamAgentId: subFile ? decodeURIComponent(subFile) : null,

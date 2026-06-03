@@ -193,7 +193,7 @@ const checks = [
       var inboxIdx = html.indexOf('id="team-inbox-wrap"');
       return activityIdx >= 0 && contextIdx > activityIdx && inboxIdx > contextIdx &&
         html.includes('id="team-context-toggle"') &&
-        /if \(name === 'team'\)[\s\S]*setTeamRailExpanded\('context', false\)/.test(html);
+        /if \(pageId === 'team'\)[\s\S]*setTeamRailExpanded\('context', false\)/.test(html);
     })(),
   },
   {
@@ -362,12 +362,12 @@ const checks = [
       html.includes('team_capability_evaluation'),
   },
   {
-    name: 'Team hash route without agent id opens map page',
-    ok: /if \(!subFile\)[\s\S]*name: 'team'/.test(html),
+    name: 'Team2 hash route without agent id opens roster map page',
+    ok: /if \(name === 'team2'\)[\s\S]*return \{ name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: null \}/.test(html),
   },
   {
-    name: 'Team hash route with agent id opens edit modal on team page',
-    ok: /if \(name === 'team'\)[\s\S]*teamAgentId: decodeURIComponent\(subFile\)/.test(html) &&
+    name: 'Legacy #team/agent hash opens edit modal on roster page',
+    ok: /if \(name === 'team'\)[\s\S]*return \{ name: 'team2'[\s\S]*teamAgentId: decodeURIComponent\(subFile\)/.test(html) &&
       html.includes('openAgentEditModal(teamAgentId)') &&
       !/return \{ name: 'team-agent'/.test(html),
   },
@@ -391,8 +391,8 @@ const checks = [
       !html.includes('data-page="agents"'),
   },
   {
-    name: 'Legacy #agents hash redirects to team route',
-    ok: /if \(name === 'agents'\) name = 'team';/.test(html),
+    name: 'Legacy #agents hash redirects to team2 roster route',
+    ok: /if \(name === 'agents'\) name = 'team2';/.test(html),
   },
   {
     name: 'Team page has full screen toggle',
