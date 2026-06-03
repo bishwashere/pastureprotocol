@@ -1,0 +1,222 @@
+/* MC2 shell chrome — action banner, pending approvals (team2.html header) */
+/* Action required banner */
+.mc-action-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0 1rem 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.42), rgba(69, 26, 3, 0.28));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.mc-action-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mc-action-banner-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fcd34d;
+}
+
+.mc-action-banner-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.mc-action-banner-count::before {
+  content: '(';
+}
+
+.mc-action-banner-count::after {
+  content: ')';
+}
+
+.mc-action-banner-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.45rem;
+}
+
+.mc-action-banner-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.mc-action-banner-item:hover {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(30, 41, 59, 0.72);
+  transform: translateY(-1px);
+}
+
+.mc-action-banner-item.error {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(69, 10, 10, 0.35);
+}
+
+.mc-action-banner-item-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fef3c7;
+}
+
+.mc-action-banner-item-sub {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #cbd5e1;
+}
+
+.mc-attention-item-structured {
+  align-items: flex-start;
+}
+
+.mc-attention-item-structured .mc-attention-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mc-attention-item-structured .mc-attention-title {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #e5edf9;
+  line-height: 1.35;
+}
+
+.mc-attention-item-structured .mc-attention-sub {
+  font-size: 0.58rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* Pending project-workflow approvals */
+.mc-pending-approvals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.65rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 196, 64, 0.08), transparent);
+}
+
+.mc-pending-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.mc-pending-card {
+  border: 1px solid rgba(255, 196, 64, 0.35);
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 196, 64, 0.06);
+}
+
+.mc-pending-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.mc-pending-card-head h4 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mc-pending-kind {
+  font-size: 0.58rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mc-pending-objective {
+  font-size: 0.66rem;
+  color: var(--text);
+  margin: 0 0 0.35rem;
+}
+
+.mc-pending-meta {
+  font-size: 0.58rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.mc-pending-task-list {
+  margin: 0.35rem 0 0.55rem;
+  padding-left: 1.1rem;
+  font-size: 0.62rem;
+  color: var(--text);
+}
+
+.mc-pending-task-list li {
+  margin: 0.15rem 0;
+}
+
+.mc-pending-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.mc-pending-btn {
+  font: inherit;
+  font-size: 0.62rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.mc-pending-btn.approve {
+  border-color: rgba(72, 187, 120, 0.55);
+  background: rgba(72, 187, 120, 0.12);
+}
+
+.mc-pending-btn.reject {
+  border-color: rgba(245, 101, 101, 0.45);
+  background: rgba(245, 101, 101, 0.08);
+}
+
+.mc-pending-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}

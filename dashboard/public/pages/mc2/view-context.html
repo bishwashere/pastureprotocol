@@ -1,0 +1,21 @@
+<!-- MC2 view: Context -->
+<div id="mc2-view-context" class="mc-view" hidden>
+  <div class="mc-activity-toolbar">
+    <p class="mc-section-title" id="mc2-context-title">ACTIVE CONTEXT</p>
+    <label class="mc-agent-filter" for="mc2-context-agent-filter">
+      <span>Agent</span>
+      <select id="mc2-context-agent-filter" class="mc2-agent-filter-select" aria-label="Filter context by agent">
+        <option value="">All agents</option>
+      </select>
+    </label>
+  </div>
+  <div class="team-agent-panel-ranges mc2-range-controls" aria-label="Context timeline">
+    <button type="button" class="team-agent-panel-range active" data-range="today" aria-pressed="true">Today</button>
+    <button type="button" class="team-agent-panel-range" data-range="yesterday" aria-pressed="false">Yesterday</button>
+    <button type="button" class="team-agent-panel-range" data-range="last7" aria-pressed="false">Last week</button>
+    <button type="button" class="team-agent-panel-range" data-range="last30" aria-pressed="false">Last 30 days</button>
+  </div>
+  <div id="mc2-context-list" style="display:flex;flex-direction:column;gap:0.6rem;">
+    <p style="color:var(--muted);font-size:0.66rem;">Loading context…</p>
+  </div>
+</div>

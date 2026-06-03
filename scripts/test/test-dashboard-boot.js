@@ -15,10 +15,22 @@ const publicDir = path.join(__dirname, '../../dashboard/public');
 const htmlPath = path.join(publicDir, 'index.html');
 const serverPath = path.join(__dirname, '../../dashboard/server.js');
 const assetsJs = path.join(publicDir, 'assets/js');
+const mc2JsDir = path.join(assetsJs, 'mc2');
+const mc2JsFiles = [
+  '04-mc2-shared.js',
+  '04-mc2-nav.js',
+  '04-mc2-home.js',
+  '04-mc2-tasks.js',
+  '04-mc2-views.js',
+  '04-mc2-chrome.js',
+  '04-mc2-core.js',
+];
+const mc2Js = mc2JsFiles.map((f) => fs.readFileSync(path.join(mc2JsDir, f), 'utf8')).join('\n');
 const appScripts = [
   '01-core-router-status.js',
   '02-crons-skills-agents.js',
   '03-chat-team.js',
+  ...mc2JsFiles.map((f) => path.join('mc2', f)),
   '04-mission-control.js',
   '05-bind-init.js',
   '06-projects.js',
@@ -26,11 +38,23 @@ const appScripts = [
 const loaderJs = fs.readFileSync(path.join(assetsJs, '00-loader.js'), 'utf8');
 const html = fs.readFileSync(htmlPath, 'utf8');
 const pagesDir = path.join(publicDir, 'pages');
+const mc2PagesDir = path.join(pagesDir, 'mc2');
+const mc2ViewsHtml = fs.existsSync(mc2PagesDir)
+  ? ['view-home', 'view-tasks', 'view-agents', 'view-context', 'view-goals', 'view-initiatives', 'view-projects', 'view-activity', 'view-stats']
+    .map((name) => fs.readFileSync(path.join(mc2PagesDir, name + '.html'), 'utf8'))
+    .join('\n')
+  : '';
 const pageFragments = fs.existsSync(pagesDir)
   ? fs.readdirSync(pagesDir)
     .filter((name) => name.endsWith('.html'))
     .sort()
-    .map((name) => fs.readFileSync(path.join(pagesDir, name), 'utf8'))
+    .map((name) => {
+      let fragment = fs.readFileSync(path.join(pagesDir, name), 'utf8');
+      if (name === 'team2.html') {
+        fragment = fragment.replace('<!-- MC2_VIEWS -->', mc2ViewsHtml);
+      }
+      return fragment;
+    })
     .join('\n')
   : '';
 const fullHtml = html + '\n' + pageFragments;
@@ -38,16 +62,22 @@ const serverJs = fs.readFileSync(serverPath, 'utf8');
 const script = appScripts;
 const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'utf8');
 const chat = fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8');
-const missionControlJs = fs.readFileSync(path.join(assetsJs, '04-mission-control.js'), 'utf8');
+const missionControlJs = mc2Js + fs.readFileSync(path.join(assetsJs, '04-mission-control.js'), 'utf8');
 const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
-const team2Css = fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8');
+const mc2CssDir = path.join(publicDir, 'assets/css/mc2');
+const team2Css = [
+  fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8'),
+  ...['home.css', 'tasks.css', 'chrome.css'].map((f) => fs.readFileSync(path.join(mc2CssDir, f), 'utf8')),
+].join('\n');
 
 const checks = [
   {
     name: 'index.html links split CSS and JS assets',
     ok: html.includes('assets/css/dashboard.css') &&
       html.includes('assets/css/team2.css') &&
+      html.includes('assets/css/mc2/home.css') &&
       html.includes('assets/js/00-loader.js') &&
+      html.includes('assets/js/mc2/04-mc2-core.js') &&
       html.includes('assets/js/01-core-router-status.js') &&
       !html.includes('<style>'),
   },
@@ -56,6 +86,8 @@ const checks = [
     ok: loaderJs.includes('assets/partials/nav.html') &&
       loaderJs.includes('assets/partials/modals.html') &&
       loaderJs.includes('pages/') &&
+      loaderJs.includes('pages/mc2/') &&
+      loaderJs.includes('MC2_VIEWS') &&
       loaderJs.includes('dashboard-nav-root'),
   },
   {
@@ -81,11 +113,14 @@ const checks = [
   {
     name: 'index.html loads core router before chat and mission-control bundles',
     ok: (() => {
-      const scripts = [...html.matchAll(/assets\/js\/(\d{2}-[^"]+\.js)/g)].map((m) => m[1]);
+      const scripts = [...html.matchAll(/assets\/js\/([\w/.-]+\.js)/g)].map((m) => m[1]);
       const coreIdx = scripts.indexOf('01-core-router-status.js');
       const chatIdx = scripts.indexOf('03-chat-team.js');
-      const mcIdx = scripts.indexOf('04-mission-control.js');
-      return coreIdx >= 0 && chatIdx > coreIdx && mcIdx > chatIdx;
+      const mcSharedIdx = scripts.indexOf('mc2/04-mc2-shared.js');
+      const mcCoreIdx = scripts.indexOf('mc2/04-mc2-core.js');
+      const bindIdx = scripts.indexOf('05-bind-init.js');
+      return coreIdx >= 0 && chatIdx > coreIdx && mcSharedIdx > chatIdx &&
+        mcCoreIdx > mcSharedIdx && bindIdx > mcCoreIdx;
     })(),
   },
   {
@@ -95,7 +130,18 @@ const checks = [
   {
     name: 'renderMissionControl is fault-tolerant',
     ok: script.includes('function renderMissionControl()') &&
-      /function renderMissionControl\(\)[\s\S]*try \{[\s\S]*catch \(err\)/.test(script),
+      script.includes('function mc2RenderHome()') &&
+      script.includes('function mc2RenderLiveChrome()') &&
+      /function renderMissionControl\(\)[\s\S]*try \{[\s\S]*catch \(err\)/.test(script) &&
+      /function renderMissionControl\(\)[\s\S]*mc2ActiveView === 'mission'[\s\S]*mc2RenderHome\(\)/.test(script),
+  },
+  {
+    name: 'MC2 views split into pages/mc2 partials',
+    ok: fs.existsSync(path.join(mc2PagesDir, 'view-home.html')) &&
+      fs.existsSync(path.join(mc2PagesDir, 'view-tasks.html')) &&
+      fullHtml.includes('id="mc2-views-root"') &&
+      fullHtml.includes('id="mc2-view-mission"') &&
+      !fullHtml.includes('<!-- MC2_VIEWS -->'),
   },
   {
     name: 'skills-save uses wireEl not bare addEventListener',

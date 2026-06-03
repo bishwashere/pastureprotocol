@@ -3402,9 +3402,7 @@
       renderAgentContext();
       renderCurrentMission();
       renderTeamTaskSummary();
-      if (typeof mc2ActiveView === 'string' && mc2ActiveView === 'tasks' && typeof mc2RenderTasks === 'function') {
-        mc2RenderTasks();
-      } else if (typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
+      if (typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
         renderMissionControl();
       }
       if (!shouldPauseTeamDashboardRefresh()) renderTeamUserInputModal();

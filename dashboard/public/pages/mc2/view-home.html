@@ -1,0 +1,87 @@
+<!-- MC2 view: Home (mission overview) — live-refresh target -->
+<div id="mc2-view-mission" class="mc-view" role="main">
+  <!-- Progress row -->
+  <div class="mc-progress-row">
+    <div class="mc-progress-card">
+      <div class="mc-progress-summary">
+        <div class="mc-progress-head">
+          <h3>MISSION PROGRESS</h3>
+        </div>
+        <div class="mc-progress-score">
+          <span class="mc-progress-current" id="mc2-progress-label">— / — tasks completed</span>
+          <span class="mc-progress-percent" id="mc2-progress-percent">0%</span>
+        </div>
+        <div class="mc-progress-bar"><span id="mc2-progress-bar-fill" style="width:0%"></span></div>
+        <span class="mc-progress-meta" id="mc2-eta-label">ETA: live</span>
+      </div>
+      <div class="mc-stat-grid">
+        <div class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="open" role="button" tabindex="0" aria-label="View open and in-progress tasks">
+          <div class="mc-stat-label">Active</div>
+          <div class="mc-stat-value active" id="mc2-stat-active">0</div>
+        </div>
+        <div class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="blocked" role="button" tabindex="0" aria-label="View tasks needing attention">
+          <div class="mc-stat-label">Waiting</div>
+          <div class="mc-stat-value waiting" id="mc2-stat-waiting">0</div>
+        </div>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="blocked" aria-label="View blocked tasks and subtasks">
+          <div class="mc-stat-label">Blocked</div>
+          <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
+        </button>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="done" aria-label="View completed tasks">
+          <div class="mc-stat-label">Done Today</div>
+          <div class="mc-stat-value done" id="mc2-stat-done">0</div>
+        </button>
+        <div class="mc-stat-card">
+          <div class="mc-stat-label">Team Pace</div>
+          <div class="mc-stat-value pace" id="mc2-stat-pace">—/hr</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kanban columns -->
+  <div class="mc-kanban">
+    <div class="mc-kanban-col">
+      <div class="mc-kanban-col-head">NEEDS ATTENTION <span class="mc-kanban-col-count" id="mc2-col-count-attention">0</span></div>
+      <div class="mc-kanban-col-body" id="mc2-col-attention"><p class="mc-kanban-empty">All clear</p></div>
+    </div>
+    <div class="mc-kanban-col">
+      <div class="mc-kanban-col-head">WORK COMPLETED <span class="mc-kanban-col-count" id="mc2-col-count-completed">0</span></div>
+      <div class="mc-kanban-col-body" id="mc2-col-completed"><p class="mc-kanban-empty">Nothing completed yet</p></div>
+    </div>
+    <div class="mc-kanban-col">
+      <div class="mc-kanban-col-head">WORK IN PROGRESS <span class="mc-kanban-col-count" id="mc2-col-count-progress">0</span></div>
+      <div class="mc-kanban-col-body" id="mc2-col-progress"><p class="mc-kanban-empty">No active work</p></div>
+    </div>
+    <div class="mc-kanban-col">
+      <div class="mc-kanban-col-head">AUTO DISCOVERIES <span class="mc-kanban-col-count" id="mc2-col-count-discoveries">0</span></div>
+      <div class="mc-kanban-col-body" id="mc2-col-discoveries"><p class="mc-kanban-empty">No discoveries yet</p></div>
+    </div>
+  </div>
+
+  <!-- Agents overview -->
+  <div>
+    <p class="mc-section-title">AGENTS OVERVIEW</p>
+    <div class="mc-agents-overview" id="mc2-agents-overview">
+      <p style="color:var(--muted);font-size:0.66rem;">Loading agents…</p>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="mc-bottom-row">
+    <div class="mc-panel">
+      <p class="mc-section-title">RECENT MOVEMENT</p>
+      <div class="mc-panel-body" id="mc2-recent-movement">
+        <p class="mc-kanban-empty">No activity yet.</p>
+      </div>
+      <button type="button" class="mc-panel-link" data-mc-nav="tasks" data-mc-tasks-filter="all">View all tasks →</button>
+    </div>
+    <div class="mc-panel">
+      <p class="mc-section-title">ACTION QUEUE</p>
+      <div class="mc-panel-body" id="mc2-attention">
+        <p class="mc-kanban-empty">All clear.</p>
+      </div>
+      <button type="button" class="mc-panel-link" data-mc-nav="tasks" data-mc-tasks-filter="blocked">View blocked tasks →</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,34 @@
+<!-- MC2 view: Tasks -->
+<div id="mc2-view-tasks" class="mc-view" hidden>
+  <p class="mc2-tasks-hint" style="color:var(--muted);font-size:0.66rem;margin:0 0 0.45rem;">
+    Tasks are the center of the dashboard — assignee, status, delegation, initiative source, timeline, and mission linkage live here. Click anything on Mission to land on a task.
+  </p>
+  <div id="mc2-tasks-pending" class="mc-pending-inline"></div>
+  <div class="mc-activity-toolbar">
+    <p class="mc-section-title" id="mc2-tasks-title">MISSION TASKS</p>
+    <label class="mc-agent-filter" for="mc2-tasks-agent-filter">
+      <span>Agent</span>
+      <select id="mc2-tasks-agent-filter" class="mc2-agent-filter-select" aria-label="Filter tasks by agent">
+        <option value="">All agents</option>
+      </select>
+    </label>
+  </div>
+  <div id="mc2-tasks-filters" class="mc2-tasks-filters" role="tablist" aria-label="Task status filters">
+    <button type="button" class="mc2-tasks-filter active" data-mc-tasks-filter="all" aria-pressed="true">All</button>
+    <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="blocked" aria-pressed="false">Blocked</button>
+    <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="open" aria-pressed="false">Open</button>
+    <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="done" aria-pressed="false">Completed</button>
+  </div>
+  <div id="mc2-tasks-range-wrap" class="team-agent-panel-ranges mc2-range-controls" aria-label="Completed tasks timeline">
+    <button type="button" class="team-agent-panel-range active" data-range="today" aria-pressed="true">Today</button>
+    <button type="button" class="team-agent-panel-range" data-range="yesterday" aria-pressed="false">Yesterday</button>
+    <button type="button" class="team-agent-panel-range" data-range="last7" aria-pressed="false">Last week</button>
+    <button type="button" class="team-agent-panel-range" data-range="last30" aria-pressed="false">Last 30 days</button>
+  </div>
+  <div id="mc2-task-detail" class="mc-task-detail-panel" hidden aria-label="Task detail">
+    <p class="team-agent-inbox-empty" style="margin:0;">Select a task to see its timeline and actions.</p>
+  </div>
+  <div class="mc-agents-overview mc-tasks-list-wrap" id="mc2-tasks-list">
+    <p style="color:var(--muted);font-size:0.66rem;">Loading tasks…</p>
+  </div>
+</div>
