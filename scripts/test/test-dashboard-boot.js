@@ -195,18 +195,17 @@ const checks = [
   },
   {
     name: 'mission view scrolls when kanban content is long',
-    ok: /#mc2-views-root[\s\S]{0,220}flex:\s*1 1 0[\s\S]{0,120}min-height:\s*0/.test(team2Css) &&
-      /#mc2-view-mission[\s\S]{0,260}overflow-y:\s*auto/.test(team2Css) &&
-      /#mc2-view-mission > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
+    ok: /#mc2-views-root > \.mc-view[\s\S]{0,320}overflow-y:\s*auto/.test(team2Css) &&
+      /#mc2-views-root > \.mc-view > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
       /#mc2-view-mission \.mc-bottom-row \.mc-panel-body[\s\S]{0,80}flex:\s*none/.test(team2Css) &&
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
-    name: 'action required banner renders structured attention items',
-    ok: fullHtml.includes('id="mc2-action-banner"') &&
-      fullHtml.includes('ACTION REQUIRED') &&
+    name: 'attention items use task titles and auto-promoted tags',
+    ok: !fullHtml.includes('id="mc2-action-banner"') &&
+      !fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectActionRequiredItems') &&
-      missionControlJs.includes('function mc2RenderActionBanner') &&
+      !missionControlJs.includes('function mc2RenderActionBanner') &&
       missionControlJs.includes("action: 'initiative-review'") &&
       missionControlJs.includes("tag: 'Auto-promoted'") &&
       missionControlJs.includes('function mc2TaskTitleForInitiative') &&
@@ -237,6 +236,7 @@ const checks = [
       !/id="mc2-view-mission" class="mc-view" role="main" hidden/.test(fullHtml) &&
       /class="mc-nav-item active"[\s\S]{0,80}data-mc-nav="mission"/.test(fullHtml) &&
       fullHtml.includes('mc-nav-label">Home</span>') &&
+      /data-mc-nav="mission"[\s\S]{0,220}data-mc-nav="tasks"/.test(fullHtml) &&
       missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
       missionControlJs.includes('mc2OpenTaskForInitiative') &&
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),

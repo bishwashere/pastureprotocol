@@ -3,7 +3,6 @@
     function mc2RenderLiveChrome() {
       mc2UpdateLiveBadge();
       mc2UpdateApprovalsBadge();
-      mc2RenderActionBanner();
       mc2RenderPendingApprovalsBanner();
       mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');

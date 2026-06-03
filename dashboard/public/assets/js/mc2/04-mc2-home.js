@@ -334,42 +334,6 @@
       return items;
     }
 
-    function mc2ActionRequiredItemAttrs(item) {
-      var attrs = ' data-attention-action="' + escapeHtml(item.action || '') + '"';
-      if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(item.goalId) + '"';
-      if (item.subgoalId) attrs += ' data-subgoal-id="' + escapeHtml(item.subgoalId) + '"';
-      if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
-      if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
-      if (item.initiativeId) attrs += ' data-initiative-id="' + escapeHtml(item.initiativeId) + '"';
-      return attrs;
-    }
-
-    function mc2RenderActionBanner() {
-      var banner = mc2El('mc2-action-banner');
-      var countEl = mc2El('mc2-action-banner-count');
-      var itemsEl = mc2El('mc2-action-banner-items');
-      if (!banner || !itemsEl) return;
-      var items = mc2CollectActionRequiredItems();
-      if (!items.length) {
-        banner.hidden = true;
-        itemsEl.innerHTML = '';
-        if (countEl) countEl.textContent = '0';
-        return;
-      }
-      banner.hidden = false;
-      if (countEl) countEl.textContent = String(items.length);
-      itemsEl.innerHTML = items.slice(0, 6).map(function (item) {
-        return '<button type="button" class="mc-action-banner-item ' + escapeHtml(item.kind || 'warning') + '"' +
-          mc2ActionRequiredItemAttrs(item) + '>' +
-          '<span class="mc-action-banner-item-title">' +
-            escapeHtml(item.title) +
-            (item.tag ? ' ' + mc2AutoPromotedTagHtml('mc-action-banner-item-tag') : '') +
-          '</span>' +
-          '<span class="mc-action-banner-item-sub">' + escapeHtml(item.subtitle || '') + '</span>' +
-        '</button>';
-      }).join('');
-    }
-
     function mc2MapKanbanAttentionItem(item) {
       return {
         kind: item.kind,
