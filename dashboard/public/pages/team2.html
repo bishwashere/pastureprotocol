@@ -4,11 +4,11 @@
       <nav class="mc-sidebar" aria-label="Mission Control navigation">
         <div class="mc-sidebar-logo" aria-hidden="true">♞</div>
         <div class="mc-sidebar-nav">
-          <button type="button" class="mc-nav-item active" data-mc-nav="tasks" aria-label="Tasks">
+          <button type="button" class="mc-nav-item" data-mc-nav="tasks" aria-label="Tasks">
             <span class="mc-nav-icon">☑</span><span class="mc-nav-label">Tasks</span>
           </button>
-          <button type="button" class="mc-nav-item" data-mc-nav="mission" aria-label="Mission">
-            <span class="mc-nav-icon">⌂</span><span class="mc-nav-label">Mission</span>
+          <button type="button" class="mc-nav-item active" data-mc-nav="mission" aria-label="Home">
+            <span class="mc-nav-icon">⌂</span><span class="mc-nav-label">Home</span>
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Agents">
             <span class="mc-nav-icon">♙</span><span class="mc-nav-label">Agents</span>
@@ -89,8 +89,8 @@
           <div class="mc-action-banner-items" id="mc2-action-banner-items"></div>
         </div>
 
-        <!-- Mission view -->
-        <div id="mc2-view-mission" class="mc-view" role="main" hidden>
+        <!-- Home (mission overview) -->
+        <div id="mc2-view-mission" class="mc-view" role="main">
           <!-- Progress row -->
           <div class="mc-progress-row">
             <div class="mc-progress-card">
@@ -186,7 +186,7 @@
         </div>
 
         <!-- Mission tasks view (blocked / open / completed) -->
-        <div id="mc2-view-tasks" class="mc-view">
+        <div id="mc2-view-tasks" class="mc-view" hidden>
           <p class="mc2-tasks-hint" style="color:var(--muted);font-size:0.66rem;margin:0 0 0.45rem;">
             Tasks are the center of the dashboard — assignee, status, delegation, initiative source, timeline, and mission linkage live here. Click anything on Mission to land on a task.
           </p>

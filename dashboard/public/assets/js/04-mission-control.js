@@ -1,6 +1,6 @@
 /* ── Mission Control (#team2) ─────────────────────────────────────────── */
 
-    var mc2ActiveView = 'tasks';
+    var mc2ActiveView = 'mission';
     var mc2InboxAgentFilter = '';
     var mc2TasksAgentFilter = '';
     var mc2SelectedProjectId = '';
