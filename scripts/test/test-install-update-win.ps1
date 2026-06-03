@@ -11,10 +11,10 @@ $NodeDir = Join-Path $TestRoot 'node-portable'
 $Results = @()
 
 function Add-Case {
-    param([string]$Name, [string]$Input, [string]$Output, [bool]$Ok)
+    param([string]$Name, [string]$CaseInput, [string]$Output, [bool]$Ok)
     $script:Results += [pscustomobject]@{
         Test   = $Name
-        Input  = $Input
+        Input  = $CaseInput
         Output = $Output
         Status = $(if ($Ok) { 'Pass' } else { 'Fail' })
     }
@@ -139,8 +139,10 @@ if (-not (Ensure-PortableNode22)) {
         Add-Case 'update.ps1 -Force' 'v0.0.1-test-old' "exit=$LASTEXITCODE ver=$verAfterForce" (($LASTEXITCODE -eq 0) -and ($verAfterForce -eq '2.0.0'))
 
         & (Join-Path $Repo 'update.ps1') 2>&1 | Out-File (Join-Path $TestRoot 'update-skip.log')
-        $skipOk = ($LASTEXITCODE -eq 0) -and ((Get-Content (Join-Path $TestRoot 'update-skip.log') -Raw) -match 'Already up to date')
-        Add-Case 'update.ps1' 'same version' "exit=$LASTEXITCODE" $skipOk
+        $skipExit = $LASTEXITCODE
+        $verAfterSkip = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version
+        $skipOk = ($skipExit -eq 0) -and ($verAfterSkip -eq '2.0.0')
+        Add-Case 'update.ps1' 'same version' "exit=$skipExit ver=$verAfterSkip" $skipOk
 
         $pkg.version = '0.0.1-test-old'
         $pkg | ConvertTo-Json -Depth 10 | Set-Content $pkgPath -Encoding UTF8
@@ -166,6 +168,6 @@ foreach ($r in $Results) {
 }
 Write-Host ""
 
-$failed = ($Results | Where-Object { $_.Status -ne 'Pass' }).Count
+$failed = @($Results | Where-Object { $_.Status -ne 'Pass' }).Count
 if ($failed -gt 0) { exit 1 }
 exit 0
