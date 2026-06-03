@@ -397,14 +397,17 @@ async function main() {
           persistHistory: true,
         }),
       onLog: (event) => {
+        const baseDetails = event?.details && typeof event.details === 'object' ? event.details : {};
         logTeamActivity({
           type: event.type || 'goal_tick',
-          agentId: event.ownerAgentId || DEFAULT_AGENT_ID,
+          agentId: event.ownerAgentId || event.agentId || DEFAULT_AGENT_ID,
           status: event.status || 'ok',
           message: event.message || event.title || 'Goal tick',
+          title: event.title || baseDetails.title || '',
           details: {
-            goalId: event.goalId || '',
-            title: event.title || '',
+            ...baseDetails,
+            goalId: event.goalId || baseDetails.goalId || '',
+            title: event.title || baseDetails.title || '',
           },
         });
       },

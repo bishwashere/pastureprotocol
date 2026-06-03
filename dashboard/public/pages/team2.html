@@ -179,6 +179,9 @@
 
         <!-- Mission tasks view (blocked / open / completed) -->
         <div id="mc2-view-tasks" class="mc-view" hidden>
+          <p class="mc2-tasks-hint" style="color:var(--muted);font-size:0.66rem;margin:0 0 0.45rem;">
+            Each task has actions to respond, mark done, reopen, remove, or review the source initiative.
+          </p>
           <div id="mc2-tasks-pending" class="mc-pending-inline"></div>
           <div class="mc-activity-toolbar">
             <p class="mc-section-title" id="mc2-tasks-title">MISSION TASKS</p>
@@ -247,7 +250,7 @@
             <button type="button" id="mc2-initiatives-refresh" class="secondary" style="margin:0;">Refresh</button>
           </div>
           <p class="mc2-initiatives-hint" style="color:var(--muted);font-size:0.66rem;margin:0 0 0.5rem;">
-            Select an initiative to accept, reject, promote to a mission, or undo auto-promotion.
+            Review agent suggestions — accept, reject, add to a mission, or undo auto-promotion.
           </p>
           <div class="team-initiatives-main mc2-initiatives-main">
             <div id="mc2-initiatives-list" class="team-initiatives-list">

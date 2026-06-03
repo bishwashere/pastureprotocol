@@ -1395,10 +1395,201 @@
       return index;
     }
 
-    function renderGoalSubgoalTree(subgoals, lookup, depth) {
+    function initiativeIdFromSubgoalId(subgoalId) {
+      var m = String(subgoalId || '').match(/^init-(.+)$/);
+      return m ? m[1] : '';
+    }
+
+    function findInitiativeForSubgoalId(subgoalId) {
+      var initId = initiativeIdFromSubgoalId(subgoalId);
+      if (!initId) return null;
+      return (Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : []).find(function (it) {
+        return String(it.id || '') === initId;
+      }) || null;
+    }
+
+    function openInitiativeForSubgoal(subgoalId) {
+      var initId = initiativeIdFromSubgoalId(subgoalId);
+      if (!initId) return false;
+      selectedTeamInitiativeId = initId;
+      if (typeof mc2SetView === 'function') mc2SetView('initiatives');
+      if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
+      return true;
+    }
+
+    function missionTaskActionButtonsHtml(goalId, subgoalId, status, opts) {
+      opts = opts || {};
+      var gid = String(goalId || '').trim();
+      var sid = String(subgoalId || '').trim();
+      if (!gid || !sid) return '';
+      var st = normalizeSubgoalStatus(status);
+      var fromInit = !!opts.fromInitiative || /^init-/.test(sid);
+      var btnClass = opts.compact ? 'team-goal-task-btn secondary' : 'mc-task-card-btn';
+      var primaryClass = opts.compact ? 'team-goal-task-btn secondary' : 'mc-task-card-btn primary';
+      var parts = [];
+      function btn(action, label, primary) {
+        return '<button type="button" class="' + (primary ? primaryClass : btnClass) + '" data-mc-task-action="' + escapeHtml(action) + '"' +
+          ' data-goal-id="' + escapeHtml(gid) + '" data-subgoal-id="' + escapeHtml(sid) + '">' + escapeHtml(label) + '</button>';
+      }
+      if (st === 'blocked') {
+        parts.push(btn('respond', 'Respond', true));
+        parts.push(btn('unblock', 'Mark open', false));
+      } else if (st !== 'done') {
+        parts.push(btn('mark-done', 'Mark done', false));
+      } else {
+        parts.push(btn('mark-open', 'Reopen', false));
+      }
+      parts.push(btn('remove', 'Remove', false));
+      if (fromInit) parts.push(btn('review-initiative', 'Review initiative', false));
+      var wrapClass = opts.compact ? 'team-goal-task-actions' : 'mc-task-card-actions';
+      return '<div class="' + wrapClass + '">' + parts.join('') + '</div>';
+    }
+
+    async function removeMissionTask(goalId, subgoalId) {
+      var gid = String(goalId || '').trim();
+      var sid = String(subgoalId || '').trim();
+      if (!gid || !sid) return false;
+      if (!window.confirm('Remove this task from the mission? Agents will stop tracking it here.')) return false;
+      var initiative = findInitiativeForSubgoalId(sid);
+      if (initiative) return undoInitiativePromotion(initiative);
+      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === gid;
+      });
+      if (!goal) return false;
+      try {
+        var r = await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subgoals: removeSubgoalFromTree(goal.subgoals, sid) }),
+        });
+        if (!r.ok) return false;
+        await fetchGoalsSnapshot();
+        if (typeof renderMissionControl === 'function') renderMissionControl();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function wireMissionTaskActions(root) {
+      if (!root) return;
+      root.querySelectorAll('[data-mc-task-action]').forEach(function (btn) {
+        if (btn._wiredMissionTask) return;
+        btn._wiredMissionTask = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var action = String(btn.getAttribute('data-mc-task-action') || '');
+          var goalId = btn.getAttribute('data-goal-id');
+          var subgoalId = btn.getAttribute('data-subgoal-id');
+          var card = btn.closest('.mc-mission-task-card');
+          var item = card && typeof mc2MissionTaskItemFromEl === 'function'
+            ? mc2MissionTaskItemFromEl(card)
+            : {
+              kind: 'subgoal',
+              goalId: goalId,
+              subgoalId: subgoalId,
+              title: card ? card.getAttribute('data-title') : '',
+              status: card ? card.getAttribute('data-status') : 'todo',
+            };
+          if (action === 'respond') {
+            if (typeof openMissionWorkInputModal === 'function') openMissionWorkInputModal(item);
+            return;
+          }
+          if (action === 'unblock' || action === 'mark-open') {
+            if (typeof patchMissionSubgoalStatus === 'function') {
+              patchMissionSubgoalStatus(goalId, subgoalId, 'todo');
+            }
+            return;
+          }
+          if (action === 'mark-done') {
+            if (typeof patchMissionSubgoalStatus === 'function') {
+              patchMissionSubgoalStatus(goalId, subgoalId, 'done');
+            }
+            return;
+          }
+          if (action === 'remove') {
+            removeMissionTask(goalId, subgoalId);
+            return;
+          }
+          if (action === 'review-initiative') {
+            openInitiativeForSubgoal(subgoalId);
+            return;
+          }
+          if ((action === 'in-mission' || action === 'details') && card && typeof mc2ShowMissionTaskDetails === 'function') {
+            mc2ShowMissionTaskDetails(card);
+          } else if ((action === 'in-mission' || action === 'details') && goalId) {
+            selectedTeamGoalId = goalId;
+            if (typeof mc2SetView === 'function') mc2SetView('goals');
+            if (typeof mc2RenderGoals === 'function') {
+              Promise.resolve(mc2RenderGoals()).then(function () {
+                if (subgoalId && typeof scheduleScrollToBlockedTarget === 'function') {
+                  scheduleScrollToBlockedTarget({
+                    kind: 'subgoal',
+                    goalId: goalId,
+                    subgoalId: subgoalId,
+                    title: '',
+                  }, 0);
+                }
+              });
+            }
+          }
+        });
+      });
+    }
+
+    async function runMissionGoalAction(goalId, action) {
+      var gid = String(goalId || '').trim();
+      if (!gid) return;
+      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === gid;
+      });
+      if (!goal) return;
+      if (action === 'run') {
+        try {
+          await fetch(API + '/api/goals/' + encodeURIComponent(gid) + '/run', { method: 'POST' });
+        } catch (_) {}
+        fetchGoalsSnapshot();
+        return;
+      }
+      if (action === 'toggle') {
+        var status = String(goal.status || 'active').toLowerCase();
+        var nextStatus = status === 'active' ? 'paused' : 'active';
+        try {
+          await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nextStatus }),
+          });
+        } catch (_) {}
+        fetchGoalsSnapshot();
+        return;
+      }
+      if (action === 'respond' && typeof openTeamUserInputModal === 'function') {
+        openTeamUserInputModal(goal, { ask: goalAttentionPrompt(goal) });
+      }
+    }
+
+    function wireMissionGoalDetailActions(detailEl, goal) {
+      if (!detailEl || !goal) return;
+      var goalId = String(goal.id || '');
+      detailEl.querySelectorAll('[data-mc-goal-action]').forEach(function (btn) {
+        if (btn._wiredMissionGoal) return;
+        btn._wiredMissionGoal = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          runMissionGoalAction(goalId, btn.getAttribute('data-mc-goal-action'));
+        });
+      });
+      wireMissionTaskActions(detailEl);
+    }
+
+    function renderGoalSubgoalTree(subgoals, lookup, depth, goalId) {
       var list = Array.isArray(subgoals) ? subgoals : [];
       if (!list.length) return '';
       var level = Number(depth) || 0;
+      var gid = String(goalId || '').trim();
       return list.map(function (sg) {
         if (!sg || typeof sg !== 'object') return '';
         var title = String(sg.title || '').trim() || 'Untitled task';
@@ -1411,15 +1602,20 @@
           var dep = lookup[key];
           return dep && dep.title ? dep.title : key;
         }).filter(Boolean).join(', ');
-        var children = renderGoalSubgoalTree(sg.subgoals, lookup, level + 1);
         var sgKey = String(sg.id || '').trim();
+        var children = renderGoalSubgoalTree(sg.subgoals, lookup, level + 1, gid);
+        var initBadge = /^init-/.test(sgKey) ? '<span class="team-initiative-auto-badge">From initiative</span> ' : '';
+        var actionsHtml = gid && sgKey
+          ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromInitiative: /^init-/.test(sgKey) })
+          : '';
         var summary = '<span class="team-goal-subgoal-row" data-subgoal-id="' + escapeHtml(sgKey) + '">' +
+          initBadge +
           '<span class="team-goal-subgoal-title">' + escapeHtml(title) + '</span>' +
           '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '<span class="team-goal-subgoal-meta">' + escapeHtml(String(progress)) + '%</span>' +
           (assignee ? '<span class="team-goal-subgoal-meta">assignee: ' + escapeHtml(agentNameById(assignee)) + '</span>' : '') +
           (depsLabel ? '<span class="team-goal-subgoal-meta">depends on: ' + escapeHtml(depsLabel) + '</span>' : '') +
-        '</span>';
+        '</span>' + actionsHtml;
         return '<details class="team-goal-subgoal-node" ' + (level < 1 ? 'open' : '') + '>' +
           '<summary>' + summary + '</summary>' +
           (children || '') +
@@ -1436,19 +1632,30 @@
       }
       var status = String(goal.status || 'active').toLowerCase();
       var pct = normalizeSubgoalProgress(goal.progress && goal.progress.pct);
+      var goalId = String(goal.id || '');
       var subgoals = Array.isArray(goal.subgoals) ? goal.subgoals : [];
       var subgoalLookup = indexGoalSubgoals(subgoals, {});
-      var subgoalTree = renderGoalSubgoalTree(subgoals, subgoalLookup, 0);
+      var subgoalTree = renderGoalSubgoalTree(subgoals, subgoalLookup, 0, goalId);
+      var needsInput = typeof goalNeedsAttention === 'function' ? goalNeedsAttention(goal) : false;
+      var toggleLabel = status === 'active' ? 'Pause mission' : (status === 'paused' ? 'Resume mission' : 'Activate mission');
       detail.innerHTML = '' +
         '<h4>' + escapeHtml(goal.title || 'Untitled mission') + ' <span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span></h4>' +
         '<div class="team-goal-detail-row"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(goal)) + '</div>' +
         '<div class="team-goal-detail-row"><strong>Objective:</strong> ' + escapeHtml(String(goal.objective || '')) + '</div>' +
         '<div class="team-goal-detail-row"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</div>' +
         (goal.lastActivity ? '<div class="team-goal-detail-row"><strong>Latest activity:</strong> ' + escapeHtml(String(goal.lastActivity)) + '</div>' : '') +
+        '<div class="team-initiative-actions team-goal-detail-actions">' +
+          '<button type="button" class="secondary" data-mc-goal-action="run" data-goal-id="' + escapeHtml(goalId) + '">Run now</button>' +
+          '<button type="button" class="secondary" data-mc-goal-action="toggle" data-goal-id="' + escapeHtml(goalId) + '">' + escapeHtml(toggleLabel) + '</button>' +
+          (needsInput
+            ? '<button type="button" class="secondary" data-mc-goal-action="respond" data-goal-id="' + escapeHtml(goalId) + '">Give input</button>'
+            : '') +
+        '</div>' +
         '<div class="team-goal-subgoals">' +
-          '<h5>Tasks (expandable tree)</h5>' +
+          '<h5>Tasks — you can change or remove any task below</h5>' +
           (subgoalTree || '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">No tasks yet.</p>') +
         '</div>';
+      wireMissionGoalDetailActions(detail, goal);
     }
 
     function renderGoalsOwnerOptions() {
@@ -2589,7 +2796,11 @@
         return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> finished the task. ' + escapeHtml(msg || '');
       }
       if (type === 'initiative_auto_promoted') {
-        var initTitle = String(event.title || '').trim();
+        var initTitle = String(event.title || (details && details.title) || '').trim();
+        if (!initTitle && msg) {
+          var titleFromMsg = msg.match(/(?:Auto-promoted initiative to subgoal:|Added initiative to mission:)\s*(.+?)\s*\(\d+%/i);
+          if (titleFromMsg) initTitle = String(titleFromMsg[1] || '').trim();
+        }
         var missionName = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
         var confMatch = msg.match(/\((\d+)%\s*confidence\)/i);
         var confPct = confMatch ? confMatch[1] : '';
@@ -2643,7 +2854,7 @@
         return 'Delegation to <span class="accent">' + escapeHtml(target || 'agent') + '</span> failed: ' + escapeHtml(msg || 'Error');
       }
       if (type === 'initiative_auto_promoted') {
-        var initTitleSub = String(event.title || '').trim();
+        var initTitleSub = String(event.title || (details && details.title) || '').trim();
         var missionNameSub = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
         var lineSub = 'Added <span class="accent">' + escapeHtml(initTitleSub || 'initiative') + '</span> to mission';
         if (missionNameSub) lineSub += ' <span class="accent">' + escapeHtml(missionNameSub) + '</span>';
@@ -2869,6 +3080,55 @@
         return (Number(b.ts) || 0) - (Number(a.ts) || 0);
       });
     }
+
+    var MC2_PINNED_MOVEMENT_TYPES = {
+      initiative_auto_promoted: true,
+      initiative_scan_done: true,
+    };
+
+    function buildMissionControlMovementGroups(maxGroups) {
+      maxGroups = Math.max(6, Number(maxGroups) || 10);
+      var all = Array.isArray(teamActivityEvents) ? teamActivityEvents.slice() : [];
+      var pinnedEvents = all.filter(function (ev) {
+        return ev && MC2_PINNED_MOVEMENT_TYPES[String(ev.type || '')];
+      }).slice(-6);
+      var pinnedIds = {};
+      pinnedEvents.forEach(function (ev) {
+        if (ev && ev.id) pinnedIds[String(ev.id)] = true;
+      });
+      var pinnedGroups = pinnedEvents.map(function (ev) {
+        var g = {
+          ts: Number(ev.ts) || 0,
+          agentId: String(ev.agentId || ''),
+          lines: [],
+          _keys: {},
+        };
+        mergeActivityNav(g, ev);
+        pushUniqueActivityLine(g, formatTeamActivityText(ev));
+        delete g._keys;
+        return g;
+      }).filter(function (g) { return g.lines && g.lines.length; });
+      pinnedGroups.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+      var rest = all.filter(function (ev) { return !ev || !pinnedIds[String(ev.id || '')]; });
+      var regular = groupTeamActivityEvents(rest.slice(-100));
+      var seen = {};
+      var out = [];
+      function appendGroup(g) {
+        if (!g || !g.lines || !g.lines.length) return;
+        var key = activityLineKey(g.lines[0]);
+        if (key && seen[key]) return;
+        if (key) seen[key] = true;
+        out.push(g);
+      }
+      pinnedGroups.forEach(appendGroup);
+      regular.forEach(function (g) {
+        if (out.length >= maxGroups) return;
+        appendGroup(g);
+      });
+      return out.slice(0, maxGroups);
+    }
+
+    window.buildMissionControlMovementGroups = buildMissionControlMovementGroups;
 
     function renderTeamActivityGroupRow(group, opts) {
       opts = opts || {};
@@ -3279,6 +3539,11 @@
 
     window.openMissionWorkInputModal = openMissionWorkInputModal;
     window.patchMissionSubgoalStatus = patchMissionSubgoalStatus;
+    window.wireMissionTaskActions = wireMissionTaskActions;
+    window.missionTaskActionButtonsHtml = missionTaskActionButtonsHtml;
+    window.runMissionGoalAction = runMissionGoalAction;
+    window.removeMissionTask = removeMissionTask;
+    window.openInitiativeForSubgoal = openInitiativeForSubgoal;
     window.goalNeedsAttention = goalNeedsAttention;
     window.countBlockedSubgoalsForGoal = countBlockedSubgoalsForGoal;
 

@@ -271,6 +271,12 @@ const checks = [
       html.includes('initiative_auto_promoted') &&
       html.includes('Added initiative to mission') &&
       html.includes('data-mc-movement-nav') &&
+      html.includes('buildMissionControlMovementGroups') &&
+      html.includes('MC2_PINNED_MOVEMENT_TYPES') &&
+      html.includes('missionTaskActionButtonsHtml') &&
+      html.includes('wireMissionTaskActions') &&
+      html.includes('data-mc-goal-action') &&
+      html.includes('review-initiative') &&
       html.includes('renderInitiativesPanels') &&
       html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&

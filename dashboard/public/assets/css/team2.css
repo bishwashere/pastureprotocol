@@ -936,6 +936,33 @@ button.mc-mission-task-card {
   background: rgba(167, 139, 250, 0.08);
   border-radius: 6px;
 }
+.team-goal-task-actions,
+.team-goal-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+.team-goal-subgoal-node > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.team-goal-task-btn {
+  font-size: 0.62rem !important;
+  padding: 0.15rem 0.4rem !important;
+  margin: 0 !important;
+}
+.mc-mission-select-card.selected {
+  outline: 1px solid rgba(167, 139, 250, 0.55);
+  background: rgba(167, 139, 250, 0.06);
+}
+.mc-mission-card-btn {
+  font-size: 0.62rem !important;
+  padding: 0.2rem 0.45rem !important;
+  margin: 0 !important;
+}
 .mc-task-card-actions {
   display: flex;
   flex-wrap: wrap;
