@@ -165,10 +165,16 @@ const checks = [
     ok: fullHtml.includes('id="mc2-task-drawer"') &&
       missionControlJs.includes('function mc2BuildTaskDetailHtml') &&
       missionControlJs.includes('function mc2OpenTaskDrawer') &&
+      missionControlJs.includes('Source Chain') &&
       missionControlJs.includes('Assigned To') &&
-      missionControlJs.includes('Created By') &&
       missionControlJs.includes('Skills Used') &&
       chat.includes('function enrichMissionTaskItem') &&
+      chat.includes('function buildMissionTaskSourceChain') &&
+      chat.includes('function buildMissionTaskInactionImpact') &&
+      chat.includes('Auto archive in') &&
+      missionControlJs.includes('If you do nothing') &&
+      missionControlJs.includes('mc-task-inaction') &&
+      chat.includes('Initiative Auto Promotion') &&
       chat.includes('function buildStructuredMissionTaskTimeline'),
   },
   {

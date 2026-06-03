@@ -923,6 +923,8 @@
               assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
               delegatedFrom: String(sg.delegatedFrom || '').trim(),
               delegatedAt: Number(sg.delegatedAt) || 0,
+              source: String(sg.source || '').trim(),
+              dueAt: Number(sg.dueAt) || 0,
               progress: normalizeSubgoalProgress(sg.progress),
               description: String(sg.description || '').trim(),
               updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
@@ -3721,6 +3723,318 @@
       });
     }
 
+    function initiativeWasAutoPromoted(initiative) {
+      var lines = Array.isArray(initiative && initiative.activity) ? initiative.activity : [];
+      return lines.some(function (line) {
+        return String(line || '').indexOf('Auto-promoted to subgoal in ') >= 0;
+      });
+    }
+
+    function countGoalTicksBefore(goalId, beforeTs) {
+      var gid = String(goalId || '').trim();
+      if (!gid) return 0;
+      var cutoff = Number(beforeTs) || Date.now();
+      var ticks = (teamActivityEvents || []).filter(function (ev) {
+        return ev &&
+          String(ev.type || '') === 'goal_tick_start' &&
+          String(ev.goalId || '') === gid &&
+          Number(ev.ts) <= cutoff;
+      }).sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); });
+      return ticks.length;
+    }
+
+    function formatMissionSourceLabel(kind) {
+      var labels = {
+        initiative_auto_promotion: 'Initiative Auto Promotion',
+        initiative_promotion: 'Initiative Promotion',
+        goal_tick: 'Goal Tick',
+        curiosity_momentum: 'Curiosity Momentum',
+        agent_delegation: 'Agent Delegation',
+        user_request: 'User Request',
+        agent_turn: 'Agent Task',
+        mission_planning: 'Mission Planning',
+      };
+      return labels[kind] || labels.mission_planning;
+    }
+
+    function findTaskOriginEvents(item) {
+      var subgoalId = String(item && item.subgoalId || '');
+      var goalId = String(item && item.goalId || '');
+      var titleNeedle = String(item && item.title || '').trim().toLowerCase().slice(0, 40);
+      var out = { promoteEv: null, createEv: null, assignEv: null };
+      (teamActivityEvents || []).forEach(function (ev) {
+        if (!ev) return;
+        var type = String(ev.type || '');
+        var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
+        var evSubId = String(details.subgoalId || ev.subgoalId || '');
+        var evGoalId = String(details.goalId || ev.goalId || '');
+        var matchSub = subgoalId && evSubId === subgoalId;
+        var matchGoalTitle = !matchSub && goalId && evGoalId === goalId && titleNeedle &&
+          (String(ev.title || details.title || ev.message || '').toLowerCase().indexOf(titleNeedle.slice(0, 24)) >= 0);
+        if (!matchSub && !matchGoalTitle) return;
+        if (type === 'initiative_auto_promoted' && !out.promoteEv) out.promoteEv = ev;
+        if (type === 'goal_subgoal_created' && !out.createEv) out.createEv = ev;
+        if (type === 'delegation_task_assigned' && !out.assignEv) out.assignEv = ev;
+      });
+      return out;
+    }
+
+    function buildMissionTaskSourceChain(item) {
+      if (!item) return null;
+      var chain = {
+        createdBy: '',
+        agent: '',
+        agentId: '',
+        source: '',
+        sourceKind: 'mission_planning',
+        confidence: null,
+        initiativeTitle: '',
+        initiativeId: '',
+      };
+      var goalId = String(item.goalId || '');
+      var subgoalId = String(item.subgoalId || '');
+      var initiative = typeof findInitiativeForSubgoalId === 'function'
+        ? findInitiativeForSubgoalId(subgoalId)
+        : null;
+      var origin = findTaskOriginEvents(item);
+      var promoteEv = origin.promoteEv;
+      var createEv = origin.createEv;
+      var assignEv = origin.assignEv;
+
+      if (initiative || promoteEv || /^init-/.test(subgoalId)) {
+        var auto = (initiative && initiativeWasAutoPromoted(initiative)) || !!promoteEv;
+        chain.sourceKind = auto ? 'initiative_auto_promotion' : 'initiative_promotion';
+        chain.source = formatMissionSourceLabel(chain.sourceKind);
+        chain.initiativeId = initiative
+          ? String(initiative.id || '')
+          : initiativeIdFromSubgoalId(subgoalId);
+        chain.initiativeTitle = initiative ? String(initiative.title || '') : String(item.title || '');
+        var conf = initiative ? Number(initiative.confidence) : NaN;
+        if (!isFinite(conf) && promoteEv) {
+          var confMatch = String(promoteEv.message || '').match(/\((\d+)%\s*confidence\)/i);
+          if (confMatch) conf = Number(confMatch[1]) / 100;
+        }
+        if (isFinite(conf) && conf > 0) {
+          chain.confidence = Math.round(conf <= 1 ? conf * 100 : conf);
+        }
+        var originTs = (initiative && Number(initiative.createdAt)) ||
+          (promoteEv && Number(promoteEv.ts)) ||
+          Number(item.createdAt) || Date.now();
+        var tickGoalId = goalId ||
+          (initiative && Array.isArray(initiative.relatedGoalIds) && initiative.relatedGoalIds[0]) ||
+          String(promoteEv && promoteEv.goalId || '');
+        var tickNum = countGoalTicksBefore(tickGoalId, originTs);
+        chain.createdBy = tickNum ? ('Goal Tick #' + tickNum) : 'Initiative Scan';
+        chain.agentId = (initiative && String(initiative.createdBy || '')) ||
+          String(promoteEv && (promoteEv.agentId || promoteEv.ownerAgentId) || '') ||
+          String(item.assignee || item.agentId || '');
+        chain.agent = agentNameById(chain.agentId) || chain.agentId || '—';
+        return chain;
+      }
+
+      if (String(item.source || '') === 'delegation' || assignEv || item.delegatedFrom) {
+        chain.sourceKind = 'agent_delegation';
+        chain.source = formatMissionSourceLabel(chain.sourceKind);
+        chain.agentId = String(item.assignee || item.agentId || (assignEv && assignEv.targetAgentId) || '');
+        chain.agent = agentNameById(chain.agentId) || '—';
+        var delegator = String(item.delegatedFrom || (assignEv && assignEv.agentId) || '').trim();
+        chain.createdBy = delegator ? agentNameById(delegator) : 'Agent Delegation';
+        if (assignEv && goalId) {
+          var dTick = countGoalTicksBefore(goalId, assignEv.ts);
+          if (dTick) chain.createdBy = 'Goal Tick #' + dTick;
+        }
+        return chain;
+      }
+
+      if (createEv) {
+        var createMsg = String(createEv.message || '');
+        var isCuriosity = /curiosity subgoal/i.test(createMsg);
+        chain.sourceKind = isCuriosity ? 'curiosity_momentum' : 'goal_tick';
+        chain.source = formatMissionSourceLabel(chain.sourceKind);
+        var cGoalId = goalId || String(createEv.goalId || '');
+        var cTick = countGoalTicksBefore(cGoalId, createEv.ts);
+        chain.createdBy = cTick ? ('Goal Tick #' + cTick) : (isCuriosity ? 'Curiosity Cycle' : 'Goal Tick');
+        chain.agentId = String(createEv.agentId || createEv.ownerAgentId || item.assignee || item.agentId || '');
+        chain.agent = agentNameById(chain.agentId) || '—';
+        return chain;
+      }
+
+      if (item.kind === 'turn' || item.turnTs) {
+        chain.sourceKind = 'agent_turn';
+        chain.source = formatMissionSourceLabel(chain.sourceKind);
+        chain.createdBy = 'Agent Turn';
+        chain.agentId = String(item.assignee || item.agentId || '');
+        chain.agent = agentNameById(chain.agentId) || '—';
+        return chain;
+      }
+
+      var goal = goalId ? findGoalById(goalId) : null;
+      if (goal && String(goal.needsUserInput || '').trim()) {
+        chain.sourceKind = 'user_request';
+        chain.source = formatMissionSourceLabel(chain.sourceKind);
+        chain.createdBy = 'User';
+        chain.agentId = String(item.assignee || goal.ownerAgentId || '');
+        chain.agent = agentNameById(chain.agentId) || '—';
+        return chain;
+      }
+
+      chain.source = formatMissionSourceLabel('mission_planning');
+      var fallbackTick = countGoalTicksBefore(goalId, item.createdAt || Date.now());
+      chain.createdBy = fallbackTick ? ('Goal Tick #' + fallbackTick) : 'Mission Planning';
+      chain.agentId = String(item.assignee || (goal && goal.ownerAgentId) || item.agentId || '');
+      chain.agent = agentNameById(chain.agentId) || '—';
+      return chain;
+    }
+
+    var MISSION_TASK_INITIATIVE_ARCHIVE_DAYS = 3;
+    var MISSION_TASK_MANUAL_INIT_ARCHIVE_DAYS = 7;
+
+    function formatInactionDaysRemaining(deadlineTs) {
+      var ms = Number(deadlineTs) - Date.now();
+      if (!Number(deadlineTs)) return null;
+      if (ms <= 0) return 'Soon';
+      var days = Math.ceil(ms / 86400000);
+      if (days === 1) return '1 day';
+      return days + ' days';
+    }
+
+    function missionTaskImpactFromInitiative(initiative) {
+      if (!initiative) return 'Medium';
+      var initType = String(initiative.type || 'observation').toLowerCase();
+      if (initType === 'risk' || initType === 'gap' || initType === 'warning') return 'High';
+      var conf = Number(initiative.confidence);
+      if (!isFinite(conf)) return 'Medium';
+      var pct = conf <= 1 ? conf * 100 : conf;
+      if (pct >= 80) return 'High';
+      if (pct >= 55) return 'Medium';
+      return 'Low';
+    }
+
+    function buildMissionTaskInactionImpact(item) {
+      if (!item) return null;
+      var status = String(item.status || '').toLowerCase();
+      if (status === 'done') {
+        return {
+          required: false,
+          requiredLabel: 'No',
+          autoArchiveIn: null,
+          impact: 'None',
+          impactKind: 'none',
+          summary: 'Task is complete — no action needed.',
+          lines: [
+            { label: 'Required?', value: 'No' },
+            { label: 'Impact', value: 'None' },
+          ],
+        };
+      }
+
+      var goal = item.goalId ? findGoalById(item.goalId) : null;
+      var initiative = (item.fromInitiative || /^init-/.test(String(item.subgoalId || '')))
+        ? findInitiativeForSubgoalId(item.subgoalId)
+        : null;
+      var autoPromoted = initiative && initiativeWasAutoPromoted(initiative);
+
+      function pack(required, impact, summary, autoArchiveIn, extraLines) {
+        var lines = [
+          { label: 'Required?', value: required ? 'Yes' : 'No' },
+        ];
+        if (autoArchiveIn) lines.push({ label: 'Auto archive in', value: autoArchiveIn });
+        lines.push({ label: 'Impact', value: impact });
+        if (summary) lines.push({ label: 'Consequence', value: summary });
+        if (extraLines && extraLines.length) lines = lines.concat(extraLines);
+        return {
+          required: required,
+          requiredLabel: required ? 'Yes' : 'No',
+          autoArchiveIn: autoArchiveIn,
+          impact: impact,
+          impactKind: String(impact || 'low').toLowerCase(),
+          summary: summary,
+          lines: lines,
+        };
+      }
+
+      if (item.kind === 'agent' || status === 'blocked') {
+        var blockedMsg = status === 'blocked'
+          ? 'Mission progress blocked until you respond to this task.'
+          : 'Agent remains blocked until the underlying issue is resolved.';
+        if (goal && String(goal.needsUserInput || '').trim()) {
+          blockedMsg = 'Mission progress blocked until reviewed.';
+        }
+        return pack(true, 'High', blockedMsg, null);
+      }
+
+      if (goal) {
+        var needsInput = String(goal.needsUserInput || '').trim();
+        var partialWait = typeof isGoalPartialWait === 'function' && isGoalPartialWait(goal);
+        if (needsInput) {
+          return pack(true, 'High', 'Mission progress blocked until you respond.', null);
+        }
+        if (partialWait) {
+          return pack(true, 'High', 'Implementation blocked — mission continues research only until resolved.', null);
+        }
+        if (String(goal.status || '').toLowerCase() === 'blocked') {
+          return pack(true, 'High', 'Mission progress blocked until reviewed.', null);
+        }
+      }
+
+      if (autoPromoted && initiative) {
+        var promotedTs = Number(initiative.updatedAt || initiative.createdAt || item.createdAt) || Date.now();
+        var archiveDeadline = promotedTs + (MISSION_TASK_INITIATIVE_ARCHIVE_DAYS * 86400000);
+        var impact = missionTaskImpactFromInitiative(initiative);
+        var archiveIn = formatInactionDaysRemaining(archiveDeadline);
+        var advisory = 'Agents keep working on other tasks. Unreviewed auto-promoted tasks archive and leave the mission after ' +
+          MISSION_TASK_INITIATIVE_ARCHIVE_DAYS + ' days.';
+        return pack(false, impact, advisory, archiveIn);
+      }
+
+      if (initiative && typeof initiativeIsOnMission === 'function' && initiativeIsOnMission(initiative)) {
+        var manualTs = Number(initiative.updatedAt || item.createdAt) || Date.now();
+        var manualArchive = formatInactionDaysRemaining(manualTs + (MISSION_TASK_MANUAL_INIT_ARCHIVE_DAYS * 86400000));
+        return pack(
+          false,
+          missionTaskImpactFromInitiative(initiative),
+          'Task stays on the mission board. Review or undo promotion when convenient.',
+          manualArchive
+        );
+      }
+
+      var dueAt = Number(item.dueAt) || 0;
+      if (dueAt > 0 && dueAt < Date.now()) {
+        return pack(
+          true,
+          'High',
+          'Delegated task is overdue — downstream work may be waiting on this.',
+          null
+        );
+      }
+      if (dueAt > 0) {
+        var dueIn = formatInactionDaysRemaining(dueAt);
+        return pack(
+          false,
+          'Medium',
+          'Task stays active until completed or reassigned.',
+          null,
+          dueIn ? [{ label: 'Due in', value: dueIn }] : []
+        );
+      }
+
+      if (String(item.source || '') === 'delegation') {
+        return pack(
+          false,
+          'Medium',
+          'Assignee continues work. Re-delegate or mark done if this stalls.',
+          null
+        );
+      }
+
+      return pack(
+        false,
+        'Low',
+        'Agents continue other mission work. This task stays open on the board.',
+        null
+      );
+    }
+
     function enrichMissionTaskItem(item) {
       if (!item) return null;
       var out = Object.assign({}, item);
@@ -3793,6 +4107,11 @@
         out.missionTitle = String(goal.title || goal.objective || '').trim();
       }
       if (!out.assignee && out.agentId) out.assignee = out.agentId;
+      out.sourceChain = buildMissionTaskSourceChain(out);
+      if (out.sourceChain && out.sourceChain.createdBy) {
+        out.createdByLabel = out.sourceChain.createdBy;
+      }
+      out.inactionImpact = buildMissionTaskInactionImpact(out);
       return out;
     }
 
@@ -4176,6 +4495,8 @@
     window.enrichMissionTaskItem = enrichMissionTaskItem;
     window.buildMissionTaskFromTurn = buildMissionTaskFromTurn;
     window.buildMissionTaskTimeline = buildMissionTaskTimeline;
+    window.buildMissionTaskSourceChain = buildMissionTaskSourceChain;
+    window.buildMissionTaskInactionImpact = buildMissionTaskInactionImpact;
     window.buildStructuredMissionTaskTimeline = buildStructuredMissionTaskTimeline;
     window.formatMissionTaskTimelineLine = formatMissionTaskTimelineLine;
     window.formatStructuredMissionTaskTimelineLine = formatStructuredMissionTaskTimelineLine;

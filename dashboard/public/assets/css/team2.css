@@ -1059,6 +1059,55 @@ button.mc-mission-task-card {
   line-height: 1.45;
   color: #cbd5e1;
 }
+.mc-task-source-chain {
+  margin: 0.55rem 0 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  background: linear-gradient(135deg, rgba(76, 29, 149, 0.16), rgba(15, 23, 42, 0.35));
+}
+.mc-task-source-chain .mc-section-title {
+  margin-top: 0 !important;
+  color: #ddd6fe;
+}
+.mc-task-source-chain-fields dd {
+  color: #f4f4f5;
+  font-weight: 500;
+}
+.mc-task-inaction {
+  margin: 0.55rem 0 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: linear-gradient(135deg, rgba(69, 26, 3, 0.22), rgba(15, 23, 42, 0.35));
+}
+.mc-task-inaction-high {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.28), rgba(15, 23, 42, 0.35));
+}
+.mc-task-inaction-none {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.28);
+}
+.mc-task-inaction .mc-section-title {
+  margin-top: 0 !important;
+  color: #fde68a;
+}
+.mc-task-inaction-high .mc-section-title {
+  color: #fecaca;
+}
+.mc-task-inaction-fields dd {
+  color: #f4f4f5;
+  font-weight: 500;
+}
+.mc-task-inaction-required-yes {
+  color: #fca5a5 !important;
+  font-weight: 700 !important;
+}
+.mc-task-inaction-impact-high {
+  color: #fdba74 !important;
+  font-weight: 700 !important;
+}
 .mc-task-detail-links {
   display: flex;
   flex-wrap: wrap;

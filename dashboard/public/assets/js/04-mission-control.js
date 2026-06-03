@@ -74,6 +74,46 @@
       return new Date(n).toLocaleString();
     }
 
+    function mc2RenderMissionTaskInactionHtml(inactionImpact) {
+      if (!inactionImpact || !inactionImpact.lines || !inactionImpact.lines.length) return '';
+      var kind = String(inactionImpact.impactKind || 'low');
+      return '<section class="mc-task-inaction mc-task-inaction-' + escapeHtml(kind) + '">' +
+        '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">If you do nothing</p>' +
+        '<dl class="mc-task-detail-fields mc-task-inaction-fields">' +
+          inactionImpact.lines.map(function (row) {
+            var valueClass = '';
+            if (row.label === 'Required?' && row.value === 'Yes') valueClass = ' mc-task-inaction-required-yes';
+            if (row.label === 'Impact' && String(row.value).toLowerCase() === 'high') valueClass = ' mc-task-inaction-impact-high';
+            return '<dt>' + escapeHtml(row.label) + '</dt><dd class="' + valueClass + '">' + escapeHtml(row.value) + '</dd>';
+          }).join('') +
+        '</dl>' +
+      '</section>';
+    }
+
+    function mc2RenderMissionTaskSourceChainHtml(sourceChain) {
+      if (!sourceChain || !sourceChain.source) return '';
+      var rows = [
+        sourceChain.createdBy ? { label: 'Created by', value: sourceChain.createdBy } : null,
+        sourceChain.agent ? { label: 'Agent', value: sourceChain.agent } : null,
+        { label: 'Source', value: sourceChain.source },
+        sourceChain.confidence != null && sourceChain.confidence > 0
+          ? { label: 'Confidence', value: String(sourceChain.confidence) + '%' }
+          : null,
+        sourceChain.initiativeTitle
+          ? { label: 'Initiative', value: sourceChain.initiativeTitle }
+          : null,
+      ].filter(Boolean);
+      if (!rows.length) return '';
+      return '<section class="mc-task-source-chain">' +
+        '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Source Chain</p>' +
+        '<dl class="mc-task-detail-fields mc-task-source-chain-fields">' +
+          rows.map(function (row) {
+            return '<dt>' + escapeHtml(row.label) + '</dt><dd>' + escapeHtml(row.value) + '</dd>';
+          }).join('') +
+        '</dl>' +
+      '</section>';
+    }
+
     function mc2BuildTaskDetailHtml(item) {
       if (!item) {
         return '<p class="team-agent-inbox-empty" style="margin:0;">Select a task to see its timeline and actions.</p>';
@@ -84,7 +124,8 @@
       if (status === 'done') statusLabel = 'Completed';
       var mission = String(item.missionTitle || '').trim();
       var assignee = String(item.assignee || item.agentId || '').trim();
-      var createdBy = String(item.createdByLabel || 'User').trim();
+      var sourceChain = item.sourceChain || null;
+      var inactionImpact = item.inactionImpact || null;
       var reason = String(item.reason || '').trim();
       var skills = Array.isArray(item.skillsUsed) ? item.skillsUsed : [];
       var skillsLabel = skills.length ? skills.join(', ') : '—';
@@ -111,7 +152,6 @@
         { label: 'Status', value: statusLabel },
         mission ? { label: 'Mission', value: mission } : null,
         assignee ? { label: 'Assigned To', value: agentNameById(assignee) } : null,
-        { label: 'Created By', value: createdBy },
         item.createdAt ? { label: 'Created', value: mc2FormatTaskTimestamp(item.createdAt) } : null,
         item.completedAt && status === 'done' ? { label: 'Completed', value: mc2FormatTaskTimestamp(item.completedAt) } : null,
         { label: 'Skills Used', value: skillsLabel },
@@ -119,12 +159,16 @@
       var fieldsHtml = '<dl class="mc-task-detail-fields">' + fields.map(function (row) {
         return '<dt>' + escapeHtml(row.label) + '</dt><dd>' + escapeHtml(row.value) + '</dd>';
       }).join('') + '</dl>';
+      var sourceChainHtml = mc2RenderMissionTaskSourceChainHtml(sourceChain);
+      var inactionHtml = mc2RenderMissionTaskInactionHtml(inactionImpact);
       return '' +
         '<div class="mc-task-detail-head">' +
           '<h3 class="mc-task-detail-title" id="mc2-task-drawer-title">' + escapeHtml(title) + '</h3>' +
           '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(statusLabel) + '</span>' +
         '</div>' +
         fieldsHtml +
+        sourceChainHtml +
+        inactionHtml +
         (reason
           ? '<div class="mc-task-detail-reason"><strong>Reason:</strong> ' + escapeHtml(reason) + '</div>'
           : '') +
