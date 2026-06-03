@@ -68,7 +68,9 @@ const checks = [
   {
     name: 'dashboardBoot runs soon after fetchStatus in core bundle (home data load regression)',
     ok: /async function fetchStatus\(\)[\s\S]*function dashboardBoot\(\)[\s\S]*dashboardBoot\(\)/.test(core) &&
-      core.indexOf('dashboardBoot()') < core.length * 0.95,
+      core.includes('dashboardBoot()') &&
+      !chat.includes('dashboardBoot()') &&
+      !bind.includes('dashboardBoot()'),
   },
   {
     name: 'index.html loads core router before chat and mission-control bundles',
@@ -111,14 +113,22 @@ const checks = [
       fullHtml.includes('id="home-identity-tiles"'),
   },
   {
-    name: 'chat bundle guards mission-control forward refs before script 04 loads',
-    ok: fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8').includes("typeof renderMissionControl === 'function'") &&
-      fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8').includes("typeof mc2SyncTimelineHighlightForScroll === 'function'"),
+    name: 'chat bundle guards mission-control forward refs before script 04 loads (click handler regression)',
+    ok: chat.includes("typeof renderMissionControl === 'function'") &&
+      chat.includes("typeof mc2SyncTimelineHighlightForScroll === 'function'") &&
+      !/function setTeamAgentPanelRange[\s\S]{0,600}renderMissionControl\(\);/.test(chat),
   },
   {
-    name: 'home chat toolbar buttons are wired in chat bundle',
-    ok: fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8').includes("wireEl('chat-send', 'click'") &&
-      fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8').includes("wireClick('chat-agent-create-btn'"),
+    name: 'home chat toolbar buttons wired in bind-init after all bundles load',
+    ok: bind.includes("wireEl('chat-send', 'click'") &&
+      bind.includes("wireClick('chat-agent-create-btn'") &&
+      bind.includes("wireClick('chat-new-btn'") &&
+      bind.includes("wireClick('agent-team-create-btn'"),
+  },
+  {
+    name: 'bind-init re-syncs team panel after mission-control bundle is available',
+    ok: bind.includes('typeof renderMissionControl === \'function\'') &&
+      bind.includes('setTeamAgentPanelRange(typeof teamAgentPanelRange'),
   },
 ];
 
