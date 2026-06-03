@@ -92,10 +92,16 @@ function Refresh-NodeToolPath {
 
 function Get-CowcodeToolPath {
     param([Parameter(Mandatory = $true)][string]$Name)
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd) {
+        $nodeDir = Split-Path $nodeCmd.Source -Parent
+        $adjacent = Join-Path $nodeDir "$Name.cmd"
+        if (Test-Path -LiteralPath $adjacent) { return $adjacent }
+    }
     $candidates = @(
+        (Join-Path $env:APPDATA "npm\$Name.cmd"),
         (Join-Path $env:ProgramFiles "nodejs\$Name.cmd"),
-        (Join-Path ${env:ProgramFiles(x86)} "nodejs\$Name.cmd"),
-        (Join-Path $env:APPDATA "npm\$Name.cmd")
+        (Join-Path ${env:ProgramFiles(x86)} "nodejs\$Name.cmd")
     )
     foreach ($c in $candidates) {
         if (Test-Path -LiteralPath $c) { return $c }
