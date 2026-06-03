@@ -161,6 +161,17 @@ const checks = [
       missionControlJs.includes("action: 'initiative-review'"),
   },
   {
+    name: 'task detail drawer renders structured mission task fields',
+    ok: fullHtml.includes('id="mc2-task-drawer"') &&
+      missionControlJs.includes('function mc2BuildTaskDetailHtml') &&
+      missionControlJs.includes('function mc2OpenTaskDrawer') &&
+      missionControlJs.includes('Assigned To') &&
+      missionControlJs.includes('Created By') &&
+      missionControlJs.includes('Skills Used') &&
+      chat.includes('function enrichMissionTaskItem') &&
+      chat.includes('function buildStructuredMissionTaskTimeline'),
+  },
+  {
     name: 'Tasks is default mission control view and navigation hub',
     ok: missionControlJs.includes("var mc2ActiveView = 'tasks'") &&
       fullHtml.includes('id="mc2-view-tasks" class="mc-view"') &&

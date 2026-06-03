@@ -922,6 +922,7 @@
               path: parts.join(' → '),
               assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
               delegatedFrom: String(sg.delegatedFrom || '').trim(),
+              delegatedAt: Number(sg.delegatedAt) || 0,
               progress: normalizeSubgoalProgress(sg.progress),
               description: String(sg.description || '').trim(),
               updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
@@ -3603,6 +3604,249 @@
       }
     }
 
+    function findGoalById(goalId) {
+      var gid = String(goalId || '').trim();
+      if (!gid) return null;
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      for (var i = 0; i < goals.length; i++) {
+        if (String(goals[i].id || '') === gid) return goals[i];
+      }
+      return null;
+    }
+
+    function findMissionTaskItemByTitle(title) {
+      var needle = String(title || '').trim().toLowerCase();
+      if (!needle) return null;
+      var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var i;
+      for (i = 0; i < items.length; i++) {
+        if (String(items[i].title || '').trim().toLowerCase() === needle) return items[i];
+      }
+      for (i = 0; i < items.length; i++) {
+        var t = String(items[i].title || '').toLowerCase();
+        if (t && (t.indexOf(needle.slice(0, 48)) >= 0 || needle.indexOf(t.slice(0, 48)) >= 0)) return items[i];
+      }
+      return null;
+    }
+
+    function extractSkillsFromTurnEvents(agentId, turnDoneTs) {
+      var aid = String(agentId || '').trim();
+      var doneTs = Number(turnDoneTs) || 0;
+      if (!aid || !doneTs) return [];
+      var events = teamActivityEvents || [];
+      var startTs = 0;
+      var skills = [];
+      var seen = {};
+      for (var i = events.length - 1; i >= 0; i--) {
+        var ev = events[i];
+        if (!ev || String(ev.agentId || '') !== aid) continue;
+        if (String(ev.type || '') === 'turn_done' && Number(ev.ts) === doneTs) {
+          for (var j = i - 1; j >= 0; j--) {
+            var prev = events[j];
+            if (String(prev.agentId || '') !== aid) continue;
+            if (String(prev.type || '') === 'turn_start') {
+              startTs = Number(prev.ts) || 0;
+              break;
+            }
+            if (String(prev.type || '') === 'turn_done') break;
+          }
+          break;
+        }
+      }
+      events.forEach(function (ev) {
+        if (!ev || String(ev.agentId || '') !== aid) return;
+        var ts = Number(ev.ts) || 0;
+        if (startTs && ts < startTs) return;
+        if (doneTs && ts > doneTs + 5000) return;
+        var type = String(ev.type || '');
+        if (type !== 'skill_start' && type !== 'skill_done') return;
+        var skillId = String(ev.skillId || '').trim();
+        if (!skillId || seen[skillId]) return;
+        seen[skillId] = true;
+        skills.push(skillId);
+      });
+      return skills;
+    }
+
+    function missionTaskDisplayTitle(task) {
+      var prompt = String(task && task.prompt || '').trim();
+      if (prompt && !/^Handled in \d+/i.test(prompt) && !/^Completed turn/i.test(prompt)) {
+        return prompt.slice(0, 160);
+      }
+      var summary = String(task && task.summary || '').trim();
+      if (summary && !/^Handled in \d+/i.test(summary)) return summary.slice(0, 160);
+      return 'Completed task';
+    }
+
+    function buildMissionTaskFromTurn(opts) {
+      opts = opts || {};
+      var agentId = String(opts.agentId || '').trim();
+      var ts = Number(opts.ts) || 0;
+      if (!agentId || !ts) return null;
+      var task = null;
+      if (typeof listCompletedTasks === 'function') {
+        ['today', 'yesterday', 'last7', 'last30'].some(function (range) {
+          var list = listCompletedTasks({ range: range, agentId: agentId });
+          for (var i = 0; i < list.length; i++) {
+            if (Number(list[i].ts) === ts) {
+              task = list[i];
+              return true;
+            }
+          }
+          return false;
+        });
+      }
+      if (!task) return null;
+      var title = missionTaskDisplayTitle(task);
+      var matched = findMissionTaskItemByTitle(title);
+      if (matched) {
+        return enrichMissionTaskItem(Object.assign({}, matched, {
+          prompt: task.prompt,
+          summary: task.summary,
+          turnTs: ts,
+        }));
+      }
+      return enrichMissionTaskItem({
+        kind: 'turn',
+        title: title,
+        status: 'done',
+        assignee: agentId,
+        agentId: agentId,
+        completedAt: ts,
+        createdAt: ts,
+        prompt: task.prompt,
+        summary: task.summary,
+        reason: String(task.prompt || task.summary || '').trim(),
+        skillsUsed: extractSkillsFromTurnEvents(agentId, ts),
+      });
+    }
+
+    function enrichMissionTaskItem(item) {
+      if (!item) return null;
+      var out = Object.assign({}, item);
+      var goal = out.goalId ? findGoalById(out.goalId) : null;
+      var events = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(out, 40) : [];
+      var createdEv = null;
+      var assignedEv = null;
+      var delegatedEv = null;
+      var completedEv = null;
+      events.forEach(function (ev) {
+        var type = String(ev && ev.type || '');
+        if (type === 'goal_subgoal_created' && !createdEv) createdEv = ev;
+        if (type === 'delegation_task_assigned' && !assignedEv) assignedEv = ev;
+        if (type === 'delegation_start' && !delegatedEv) delegatedEv = ev;
+        if (type === 'turn_done' && !completedEv) completedEv = ev;
+      });
+
+      if (!out.createdAt) {
+        if (createdEv) out.createdAt = Number(createdEv.ts) || 0;
+        else if (out.delegatedAt) out.createdAt = Number(out.delegatedAt) || 0;
+        else if (goal && goal.createdAt) out.createdAt = Number(goal.createdAt) || 0;
+        else if (out.turnTs) out.createdAt = Number(out.turnTs) || 0;
+      }
+      if (!out.completedAt && String(out.status || '').toLowerCase() === 'done') {
+        out.completedAt = Number(out.updatedAt) || 0;
+        if (completedEv) out.completedAt = Number(completedEv.ts) || out.completedAt;
+        else if (out.turnTs) out.completedAt = Number(out.turnTs) || 0;
+      }
+      if (!out.createdByLabel) {
+        if (out.delegatedFrom) {
+          out.createdByLabel = agentNameById(out.delegatedFrom) || out.delegatedFrom;
+        } else if (createdEv && String(createdEv.agentId || '').trim()) {
+          out.createdByLabel = agentNameById(createdEv.agentId);
+        } else if (out.fromInitiative) {
+          out.createdByLabel = createdEv && createdEv.agentId ? agentNameById(createdEv.agentId) : 'Agent';
+        } else if (goal && String(goal.needsUserInput || '').trim()) {
+          out.createdByLabel = 'User';
+        } else {
+          out.createdByLabel = 'User';
+        }
+      }
+      if (!out.reason) {
+        out.reason = String(out.description || '').trim();
+        if (!out.reason && goal) {
+          out.reason = String(goal.needsUserInput || goal.objective || '').trim();
+        }
+        if (!out.reason && out.prompt) out.reason = String(out.prompt).trim();
+        if (!out.reason && out.summary) out.reason = String(out.summary).trim();
+      }
+      if (!out.skillsUsed || !out.skillsUsed.length) {
+        var skills = [];
+        var seenSkills = {};
+        events.forEach(function (ev) {
+          var type = String(ev && ev.type || '');
+          if (type !== 'skill_start' && type !== 'skill_done') return;
+          var skillId = String(ev.skillId || '').trim();
+          if (!skillId || seenSkills[skillId]) return;
+          seenSkills[skillId] = true;
+          skills.push(skillId);
+        });
+        if (!skills.length && out.turnTs && out.assignee) {
+          skills = extractSkillsFromTurnEvents(out.assignee || out.agentId, out.turnTs || out.completedAt);
+        }
+        if (!skills.length && goal && String(goal.source || '').indexOf('workflow') >= 0) {
+          skills.push('project-workflow');
+        }
+        out.skillsUsed = skills;
+      }
+      if (!out.missionTitle && goal) {
+        out.missionTitle = String(goal.title || goal.objective || '').trim();
+      }
+      if (!out.assignee && out.agentId) out.assignee = out.agentId;
+      return out;
+    }
+
+    function buildStructuredMissionTaskTimeline(item, limit) {
+      limit = Math.max(6, Number(limit) || 20);
+      if (!item) return [];
+      var raw = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(item, limit * 2) : [];
+      var structured = [];
+      var seen = {};
+      function push(ts, label) {
+        var t = Number(ts) || 0;
+        var key = String(t) + '|' + String(label || '');
+        if (!label || seen[key]) return;
+        seen[key] = true;
+        structured.push({ ts: t, label: label });
+      }
+
+      raw.forEach(function (ev) {
+        var type = String(ev && ev.type || '');
+        var ts = Number(ev.ts) || 0;
+        if (type === 'goal_subgoal_created') push(ts, 'Created');
+        else if (type === 'delegation_task_assigned') push(ts, 'Assigned');
+        else if (type === 'delegation_start') push(ts, 'Delegated');
+        else if (type === 'turn_start') push(ts, 'Started');
+        else if (type === 'turn_done') push(ts, 'Completed');
+        else if (type === 'initiative_auto_promoted') push(ts, 'Added to mission');
+        else if (type === 'skill_start' || type === 'skill_done') {
+          var skill = String(ev.skillId || 'work').replace(/[-_]/g, ' ');
+          push(ts, (type === 'skill_done' ? 'Finished ' : 'Started ') + skill);
+        } else if (typeof formatMissionTaskTimelineLine === 'function') {
+          var line = formatMissionTaskTimelineLine(ev);
+          var text = stripActivityHtml(line).replace(/^\d{1,2}:\d{2}\s*/, '').trim();
+          if (text) push(ts, text);
+        }
+      });
+
+      if (!structured.length) {
+        if (item.createdAt) push(item.createdAt, 'Created');
+        if (item.delegatedFrom && item.delegatedAt) push(item.delegatedAt, 'Assigned');
+        if (item.completedAt && String(item.status || '') === 'done') push(item.completedAt, 'Completed');
+      }
+
+      structured.sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); });
+      return structured.slice(-limit);
+    }
+
+    function formatStructuredMissionTaskTimelineLine(entry) {
+      if (!entry) return '';
+      var ts = Number(entry.ts) || Date.now();
+      var time = new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return '<li class="mc-task-timeline-item"><span class="mc-task-timeline-time">' + escapeHtml(time) + '</span>' +
+        '<span class="mc-task-timeline-text">' + escapeHtml(String(entry.label || '')) + '</span></li>';
+    }
+
     function findMissionTaskItem(opts) {
       opts = opts || {};
       var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
@@ -3630,6 +3874,10 @@
           }
         }
         if (agentItems.length) return agentItems[0];
+      }
+      if (title && !subgoalId && !goalId) {
+        var byTitleOnly = findMissionTaskItemByTitle(title);
+        if (byTitleOnly) return byTitleOnly;
       }
       if (title && goalId) {
         for (i = 0; i < items.length; i++) {
@@ -3923,9 +4171,15 @@
     window.openMissionWorkInputModal = openMissionWorkInputModal;
     window.patchMissionSubgoalStatus = patchMissionSubgoalStatus;
     window.findMissionTaskItem = findMissionTaskItem;
+    window.findMissionTaskItemByTitle = findMissionTaskItemByTitle;
     window.findMissionTaskForAgent = findMissionTaskForAgent;
+    window.enrichMissionTaskItem = enrichMissionTaskItem;
+    window.buildMissionTaskFromTurn = buildMissionTaskFromTurn;
     window.buildMissionTaskTimeline = buildMissionTaskTimeline;
+    window.buildStructuredMissionTaskTimeline = buildStructuredMissionTaskTimeline;
     window.formatMissionTaskTimelineLine = formatMissionTaskTimelineLine;
+    window.formatStructuredMissionTaskTimelineLine = formatStructuredMissionTaskTimelineLine;
+    window.missionTaskDisplayTitle = missionTaskDisplayTitle;
     window.wireMissionTaskActions = wireMissionTaskActions;
     window.missionTaskActionButtonsHtml = missionTaskActionButtonsHtml;
     window.runMissionGoalAction = runMissionGoalAction;
