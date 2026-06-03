@@ -6,7 +6,6 @@ set -e
 
 BRANCH="${PASTURE_BRANCH:-master}"
 TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
-EXTRACTED="cowCode-${BRANCH}"
 
 # Run from project root (where package.json and index.js exist)
 ROOT="${PASTURE_ROOT:-$PWD}"
@@ -135,7 +134,8 @@ fi
 echo "  ► Downloading latest..."
 curl -fsSL "$TARBALL" -o "$WORK/archive.tar.gz"
 tar xzf "$WORK/archive.tar.gz" -C "$WORK"
-SRC="$WORK/$EXTRACTED"
+SRC=$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -1)
+[ -n "$SRC" ] || { echo "  ✖ Archive extract failed (empty tarball root)."; exit 1; }
 
 echo "  ► Updating files..."
 # Copy all from release over current (excluding node_modules)

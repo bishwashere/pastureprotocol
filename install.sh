@@ -8,7 +8,6 @@ POST_INSTALL_CMD=
 
 BRANCH="${PASTURE_BRANCH:-master}"
 TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
-EXTRACTED="cowCode-${BRANCH}"
 
 INSTALL_DIR="${PASTURE_INSTALL_DIR:-$HOME/.local/share/pastureprotocol}"
 BIN_DIR="$HOME/.local/bin"
@@ -35,6 +34,8 @@ trap 'rm -rf "$WORK"' EXIT
 echo "  ► Downloading..."
 curl -fsSL "$TARBALL" -o "$WORK/archive.tar.gz"
 tar xzf "$WORK/archive.tar.gz" -C "$WORK"
+EXTRACTED=$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -1)
+[ -n "$EXTRACTED" ] || { echo "  ✖ Archive extract failed."; exit 1; }
 echo "  ✓ Done."
 echo ""
 
@@ -43,8 +44,8 @@ echo ""
 echo "  ► Installing to $INSTALL_DIR ..."
 mkdir -p "$INSTALL_DIR"
 
-rsync -a --exclude=node_modules "$WORK/$EXTRACTED/" "$INSTALL_DIR/" 2>/dev/null \
-  || cp -R "$WORK/$EXTRACTED/"* "$INSTALL_DIR/"
+rsync -a --exclude=node_modules "$EXTRACTED/" "$INSTALL_DIR/" 2>/dev/null \
+  || cp -R "$EXTRACTED/"* "$INSTALL_DIR/"
 
 cd "$INSTALL_DIR"
 
