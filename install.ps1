@@ -77,9 +77,37 @@ function Refresh-NpmGlobalPath {
     }
 }
 
+function Refresh-NodeToolPath {
+    $dirs = @(
+        (Join-Path $env:ProgramFiles "nodejs"),
+        (Join-Path ${env:ProgramFiles(x86)} "nodejs"),
+        (Join-Path $env:APPDATA "npm")
+    )
+    foreach ($d in $dirs) {
+        if ((Test-Path $d) -and ($env:Path -notlike "*$d*")) {
+            $env:Path = "$d;$env:Path"
+        }
+    }
+}
+
+function Get-CowcodeToolPath {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    $candidates = @(
+        (Join-Path $env:ProgramFiles "nodejs\$Name.cmd"),
+        (Join-Path ${env:ProgramFiles(x86)} "nodejs\$Name.cmd"),
+        (Join-Path $env:APPDATA "npm\$Name.cmd")
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) { return $c }
+    }
+    $cmd = Get-Command "$Name.cmd" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
+
 function Test-CowcodePm2 {
-    Refresh-NpmGlobalPath
-    return [bool](Get-Command pm2 -ErrorAction SilentlyContinue)
+    Refresh-NodeToolPath
+    return [bool](Get-CowcodeToolPath "pm2")
 }
 
 function Ensure-CowcodePm2 {
@@ -107,8 +135,13 @@ function Ensure-CowcodePm2 {
         return $false
     }
     Write-Host "  > Installing pm2 globally..."
-    Invoke-Native "npm install -g pm2" { npm install -g pm2 }
-    Refresh-NpmGlobalPath
+    $npmCmd = Get-CowcodeToolPath "npm"
+    if (-not $npmCmd) {
+        Write-Host "  [X] npm.cmd not found."
+        return $false
+    }
+    Invoke-Native "npm install -g pm2" { & $npmCmd install -g pm2 }
+    Refresh-NodeToolPath
     if (-not (Test-CowcodePm2)) {
         Write-Host "  [X] pm2 still not found. Close PowerShell, open a new window, and run:"
         Write-Host "      npm install -g pm2"
@@ -120,9 +153,11 @@ function Ensure-CowcodePm2 {
 
 function Enable-CowcodePm2AutoRestart {
     if (-not (Test-CowcodePm2)) { return $false }
+    $pm2Cmd = Get-CowcodeToolPath "pm2"
+    if (-not $pm2Cmd) { return $false }
 
     Write-Host "  > Saving pm2 process list..."
-    & pm2 save 2>$null
+    & $pm2Cmd save 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  [WARN] pm2 save failed."
         return $false
@@ -143,7 +178,7 @@ function Enable-CowcodePm2AutoRestart {
     }
 
     Write-Host "  > Configuring pm2 auto-start..."
-    $startupLines = @(& pm2 startup 2>&1)
+    $startupLines = @(& $pm2Cmd startup 2>&1)
     foreach ($line in $startupLines) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         Write-Host "  $line"
@@ -152,7 +187,7 @@ function Enable-CowcodePm2AutoRestart {
     if ($adminCmd) {
         Write-Host "  If pm2 printed an admin command above, run it in an elevated PowerShell, then: pm2 save"
     }
-    & pm2 save 2>$null
+    & $pm2Cmd save 2>$null
     Write-Host "  [OK] Auto-start configured (pm2 save)."
     return $true
 }
@@ -317,13 +352,16 @@ Write-Host "  ------------------------------------------------"
 Write-Host ""
 
 # --- sanity checks (before download; PowerShell-only until npm install) ---
+Refresh-NodeToolPath
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
     Offer-CowcodeNodeJs "Node.js was not found on PATH."
 }
 
-$hasPnpm = [bool](Get-Command pnpm -ErrorAction SilentlyContinue)
-$hasNpm = [bool](Get-Command npm -ErrorAction SilentlyContinue)
+$npmCmd = Get-CowcodeToolPath "npm"
+$pnpmCmd = Get-CowcodeToolPath "pnpm"
+$hasPnpm = [bool]$pnpmCmd
+$hasNpm = [bool]$npmCmd
 if (-not $hasPnpm -and -not $hasNpm) {
     $reason = "npm (or pnpm) was not found on PATH."
     if ($nodeCmd.Source -match "cursor|Cursor") {
@@ -438,10 +476,10 @@ node "$InstallDir\cli.js" %*
         if ($hasDotenv) {
             Write-Host "  [OK] Dependencies already installed."
         } elseif ($hasPnpm) {
-            Invoke-Native "pnpm install" { pnpm install }
+            Invoke-Native "pnpm install" { & $pnpmCmd install }
             Write-Host "  [OK] Dependencies installed."
         } else {
-            Invoke-Native "npm install" { npm install }
+            Invoke-Native "npm install" { & $npmCmd install }
             Write-Host "  [OK] Dependencies installed."
         }
         if (-not (Test-Path (Join-Path $InstallDir "node_modules\dotenv"))) {
@@ -478,7 +516,7 @@ node "$InstallDir\cli.js" %*
 
     $env:COWCODE_INSTALL_DIR = $InstallDir
     $env:Path = "$BinDir;$env:Path"
-    Refresh-NpmGlobalPath
+    Refresh-NodeToolPath
 
     if (-not (Ensure-CowcodePm2)) {
         Show-CowcodePostInstallHelp -Running $false
