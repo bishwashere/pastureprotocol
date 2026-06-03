@@ -82,6 +82,9 @@ function checkWindowsPs1(filename, opts) {
   if (opts.pm2Help && !src.includes('Enable-CowcodePm2AutoRestart')) {
     return { ok: false, detail: `${filename} must configure pm2 auto-start` };
   }
+  if (opts.npmCmd && !src.includes('Get-CowcodeToolPath')) {
+    return { ok: false, detail: `${filename} must use npm.cmd (execution policy safe)` };
+  }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }
 
@@ -92,12 +95,14 @@ function checkInstallPs1() {
     exitHelper: 'Exit-Install',
     offerNode: true,
     pm2Help: true,
+    npmCmd: true,
   });
 }
 
 function checkUpdatePs1() {
   return checkWindowsPs1('update.ps1', {
     exitHelper: 'Exit-Update',
+    npmCmd: true,
   });
 }
 

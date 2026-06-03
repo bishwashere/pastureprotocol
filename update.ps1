@@ -27,6 +27,34 @@ function Invoke-Native {
     }
 }
 
+function Refresh-NodeToolPath {
+    $dirs = @(
+        (Join-Path $env:ProgramFiles "nodejs"),
+        (Join-Path ${env:ProgramFiles(x86)} "nodejs"),
+        (Join-Path $env:APPDATA "npm")
+    )
+    foreach ($d in $dirs) {
+        if ((Test-Path $d) -and ($env:Path -notlike "*$d*")) {
+            $env:Path = "$d;$env:Path"
+        }
+    }
+}
+
+function Get-CowcodeToolPath {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    $candidates = @(
+        (Join-Path $env:ProgramFiles "nodejs\$Name.cmd"),
+        (Join-Path ${env:ProgramFiles(x86)} "nodejs\$Name.cmd"),
+        (Join-Path $env:APPDATA "npm\$Name.cmd")
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) { return $c }
+    }
+    $cmd = Get-Command "$Name.cmd" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
+
 function Test-CowcodeBranchName {
     param([Parameter(Mandatory = $true)][string]$Branch)
     if ([string]::IsNullOrWhiteSpace($Branch)) { return $false }
@@ -237,13 +265,20 @@ try {
     Write-Host "  > Installing dependencies..."
     Push-Location $Root
     try {
+        Refresh-NodeToolPath
+        $npmCmd = Get-CowcodeToolPath "npm"
+        $pnpmCmd = Get-CowcodeToolPath "pnpm"
+        if (-not $npmCmd -and -not $pnpmCmd) {
+            Write-Host "  [X] npm.cmd not found. Install Node.js from https://nodejs.org/"
+            Exit-Update 1
+        }
         if (Test-Path "node_modules") {
             Remove-Item -Path "node_modules" -Recurse -Force -ErrorAction SilentlyContinue
         }
-        if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-            Invoke-Native "pnpm install" { pnpm install --silent }
+        if ($pnpmCmd) {
+            Invoke-Native "pnpm install" { & $pnpmCmd install --silent }
         } else {
-            Invoke-Native "npm install" { npm install --silent }
+            Invoke-Native "npm install" { & $npmCmd install --silent }
         }
     } finally {
         Pop-Location
