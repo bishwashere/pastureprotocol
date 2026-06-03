@@ -11,12 +11,17 @@ param(
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 
+function Test-CowcodeInteractive {
+    if ($env:COWCODE_NONINTERACTIVE -eq "1") { return $false }
+    return ($Host.Name -eq "ConsoleHost")
+}
+
 function Exit-Install {
     param([int]$Code = 0)
     if ($Code -ne 0) {
         Write-Host ""
         Write-Host "  [X] Install failed (exit $Code). See messages above."
-        if ($Host.Name -eq "ConsoleHost") {
+        if (Test-CowcodeInteractive) {
             try { Read-Host "Press Enter to close" } catch { }
         }
     }
@@ -43,7 +48,7 @@ function Offer-CowcodeNodeJs {
     Write-Host "  This step runs in PowerShell only. Node.js is not needed to download"
     Write-Host "  cowCode, but it is required for npm install, setup, and running the bot."
     Write-Host ""
-    if ($Host.Name -eq "ConsoleHost") {
+    if (Test-CowcodeInteractive) {
         try {
             if (Get-Command winget -ErrorAction SilentlyContinue) {
                 $answer = Read-Host "  Install Node.js LTS with winget now? [Y/n]"
@@ -78,14 +83,15 @@ function Refresh-NpmGlobalPath {
 }
 
 function Refresh-NodeToolPath {
-    $dirs = @(
-        (Join-Path $env:ProgramFiles "nodejs"),
-        (Join-Path ${env:ProgramFiles(x86)} "nodejs"),
-        (Join-Path $env:APPDATA "npm")
-    )
-    foreach ($d in $dirs) {
+    $toAdd = @()
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        $toAdd += (Join-Path $env:ProgramFiles "nodejs")
+        $toAdd += (Join-Path ${env:ProgramFiles(x86)} "nodejs")
+    }
+    $toAdd += (Join-Path $env:APPDATA "npm")
+    foreach ($d in $toAdd) {
         if ((Test-Path $d) -and ($env:Path -notlike "*$d*")) {
-            $env:Path = "$d;$env:Path"
+            $env:Path = "$env:Path;$d"
         }
     }
 }
@@ -124,7 +130,7 @@ function Ensure-CowcodePm2 {
     Write-Host "  pm2 is required to run cowCode in the background on Windows."
     Write-Host "  (Like Node.js, it is not needed to download the code, only to keep the bot running.)"
     Write-Host ""
-    if ($Host.Name -eq "ConsoleHost") {
+    if (Test-CowcodeInteractive) {
         try {
             $answer = Read-Host "  Install pm2 globally now (npm install -g pm2)? [Y/n]"
             if ($answer -match '^[nN]') {
@@ -136,6 +142,9 @@ function Ensure-CowcodePm2 {
             Write-Host "  Install manually: npm install -g pm2"
             return $false
         }
+    } elseif (-not (Test-CowcodeInteractive)) {
+        # Non-interactive (CI/E2E): install pm2 automatically
+        Write-Host "  > Installing pm2 (non-interactive)..."
     } else {
         Write-Host "  Install manually: npm install -g pm2"
         return $false
@@ -169,9 +178,10 @@ function Enable-CowcodePm2AutoRestart {
         return $false
     }
 
-    $wantAuto = $true
-    if ($Host.Name -eq "ConsoleHost") {
+    $wantAuto = $false
+    if (Test-CowcodeInteractive) {
         try {
+            $wantAuto = $true
             $answer = Read-Host "  Start cowCode automatically when you log in to Windows? [Y/n]"
             if ($answer -match '^[nN]') { $wantAuto = $false }
         } catch { }

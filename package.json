@@ -45,6 +45,7 @@
     "test:update-build": "node scripts/test/test-update-build.js",
     "test:install": "node scripts/test/test-install.js",
     "test:daemon-pm2": "node scripts/test/test-daemon-pm2.js",
+    "test:install-update-win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-install-update-win.ps1",
     "test:dry-run": "node scripts/test/test-dry-run.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",
     "test:conversation-context": "node scripts/test/test-conversation-context.js",

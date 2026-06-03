@@ -28,14 +28,15 @@ function Invoke-Native {
 }
 
 function Refresh-NodeToolPath {
-    $dirs = @(
-        (Join-Path $env:ProgramFiles "nodejs"),
-        (Join-Path ${env:ProgramFiles(x86)} "nodejs"),
-        (Join-Path $env:APPDATA "npm")
-    )
-    foreach ($d in $dirs) {
+    $toAdd = @()
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        $toAdd += (Join-Path $env:ProgramFiles "nodejs")
+        $toAdd += (Join-Path ${env:ProgramFiles(x86)} "nodejs")
+    }
+    $toAdd += (Join-Path $env:APPDATA "npm")
+    foreach ($d in $toAdd) {
         if ((Test-Path $d) -and ($env:Path -notlike "*$d*")) {
-            $env:Path = "$d;$env:Path"
+            $env:Path = "$env:Path;$d"
         }
     }
 }
