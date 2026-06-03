@@ -64,22 +64,18 @@ const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'u
 const chat = fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8');
 const missionControlJs = mc2Js + fs.readFileSync(path.join(assetsJs, '04-mission-control.js'), 'utf8');
 const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
-const mc2CssDir = path.join(publicDir, 'assets/css/mc2');
-const team2Css = [
-  fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8'),
-  ...['home.css', 'tasks.css', 'chrome.css'].map((f) => fs.readFileSync(path.join(mc2CssDir, f), 'utf8')),
-].join('\n');
+const team2Css = fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8');
 
 const checks = [
   {
     name: 'index.html links split CSS and JS assets',
     ok: html.includes('assets/css/dashboard.css') &&
       html.includes('assets/css/team2.css') &&
-      html.includes('assets/css/mc2/home.css') &&
       html.includes('assets/js/00-loader.js') &&
       html.includes('assets/js/mc2/04-mc2-core.js') &&
       html.includes('assets/js/01-core-router-status.js') &&
-      !html.includes('<style>'),
+      !html.includes('<style>') &&
+      !html.includes('assets/css/mc2/'),
   },
   {
     name: 'loader injects nav, modals, and pages',
