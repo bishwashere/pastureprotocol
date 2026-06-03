@@ -2655,7 +2655,30 @@
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
     var teamGoalsSnapshot = { goals: [], updatedAt: 0 };
+    var mc2PendingSnapshot = { pending: [], updatedAt: 0 };
     var teamInitiativesSnapshot = { initiatives: [], updatedAt: 0 };
+
+    function wireClick(id, handler) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('click', handler);
+    }
+
+    function wireEl(id, type, handler, options) {
+      var el = document.getElementById(id);
+      if (!el) return false;
+      el.addEventListener(type, handler, options);
+      return true;
+    }
+
+    function dashboardRouteFromHash() {
+      try {
+        var p = parseHash();
+        setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
+      } catch (err) {
+        console.error('[dashboard] route failed:', err);
+        setPage('home');
+      }
+    }
     var selectedTeamGoalId = '';
     var selectedTeamInitiativeId = '';
     var teamPageFullscreen = false;
@@ -2686,7 +2709,11 @@
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
-      if (name === 'home') fetchChatAgents();
+      if (name === 'home') {
+        fetchStatus();
+        fetchChatAgents();
+        renderHomeIdentityTiles();
+      }
       if (name === 'team') {
         setTeamTopTab('roster');
         setTeamRailExpanded('context', false);
@@ -2771,8 +2798,7 @@
       });
     });
     window.addEventListener('hashchange', function () {
-      var p = parseHash();
-      setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
+      dashboardRouteFromHash();
     });
 
     async function fetchStatus() {
@@ -2874,6 +2900,16 @@
       } catch (_) {}
     }
 
+    function dashboardBoot() {
+      fetchStatus();
+      if (!window._cowcodeDashboardStatusPoll) {
+        window._cowcodeDashboardStatusPoll = setInterval(fetchStatus, 8000);
+      }
+      if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
+    }
+    dashboardBoot();
+    dashboardRouteFromHash();
+
     async function fetchCrons() {
       const r = await fetch(API + '/api/crons');
       const d = await r.json();
@@ -2958,7 +2994,7 @@
       panel.classList.add('open');
     }
 
-    document.getElementById('skills-save').addEventListener('click', async () => {
+    wireEl('skills-save', 'click', async () => {
       const boxes = document.querySelectorAll('#skills-list input[type="checkbox"]:checked');
       const enabled = Array.from(boxes).map(b => b.dataset.id);
       const r = await fetch(API + '/api/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
@@ -3544,7 +3580,7 @@
       });
     }
 
-    document.getElementById('agent-create-btn').addEventListener('click', async function () {
+    wireEl('agent-create-btn', 'click', async function () {
       var input = document.getElementById('agent-create-name');
       var rawName = (input && input.value) ? input.value.trim() : '';
       if (!rawName) return;
@@ -3561,7 +3597,7 @@
       }
     });
 
-    document.getElementById('agent-delete-btn').addEventListener('click', async function () {
+    wireEl('agent-delete-btn', 'click', async function () {
       if (!selectedAgentId || selectedAgentId === 'main') return;
       var ok = window.confirm('Delete agent "' + selectedAgentId + '"? This removes its config and identity files.');
       if (!ok) return;
@@ -3580,7 +3616,7 @@
       await fetchChatAgents();
     });
 
-    document.getElementById('agent-skills-save').addEventListener('click', async function () {
+    wireEl('agent-skills-save', 'click', async function () {
       var checked = document.querySelectorAll('#agent-skills-list input[data-agent-skill]:checked');
       var enabled = Array.from(checked).map(function (x) { return x.getAttribute('data-agent-skill'); });
       var cfgRes = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/config');
@@ -3598,7 +3634,7 @@
       }
     });
 
-    document.getElementById('agent-md-save').addEventListener('click', async function () {
+    wireEl('agent-md-save', 'click', async function () {
       if (!selectedAgentMdFile || !selectedAgentId) return;
       var content = document.getElementById('agent-md-textarea').value;
       var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/md/' + encodeURIComponent(selectedAgentMdFile), {
@@ -3791,7 +3827,7 @@
       panel.classList.add('open');
     }
 
-    document.getElementById('group-skills-save').addEventListener('click', async function () {
+    wireEl('group-skills-save', 'click', async function () {
       var boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
       var enabled = Array.from(boxes).map(function (b) { return b.getAttribute('data-id'); });
       var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled }) });
@@ -3819,7 +3855,7 @@
       } catch (_) {}
     }
 
-    document.getElementById('group-agent-save').addEventListener('click', async function () {
+    wireEl('group-agent-save', 'click', async function () {
       var select = document.getElementById('group-agent-select');
       var agentId = select && select.value ? select.value : 'main';
       var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', {
@@ -3906,7 +3942,7 @@
       }
     }
 
-    document.getElementById('tide-checklist-save-triggers').addEventListener('click', async function () {
+    wireEl('tide-checklist-save-triggers', 'click', async function () {
       var saved = document.getElementById('tide-checklist-saved');
       saved.style.display = 'none';
       try {
@@ -3918,7 +3954,7 @@
       }
     });
 
-    document.getElementById('tide-checklist-add').addEventListener('click', async function () {
+    wireEl('tide-checklist-add', 'click', async function () {
       var label = document.getElementById('tide-new-label').value.trim();
       var prompt = document.getElementById('tide-new-prompt').value.trim();
       if (!label) { alert('Label is required.'); return; }
@@ -3940,7 +3976,7 @@
       }
     });
 
-    document.getElementById('tide-checklist-run').addEventListener('click', async function () {
+    wireEl('tide-checklist-run', 'click', async function () {
       var status = document.getElementById('tide-checklist-run-status');
       status.textContent = 'Running…';
       try {
@@ -3968,7 +4004,7 @@
       }
     }
 
-    document.getElementById('config-save').addEventListener('click', async function () {
+    wireEl('config-save', 'click', async function () {
       var textarea = document.getElementById('full-config');
       var savedEl = document.getElementById('config-saved');
       var errEl = document.getElementById('config-error');
@@ -4330,10 +4366,10 @@
       setTestRunBusy(false);
     }
 
-    document.getElementById('test-run-skill').addEventListener('click', function () {
+    wireEl('test-run-skill', 'click', function () {
       if (activeTestId) runTest(activeTestId);
     });
-    document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
+    wireEl('test-run-all', 'click', function () { runAllTests(); });
 
     var selectedMemoryFileId = null;
     var selectedMemoryFileReadOnly = false;
@@ -4554,7 +4590,7 @@
     });
 
     // Long-term save
-    document.getElementById('mem-longterm-save').addEventListener('click', async function() {
+    wireEl('mem-longterm-save', 'click', async function() {
       var content = document.getElementById('mem-longterm-textarea').value;
       var r = await fetch(API + '/api/workspace-md/MEMORY.md', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
       if (r.ok) {
@@ -4564,7 +4600,7 @@
     });
 
     // Notes save
-    document.getElementById('mem-notes-save').addEventListener('click', async function() {
+    wireEl('mem-notes-save', 'click', async function() {
       if (!selectedNotesId) return;
       var content = document.getElementById('mem-notes-textarea').value;
       var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(selectedNotesId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
@@ -4633,8 +4669,9 @@
 
     renderHomeIdentityTiles();
 
-    document.getElementById('identity-editor-modal-cancel').addEventListener('click', closeIdentityEditor);
-    document.getElementById('identity-editor-modal-save').addEventListener('click', async function () {
+    wireClick('identity-editor-modal-cancel', closeIdentityEditor);
+    var identityEditorSaveBtn = document.getElementById('identity-editor-modal-save');
+    if (identityEditorSaveBtn) identityEditorSaveBtn.addEventListener('click', async function () {
       var id = identityEditorFileId;
       if (!id) return;
       var content = document.getElementById('identity-editor-modal-textarea').value;
@@ -4645,12 +4682,16 @@
         setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
       }
     });
-    document.getElementById('identity-editor-modal').addEventListener('click', function (e) {
-      if (e.target && e.target.id === 'identity-editor-modal') closeIdentityEditor();
-    });
-    document.querySelector('#identity-editor-modal .modal-card').addEventListener('click', function (e) {
-      e.stopPropagation();
-    });
+    var identityEditorModal = document.getElementById('identity-editor-modal');
+    if (identityEditorModal) {
+      identityEditorModal.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'identity-editor-modal') closeIdentityEditor();
+      });
+    }
+    var identityEditorCard = document.querySelector('#identity-editor-modal .modal-card');
+    if (identityEditorCard) {
+      identityEditorCard.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
 
     async function renderLlmForm() {
       const r = await fetch(API + '/api/config');
@@ -4676,7 +4717,7 @@
       if (models.length === 0) { container.className = ''; container.innerHTML = '<p class="empty">No models in config. Add entries in Config (read-only) or via setup.</p>'; } else { container.className = 'llm-models-grid'; }
     }
 
-    document.getElementById('llm-save').addEventListener('click', async () => {
+    wireEl('llm-save', 'click', async () => {
       const maxTokens = Number(document.getElementById('llm-max-tokens').value) || 2048;
       const modelCards = document.querySelectorAll('#llm-models .llm-model');
       const models = Array.from(modelCards).map(card => {
@@ -7449,32 +7490,32 @@
       }
     }
 
-    document.getElementById('chat-send').addEventListener('click', function () {
+    wireEl('chat-send', 'click', function () {
       if (chatLoading && chatAbortController) {
         chatAbortController.abort();
         return;
       }
       sendChatMessage();
     });
-    document.getElementById('chat-input').addEventListener('keydown', function (e) {
+    wireEl('chat-input', 'keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
     });
-    document.getElementById('chat-agent-select').addEventListener('change', function (e) {
+    wireEl('chat-agent-select', 'change', function (e) {
       setChatAgent((e.target && e.target.value) || 'main');
     });
-    document.getElementById('chat-agent-create-btn').addEventListener('click', function () {
+    wireClick('chat-agent-create-btn', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
-    document.getElementById('agent-team-ext-btn').addEventListener('click', function () {
+    wireClick('agent-team-ext-btn', function () {
       openTeamPage();
     });
-    document.getElementById('agent-team-create-btn').addEventListener('click', function () {
+    wireClick('agent-team-create-btn', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
-    document.getElementById('team-page-create-btn').addEventListener('click', function () {
+    wireClick('team-page-create-btn', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
-    document.getElementById('team-page-fullscreen-btn').addEventListener('click', function () {
+    wireClick('team-page-fullscreen-btn', function () {
       toggleTeamPageFullscreen();
     });
 
@@ -7489,7 +7530,6 @@
     var mc2TimelineScrollRaf = 0;
     var mc2TimelineHighlightKey = '';
     var mc2TimelineSpyEnabled = false;
-    var mc2PendingSnapshot = { pending: [], updatedAt: 0 };
     var mc2PendingActionBusy = false;
 
     function mc2El(id) { return document.getElementById(id); }
@@ -8409,7 +8449,8 @@
     }
 
     function mc2PendingItems() {
-      return Array.isArray(mc2PendingSnapshot.pending) ? mc2PendingSnapshot.pending : [];
+      var snap = mc2PendingSnapshot || { pending: [], updatedAt: 0 };
+      return Array.isArray(snap.pending) ? snap.pending : [];
     }
 
     function mc2PendingKindLabel(kind) {
@@ -8556,24 +8597,28 @@
     }
 
     function renderMissionControl() {
-      mc2RenderMissionProgress();
-      mc2RenderKanban();
-      mc2RenderAgentsOverview();
-      mc2RenderMovement();
-      mc2RenderAttention();
-      mc2UpdateLiveBadge();
-      mc2UpdateApprovalsBadge();
-      mc2RenderPendingApprovalsBanner();
-      mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
-      mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
-      mc2ScheduleSidebarProjects();
-      if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
-      if (mc2ActiveView === 'goals') mc2RenderGoals();
-      if (mc2ActiveView === 'initiatives') mc2RenderInitiatives();
-      if (mc2ActiveView === 'projects') mc2RenderProjects();
-      if (mc2ActiveView === 'context') mc2RenderContext();
-      if (mc2ActiveView === 'stats') mc2RenderStats();
-      if (mc2ActiveView === 'tasks') mc2RenderTasks();
+      try {
+        mc2RenderMissionProgress();
+        mc2RenderKanban();
+        mc2RenderAgentsOverview();
+        mc2RenderMovement();
+        mc2RenderAttention();
+        mc2UpdateLiveBadge();
+        mc2UpdateApprovalsBadge();
+        mc2RenderPendingApprovalsBanner();
+        mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
+        mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
+        mc2ScheduleSidebarProjects();
+        if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
+        if (mc2ActiveView === 'goals') mc2RenderGoals();
+        if (mc2ActiveView === 'initiatives') mc2RenderInitiatives();
+        if (mc2ActiveView === 'projects') mc2RenderProjects();
+        if (mc2ActiveView === 'context') mc2RenderContext();
+        if (mc2ActiveView === 'stats') mc2RenderStats();
+        if (mc2ActiveView === 'tasks') mc2RenderTasks();
+      } catch (err) {
+        console.error('[mission-control] render failed:', err);
+      }
     }
 
     /* Wire MC sidebar nav */
@@ -8673,83 +8718,93 @@
     }
     mc2BindTimelineScrollSpy(document.getElementById('mc2-view-activity'));
     mc2BindTimelineScrollSpy(document.getElementById('mc2-view-context'));
-    document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
-    document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
-      submitAgentCreateModal(true);
-    });
-    document.getElementById('agent-create-modal').addEventListener('click', function (e) {
-      if (e.target && e.target.id === 'agent-create-modal') closeAgentCreateModal();
-    });
-    document.querySelector('#agent-create-modal .modal-card').addEventListener('click', function (e) {
-      e.stopPropagation();
-    });
-    document.getElementById('agent-create-modal-title-input').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitAgentCreateModal(true);
+    try {
+      wireClick('agent-create-modal-cancel', closeAgentCreateModal);
+      wireClick('agent-create-modal-submit', function () { submitAgentCreateModal(true); });
+      var agentCreateModal = document.getElementById('agent-create-modal');
+      if (agentCreateModal) {
+        agentCreateModal.addEventListener('click', function (e) {
+          if (e.target && e.target.id === 'agent-create-modal') closeAgentCreateModal();
+        });
       }
-    });
-    document.getElementById('agent-edit-modal-cancel').addEventListener('click', closeAgentEditModal);
-    document.getElementById('agent-edit-modal-submit').addEventListener('click', submitAgentEditModal);
-    document.getElementById('agent-edit-modal-md-save').addEventListener('click', async function () {
-      var agentId = agentEditorState.modal.agentId;
-      if (!agentId || !agentEditorState.modal.mdFile) return;
-      showAgentEditorError('', 'modal');
-      try {
-        await saveAgentEditorMdFile(agentId, 'modal');
-      } catch (err) {
-        showAgentEditorError(err.message || String(err), 'modal');
+      var agentCreateCard = document.querySelector('#agent-create-modal .modal-card');
+      if (agentCreateCard) {
+        agentCreateCard.addEventListener('click', function (e) { e.stopPropagation(); });
       }
-    });
-    document.getElementById('team-agent-back').addEventListener('click', function () {
-      location.hash = '#team';
-    });
-    document.getElementById('team-agent-save').addEventListener('click', submitTeamAgentPage);
-    document.getElementById('team-agent-md-save').addEventListener('click', async function () {
-      var agentId = agentEditorState.page.agentId;
-      if (!agentId || !agentEditorState.page.mdFile) return;
-      showAgentEditorError('', 'page');
-      try {
-        await saveAgentEditorMdFile(agentId, 'page');
-      } catch (err) {
-        showAgentEditorError(err.message || String(err), 'page');
+      var agentCreateTitleInput = document.getElementById('agent-create-modal-title-input');
+      if (agentCreateTitleInput) {
+        agentCreateTitleInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitAgentCreateModal(true);
+          }
+        });
       }
-    });
-    document.getElementById('agent-edit-modal').addEventListener('click', function (e) {
-      if (e.target && e.target.id === 'agent-edit-modal') closeAgentEditModal();
-    });
-    document.querySelector('#agent-edit-modal .modal-card').addEventListener('click', function (e) {
-      e.stopPropagation();
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && agentEditModalOpen) closeAgentEditModal();
-      else if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
-      else if (e.key === 'Escape' && teamPageFullscreen) setTeamPageFullscreen(false);
-    });
-    document.getElementById('chat-new-btn').addEventListener('click', function () {
-      closeChatHistory();
-      saveCurrentSession();
-      currentSessionId = newSessionId();
-      chatMessages = [];
-      chatMessagesByAgent[selectedChatAgentId] = [];
-      renderChatMessages();
-      document.getElementById('chat-input').focus();
-    });
-    document.getElementById('chat-history-btn').addEventListener('click', function (e) {
-      e.stopPropagation();
-      toggleChatHistory();
-    });
-    document.addEventListener('click', function (e) {
-      var panel = document.getElementById('chat-history-panel');
-      var btn = document.getElementById('chat-history-btn');
-      if (panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) {
+      wireClick('agent-edit-modal-cancel', closeAgentEditModal);
+      wireClick('agent-edit-modal-submit', submitAgentEditModal);
+      wireClick('agent-edit-modal-md-save', async function () {
+        var agentId = agentEditorState.modal.agentId;
+        if (!agentId || !agentEditorState.modal.mdFile) return;
+        showAgentEditorError('', 'modal');
+        try {
+          await saveAgentEditorMdFile(agentId, 'modal');
+        } catch (err) {
+          showAgentEditorError(err.message || String(err), 'modal');
+        }
+      });
+      wireClick('team-agent-back', function () { location.hash = '#team'; });
+      wireClick('team-agent-save', submitTeamAgentPage);
+      wireClick('team-agent-md-save', async function () {
+        var agentId = agentEditorState.page.agentId;
+        if (!agentId || !agentEditorState.page.mdFile) return;
+        showAgentEditorError('', 'page');
+        try {
+          await saveAgentEditorMdFile(agentId, 'page');
+        } catch (err) {
+          showAgentEditorError(err.message || String(err), 'page');
+        }
+      });
+      var agentEditModal = document.getElementById('agent-edit-modal');
+      if (agentEditModal) {
+        agentEditModal.addEventListener('click', function (e) {
+          if (e.target && e.target.id === 'agent-edit-modal') closeAgentEditModal();
+        });
+      }
+      var agentEditCard = document.querySelector('#agent-edit-modal .modal-card');
+      if (agentEditCard) {
+        agentEditCard.addEventListener('click', function (e) { e.stopPropagation(); });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && agentEditModalOpen) closeAgentEditModal();
+        else if (e.key === 'Escape' && agentCreateModalOpen) closeAgentCreateModal();
+        else if (e.key === 'Escape' && teamPageFullscreen) setTeamPageFullscreen(false);
+      });
+      wireClick('chat-new-btn', function () {
         closeChatHistory();
-      }
-    });
+        saveCurrentSession();
+        currentSessionId = newSessionId();
+        chatMessages = [];
+        chatMessagesByAgent[selectedChatAgentId] = [];
+        renderChatMessages();
+        var chatInput = document.getElementById('chat-input');
+        if (chatInput) chatInput.focus();
+      });
+      wireClick('chat-history-btn', function (e) {
+        e.stopPropagation();
+        toggleChatHistory();
+      });
+      document.addEventListener('click', function (e) {
+        var panel = document.getElementById('chat-history-panel');
+        var btn = document.getElementById('chat-history-btn');
+        if (panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) {
+          closeChatHistory();
+        }
+      });
+    } catch (err) {
+      console.error('[dashboard] modal/chat bind failed:', err);
+    }
 
-    fetchStatus();
-    fetchChatAgents();
-    setInterval(fetchStatus, 8000);
+    if (typeof fetchChatAgents === 'function') fetchChatAgents();
     (function () {
       AGENT_MAP_PREFIXES.forEach(function (mapConfig) {
         var canvas = document.getElementById(mapConfig.prefix + '-canvas');
@@ -8765,10 +8820,6 @@
           }, 80);
         }).observe(canvas);
       });
-    })();
-    (function () {
-      var p = parseHash();
-      setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
     })();
 
     // ── Projects ────────────────────────────────────────────────────────────

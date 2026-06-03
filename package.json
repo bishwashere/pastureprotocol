@@ -30,6 +30,7 @@
     "test:delegation-llm-router": "node scripts/test/test-delegation-llm-router.js",
     "test:evaluate-team-capability": "node scripts/test/test-evaluate-team-capability.js",
     "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
+    "test:dashboard-boot": "node scripts/test/test-dashboard-boot.js",
     "test:apply-patch-unit": "node scripts/test/test-apply-patch-unit.js",
     "test:output-parse": "node scripts/test/test-output-parse.js",
     "test:retrospective": "node scripts/test/test-retrospective.js",
