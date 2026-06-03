@@ -364,7 +364,7 @@ try {
     # --- download ---
     Write-Host "  > Downloading (branch: $Branch)..."
     $Archive = Join-Path $Work "archive.tar.gz"
-    Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
+    $null = Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
     Invoke-Native "Extract archive" { tar -xzf $Archive -C $Work }
     Write-Host "  [OK] Done."
     Write-Host ""

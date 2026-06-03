@@ -173,7 +173,7 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
+$Tarball = "https://github.com/bishwashere/cowcode/archive/refs/heads/$BranchPath.tar.gz"
 $Extracted = "cowCode-$Branch"
 
 $Root = if ($env:COWCODE_ROOT) { $env:COWCODE_ROOT } elseif ($env:COWCODE_INSTALL_DIR) { $env:COWCODE_INSTALL_DIR } else { $PSScriptRoot }
@@ -199,7 +199,7 @@ try {
         $localVer = Read-PackageJsonVersion (Join-Path $Root "package.json")
         $remoteJson = Join-Path $Work "remote_package.json"
         $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowCode/$BranchPath/package.json?t=$ts"
+        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowcode/$BranchPath/package.json?t=$ts"
         if (Save-CowcodeDownload -Uri $pkgUri -OutFile $remoteJson -Label "Fetch remote package.json" `
             -MinBytes 16 -TimeoutSec 120 -AllowFail) {
             $remoteVer = Read-PackageJsonVersion $remoteJson
@@ -223,7 +223,7 @@ try {
 
     Write-Host "  > Downloading latest..."
     $Archive = Join-Path $Work "archive.tar.gz"
-    Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
+    $null = Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
     Invoke-Native "Extract archive" { tar -xzf $Archive -C $Work }
     $Src = Join-Path $Work $Extracted
     if (-not (Test-Path -LiteralPath $Src)) {
