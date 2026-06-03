@@ -6,6 +6,11 @@ param(
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 
+$CowcodeNodeVersion = "v22.16.0"
+$CowcodeNodeZipName = "node-$CowcodeNodeVersion-win-x64"
+$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "cowcode\node"
+$CowcodeNodeDir = Join-Path $CowcodeNodeRoot $CowcodeNodeZipName
+
 function Exit-Update {
     param([int]$Code = 0)
     if ($Code -ne 0 -and $Host.Name -eq "ConsoleHost") {
@@ -27,8 +32,21 @@ function Invoke-Native {
     }
 }
 
+function Use-CowcodeNodeRuntime {
+    if (Test-Path -LiteralPath (Join-Path $CowcodeNodeDir "node.exe")) {
+        if ($env:Path -notlike "*$CowcodeNodeDir*") {
+            $env:Path = "$CowcodeNodeDir;$env:Path"
+        }
+        return $true
+    }
+    return $false
+}
+
 function Refresh-NodeToolPath {
     $toAdd = @()
+    if (Use-CowcodeNodeRuntime) {
+        $toAdd += $CowcodeNodeDir
+    }
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         $toAdd += (Join-Path $env:ProgramFiles "nodejs")
         $toAdd += (Join-Path ${env:ProgramFiles(x86)} "nodejs")

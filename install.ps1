@@ -11,6 +11,11 @@ param(
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 
+$CowcodeNodeVersion = "v22.16.0"
+$CowcodeNodeZipName = "node-$CowcodeNodeVersion-win-x64"
+$CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "cowcode\node"
+$CowcodeNodeDir = Join-Path $CowcodeNodeRoot $CowcodeNodeZipName
+
 function Test-CowcodeInteractive {
     if ($env:COWCODE_NONINTERACTIVE -eq "1") { return $false }
     return ($Host.Name -eq "ConsoleHost")
@@ -40,39 +45,66 @@ function Invoke-Native {
     }
 }
 
+function Use-CowcodeNodeRuntime {
+    if (Test-Path -LiteralPath (Join-Path $CowcodeNodeDir "node.exe")) {
+        if ($env:Path -notlike "*$CowcodeNodeDir*") {
+            $env:Path = "$CowcodeNodeDir;$env:Path"
+        }
+        return $true
+    }
+    return $false
+}
+
+function Install-CowcodeNodeRuntime {
+    Write-Host "  > Installing cowCode-managed Node.js 22 runtime..."
+    try {
+        New-Item -ItemType Directory -Path $CowcodeNodeRoot -Force | Out-Null
+        $work = Join-Path ([System.IO.Path]::GetTempPath()) ("cowcode-node-" + [guid]::NewGuid().ToString("n"))
+        New-Item -ItemType Directory -Path $work -Force | Out-Null
+        $zip = Join-Path $work "node.zip"
+        $url = "https://nodejs.org/dist/$CowcodeNodeVersion/$CowcodeNodeZipName.zip"
+        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 600
+        if (Test-Path -LiteralPath $CowcodeNodeDir) {
+            Remove-Item -LiteralPath $CowcodeNodeDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Expand-Archive -Path $zip -DestinationPath $CowcodeNodeRoot -Force
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Use-CowcodeNodeRuntime)) {
+            Write-Host "  [X] Managed Node.js install did not produce node.exe."
+            return $false
+        }
+        Write-Host "  [OK] Node.js runtime installed: $CowcodeNodeDir"
+        return $true
+    } catch {
+        Write-Host "  [X] Managed Node.js install failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Offer-CowcodeNodeJs {
     param([Parameter(Mandatory = $true)][string]$Reason)
     Write-Host ""
     Write-Host "  [X] $Reason"
     Write-Host ""
-    Write-Host "  This step runs in PowerShell only. Node.js is not needed to download"
-    Write-Host "  cowCode, but it is required for npm install, setup, and running the bot."
+    Write-Host "  cowCode needs Node.js 18, 20, or 22 on Windows because native"
+    Write-Host "  dependencies like better-sqlite3 do not have Node 24 prebuilds yet."
+    Write-Host "  The installer can install a private Node.js 22 runtime for cowCode."
     Write-Host ""
     if (Test-CowcodeInteractive) {
         try {
-            if (Get-Command winget -ErrorAction SilentlyContinue) {
-                $answer = Read-Host "  Install Node.js LTS with winget now? [Y/n]"
-                if ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^[yY]') {
-                    Write-Host "  > Installing Node.js LTS via winget..."
-                    & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-                    Write-Host ""
-                    Write-Host "  When winget finishes, close this window and open a NEW PowerShell."
-                    Write-Host "  Then run:  node -v   and   npm -v   and run this installer again."
-                    Exit-Install 0
-                }
-            }
-            $open = Read-Host "  Open https://nodejs.org/ in your browser? [Y/n]"
-            if ([string]::IsNullOrWhiteSpace($open) -or $open -match '^[yY]') {
-                Start-Process "https://nodejs.org/"
+            $answer = Read-Host "  Install cowCode-managed Node.js 22 now? [Y/n]"
+            if ($answer -match '^[nN]') {
+                Write-Host "  Install Node.js 22 LTS manually, then open a new PowerShell and rerun this installer."
+                Exit-Install 1
             }
         } catch {
-            Write-Host "  Install from: https://nodejs.org/"
+            Write-Host "  Install Node.js 22 LTS manually, then rerun this installer."
+            Exit-Install 1
         }
-    } else {
-        Write-Host "  Install from: https://nodejs.org/"
     }
-    Write-Host "  Open a new PowerShell window after installing, then run the installer again."
-    Exit-Install 1
+    if (-not (Install-CowcodeNodeRuntime)) {
+        Exit-Install 1
+    }
 }
 
 function Refresh-NpmGlobalPath {
@@ -84,6 +116,9 @@ function Refresh-NpmGlobalPath {
 
 function Refresh-NodeToolPath {
     $toAdd = @()
+    if (Use-CowcodeNodeRuntime) {
+        $toAdd += $CowcodeNodeDir
+    }
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         $toAdd += (Join-Path $env:ProgramFiles "nodejs")
         $toAdd += (Join-Path ${env:ProgramFiles(x86)} "nodejs")
@@ -404,11 +439,21 @@ Refresh-NodeToolPath
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
     Offer-CowcodeNodeJs "Node.js was not found on PATH."
+    Refresh-NodeToolPath
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 }
 $nodeVersion = Get-CowcodeNodeVersion $nodeCmd.Source
 if (-not (Test-CowcodeSupportedNode $nodeVersion)) {
     $found = if ($nodeVersion) { $nodeVersion.Raw } else { "unknown" }
     Offer-CowcodeNodeJs "Unsupported Node.js version found ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+    Refresh-NodeToolPath
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    $nodeVersion = Get-CowcodeNodeVersion $nodeCmd.Source
+    if (-not (Test-CowcodeSupportedNode $nodeVersion)) {
+        $found = if ($nodeVersion) { $nodeVersion.Raw } else { "unknown" }
+        Write-Host "  [X] Still using unsupported Node.js after managed install: $found"
+        Exit-Install 1
+    }
 }
 
 $npmCmd = Get-CowcodeToolPath "npm"
@@ -421,11 +466,27 @@ if (-not $hasPnpm -and -not $hasNpm) {
         $reason = "Node from Cursor was found, but that build does not include npm."
     }
     Offer-CowcodeNodeJs $reason
+    Refresh-NodeToolPath
+    $npmCmd = Get-CowcodeToolPath "npm"
+    $pnpmCmd = Get-CowcodeToolPath "pnpm"
+    $hasPnpm = [bool]$pnpmCmd
+    $hasNpm = [bool]$npmCmd
 }
 $packageManagerNode = if ($hasPnpm) { Get-CowcodeToolNodeVersion $pnpmCmd } else { Get-CowcodeToolNodeVersion $npmCmd }
 if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
     $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
     Offer-CowcodeNodeJs "npm/pnpm is using unsupported Node.js ($found). cowCode needs Node.js 18, 20, or 22 LTS on Windows."
+    Refresh-NodeToolPath
+    $npmCmd = Get-CowcodeToolPath "npm"
+    $pnpmCmd = Get-CowcodeToolPath "pnpm"
+    $hasPnpm = [bool]$pnpmCmd
+    $hasNpm = [bool]$npmCmd
+    $packageManagerNode = if ($hasPnpm) { Get-CowcodeToolNodeVersion $pnpmCmd } else { Get-CowcodeToolNodeVersion $npmCmd }
+    if (-not (Test-CowcodeSupportedNode $packageManagerNode)) {
+        $found = if ($packageManagerNode) { $packageManagerNode.Raw } else { "unknown" }
+        Write-Host "  [X] npm/pnpm is still using unsupported Node.js after managed install: $found"
+        Exit-Install 1
+    }
 }
 
 if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
@@ -502,6 +563,8 @@ try {
         $cmdContent = @"
 @echo off
 set COWCODE_INSTALL_DIR=$InstallDir
+set COWCODE_NODE_DIR=$CowcodeNodeDir
+if exist "%COWCODE_NODE_DIR%\node.exe" set PATH=%COWCODE_NODE_DIR%;%APPDATA%\npm;%PATH%
 node "$InstallDir\cli.js" %*
 "@
         Set-Content -Path $Launcher -Value $cmdContent -Encoding ASCII -ErrorAction Stop
@@ -533,12 +596,18 @@ node "$InstallDir\cli.js" %*
         $hasDotenv = Test-Path (Join-Path $InstallDir "node_modules\dotenv")
         if ($hasDotenv) {
             Write-Host "  [OK] Dependencies already installed."
-        } elseif ($hasPnpm) {
+        } else {
+            if (Test-Path (Join-Path $InstallDir "node_modules")) {
+                Write-Host "  > Removing incomplete node_modules..."
+                Remove-Item -Path (Join-Path $InstallDir "node_modules") -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            if ($hasPnpm) {
             Invoke-Native "pnpm install" { & $pnpmCmd install }
             Write-Host "  [OK] Dependencies installed."
-        } else {
+            } else {
             Invoke-Native "npm install" { & $npmCmd install }
             Write-Host "  [OK] Dependencies installed."
+            }
         }
         if (-not (Test-Path (Join-Path $InstallDir "node_modules\dotenv"))) {
             Write-Host "  [X] Dependencies missing after install (node_modules/dotenv)."
