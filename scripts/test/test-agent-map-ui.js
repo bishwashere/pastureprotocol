@@ -117,6 +117,10 @@ const checks = [
     ok: html.includes('id="team-user-input-modal"') &&
       html.includes('renderTeamUserInputModal') &&
       html.includes('isTeamMainViewActive') &&
+      html.includes('shouldPauseTeamDashboardRefresh') &&
+      html.includes('isTeamUserInputModalOpen') &&
+      /if \(modalOpen\)[\s\S]{0,220}return;/.test(html) &&
+      /function renderMissionControl\(\)[\s\S]{0,120}shouldPauseTeamDashboardRefresh/.test(html) &&
       html.includes('/api/goals/') &&
       html.includes('/respond') &&
       html.includes('team-user-input-modal-submit') &&

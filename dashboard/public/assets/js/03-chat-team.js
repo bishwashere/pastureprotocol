@@ -2406,7 +2406,10 @@
       renderAgentOutbox();
       renderAgentContext();
       renderTeamTaskSummary();
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') && typeof renderMissionControl === 'function') renderMissionControl();
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') &&
+        typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
+        renderMissionControl();
+      }
     }
 
     async function fetchTeamContextFeed() {
@@ -2424,7 +2427,10 @@
       renderCurrentMission();
       renderTeamTaskSummary();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') && typeof renderMissionControl === 'function') renderMissionControl();
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') &&
+        typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
+        renderMissionControl();
+      }
     }
 
     async function fetchTeamMetricsFeed() {
@@ -2459,7 +2465,7 @@
       } catch (_) {}
       renderGoalsList();
       renderAgentContext();
-      renderTeamUserInputModal();
+      if (!shouldPauseTeamDashboardRefresh()) renderTeamUserInputModal();
     }
 
     var teamUserInputGoalId = '';
@@ -2488,9 +2494,18 @@
       return String(goal.id || '') + '::' + String(goal.needsUserInput || '').slice(0, 240);
     }
 
+    function isTeamUserInputModalOpen() {
+      var modal = document.getElementById('team-user-input-modal');
+      return !!(modal && modal.classList.contains('open'));
+    }
+
+    function shouldPauseTeamDashboardRefresh() {
+      return isTeamUserInputModalOpen();
+    }
+
     function isTeamMainViewActive() {
       if (document.body.classList.contains('dashboard-team2-active')) {
-        return typeof mc2ActiveView === 'undefined' || mc2ActiveView === 'mission';
+        return true;
       }
       if (document.body.classList.contains('dashboard-team-active')) {
         return teamTopTab === 'roster';
@@ -2558,22 +2573,32 @@
     }
 
     function renderTeamUserInputModal() {
+      var modal = document.getElementById('team-user-input-modal');
+      var modalOpen = isTeamUserInputModalOpen();
       if (!isTeamMainViewActive()) {
-        closeTeamUserInputModal();
+        if (!modalOpen) closeTeamUserInputModal();
         return;
       }
-      var modal = document.getElementById('team-user-input-modal');
       if (!modal) return;
       var goals = getGoalsNeedingUserInput().filter(function (g) {
         return !teamUserInputDismissed[teamUserInputDismissKey(g)];
       });
+      if (modalOpen) {
+        if (teamUserInputGoalId) {
+          var current = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; });
+          if (current) return;
+        }
+        if (!goals.length) return;
+        var queued = goals[0];
+        if (teamUserInputGoalId === String(queued.id || '')) return;
+        openTeamUserInputModal(queued);
+        return;
+      }
       if (!goals.length) {
         closeTeamUserInputModal();
         return;
       }
-      var next = goals[0];
-      if (modal.classList.contains('open') && teamUserInputGoalId === String(next.id || '')) return;
-      openTeamUserInputModal(next);
+      openTeamUserInputModal(goals[0]);
     }
 
     async function submitTeamUserInputResponse(responseText) {
@@ -2774,6 +2799,7 @@
       if (!teamActivityPollTimer) return;
       clearInterval(teamActivityPollTimer);
       teamActivityPollTimer = null;
+      closeTeamUserInputModal();
     }
 
     function setChatAgent(agentId) {

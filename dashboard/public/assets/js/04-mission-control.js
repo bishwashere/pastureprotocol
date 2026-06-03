@@ -1133,7 +1133,10 @@
       mc2RenderPendingApprovalsBanner();
       mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
-      if (mc2ActiveView === 'mission') mc2RenderAttention();
+      if (mc2ActiveView === 'mission' &&
+        !(typeof shouldPauseTeamDashboardRefresh === 'function' && shouldPauseTeamDashboardRefresh())) {
+        mc2RenderAttention();
+      }
     }
 
     async function mc2HandlePendingAction(pendingId, action) {
@@ -1172,6 +1175,7 @@
     }
 
     function renderMissionControl() {
+      if (typeof shouldPauseTeamDashboardRefresh === 'function' && shouldPauseTeamDashboardRefresh()) return;
       try {
         mc2RenderMissionProgress();
         mc2RenderKanban();
