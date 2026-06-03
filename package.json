@@ -62,6 +62,7 @@
     "test:goals": "node scripts/test/test-goals.js",
     "test:goals-merge-subgoals": "node scripts/test/test-goals-merge-subgoals.js",
     "test:initiatives": "node scripts/test/test-initiatives.js",
+    "test:curiosity-momentum": "node scripts/test/test-curiosity-momentum.js",
     "test:projects": "node scripts/test/test-projects-db.js",
     "test:projects-ui": "node scripts/test/test-projects-ui.js",
     "test:projects-context": "node scripts/test/test-projects-context.js",

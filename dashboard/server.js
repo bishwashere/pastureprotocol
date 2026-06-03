@@ -17,7 +17,7 @@ import { readTeamActivity } from '../lib/team-activity.js';
 import { readAllAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
 import { listGoals, createGoal, updateGoal, getGoal, runGoalTick, respondToGoalUserInput } from '../lib/goals.js';
-import { listInitiatives, getInitiative, updateInitiative } from '../lib/initiatives.js';
+import { listInitiatives, getInitiative, updateInitiative, promoteInitiativeToSubgoal } from '../lib/initiatives.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
@@ -656,23 +656,12 @@ app.post('/api/initiatives/:id/promote', (req, res) => {
       res.status(404).json({ error: 'Goal not found' });
       return;
     }
-    const subgoals = Array.isArray(goal.subgoals) ? goal.subgoals.slice() : [];
-    subgoals.push({
-      id: `init-${initiative.id}`,
-      title: initiative.title,
-      status: 'todo',
-      progress: 0,
-      assignee: initiative.createdBy || '',
-      depends_on: [],
-      subgoals: [],
-    });
-    const updatedGoal = updateGoal(goal.id, { subgoals });
-    const updatedInitiative = updateInitiative(initiative.id, {
-      status: 'accepted',
-      relatedGoalIds: [goal.id],
-      activity: [`Promoted to subgoal in ${goal.id}`],
-    });
-    res.json({ initiative: updatedInitiative, goal: updatedGoal });
+    const result = await promoteInitiativeToSubgoal(initiative, targetGoalId);
+    if (result.skipped) {
+      res.status(409).json({ error: 'Initiative already promoted to this goal', initiative: result.initiative, goal: result.goal });
+      return;
+    }
+    res.json({ initiative: result.initiative, goal: result.goal });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

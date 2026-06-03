@@ -175,6 +175,7 @@
       if (view === 'agents') mc2RenderAgentsDetail();
       if (view === 'tasks') mc2RenderTasks();
       mc2SyncTimelineHighlightForScroll();
+      if (typeof renderTeamUserInputModal === 'function') renderTeamUserInputModal();
     }
 
     function mc2ScrollToProject(pid) {
@@ -550,14 +551,15 @@
       });
       var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
       goals.forEach(function (g) {
-        if (String(g.status || '').toLowerCase() === 'blocked') {
+        var status = String(g.status || '').toLowerCase();
+        if (status === 'blocked') {
           items.push({ kind: 'error', text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)), ts: Number(g.updatedAt) || 0 });
+          return;
         }
-        var ask = String(g.needsUserInput || '').trim();
-        if (ask) {
+        if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
           items.push({
             kind: 'warning',
-            text: 'Needs your input — ' + escapeHtml(String(g.title || g.objective || 'Mission').slice(0, 48)) + ': ' + escapeHtml(ask.slice(0, 80)),
+            text: formatGoalImplementationAttention(g),
             ts: Number(g.updatedAt) || 0,
           });
         }

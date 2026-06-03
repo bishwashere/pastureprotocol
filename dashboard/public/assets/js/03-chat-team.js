@@ -580,6 +580,35 @@
       initiatives: 'Proactive suggestions from goal reflection and team activity — review and promote into goals or subgoals.',
     };
 
+    function isGoalPartialWait(goal) {
+      var w = goal && goal.waitCondition;
+      if (!w || typeof w !== 'object') return false;
+      return String(w.kind || '').toLowerCase() === 'partial';
+    }
+
+    function goalImplementationBlockedLabel(goal) {
+      if (!goal) return '';
+      var w = goal.waitCondition;
+      var reason = String((w && (w.reason || w.condition)) || goal.blockedReason || '').trim();
+      if (isGoalPartialWait(goal)) {
+        var appliesTo = (w && (w.waitAppliesTo || w.scope)) || 'implementation';
+        return reason || ('Implementation blocked (' + appliesTo + ') — research continues');
+      }
+      return reason;
+    }
+
+    function formatGoalImplementationAttention(goal) {
+      var title = escapeHtml(String(goal.title || goal.objective || 'Mission').slice(0, 48));
+      var ask = String(goal.needsUserInput || '').trim();
+      var reason = goalImplementationBlockedLabel(goal);
+      var text = title + ': Implementation blocked — research continues';
+      if (reason && reason !== 'Implementation blocked — research continues') {
+        text += ' (' + escapeHtml(reason.slice(0, 56)) + ')';
+      }
+      if (ask) text += ' · ' + escapeHtml(ask.slice(0, 72));
+      return text;
+    }
+
     function setTeamTopTab(tab) {
       teamTopTab = tab === 'goals' ? 'goals' : (tab === 'initiatives' ? 'initiatives' : 'roster');
       var rosterTab = document.getElementById('team-top-tab-roster');
@@ -611,6 +640,7 @@
       if (teamTopTab === 'initiatives' && (!teamInitiativesSnapshot.initiatives || !teamInitiativesSnapshot.initiatives.length)) {
         fetchInitiativesSnapshot();
       }
+      if (typeof renderTeamUserInputModal === 'function') renderTeamUserInputModal();
     }
 
     function formatGoalTs(ts) {
@@ -940,12 +970,15 @@
 
       var subgoals = { todo: [], doing: [], blocked: [] };
       var blockedReasons = [];
+      var implementationBlockedLabels = [];
       (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
         var status = String(g.status || '').toLowerCase();
         if (status === 'blocked') {
           blocked++;
           var reason = String(g.blockedReason || g.title || g.objective || '').trim();
           if (reason) blockedReasons.push(reason);
+        } else if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
+          implementationBlockedLabels.push(goalImplementationBlockedLabel(g) || String(g.needsUserInput || '').trim());
         }
         collectSubgoalsByStatus(g.subgoals, subgoals);
       });
@@ -953,7 +986,9 @@
 
       var blockedLabel = '';
       if (subgoals.blocked.length) blockedLabel = subgoals.blocked[0];
-      else if (blockedReasons.length) blockedLabel = blockedReasons[0];
+      else if (implementationBlockedLabels.length) {
+        blockedLabel = implementationBlockedLabels[0] + '. Research continues.';
+      } else if (blockedReasons.length) blockedLabel = blockedReasons[0];
       else if (waitingAgents.length) {
         waitingAgents.sort(function (a, b) {
           return (Number(b.ctx.updatedAt) || 0) - (Number(a.ctx.updatedAt) || 0);
@@ -984,7 +1019,7 @@
         '<span class="team-task-badge blocked">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</span>' +
         '<span class="team-task-badge completed">[' + escapeHtml(String(summary.completedToday)) + ' Completed Today]</span>';
       blockedEl.innerHTML = summary.blockedLabel
-        ? '<strong>Blocked:</strong> ' + escapeHtml(summary.blockedLabel)
+        ? '<strong>' + (summary.blockedLabel.indexOf('Research continues') >= 0 ? 'Implementation blocked:' : 'Blocked:') + '</strong> ' + escapeHtml(summary.blockedLabel)
         : '<strong>Blocked:</strong> <span class="empty">None</span>';
       blockedEl.classList.toggle('empty', !summary.blockedLabel);
     }
@@ -2453,9 +2488,14 @@
       return String(goal.id || '') + '::' + String(goal.needsUserInput || '').slice(0, 240);
     }
 
-    function isTeamPageActive() {
-      return document.body.classList.contains('dashboard-team-active') ||
-        document.body.classList.contains('dashboard-team2-active');
+    function isTeamMainViewActive() {
+      if (document.body.classList.contains('dashboard-team2-active')) {
+        return typeof mc2ActiveView === 'undefined' || mc2ActiveView === 'mission';
+      }
+      if (document.body.classList.contains('dashboard-team-active')) {
+        return teamTopTab === 'roster';
+      }
+      return false;
     }
 
     function getGoalsNeedingUserInput() {
@@ -2518,7 +2558,7 @@
     }
 
     function renderTeamUserInputModal() {
-      if (!isTeamPageActive()) {
+      if (!isTeamMainViewActive()) {
         closeTeamUserInputModal();
         return;
       }

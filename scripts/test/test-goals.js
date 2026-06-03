@@ -23,6 +23,9 @@ async function main() {
       getGoalMemoryPath,
       readGoalMemory,
       respondToGoalUserInput,
+      partitionSubgoalsByWait,
+      subgoalBlockedByWait,
+      normalizeWaitAppliesTo,
     } = await import('../../lib/goals.js');
     const { logTeamActivity } = await import('../../lib/team-activity.js');
 
@@ -50,7 +53,26 @@ async function main() {
     assert(/7\) Waiting \/ Watchers \/ Conditions/.test(prompt), 'prompt includes waiting section');
     assert(/8\) Opportunity Detection/.test(prompt), 'prompt includes opportunity detection section');
     assert(/"userInputRequired": false/.test(prompt), 'prompt includes user input required flag');
+    assert(/partial wait does NOT pause goal ticks/.test(prompt), 'prompt explains partial wait keeps ticking');
+    assert(/waitAppliesTo/.test(prompt), 'prompt includes waitAppliesTo');
+    const partialPrompt = buildGoalTickPrompt({
+      ...created,
+      waitCondition: {
+        kind: 'partial',
+        waitAppliesTo: 'implementation',
+        reason: 'Await analytics vendor',
+      },
+      subgoals: [
+        { id: 'research-competitors', title: 'Competitor signup research', status: 'todo', progress: 0, subgoals: [] },
+        { id: 'instrument-funnel', title: 'Instrument funnel with PostHog', status: 'doing', progress: 10, subgoals: [] },
+      ],
+    });
+    assert(/Actionable branches/.test(partialPrompt), 'prompt lists actionable branches during wait');
+    assert(/Blocked branches/.test(partialPrompt), 'prompt lists blocked branches during wait');
     assert(/"wait":/.test(prompt), 'prompt includes wait schema');
+    assert(/partial/.test(prompt), 'prompt includes partial wait kind');
+    assert(/9\) Curiosity & Next Steps/.test(prompt), 'prompt includes curiosity section');
+    assert(/createdSubgoals/.test(prompt), 'prompt includes createdSubgoals schema');
     assert(/"initiatives": \[\{/.test(prompt), 'prompt includes initiatives schema');
     const memoryPath = getGoalMemoryPath(created.id);
     assert(existsSync(memoryPath), 'goal memory file created');
@@ -127,6 +149,60 @@ async function main() {
     assert(Array.isArray(runResult.goal.subgoals) && runResult.goal.subgoals.length === 2, 'goal subgoal tree saved');
     assert(runResult.goal.subgoals[1].depends_on.includes('research'), 'subgoal dependency saved');
     assert(runResult.goal.subgoals[1].subgoals[0].subgoals[0].title === 'Promotion', 'nested subgoal saved');
+    assert(Array.isArray(runResult.createdSubgoals) && runResult.createdSubgoals.length === 0, 'no createdSubgoals when field omitted');
+
+    updateGoal(created.id, { nextRunAt: Date.now() - 1, status: 'active' });
+    const spawnResult = await runGoalTick(created.id, {
+      runGoalTurn: async () => ({
+        textToSend: JSON.stringify({
+          status: 'active',
+          summary: 'Discovered follow-up research tasks.',
+          progressPct: 45,
+          subgoals: [
+            {
+              id: 'research',
+              title: 'Research',
+              status: 'done',
+              progress: 100,
+              assignee: 'marketer',
+              depends_on: [],
+              subgoals: [],
+            },
+          ],
+          createdSubgoals: [
+            {
+              title: 'Interview 3 churned users',
+              description: 'Capture signup drop-off reasons',
+              assignee: 'marketer',
+              priority: 2,
+              dueInHours: 48,
+            },
+            {
+              title: 'Map onboarding email sequence',
+              description: 'Document current lifecycle emails',
+              assignee: 'main',
+              priority: 3,
+              dueInHours: 72,
+            },
+            {
+              title: 'Interview 3 churned users',
+              description: 'duplicate should be skipped',
+              assignee: 'marketer',
+              priority: 4,
+              dueInHours: 12,
+            },
+          ],
+        }),
+        skillsCalled: [],
+      }),
+    });
+    assert(spawnResult.createdSubgoals.length === 2, `expected 2 created subgoals, got ${spawnResult.createdSubgoals.length}`);
+    assert(spawnResult.createdSubgoals[0].title === 'Interview 3 churned users', 'first created subgoal title preserved');
+    assert(spawnResult.goal.subgoals.some((sg) => sg.title === 'Interview 3 churned users'), 'created subgoal inserted into tree');
+    assert(spawnResult.goal.subgoals.some((sg) => sg.title === 'Map onboarding email sequence'), 'second created subgoal inserted into tree');
+    const memoryAfterSpawn = readGoalMemory(created.id, { maxChars: 5000 });
+    assert(/New subgoals:/.test(memoryAfterSpawn), 'memory stores new subgoals');
+
     assert(listGoals().goals.length === 1, 'single goal remains in store');
     const memoryAfterRun = readGoalMemory(created.id, { maxChars: 5000 });
     assert(/Learned:/.test(memoryAfterRun), 'memory stores learnings');
@@ -191,10 +267,38 @@ async function main() {
     updateGoal(created.id, {
       status: 'active',
       needsUserInput: 'Which analytics vendor should we use?',
-      waitCondition: { kind: 'manual', reason: 'Awaiting analytics choice' },
-      nextRunAt: Date.now() + 60_000,
+      waitCondition: {
+        kind: 'partial',
+        waitAppliesTo: 'implementation',
+        blockedSubgoalIds: ['instrument-funnel'],
+        reason: 'Awaiting analytics choice before instrumentation',
+      },
+      nextRunAt: Date.now() - 1,
     });
-    assert(!listDueGoals().some((g) => g.id === created.id), 'manual-wait goal with user input is not due');
+    const withPartial = getGoal(created.id);
+    assert(withPartial.waitCondition && withPartial.waitCondition.kind === 'partial', 'partial wait condition stored');
+    assert(withPartial.waitCondition.waitAppliesTo === 'implementation', 'waitAppliesTo stored on partial wait');
+    assert(listDueGoals().some((g) => g.id === created.id), 'partial-wait goal with user input stays due');
+
+    const parts = partitionSubgoalsByWait([
+      { id: 'research-competitors', title: 'Competitor signup research', status: 'todo', progress: 0, subgoals: [] },
+      { id: 'instrument-funnel', title: 'Instrument funnel with PostHog', status: 'doing', progress: 10, subgoals: [] },
+      { id: 'stack-confirmation-config', title: 'Confirm analytics stack config', status: 'todo', progress: 0, subgoals: [] },
+    ], withPartial.waitCondition);
+    assert(parts.actionable.some((sg) => sg.id === 'research-competitors'), 'research subgoal stays actionable during implementation wait');
+    assert(parts.blocked.some((sg) => sg.id === 'instrument-funnel'), 'explicit blockedSubgoalIds are blocked');
+    assert(parts.blocked.some((sg) => sg.id === 'stack-confirmation-config'), 'implementation-scoped subgoal blocked by waitAppliesTo');
+    assert(subgoalBlockedByWait({ id: 'research-competitors', title: 'Competitor signup research', status: 'todo' }, withPartial.waitCondition) === false, 'research not blocked by implementation wait');
+
+    updateGoal(created.id, {
+      waitCondition: { kind: 'manual', reason: 'Legacy manual wait' },
+      nextRunAt: Date.now() - 1,
+    });
+    const legacyManual = getGoal(created.id);
+    assert(legacyManual.waitCondition && legacyManual.waitCondition.kind === 'partial', 'legacy manual wait normalizes to partial');
+    assert(legacyManual.waitCondition.waitAppliesTo === 'implementation', 'legacy manual wait defaults waitAppliesTo to implementation');
+    assert(listDueGoals().some((g) => g.id === created.id), 'legacy manual wait keeps goal due');
+
     const responded = respondToGoalUserInput(created.id, 'PostHog with product analytics only');
     assert(!responded.needsUserInput, 'needsUserInput cleared after response');
     assert(!responded.waitCondition, 'wait condition cleared after response');
