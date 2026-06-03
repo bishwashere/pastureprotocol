@@ -80,8 +80,8 @@ const API = '';
       if (name === 'groups') fetchGroups();
       if (name === 'home') {
         fetchStatus();
-        fetchChatAgents();
-        renderHomeIdentityTiles();
+        if (typeof fetchChatAgents === 'function') fetchChatAgents();
+        if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
       }
       if (name === 'team') {
         setTeamTopTab('roster');
@@ -277,4 +277,3 @@ const API = '';
       if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
     }
     dashboardBoot();
-    dashboardRouteFromHash();

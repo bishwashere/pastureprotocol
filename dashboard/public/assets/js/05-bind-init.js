@@ -144,3 +144,4 @@ function mc2BindTimelineScrollSpy(viewEl) {
         }).observe(canvas);
       });
     })();
+    if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();

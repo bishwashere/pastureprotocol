@@ -93,5 +93,6 @@ Discovery rule: folder `scripts/test/<id>/inputs.md` plus `scripts/test/test-<id
 | memory-index-files, output-parse, read, retrospective, search, server-inspect | unit / E2E | ✅ |
 | session-bootstrap, skill-install, speech, telegram-send, tide, tide-checklist | unit / E2E | ✅ |
 | update-build, vision, workspace-chat-days, workspace-path, write | unit / E2E | ✅ |
+| dashboard-boot, dashboard-browser | static + Playwright | — |
 
 Not in UI (wrappers only): `test-agent-send.js`, `test-agent-title.js` → run `test-agent-team-e2e.js` via pnpm aliases.

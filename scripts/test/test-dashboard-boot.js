@@ -126,9 +126,13 @@ const checks = [
       bind.includes("wireClick('agent-team-create-btn'"),
   },
   {
-    name: 'bind-init re-syncs team panel after mission-control bundle is available',
-    ok: bind.includes('typeof renderMissionControl === \'function\'') &&
-      bind.includes('setTeamAgentPanelRange(typeof teamAgentPanelRange'),
+    name: 'initial hash route runs from bind-init after all bundles load',
+    ok: bind.includes('dashboardRouteFromHash()') &&
+      !/dashboardBoot\(\);\s*\n\s*dashboardRouteFromHash\(\)/.test(core),
+  },
+  {
+    name: 'home setPage guards fetchChatAgents until chat bundle loads',
+    ok: /if \(name === 'home'\)[\s\S]*typeof fetchChatAgents === 'function'/.test(core),
   },
 ];
 
