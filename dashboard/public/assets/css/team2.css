@@ -461,31 +461,33 @@ body.dashboard-team2-active > nav {
 
 /* Mission home scrolls as one page so long kanban lists don't squash bottom panels. */
 #mc2-view-mission {
-  overflow: auto;
+  flex: 1 1 0;
   min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-#mc2-view-mission > .mc-progress-row,
-#mc2-view-mission > .mc-kanban,
-#mc2-view-mission > div:not(.mc-bottom-row),
-#mc2-view-mission > .mc-bottom-row {
-  flex-shrink: 0;
-}
-
-#mc2-view-mission > .mc-bottom-row {
+#mc2-view-mission > * {
+  flex: 0 0 auto;
   min-height: auto;
-  align-items: stretch;
+}
+
+#mc2-view-mission > .mc-bottom-row {
+  align-items: start;
 }
 
 #mc2-view-mission .mc-bottom-row .mc-panel {
   min-height: 8rem;
   height: auto;
   max-height: none;
+  align-self: stretch;
 }
 
 #mc2-view-mission .mc-bottom-row .mc-panel-body {
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: none;
+  min-height: auto;
   overflow: visible;
 }
 
@@ -2270,4 +2272,10 @@ body.dashboard-team2-active {
   .mc-agents-overview {
     grid-template-columns: 1fr;
   }
+}
+
+/* Mission view: keep bottom panels at full height; scroll the view, not inner panels. */
+#mc2-view-mission .mc-bottom-row .mc-panel-body {
+  flex: none;
+  overflow: visible;
 }

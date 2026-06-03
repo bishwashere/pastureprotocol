@@ -147,8 +147,9 @@ const checks = [
   },
   {
     name: 'mission view scrolls when kanban content is long',
-    ok: /#mc2-view-mission[\s\S]{0,180}overflow:\s*auto/.test(team2Css) &&
-      /#mc2-view-mission > \.mc-bottom-row[\s\S]{0,120}flex-shrink:\s*0/.test(team2Css) &&
+    ok: /#mc2-view-mission[\s\S]{0,260}overflow-y:\s*auto/.test(team2Css) &&
+      /#mc2-view-mission > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
+      /#mc2-view-mission \.mc-bottom-row \.mc-panel-body[\s\S]{0,80}flex:\s*none/.test(team2Css) &&
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
