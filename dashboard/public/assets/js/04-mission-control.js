@@ -1232,11 +1232,6 @@
         if (nav) mc2SetView(nav);
       });
     });
-    document.querySelectorAll('#page-team2 .mc-stat-card-action[data-mc-action="blocked"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
-      });
-    });
     var mc2AddAgentBtn = document.getElementById('mc2-add-agent-btn');
     if (mc2AddAgentBtn) {
       mc2AddAgentBtn.addEventListener('click', function () {
@@ -1246,6 +1241,13 @@
     var mc2PendingRoot = document.getElementById('page-team2');
     if (mc2PendingRoot) {
       mc2PendingRoot.addEventListener('click', function (e) {
+        var blockedBtn = e.target && e.target.closest ? e.target.closest('[data-mc-action="blocked"]') : null;
+        if (blockedBtn) {
+          e.preventDefault();
+          if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
+          else if (typeof window.navigateToBlockedWork === 'function') window.navigateToBlockedWork();
+          return;
+        }
         var attentionBtn = e.target && e.target.closest ? e.target.closest('[data-attention-action]') : null;
         if (attentionBtn) {
           e.preventDefault();

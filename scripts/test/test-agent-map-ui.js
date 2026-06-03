@@ -338,16 +338,22 @@ const checks = [
   {
     name: 'Team2 Blocked stat navigates to blocked subgoal',
     ok: html.includes('data-mc-action="blocked"') &&
+      html.includes('window.navigateToBlockedWork') &&
+      html.includes('scheduleScrollToBlockedTarget') &&
       html.includes('navigateToBlockedWork') &&
       html.includes('scrollToBlockedSubgoalMarker') &&
       html.includes('findFirstBlockedWorkRef') &&
       html.includes('id="mc2-goal-detail"') &&
       html.includes('View blocked tasks and subtasks') &&
-      html.includes('team-goal-subgoal-status blocked'),
+      html.includes('team-goal-subgoal-status blocked') &&
+      html.includes('data-mc-action="blocked"') &&
+      html.includes('scrollToFirstBlockedSubgoalTag'),
   },
   {
     name: 'Team page blocked badge is clickable',
     ok: html.includes('team-task-badge-action') &&
+      html.includes('window.navigateToBlockedWork') &&
+      html.includes('scheduleScrollToBlockedTarget') &&
       html.includes('navigateToBlockedWork') &&
       html.includes('data-mission-subgoal-id') &&
       html.includes('mission-blocked'),

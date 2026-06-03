@@ -287,6 +287,27 @@
       color: var(--muted);
       font-style: italic;
     }
+    button.team-task-blocked-link {
+      display: inline;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    button.team-task-blocked-link:hover strong {
+      color: #f87171;
+    }
+    button.team-task-blocked-link:focus-visible {
+      outline: 2px solid #ef4444;
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
     .team-current-mission-title {
       margin: 0 0 0.4rem 0;
       font-size: 0.72rem;

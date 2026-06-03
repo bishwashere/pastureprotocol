@@ -800,15 +800,43 @@
       return 'mission-todo';
     }
 
-    function walkGoalSubgoalsForBlocked(subgoals, goalId, out) {
+    function dashboardSubgoalBlockedByWait(subgoal, waitCondition) {
+      if (!subgoal || !isGoalPartialWait({ waitCondition: waitCondition })) return false;
+      var w = waitCondition || {};
+      var blockedIds = Array.isArray(w.blockedSubgoalIds) ? w.blockedSubgoalIds : (
+        Array.isArray(w.appliesToSubgoalIds) ? w.appliesToSubgoalIds : []
+      );
+      var sgId = String(subgoal.id || '').trim();
+      if (sgId && blockedIds.some(function (id) { return String(id || '').trim() === sgId; })) return true;
+      var appliesTo = String(w.waitAppliesTo || w.scope || 'implementation').toLowerCase();
+      var hay = (sgId + ' ' + String(subgoal.title || '') + ' ' + String(subgoal.description || '')).toLowerCase();
+      var scope = /research|explore|benchmark|competitor|audit|interview|survey|discover/.test(hay) ? 'research'
+        : /instrument|tracking|analytics|posthog|ga4|mixpanel|pixel|funnel/.test(hay) ? 'instrumentation'
+        : /deploy|release|launch|production|prod|go-live|ship/.test(hay) ? 'deployment'
+        : /implement|build|develop|integrate|setup|code|configure/.test(hay) ? 'implementation'
+        : 'general';
+      if (appliesTo === 'all') return true;
+      if (appliesTo === scope) return true;
+      if (appliesTo === 'implementation' && (scope === 'implementation' || scope === 'instrumentation' || scope === 'deployment')) {
+        return true;
+      }
+      return false;
+    }
+
+    function walkGoalSubgoalsForBlocked(subgoals, goalId, goal, out) {
       var refs = out || [];
+      var waitCondition = goal && goal.waitCondition;
       (subgoals || []).forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         var sgId = String(sg.id || '').trim();
-        if (normalizeSubgoalStatus(sg.status) === 'blocked') {
-          refs.push({ kind: 'subgoal', goalId: goalId, subgoalId: sgId });
+        var title = String(sg.title || '').trim();
+        var status = normalizeSubgoalStatus(sg.status);
+        var blocked = status === 'blocked' ||
+          (String(sg.status || '').toLowerCase() !== 'done' && dashboardSubgoalBlockedByWait(sg, waitCondition));
+        if (blocked) {
+          refs.push({ kind: 'subgoal', goalId: goalId, subgoalId: sgId, title: title });
         }
-        walkGoalSubgoalsForBlocked(sg.subgoals, goalId, refs);
+        walkGoalSubgoalsForBlocked(sg.subgoals, goalId, goal, refs);
       });
       return refs;
     }
@@ -827,8 +855,10 @@
         if (!goalId) return;
         if (String(g.status || '').toLowerCase() === 'blocked') {
           refs.push({ kind: 'goal', goalId: goalId, subgoalId: '', agentId: '' });
+        } else if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
+          refs.push({ kind: 'goal', goalId: goalId, subgoalId: '', agentId: '', partial: true });
         }
-        walkGoalSubgoalsForBlocked(g.subgoals, goalId, refs);
+        walkGoalSubgoalsForBlocked(g.subgoals, goalId, g, refs);
       });
       return refs;
     }
@@ -863,15 +893,68 @@
       }
     }
 
-    function scrollToBlockedSubgoalMarker(subgoalId) {
-      var id = String(subgoalId || '').trim();
-      if (!id) return false;
-      var el = document.querySelector('[data-subgoal-id="' + id + '"] .team-goal-subgoal-status.blocked') ||
-        document.querySelector('[data-mission-subgoal-id="' + id + '"]');
+    function scrollToFirstBlockedSubgoalTag() {
+      var el = document.querySelector(
+        '#mc2-goal-detail .team-goal-subgoal-status.blocked, #team-goal-detail .team-goal-subgoal-status.blocked, ' +
+        '#team-current-mission .team-goal-subgoal-status.blocked, #team-current-mission li.mission-blocked'
+      );
       if (!el) return false;
       openSubgoalAncestors(el);
       try { el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
-      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : el.closest('[data-subgoal-id]') || el);
+      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : (el.closest('[data-subgoal-id]') || el));
+      return true;
+    }
+
+    function scrollToBlockedSubgoalMarker(subgoalId, title) {
+      var id = String(subgoalId || '').trim();
+      var el = null;
+      if (id) {
+        el = document.querySelector('[data-subgoal-id="' + id + '"] .team-goal-subgoal-status.blocked') ||
+          document.querySelector('[data-mission-subgoal-id="' + id + '"]');
+      }
+      if (!el && title) {
+        var rows = document.querySelectorAll('.team-goal-subgoal-row[data-subgoal-id]');
+        for (var i = 0; i < rows.length; i++) {
+          var rowTitle = rows[i].querySelector('.team-goal-subgoal-title');
+          if (rowTitle && String(rowTitle.textContent || '').trim() === String(title).trim()) {
+            el = rows[i].querySelector('.team-goal-subgoal-status.blocked') || rows[i];
+            break;
+          }
+        }
+      }
+      if (!el) return false;
+      openSubgoalAncestors(el);
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
+      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : (el.closest('[data-subgoal-id]') || el));
+      return true;
+    }
+
+    function scheduleScrollToBlockedTarget(ref, attempt) {
+      var tries = Number(attempt) || 0;
+      var hit = false;
+      if (ref && ref.kind === 'subgoal') {
+        hit = scrollToBlockedSubgoalMarker(ref.subgoalId, ref.title) || scrollToFirstBlockedSubgoalTag();
+      } else if (ref && ref.kind === 'goal') {
+        var goalStatus = document.querySelector('#team-goal-detail .team-goal-status.blocked, #mc2-goal-detail .team-goal-status.blocked');
+        if (goalStatus) {
+          try { goalStatus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
+          highlightBlockedTarget(goalStatus);
+          hit = true;
+        } else {
+          hit = scrollToFirstBlockedSubgoalTag();
+        }
+      } else {
+        hit = scrollToFirstBlockedSubgoalTag();
+      }
+      if (hit || tries >= 20) return;
+      setTimeout(function () { scheduleScrollToBlockedTarget(ref, tries + 1); }, 100);
+    }
+
+    function scrollMc2BlockedKanban() {
+      var col = document.getElementById('mc2-col-blocked');
+      if (!col) return false;
+      try { col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (_) {}
+      highlightBlockedTarget(col);
       return true;
     }
 
@@ -879,56 +962,68 @@
       ref = ref || findFirstBlockedWorkRef();
       if (!ref) return false;
       if (ref.kind === 'agent' && ref.agentId) {
-        if (typeof mc2SetAgentFilter === 'function') {
-          mc2SetAgentFilter(ref.agentId, 'context');
+        var hasSubgoalBlockers = findBlockedWorkRefs().some(function (r) { return r.kind === 'subgoal' || r.kind === 'goal'; });
+        if (hasSubgoalBlockers) {
+          ref = findFirstBlockedWorkRef();
+        } else {
+          if (typeof mc2SetAgentFilter === 'function') {
+            mc2SetAgentFilter(ref.agentId, 'context');
+            return true;
+          }
+          if (typeof selectTeamInboxAgent === 'function') selectTeamInboxAgent(ref.agentId);
           return true;
         }
-        if (typeof selectTeamInboxAgent === 'function') selectTeamInboxAgent(ref.agentId);
-        return true;
       }
       var goalId = String(ref.goalId || '').trim();
       if (!goalId) return false;
       var mission = typeof getCurrentMissionGoal === 'function' ? getCurrentMissionGoal() : null;
-      if (ref.kind === 'subgoal' && ref.subgoalId && mission && String(mission.id || '') === goalId) {
-        if (scrollToBlockedSubgoalMarker(ref.subgoalId)) return true;
+      if (ref.kind === 'subgoal' && mission && String(mission.id || '') === goalId) {
+        renderCurrentMission();
+        if (scrollToBlockedSubgoalMarker(ref.subgoalId, ref.title)) return true;
       }
       selectedTeamGoalId = goalId;
       if (typeof mc2SetView === 'function') {
         mc2SetView('goals');
-        if (typeof mc2RenderGoals === 'function') mc2RenderGoals();
+        if (typeof mc2RenderGoals === 'function') {
+          Promise.resolve(mc2RenderGoals()).then(function () {
+            scheduleScrollToBlockedTarget(ref, 0);
+          }).catch(function () {
+            scheduleScrollToBlockedTarget(ref, 0);
+          });
+        } else {
+          scheduleScrollToBlockedTarget(ref, 0);
+        }
       } else if (typeof setTeamTopTab === 'function') {
         setTeamTopTab('goals');
         renderGoalsList();
+        scheduleScrollToBlockedTarget(ref, 0);
       }
-      setTimeout(function () {
-        if (ref.kind === 'subgoal' && ref.subgoalId) {
-          scrollToBlockedSubgoalMarker(ref.subgoalId);
-          return;
-        }
-        var goalStatus = document.querySelector('#team-goal-detail .team-goal-status.blocked, #mc2-goal-detail .team-goal-status.blocked');
-        if (goalStatus) {
-          try { goalStatus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
-          highlightBlockedTarget(goalStatus);
-        }
-      }, ref.kind === 'subgoal' ? 160 : 120);
       return true;
     }
 
     function navigateToBlockedWork() {
-      if (!findFirstBlockedWorkRef()) {
-        if (typeof mc2SetView === 'function') {
+      var ref = findFirstBlockedWorkRef();
+      if (ref && scrollToBlockedWork(ref)) return true;
+      if (typeof mc2SetView === 'function') {
+        if (document.querySelector('#mc2-col-blocked .mc-kanban-card')) {
           mc2SetView('mission');
-          setTimeout(function () {
-            var col = document.getElementById('mc2-col-blocked');
-            if (col) {
-              try { col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (_) {}
-            }
-          }, 80);
+          setTimeout(scrollMc2BlockedKanban, 80);
+          return true;
         }
-        return false;
+        mc2SetView('goals');
+        scheduleScrollToBlockedTarget(null, 0);
+        return true;
       }
-      return scrollToBlockedWork();
+      if (typeof setTeamTopTab === 'function') {
+        setTeamTopTab('goals');
+        renderGoalsList();
+        scheduleScrollToBlockedTarget(null, 0);
+        return true;
+      }
+      return false;
     }
+
+    window.navigateToBlockedWork = navigateToBlockedWork;
 
     function flattenMissionSubgoals(subgoals, out, depth) {
       var list = Array.isArray(subgoals) ? subgoals : [];
@@ -1158,10 +1253,15 @@
         '<button type="button" class="team-task-badge blocked team-task-badge-action"' + blockedDisabled +
           ' aria-label="View blocked tasks and subtasks">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</button>' +
         '<span class="team-task-badge completed">[' + escapeHtml(String(summary.completedToday)) + ' Completed Today]</span>';
-      blockedEl.innerHTML = summary.blockedLabel
-        ? '<strong>' + (summary.blockedLabel.indexOf('Research continues') >= 0 ? 'Implementation blocked:' : 'Blocked:') + '</strong> ' + escapeHtml(summary.blockedLabel)
-        : '<strong>Blocked:</strong> <span class="empty">None</span>';
-      blockedEl.classList.toggle('empty', !summary.blockedLabel);
+      if (summary.blocked > 0 && summary.blockedLabel) {
+        blockedEl.innerHTML = '<button type="button" class="team-task-blocked-link">' +
+          '<strong>' + (summary.blockedLabel.indexOf('Research continues') >= 0 ? 'Implementation blocked:' : 'Blocked:') + '</strong> ' +
+          escapeHtml(summary.blockedLabel) + '</button>';
+        blockedEl.classList.remove('empty');
+      } else {
+        blockedEl.innerHTML = '<strong>Blocked:</strong> <span class="empty">None</span>';
+        blockedEl.classList.add('empty');
+      }
     }
 
     function normalizeSubgoalStatus(status) {
@@ -2890,12 +2990,14 @@
     }
     setTeamTopTab('roster');
 
-    var teamTaskSummaryBadges = document.getElementById('team-task-summary-badges');
-    if (teamTaskSummaryBadges && !teamTaskSummaryBadges._blockedWired) {
-      teamTaskSummaryBadges._blockedWired = true;
-      teamTaskSummaryBadges.addEventListener('click', function (e) {
-        var btn = e.target && e.target.closest ? e.target.closest('.team-task-badge-action.blocked') : null;
-        if (!btn || btn.disabled) return;
+    var teamPageRoot = document.getElementById('page-team');
+    if (teamPageRoot && !teamPageRoot._blockedWired) {
+      teamPageRoot._blockedWired = true;
+      teamPageRoot.addEventListener('click', function (e) {
+        var badgeBtn = e.target && e.target.closest ? e.target.closest('.team-task-badge-action.blocked') : null;
+        var lineBtn = e.target && e.target.closest ? e.target.closest('.team-task-blocked-link') : null;
+        if (!badgeBtn && !lineBtn) return;
+        if (badgeBtn && badgeBtn.disabled) return;
         e.preventDefault();
         if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
       });
