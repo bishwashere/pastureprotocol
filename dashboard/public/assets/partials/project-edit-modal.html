@@ -1,0 +1,27 @@
+<div id="project-edit-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="project-edit-modal-title">
+      <h2 id="project-edit-modal-title">Edit project</h2>
+      <p class="skill-meta" style="margin:0 0 0.5rem 0;">Update name, URL, and description.</p>
+      <div class="field">
+        <label for="project-edit-name">Name</label>
+        <input id="project-edit-name" type="text" placeholder="Project name" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="project-edit-url">URL <span class="field-hint">(optional)</span></label>
+        <input id="project-edit-url" type="url" placeholder="https://example.com" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="project-edit-desc">Description <span class="field-hint">(optional)</span></label>
+        <input id="project-edit-desc" type="text" placeholder="Short description" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label for="project-edit-setup">Setup notes <span class="field-hint">(optional — MongoDB, env, deployment)</span></label>
+        <textarea id="project-edit-setup" rows="3" placeholder="Connection strings, API URLs, env vars…" autocomplete="off"></textarea>
+      </div>
+      <p id="project-edit-modal-error" class="modal-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="project-edit-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="project-edit-modal-submit">Save</button>
+      </div>
+    </div>
+  </div>

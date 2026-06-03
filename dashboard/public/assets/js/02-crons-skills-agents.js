@@ -1,0 +1,1827 @@
+async function fetchCrons() {
+      const r = await fetch(API + '/api/crons');
+      const d = await r.json();
+      const el = document.getElementById('crons-list');
+      const jobs = d.jobs || [];
+      if (jobs.length === 0) {
+        el.innerHTML = '<p class="empty">No scheduled crons.</p>';
+        return;
+      }
+      el.innerHTML = '<table><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Message</th></tr></thead><tbody>' +
+        jobs.map(j => {
+          const s = j.schedule || {};
+          const sched = s.kind === 'cron' ? (s.expr || '') : (s.at || '');
+          return '<tr><td>' + escapeHtml(j.name || j.id) + '</td><td><span class="badge ' + (j.enabled ? 'enabled' : 'disabled') + '">' + (j.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(sched) + '</td><td>' + escapeHtml((j.message || '').slice(0, 60)) + (j.message && j.message.length > 60 ? '…' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    let skillsDirty = false;
+    let currentEnabled = [];
+
+    let currentSkillId = null;
+
+    async function fetchSkills() {
+      const r = await fetch(API + '/api/skills');
+      const d = await r.json();
+      currentEnabled = d.enabled || [];
+      const list = d.skills || [];
+      const el = document.getElementById('skills-list');
+      el.innerHTML = list.map(s => {
+        const checked = currentEnabled.includes(s.id) ? ' checked' : '';
+        const desc = (s.description || '').trim();
+        const descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        const cs = s.configStatus;
+        const configBadge = cs === 'ok' ? '<span class="skill-config-badge ok" title="Credentials configured">configured</span>'
+          : cs === 'ok-legacy' ? '<span class="skill-config-badge ok-legacy" title="Token found in config.json — move to secrets.json for better security">token in config</span>'
+          : cs === 'missing' ? '<span class="skill-config-badge missing" title="Credentials not set — see SKILL.md for setup">needs setup</span>'
+          : cs === 'unchecked' ? '<span class="skill-config-badge unchecked" title="Uses gog CLI auth — run \'gog auth\' if not yet authenticated">gog auth</span>'
+          : '';
+        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + configBadge + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>' +
+          '<div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => { skillsDirty = true; document.getElementById('skills-save').style.display = 'block'; });
+      });
+      el.querySelectorAll('.skill-row').forEach(row => {
+        row.addEventListener('click', (e) => { if (!e.target.closest('label')) openSkillDoc(row.dataset.id, row.closest('.skill-item')); });
+      });
+      el.querySelectorAll('.skill-doc-save-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const panel = btn.closest('.skill-doc-inline');
+          const id = panel && panel.dataset.id;
+          if (!id) return;
+          const content = panel.querySelector('.skill-doc-textarea').value;
+          const r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+          if (r.ok) {
+            const savedEl = panel.querySelector('.skill-doc-saved');
+            if (savedEl) { savedEl.style.display = 'inline'; setTimeout(() => { savedEl.style.display = 'none'; }, 2000); }
+          }
+        });
+      });
+      document.getElementById('skills-save').style.display = 'none';
+      skillsDirty = false;
+    }
+
+    async function openSkillDoc(id, skillItem) {
+      currentSkillId = id;
+      const listEl = document.getElementById('skills-list');
+      listEl.querySelectorAll('.skill-doc-inline').forEach(p => p.classList.remove('open'));
+      const panel = skillItem ? skillItem.querySelector('.skill-doc-inline') : listEl.querySelector('.skill-doc-inline[data-id="' + id + '"]');
+      if (!panel) return;
+      const r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc');
+      if (!r.ok) return;
+      const d = await r.json();
+      panel.querySelector('.skill-doc-desc').textContent = d.description || '';
+      panel.querySelector('.skill-doc-textarea').value = d.content || '';
+      panel.classList.add('open');
+    }
+
+    wireEl('skills-save', 'click', async () => {
+      const boxes = document.querySelectorAll('#skills-list input[type="checkbox"]:checked');
+      const enabled = Array.from(boxes).map(b => b.dataset.id);
+      const r = await fetch(API + '/api/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+      if (r.ok) { skillsDirty = false; document.getElementById('skills-save').style.display = 'none'; }
+    });
+
+    var selectedAgentId = 'main';
+    var selectedAgentMdFile = null;
+    var agentSkillsDirty = false;
+
+    async function fetchAgentsPage() {
+      var r = await fetch(API + '/api/agents');
+      var d = await r.json();
+      var list = d.agents || [];
+      if (!list.some(function (a) { return a.id === selectedAgentId; })) selectedAgentId = list.length ? list[0].id : 'main';
+      var ul = document.getElementById('agents-list');
+      if (!ul) return;
+      ul.innerHTML = list.map(function (a) {
+        var selected = a.id === selectedAgentId ? 'selected' : '';
+        return '<li class="' + selected + '"><button type="button" class="link" data-agent-id="' + escapeHtml(a.id) + '">' + escapeHtml(a.id) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('button[data-agent-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectAgent(btn.getAttribute('data-agent-id')); });
+      });
+      if (selectedAgentId) await selectAgent(selectedAgentId);
+    }
+
+    async function selectAgent(agentId) {
+      selectedAgentId = agentId || 'main';
+      document.querySelectorAll('#agents-list li').forEach(function (li) {
+        var b = li.querySelector('button[data-agent-id]');
+        li.classList.toggle('selected', b && b.getAttribute('data-agent-id') === selectedAgentId);
+      });
+      document.getElementById('agent-detail-title').textContent = 'Agent: ' + selectedAgentId;
+      document.getElementById('agent-detail-meta').textContent = selectedAgentId === 'main'
+        ? 'Default agent created automatically.'
+        : 'Custom agent for routing specific groups/chats.';
+      var delBtn = document.getElementById('agent-delete-btn');
+      if (delBtn) {
+        delBtn.disabled = selectedAgentId === 'main';
+        delBtn.title = selectedAgentId === 'main' ? 'Default main agent cannot be deleted' : '';
+      }
+      await loadAgentSkills(selectedAgentId);
+      await loadAgentMdFiles(selectedAgentId);
+    }
+
+    async function loadAgentSkills(agentId) {
+      var all = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
+      var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+      var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled : (all.enabled || []);
+      var list = all.skills || [];
+      var el = document.getElementById('agent-skills-list');
+      el.innerHTML = list.map(function (s) {
+        var checked = enabled.includes(s.id) ? ' checked' : '';
+        return '<div class="skill-item"><div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span><div class="skill-desc">' + escapeHtml((s.description || '').trim()) + '</div></div><label><input type="checkbox" data-agent-skill="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div></div>';
+      }).join('');
+      el.querySelectorAll('input[data-agent-skill]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          agentSkillsDirty = true;
+          document.getElementById('agent-skills-save').style.display = 'inline-block';
+        });
+      });
+      document.getElementById('agent-skills-save').style.display = 'none';
+      agentSkillsDirty = false;
+    }
+
+    async function loadAgentMdFiles(agentId) {
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
+      var d = await r.json();
+      var files = d.files || [];
+      var filesEl = document.getElementById('agent-md-files');
+      filesEl.innerHTML = files.map(function (f) {
+        return '<button type="button" class="agent-md-btn" data-agent-file="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
+      }).join('');
+      filesEl.querySelectorAll('.agent-md-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectAgentMdFile(agentId, btn.getAttribute('data-agent-file')); });
+      });
+      if (files.length > 0) await selectAgentMdFile(agentId, files[0].id);
+    }
+
+    async function selectAgentMdFile(agentId, fileId) {
+      selectedAgentMdFile = fileId;
+      document.querySelectorAll('.agent-md-btn').forEach(function (btn) {
+        var active = btn.getAttribute('data-agent-file') === fileId;
+        btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
+        btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+      });
+      document.getElementById('agent-md-editor').style.display = 'block';
+      document.getElementById('agent-md-label').textContent = 'Agent file: ' + fileId;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(fileId));
+      var d = await r.json();
+      document.getElementById('agent-md-textarea').value = d.content || '';
+    }
+
+    function normalizeAgentIdInput(raw) {
+      return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    async function createAgentViaApi(name, fromAgentId, title) {
+      var body = { id: name };
+      if (fromAgentId) body.fromAgentId = fromAgentId;
+      if (title && String(title).trim()) body.title = String(title).trim();
+      var r = await fetch(API + '/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        throw new Error(d.error || ('Create failed (' + r.status + ')'));
+      }
+      return d;
+    }
+
+    function agentDisplayLabel(a) {
+      var id = String((a && a.id) || 'main');
+      var title = (a && a.title) ? String(a.title).trim() : '';
+      return title ? title + ' (' + id + ')' : id;
+    }
+
+    function agentCardShortName(a) {
+      var title = (a && a.title) ? String(a.title).trim() : '';
+      if (title) return title;
+      var id = String((a && a.id) || 'main');
+      return id.charAt(0).toUpperCase() + id.slice(1);
+    }
+
+    function getStateEmoji(state) {
+      return formatAgentStateDisplay(state).text.split(' ')[0] || '⚪';
+    }
+
+    function getStateTextLabel(state) {
+      var text = formatAgentStateDisplay(state).text;
+      var sp = text.indexOf(' ');
+      return sp >= 0 ? text.slice(sp + 1) : text;
+    }
+
+    function agentCardActiveCount(ctx, metrics) {
+      var active = Number(metrics && metrics.activeTasks);
+      if (Number.isFinite(active) && active > 0) return active;
+      var s = String((ctx && ctx.state) || 'idle').toLowerCase();
+      if (s === 'blocked') s = 'waiting';
+      return (s === 'working' || s === 'waiting') ? 1 : 0;
+    }
+
+    function isAgentContextActive(agentId) {
+      var ctx = (teamAgentContextSnapshot.agents || {})[String(agentId || '').trim()] || { state: 'idle' };
+      var s = String(ctx.state || 'idle').toLowerCase();
+      if (s === 'blocked') s = 'waiting';
+      return s !== 'idle';
+    }
+
+    function getTeamAgentsForView(agents) {
+      var list = Array.isArray(agents) ? agents.slice() : [];
+      if (!teamViewActiveOnly) return list;
+      return list.filter(function (a) { return isAgentContextActive(a && a.id); });
+    }
+
+    function setTeamViewActiveOnly(enabled) {
+      teamViewActiveOnly = !!enabled;
+      var input = document.getElementById('team-view-active-only');
+      if (input) input.checked = teamViewActiveOnly;
+      renderTeamAgentCards();
+      renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
+      renderAgentContextOverview();
+    }
+
+    var agentCreateModalOpen = false;
+
+    async function populateAgentCreateFromSelect(preselectId) {
+      var select = document.getElementById('agent-create-modal-from');
+      if (!select) return;
+      try {
+        var r = await fetch(API + '/api/agents');
+        var d = await r.json();
+        var agents = Array.isArray(d.agents) ? d.agents : [{ id: 'main' }];
+        var nonMain = agents.find(function(a) { return String(a.id) !== 'main'; });
+        var preferred = preselectId
+          || (selectedChatAgentId !== 'main' ? selectedChatAgentId : null)
+          || (nonMain ? nonMain.id : null)
+          || 'main';
+        select.innerHTML = agents.map(function (a) {
+          var id = String(a.id || 'main');
+          var selected = id === preferred ? ' selected' : '';
+          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
+        }).join('');
+      } catch (_) {
+        select.innerHTML = '<option value="main" selected>main</option>';
+      }
+    }
+
+    function showAgentCreateModalError(msg) {
+      var el = document.getElementById('agent-create-modal-error');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    async function openAgentCreateModal(opts) {
+      opts = opts || {};
+      var modal = document.getElementById('agent-create-modal');
+      var titleInput = document.getElementById('agent-create-modal-title-input');
+      if (!modal || !titleInput) return;
+      showAgentCreateModalError('');
+      titleInput.value = '';
+      await populateAgentCreateFromSelect(opts.fromAgentId);
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      agentCreateModalOpen = true;
+      setTimeout(function () { titleInput.focus(); }, 0);
+    }
+
+    function closeAgentCreateModal() {
+      var modal = document.getElementById('agent-create-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      agentCreateModalOpen = false;
+      showAgentCreateModalError('');
+    }
+
+    async function submitAgentCreateModal(switchChatToNew) {
+      var titleInput = document.getElementById('agent-create-modal-title-input');
+      var fromSelect = document.getElementById('agent-create-modal-from');
+      var submitBtn = document.getElementById('agent-create-modal-submit');
+      if (!titleInput || !fromSelect) return;
+      var title = titleInput.value.trim();
+      if (!title) {
+        showAgentCreateModalError('Enter a name for the agent.');
+        titleInput.focus();
+        return;
+      }
+      var normalized = normalizeAgentIdInput(title);
+      if (!normalized) {
+        showAgentCreateModalError('Name must contain at least one letter or number.');
+        titleInput.focus();
+        return;
+      }
+      if (normalized === 'main') {
+        showAgentCreateModalError('"main" is reserved. Choose a different name.');
+        titleInput.focus();
+        return;
+      }
+      var fromAgentId = (fromSelect.value || 'main').trim() || 'main';
+      if (submitBtn) submitBtn.disabled = true;
+      showAgentCreateModalError('');
+      try {
+        var d = await createAgentViaApi(normalized, fromAgentId, title);
+        closeAgentCreateModal();
+        selectedAgentId = d.id || normalized;
+        if (switchChatToNew) selectedChatAgentId = d.id || normalized;
+        await fetchAgentsPage();
+        await fetchChatAgents();
+        if (switchChatToNew) setChatAgent(selectedChatAgentId);
+      } catch (err) {
+        showAgentCreateModalError(err.message || String(err));
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    var agentEditModalOpen = false;
+    var agentEditorState = {
+      modal: { agentId: '', mdFile: '', mdDirty: false },
+      page: { agentId: '', mdFile: '', mdDirty: false },
+    };
+
+    function agentEditorDom(scope) {
+      var p = scope === 'page' ? 'team-agent' : 'agent-edit-modal';
+      return {
+        title: document.getElementById(p + '-title'),
+        id: document.getElementById(p + '-id'),
+        heading: document.getElementById(p + '-heading'),
+        mdFiles: document.getElementById(p + '-md-files'),
+        mdEditor: document.getElementById(p + '-md-editor'),
+        mdLabel: document.getElementById(p + '-md-label'),
+        mdTextarea: document.getElementById(p + '-md-textarea'),
+        mdSaved: document.getElementById(p + '-md-saved'),
+        skills: document.getElementById(p + '-skills'),
+        inboundWrap: document.getElementById(p + '-inbound-wrap'),
+        inbound: document.getElementById(p + '-inbound'),
+        links: document.getElementById(p + '-links'),
+        error: document.getElementById(p + '-error'),
+      };
+    }
+
+    function showAgentEditorError(msg, scope) {
+      var el = agentEditorDom(scope).error;
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    async function loadAgentEditorMdFiles(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      if (!dom.mdFiles) return;
+      state.mdFile = '';
+      state.mdDirty = false;
+      if (dom.mdSaved) dom.mdSaved.style.display = 'none';
+      if (dom.mdEditor) dom.mdEditor.style.display = 'none';
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
+      var d = await r.json();
+      var files = d.files || AGENT_IDENTITY_FILE_ORDER.map(function (id) {
+        return { id: id, label: IDENTITY_FILE_LABELS[id] || id, exists: false };
+      });
+      dom.mdFiles.innerHTML = files.map(function (f) {
+        var missing = f.exists === false ? ' · new' : '';
+        return '<button type="button" class="agent-edit-md-btn" data-agent-edit-file="' + escapeHtml(f.id) + '">' +
+          escapeHtml(f.label || IDENTITY_FILE_LABELS[f.id] || f.id) + missing + '</button>';
+      }).join('');
+      dom.mdFiles.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectAgentEditorMdFile(agentId, btn.getAttribute('data-agent-edit-file'), scope);
+        });
+      });
+      if (files.length > 0) await selectAgentEditorMdFile(agentId, files[0].id, scope);
+    }
+
+    async function selectAgentEditorMdFile(agentId, fileId, scope) {
+      if (!fileId) return;
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      state.mdFile = fileId;
+      state.mdDirty = false;
+      if (dom.mdSaved) dom.mdSaved.style.display = 'none';
+      if (dom.mdFiles) {
+        dom.mdFiles.querySelectorAll('.agent-edit-md-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-agent-edit-file') === fileId);
+        });
+      }
+      if (dom.mdEditor) dom.mdEditor.style.display = 'block';
+      if (dom.mdLabel) dom.mdLabel.textContent = (IDENTITY_FILE_LABELS[fileId] || fileId) + ' · ' + fileId;
+      if (dom.mdTextarea) {
+        dom.mdTextarea.value = '';
+        dom.mdTextarea.oninput = function () { state.mdDirty = true; };
+      }
+      try {
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(fileId));
+        if (!r.ok) throw new Error('Failed to load');
+        var data = await r.json();
+        if (dom.mdTextarea) dom.mdTextarea.value = data.content || '';
+        state.mdDirty = false;
+      } catch (_) {
+        if (dom.mdTextarea) dom.mdTextarea.value = '';
+      }
+    }
+
+    async function saveAgentEditorMdFile(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      if (!agentId || !state.mdFile || !dom.mdTextarea) return true;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(state.mdFile), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: dom.mdTextarea.value }),
+      });
+      if (!r.ok) {
+        var d = await r.json().catch(function () { return {}; });
+        throw new Error(d.error || 'Failed to save identity file');
+      }
+      state.mdDirty = false;
+      if (dom.mdSaved) {
+        dom.mdSaved.style.display = 'inline';
+        setTimeout(function () { dom.mdSaved.style.display = 'none'; }, 2000);
+      }
+      return true;
+    }
+
+    function showAgentEditModalError(msg) {
+      showAgentEditorError(msg, 'modal');
+    }
+
+    function renderAgentEditSkillTile(skill, enabled) {
+      var sid = escapeHtml(skill.id);
+      var desc = escapeHtml((skill.description || '').trim());
+      var checked = enabled.includes(skill.id) ? ' checked' : '';
+      return '<label class="agent-edit-tile agent-edit-skill-tile">' +
+        '<input type="checkbox" class="agent-edit-tile-input" data-edit-skill="' + sid + '"' + checked + '>' +
+        '<span class="agent-edit-tile-check" aria-hidden="true">✓</span>' +
+        '<span class="agent-edit-tile-title">' + sid + '</span>' +
+        (desc ? '<span class="agent-edit-tile-desc">' + desc + '</span>' : '') +
+        '</label>';
+    }
+
+    function renderAgentEditPeerTile(agent, allow) {
+      var tid = escapeHtml(agent.id);
+      var title = (agent.title && String(agent.title).trim()) ? escapeHtml(String(agent.title).trim()) : tid;
+      var checked = allow.includes(agent.id) ? ' checked' : '';
+      var sub = title !== tid ? '<span class="agent-edit-tile-desc">' + tid + '</span>' : '';
+      return '<label class="agent-edit-tile agent-edit-peer-tile">' +
+        '<input type="checkbox" class="agent-edit-tile-input" data-edit-link="' + tid + '"' + checked + '>' +
+        '<span class="agent-edit-tile-check" aria-hidden="true">✓</span>' +
+        '<span class="agent-edit-tile-title">' + title + '</span>' +
+        sub +
+        '</label>';
+    }
+
+    async function loadAgentEditor(agentId, scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      state.agentId = agentId || 'main';
+      showAgentEditorError('', scope);
+      var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+      var skillsResp = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
+      var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
+      if (dom.id) dom.id.value = agentId;
+      if (dom.title) dom.title.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
+      if (dom.heading) dom.heading.textContent = (scope === 'page' ? 'Team agent: ' : 'Edit agent: ') + agentId;
+      await loadAgentEditorMdFiles(agentId, scope);
+      var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
+      var list = (skillsResp.skills || []).filter(function (s) { return s.id !== 'agent-send' && s.id !== 'background-tasks'; });
+      if (dom.skills) {
+        dom.skills.innerHTML = list.map(function (s) {
+          return renderAgentEditSkillTile(s, enabled);
+        }).join('');
+      }
+      var messaging = cfg.agentMessaging || {};
+      var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
+      var inboundFrom = (agentsResp.agents || []).filter(function (a) {
+        var peerAllow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        return a.id !== agentId && peerAllow.indexOf(agentId) !== -1;
+      }).map(function (a) { return a.title && String(a.title).trim() ? String(a.title).trim() + ' (' + a.id + ')' : a.id; });
+      if (dom.inboundWrap && dom.inbound) {
+        if (inboundFrom.length) {
+          dom.inboundWrap.style.display = '';
+          dom.inbound.textContent = inboundFrom.join(', ');
+        } else {
+          dom.inboundWrap.style.display = 'none';
+          dom.inbound.textContent = '';
+        }
+      }
+      var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
+      if (dom.links) {
+        if (!others.length) {
+          dom.links.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
+        } else {
+          dom.links.innerHTML = others.map(function (a) {
+            return renderAgentEditPeerTile(a, allow);
+          }).join('');
+        }
+      }
+      return dom;
+    }
+
+    async function submitAgentEditor(scope, opts) {
+      opts = opts || {};
+      var state = agentEditorState[scope];
+      var agentId = state.agentId;
+      if (!agentId) return;
+      var dom = agentEditorDom(scope);
+      var submitBtn = opts.submitBtn || null;
+      var enabled = [];
+      if (dom.skills) {
+        dom.skills.querySelectorAll('input[data-edit-skill]:checked').forEach(function (cb) {
+          enabled.push(cb.getAttribute('data-edit-skill'));
+        });
+      }
+      var allow = [];
+      if (dom.links) {
+        dom.links.querySelectorAll('input[data-edit-link]:checked').forEach(function (cb) {
+          allow.push(cb.getAttribute('data-edit-link'));
+        });
+      }
+      var patch = {
+        title: dom.title ? dom.title.value : '',
+        skills: { enabled: enabled },
+        agentMessaging: { allow: allow },
+      };
+      if (submitBtn) submitBtn.disabled = true;
+      showAgentEditorError('', scope);
+      try {
+        if (state.mdDirty && state.mdFile) {
+          await saveAgentEditorMdFile(agentId, scope);
+        }
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(d.error || ('Save failed (' + r.status + ')'));
+        if (opts.onSuccess) await opts.onSuccess();
+      } catch (err) {
+        showAgentEditorError(err.message || String(err), scope);
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    async function openAgentEditModal(agentId) {
+      var modal = document.getElementById('agent-edit-modal');
+      if (!modal) return;
+      try {
+        var dom = await loadAgentEditor(agentId, 'modal');
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        agentEditModalOpen = true;
+        setTimeout(function () { if (dom.title) dom.title.focus(); }, 0);
+      } catch (err) {
+        window.alert('Could not load agent: ' + (err.message || err));
+      }
+    }
+
+    function closeAgentEditModal() {
+      var modal = document.getElementById('agent-edit-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      agentEditModalOpen = false;
+      agentEditorState.modal = { agentId: '', mdFile: '', mdDirty: false };
+      showAgentEditorError('', 'modal');
+    }
+
+    async function submitAgentEditModal() {
+      var submitBtn = document.getElementById('agent-edit-modal-submit');
+      await submitAgentEditor('modal', {
+        submitBtn: submitBtn,
+        onSuccess: async function () {
+          closeAgentEditModal();
+          await fetchChatAgents();
+          if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+          await fetchAgentMapData();
+        },
+      });
+    }
+
+    function openTeamAgentPage(agentId) {
+      openAgentEditModal(agentId);
+    }
+
+    function openTeamPage() {
+      location.hash = '#team';
+    }
+
+    function setTeamPageFullscreen(on) {
+      teamPageFullscreen = !!on;
+      document.body.classList.toggle('team-page-fullscreen', teamPageFullscreen);
+      var btn = document.getElementById('team-page-fullscreen-btn');
+      if (btn) {
+        btn.setAttribute('aria-pressed', teamPageFullscreen ? 'true' : 'false');
+        btn.title = teamPageFullscreen ? 'Exit full screen' : 'Full screen';
+        btn.setAttribute('aria-label', btn.title);
+      }
+      try {
+        if (teamPageFullscreen) sessionStorage.setItem('teamPageFullscreen', '1');
+        else sessionStorage.removeItem('teamPageFullscreen');
+      } catch (e) {}
+    }
+
+    function toggleTeamPageFullscreen() {
+      setTeamPageFullscreen(!teamPageFullscreen);
+    }
+
+    async function loadTeamAgentPage(agentId) {
+      if (!agentId) agentId = 'main';
+      try {
+        var dom = await loadAgentEditor(agentId, 'page');
+        setTimeout(function () { if (dom.title) dom.title.focus(); }, 0);
+      } catch (err) {
+        showAgentEditorError('Could not load agent: ' + (err.message || err), 'page');
+      }
+    }
+
+    async function submitTeamAgentPage() {
+      var submitBtn = document.getElementById('team-agent-save');
+      await submitAgentEditor('page', {
+        submitBtn: submitBtn,
+        onSuccess: async function () {
+          await fetchChatAgents();
+          if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+        },
+      });
+    }
+
+    wireEl('agent-create-btn', 'click', async function () {
+      var input = document.getElementById('agent-create-name');
+      var rawName = (input && input.value) ? input.value.trim() : '';
+      if (!rawName) return;
+      var id = normalizeAgentIdInput(rawName);
+      if (!id) return;
+      try {
+        var d = await createAgentViaApi(id, 'main', rawName);
+        selectedAgentId = d.id || id;
+        if (input) input.value = '';
+        await fetchAgentsPage();
+        await fetchChatAgents();
+      } catch (err) {
+        window.alert('Create failed: ' + (err.message || err));
+      }
+    });
+
+    wireEl('agent-delete-btn', 'click', async function () {
+      if (!selectedAgentId || selectedAgentId === 'main') return;
+      var ok = window.confirm('Delete agent "' + selectedAgentId + '"? This removes its config and identity files.');
+      if (!ok) return;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '?confirm=true', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      if (!r.ok) {
+        var err = await r.json().catch(function () { return {}; });
+        window.alert('Delete failed: ' + (err.error || r.status));
+        return;
+      }
+      selectedAgentId = 'main';
+      await fetchAgentsPage();
+      await fetchChatAgents();
+    });
+
+    wireEl('agent-skills-save', 'click', async function () {
+      var checked = document.querySelectorAll('#agent-skills-list input[data-agent-skill]:checked');
+      var enabled = Array.from(checked).map(function (x) { return x.getAttribute('data-agent-skill'); });
+      var cfgRes = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/config');
+      var cfg = await cfgRes.json();
+      cfg.skills = cfg.skills || {};
+      cfg.skills.enabled = enabled;
+      var save = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skills: cfg.skills })
+      });
+      if (save.ok) {
+        document.getElementById('agent-skills-save').style.display = 'none';
+        agentSkillsDirty = false;
+      }
+    });
+
+    wireEl('agent-md-save', 'click', async function () {
+      if (!selectedAgentMdFile || !selectedAgentId) return;
+      var content = document.getElementById('agent-md-textarea').value;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/md/' + encodeURIComponent(selectedAgentMdFile), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content })
+      });
+      if (r.ok) {
+        var el = document.getElementById('agent-md-saved');
+        el.style.display = 'inline';
+        setTimeout(function () { el.style.display = 'none'; }, 2000);
+      }
+    });
+
+    let groupSkillsDirty = false;
+    let selectedGroupId = 'default';
+
+    async function fetchGroups() {
+      try {
+        var ul = document.getElementById('groups-list');
+        if (!ul) return;
+        var oldHint = document.getElementById('groups-path-hint');
+        if (oldHint) oldHint.remove();
+        var r = await fetch(API + '/api/groups');
+        var d = await r.json().catch(function () { return {}; });
+        var groups = Array.isArray(d.groups) ? d.groups : [];
+        if (d.error) console.error('[groups]', d.error);
+        ul.innerHTML =
+          '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
+          groups.map(function (g) {
+            return '<li class="' + (selectedGroupId === (g && g.id) ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(String((g && g.id) || '')) + '">' + escapeHtml(String((g && g.label) || (g && g.id) || '')) + '</button></li>';
+          }).join('');
+        if (groups.length === 0 && (d._path || d.error) && ul.parentNode) {
+          var hint = document.createElement('p');
+          hint.id = 'groups-path-hint';
+          hint.className = 'skill-meta';
+          hint.style.marginTop = '0.5rem';
+          hint.textContent = d.error ? ('Error: ' + d.error + (d._path ? ' (path: ' + d._path + ')' : '')) : ('No groups yet. Server reading: ' + (d._path || ''));
+          ul.parentNode.insertBefore(hint, ul.nextSibling);
+        }
+        ul.querySelectorAll('button.link').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
+        });
+        selectGroup(selectedGroupId);
+      } catch (e) {
+        console.error('[groups]', e);
+        var ul = document.getElementById('groups-list');
+        if (ul) ul.innerHTML = '<li><button type="button" class="link" data-id="default">Default settings</button></li><li class="skill-meta">Error loading groups.</li>';
+      }
+    }
+
+    var selectedGroupTab = 'skills';
+    function setGroupTab(tab) {
+      selectedGroupTab = tab;
+      document.querySelectorAll('#groups-detail-sub-nav button[data-group-tab]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-group-tab') === tab);
+      });
+      document.querySelectorAll('#groups-detail-content .group-sub-panel').forEach(function (p) {
+        p.classList.toggle('active',
+          (p.id === 'groups-detail-skills' && tab === 'skills') ||
+          (p.id === 'groups-detail-agent' && tab === 'agent') ||
+          (p.id === 'groups-detail-history' && tab === 'history')
+        );
+      });
+      if (tab === 'history') loadGroupHistory(selectedGroupId);
+      if (tab === 'agent') loadGroupAgent(selectedGroupId);
+    }
+    function selectGroup(id) {
+      selectedGroupId = id;
+      document.querySelectorAll('#groups-list li').forEach(function (li) {
+        var btn = li.querySelector('button.link');
+        li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
+      });
+      var titleEl = document.getElementById('groups-detail-title');
+      var metaEl = document.getElementById('groups-detail-meta');
+      var subNavEl = document.getElementById('groups-detail-sub-nav');
+      var skillsEl = document.getElementById('groups-detail-skills');
+      titleEl.textContent = id === 'default' ? 'Default group settings' : ('Group ' + id);
+      subNavEl.style.display = id ? 'flex' : 'none';
+      setGroupTab(selectedGroupTab);
+      loadGroupSkills(id);
+      loadGroupAgent(id);
+      if (id !== 'default') {
+        fetch(API + '/api/groups/' + encodeURIComponent(id))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (d && d.chatLogPath) metaEl.textContent = 'Chat log: ' + d.chatLogPath;
+            else metaEl.textContent = '';
+          })
+          .catch(function () { metaEl.textContent = ''; });
+      } else {
+        metaEl.textContent = 'Used as default restrictions for groups.';
+      }
+    }
+    function timeAgo(isoStr) {
+      if (!isoStr) return '—';
+      var d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '—';
+      var sec = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (sec < 60) return sec + 's ago';
+      if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+      if (sec < 86400) return Math.floor(sec / 3600) + 'h ago';
+      if (sec < 2592000) return Math.floor(sec / 86400) + 'd ago';
+      if (sec < 31536000) return Math.floor(sec / 2592000) + 'mo ago';
+      return Math.floor(sec / 31536000) + 'y ago';
+    }
+    async function loadGroupHistory(groupId) {
+      var statsEl = document.getElementById('history-stats');
+      var filesEl = document.getElementById('history-log-files');
+      if (groupId === 'default') {
+        statsEl.innerHTML = '<p class="skill-meta">Default settings have no chat log. Add the bot to a Telegram group and chat to see history here.</p>';
+        filesEl.innerHTML = '';
+        return;
+      }
+      try {
+        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/history');
+        var d = await r.json();
+        if (d.message) {
+          statsEl.innerHTML = '<p class="skill-meta">' + escapeHtml(d.message) + '</p>';
+          filesEl.innerHTML = '';
+          return;
+        }
+        var first = d.firstActivity ? new Date(d.firstActivity).toLocaleString() : '—';
+        var last = d.lastActivity ? new Date(d.lastActivity).toLocaleString() : '—';
+        var ago = timeAgo(d.lastActivity);
+        statsEl.innerHTML =
+          '<div class="history-stat"><span class="label">First activity</span><br>' + escapeHtml(first) + '</div>' +
+          '<div class="history-stat"><span class="label">Last activity</span><br>' + escapeHtml(last) + '</div>' +
+          '<div class="history-stat"><span class="label">How long ago</span><br>' + escapeHtml(ago) + '</div>' +
+          '<div class="history-stat"><span class="label">Total exchanges</span><br>' + (typeof d.totalExchanges === 'number' ? d.totalExchanges : '—') + '</div>';
+        if (!d.logFiles || d.logFiles.length === 0) {
+          filesEl.innerHTML = '<p class="skill-meta">No log files yet.</p>';
+        } else {
+          filesEl.innerHTML = '<table><thead><tr><th>File</th><th>Last modified</th><th>Exchanges</th></tr></thead><tbody>' +
+            d.logFiles.map(function (f) {
+              var mtime = f.mtimeISO ? new Date(f.mtimeISO).toLocaleString() : '—';
+              var count = f.exchanges != null ? f.exchanges : (f.error ? '—' : '—');
+              return '<tr><td>' + escapeHtml(f.name) + '</td><td>' + escapeHtml(mtime) + '</td><td>' + escapeHtml(String(count)) + '</td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+      } catch (e) {
+        statsEl.innerHTML = '<p class="skill-meta">Error loading history.</p>';
+        filesEl.innerHTML = '';
+      }
+    }
+
+    async function loadGroupSkills(groupId) {
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/skills');
+      var d = await r.json();
+      var enabled = d.enabled || [];
+      var list = d.skills || [];
+      var el = document.getElementById('group-skills-list');
+      el.innerHTML = list.map(function (s) {
+        var checked = enabled.includes(s.id) ? ' checked' : '';
+        var desc = (s.description || '').trim();
+        var descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div><div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button type="button" class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', function () { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
+      });
+      el.querySelectorAll('.skill-row').forEach(function (row) {
+        row.addEventListener('click', function (e) { if (!e.target.closest('label')) openGroupSkillDoc(row.getAttribute('data-id'), row.closest('.skill-item')); });
+      });
+      el.querySelectorAll('.skill-doc-save-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var panel = btn.closest('.skill-doc-inline');
+          var skillId = panel && panel.getAttribute('data-id');
+          if (!skillId) return;
+          var content = panel.querySelector('.skill-doc-textarea').value;
+          fetch(API + '/api/skills/' + encodeURIComponent(skillId) + '/doc', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) }).then(function (r) {
+            if (r.ok) { var saved = panel.querySelector('.skill-doc-saved'); if (saved) { saved.style.display = 'inline'; setTimeout(function () { saved.style.display = 'none'; }, 2000); } }
+          });
+        });
+      });
+      document.getElementById('group-skills-save').style.display = 'none';
+      groupSkillsDirty = false;
+    }
+
+    async function openGroupSkillDoc(id, skillItem) {
+      var listEl = document.getElementById('group-skills-list');
+      listEl.querySelectorAll('.skill-doc-inline').forEach(function (p) { p.classList.remove('open'); });
+      var panel = skillItem ? skillItem.querySelector('.skill-doc-inline') : listEl.querySelector('.skill-doc-inline[data-id="' + id + '"]');
+      if (!panel) return;
+      var r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc');
+      if (!r.ok) return;
+      var d = await r.json();
+      panel.querySelector('.skill-doc-desc').textContent = d.description || '';
+      panel.querySelector('.skill-doc-textarea').value = d.content || '';
+      panel.classList.add('open');
+    }
+
+    wireEl('group-skills-save', 'click', async function () {
+      var boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
+      var enabled = Array.from(boxes).map(function (b) { return b.getAttribute('data-id'); });
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled }) });
+      if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
+    });
+    document.querySelectorAll('#groups-detail-sub-nav button[data-group-tab]').forEach(function (btn) {
+      btn.addEventListener('click', function () { setGroupTab(btn.getAttribute('data-group-tab')); });
+    });
+
+    async function loadGroupAgent(groupId) {
+      try {
+        var [cfgRes, agentsRes] = await Promise.all([
+          fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config'),
+          fetch(API + '/api/agents')
+        ]);
+        var cfg = await cfgRes.json();
+        var agentsData = await agentsRes.json();
+        var agentId = cfg && cfg.agentId ? cfg.agentId : 'main';
+        var agents = (agentsData && agentsData.agents) ? agentsData.agents : [];
+        var select = document.getElementById('group-agent-select');
+        select.innerHTML = agents.map(function (a) {
+          var selected = a.id === agentId ? ' selected' : '';
+          return '<option value="' + escapeHtml(a.id) + '"' + selected + '>' + escapeHtml(a.id) + '</option>';
+        }).join('');
+      } catch (_) {}
+    }
+
+    wireEl('group-agent-save', 'click', async function () {
+      var select = document.getElementById('group-agent-select');
+      var agentId = select && select.value ? select.value : 'main';
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: agentId })
+      });
+      if (r.ok) {
+        var saved = document.getElementById('group-agent-saved');
+        saved.style.display = 'inline';
+        setTimeout(function () { saved.style.display = 'none'; }, 2000);
+        loadGroupSkills(selectedGroupId);
+      }
+    });
+
+    function renderTideChecklistItems(items) {
+      var el = document.getElementById('tide-checklist-items');
+      if (!items.length) {
+        el.innerHTML = '<p class="skill-meta">No items yet.</p>';
+        return;
+      }
+      el.innerHTML = items.map(function (it) {
+        return '<div class="skill-item" style="margin-bottom:0.5rem;"><div class="skill-row">' +
+          '<div><span class="skill-id">' + escapeHtml(it.id) + '</span>' +
+          '<div class="skill-desc">' + escapeHtml(it.prompt || it.label) + '</div></div>' +
+          '<label><input type="checkbox" data-tide-item-enable="' + escapeHtml(it.id) + '"' + (it.enabled ? ' checked' : '') + '> On</label>' +
+          '<button type="button" data-tide-item-remove="' + escapeHtml(it.id) + '" style="margin-left:0.5rem; font-size:0.75rem;">Remove</button>' +
+          '</div></div>';
+      }).join('');
+      el.querySelectorAll('input[data-tide-item-enable]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          var id = cb.getAttribute('data-tide-item-enable');
+          var item = tideChecklistCache.items.find(function (x) { return x.id === id; });
+          if (item) item.enabled = cb.checked;
+          saveTideChecklistFromCache();
+        });
+      });
+      el.querySelectorAll('button[data-tide-item-remove]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-tide-item-remove');
+          tideChecklistCache.items = tideChecklistCache.items.filter(function (x) { return x.id !== id; });
+          saveTideChecklistFromCache();
+        });
+      });
+    }
+
+    async function saveTideChecklistFromCache() {
+      var payload = {
+        tideEnabled: document.getElementById('tide-enabled').checked,
+        enabled: document.getElementById('tide-checklist-enabled').checked,
+        triggers: {
+          onRestart: document.getElementById('tide-trigger-restart').checked,
+          onCycle: document.getElementById('tide-trigger-cycle').checked,
+          onFollowUp: document.getElementById('tide-trigger-followup').checked,
+        },
+        items: tideChecklistCache.items,
+      };
+      var r = await fetch(API + '/api/tide/checklist', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!r.ok) throw new Error('Save failed');
+      var d = await r.json();
+      applyTideChecklistUi(d);
+    }
+
+    function applyTideChecklistUi(d) {
+      document.getElementById('tide-enabled').checked = !!d.tideEnabled;
+      document.getElementById('tide-checklist-enabled').checked = !!d.checklist.enabled;
+      document.getElementById('tide-trigger-restart').checked = !!d.checklist.triggers.onRestart;
+      document.getElementById('tide-trigger-cycle').checked = !!d.checklist.triggers.onCycle;
+      document.getElementById('tide-trigger-followup').checked = !!d.checklist.triggers.onFollowUp;
+      tideChecklistCache = d.checklist;
+      renderTideChecklistItems(d.checklist.items || []);
+      document.getElementById('tide-checklist-last').textContent = d.lastRun
+        ? JSON.stringify(d.lastRun, null, 2)
+        : '—';
+    }
+
+    async function fetchTideChecklist() {
+      try {
+        var r = await fetch(API + '/api/tide/checklist');
+        var d = await r.json();
+        applyTideChecklistUi(d);
+      } catch (e) {
+        document.getElementById('tide-checklist-last').textContent = 'Failed to load: ' + (e.message || e);
+      }
+    }
+
+    wireEl('tide-checklist-save-triggers', 'click', async function () {
+      var saved = document.getElementById('tide-checklist-saved');
+      saved.style.display = 'none';
+      try {
+        await saveTideChecklistFromCache();
+        saved.style.display = 'inline';
+        setTimeout(function () { saved.style.display = 'none'; }, 2500);
+      } catch (e) {
+        alert(e.message || 'Save failed');
+      }
+    });
+
+    wireEl('tide-checklist-add', 'click', async function () {
+      var label = document.getElementById('tide-new-label').value.trim();
+      var prompt = document.getElementById('tide-new-prompt').value.trim();
+      if (!label) { alert('Label is required.'); return; }
+      if (!tideChecklistCache) tideChecklistCache = { items: [] };
+      var item = {
+        id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48),
+        label: label,
+        prompt: prompt || label,
+        enabled: true
+      };
+      tideChecklistCache.items = tideChecklistCache.items || [];
+      tideChecklistCache.items.push(item);
+      document.getElementById('tide-new-label').value = '';
+      document.getElementById('tide-new-prompt').value = '';
+      try {
+        await saveTideChecklistFromCache();
+      } catch (e) {
+        alert(e.message || 'Add failed');
+      }
+    });
+
+    wireEl('tide-checklist-run', 'click', async function () {
+      var status = document.getElementById('tide-checklist-run-status');
+      status.textContent = 'Running…';
+      try {
+        var r = await fetch(API + '/api/tide/checklist/run', { method: 'POST' });
+        var d = await r.json();
+        if (d.lastRun) document.getElementById('tide-checklist-last').textContent = JSON.stringify(d.lastRun, null, 2);
+        var s = d.summary || d.lastRun || {};
+        status.textContent = (s.passed != null ? s.passed + '/' + s.total + ' passed' : 'Done');
+      } catch (e) {
+        status.textContent = 'Failed';
+        alert(e.message || 'Run failed');
+      }
+    });
+
+    async function fetchConfig() {
+      try {
+        const r = await fetch(API + '/api/config');
+        const d = await r.json();
+        document.getElementById('full-config').value = JSON.stringify(d, null, 2);
+        document.getElementById('config-error').style.display = 'none';
+        document.getElementById('config-error').textContent = '';
+      } catch (e) {
+        document.getElementById('config-error').textContent = 'Failed to load config.';
+        document.getElementById('config-error').style.display = 'inline';
+      }
+    }
+
+    wireEl('config-save', 'click', async function () {
+      var textarea = document.getElementById('full-config');
+      var savedEl = document.getElementById('config-saved');
+      var errEl = document.getElementById('config-error');
+      savedEl.style.display = 'none';
+      errEl.style.display = 'none';
+      errEl.textContent = '';
+      var raw = textarea.value.trim();
+      var config;
+      try {
+        config = raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        errEl.textContent = 'Invalid JSON: ' + (e.message || 'parse error');
+        errEl.style.display = 'inline';
+        return;
+      }
+      if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+        errEl.textContent = 'Config must be a JSON object.';
+        errEl.style.display = 'inline';
+        return;
+      }
+      try {
+        var r = await fetch(API + '/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
+        if (!r.ok) {
+          var d = await r.json().catch(function () { return {}; });
+          throw new Error(d.error || 'Save failed');
+        }
+        var d = await r.json();
+        textarea.value = JSON.stringify(d, null, 2);
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2500);
+      } catch (e) {
+        errEl.textContent = e.message || 'Failed to save config.';
+        errEl.style.display = 'inline';
+      }
+    });
+
+    var testRawResults = {};
+    var testInputsCache = {};
+    var testStatusMap = {};
+    var testListCache = [];
+    var activeTestId = null;
+    var activeTestGroup = 'all';
+    var testRunBusy = false;
+    var TEST_GROUP_ORDER = [
+      'Core Skills',
+      'Agent-to-Agent',
+      'User Skills',
+      'Memory & Workspace',
+      'Utilities & Infra',
+      'Other Tests',
+    ];
+    var TEST_GROUP_BY_ID = {
+      'agent': 'Agent-to-Agent',
+      'agent-config': 'Agent-to-Agent',
+      'agent-map-ui': 'Agent-to-Agent',
+      'agent-send': 'Agent-to-Agent',
+      'agent-team': 'Agent-to-Agent',
+      'background-tasks': 'Agent-to-Agent',
+      'chat-session': 'Agent-to-Agent',
+      'conversation-context': 'Agent-to-Agent',
+      'intent-planner': 'Agent-to-Agent',
+      'retrospective': 'Agent-to-Agent',
+      'session-bootstrap': 'Agent-to-Agent',
+      'basic': 'Core Skills',
+      'edit': 'Core Skills',
+      'e2e-expect': 'Core Skills',
+      'go-read': 'Core Skills',
+      'go-write': 'Core Skills',
+      'output-parse': 'Core Skills',
+      'read': 'Core Skills',
+      'search': 'Core Skills',
+      'vision': 'Core Skills',
+      'write': 'Core Skills',
+      'apply-patch': 'Core Skills',
+      'apply-patch-unit': 'Core Skills',
+      'browser': 'Core Skills',
+      'calendar-skill': 'User Skills',
+      'cron': 'User Skills',
+      'github-skill': 'User Skills',
+      'gmail-skill': 'User Skills',
+      'gog': 'User Skills',
+      'home-assistant': 'User Skills',
+      'home-assistant-format': 'User Skills',
+      'speech': 'User Skills',
+      'telegram-send': 'User Skills',
+      'fixture-state': 'Memory & Workspace',
+      'me': 'Memory & Workspace',
+      'memory': 'Memory & Workspace',
+      'memory-index-files': 'Memory & Workspace',
+      'workspace-chat-days': 'Memory & Workspace',
+      'workspace-path': 'Memory & Workspace',
+      'credential-utils': 'Utilities & Infra',
+      'dry-run': 'Utilities & Infra',
+      'server-inspect': 'Utilities & Infra',
+      'skill-install': 'Utilities & Infra',
+      'test-output-parse': 'Utilities & Infra',
+      'tide': 'Utilities & Infra',
+      'tide-checklist': 'Utilities & Infra',
+      'update-build': 'Utilities & Infra',
+    };
+
+    function updateTestRunSkillButton() {
+      var btn = document.getElementById('test-run-skill');
+      if (!btn) return;
+      btn.disabled = testRunBusy || !activeTestId;
+      btn.textContent = activeTestId ? ('Run ' + activeTestId) : 'Run skill';
+    }
+
+    function getTestGroupName(testId) {
+      return TEST_GROUP_BY_ID[testId] || 'Other Tests';
+    }
+
+    function groupTestsByCategory(tests) {
+      var buckets = {};
+      TEST_GROUP_ORDER.forEach(function (name) { buckets[name] = []; });
+      tests.forEach(function (t) {
+        var groupName = getTestGroupName(t.id);
+        if (!buckets[groupName]) buckets[groupName] = [];
+        buckets[groupName].push(t);
+      });
+      return TEST_GROUP_ORDER.filter(function (name) { return buckets[name] && buckets[name].length; }).map(function (name) {
+        return { name: name, tests: buckets[name] };
+      });
+    }
+
+    function getVisibleTests(tests) {
+      if (activeTestGroup === 'all') return tests.slice();
+      return tests.filter(function (t) { return getTestGroupName(t.id) === activeTestGroup; });
+    }
+
+    function groupTileStatusText(tests) {
+      if (!tests.length) return 'No tests';
+      var done = tests.filter(function (t) { return testStatusMap[t.id] !== undefined; });
+      if (!done.length) return 'Not run yet';
+      var pass = done.filter(function (t) { return !!testStatusMap[t.id]; }).length;
+      var fail = done.length - pass;
+      if (!fail) return pass + '/' + done.length + ' passed';
+      if (!pass) return fail + '/' + done.length + ' failed';
+      return pass + ' pass · ' + fail + ' fail';
+    }
+
+    function renderOverviewTiles(tests) {
+      var el = document.getElementById('test-overview-tiles');
+      if (!el) return;
+      var groups = groupTestsByCategory(tests);
+      var allStatus = groupTileStatusText(tests);
+      var tiles = [
+        '<button type="button" class="test-overview-tile' + (activeTestGroup === 'all' ? ' active' : '') + '" data-test-group="all">' +
+          '<span class="test-overview-tile-title">All Tests</span>' +
+          '<span class="test-overview-tile-count">' + tests.length + '</span>' +
+          '<span class="test-overview-tile-status">' + escapeHtml(allStatus) + '</span>' +
+        '</button>',
+      ];
+      groups.forEach(function (group) {
+        tiles.push(
+          '<button type="button" class="test-overview-tile' + (activeTestGroup === group.name ? ' active' : '') + '" data-test-group="' + escapeHtml(group.name) + '">' +
+            '<span class="test-overview-tile-title">' + escapeHtml(group.name) + '</span>' +
+            '<span class="test-overview-tile-count">' + group.tests.length + '</span>' +
+            '<span class="test-overview-tile-status">' + escapeHtml(groupTileStatusText(group.tests)) + '</span>' +
+          '</button>',
+        );
+      });
+      el.innerHTML = tiles.join('');
+      el.querySelectorAll('.test-overview-tile').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          activeTestGroup = btn.getAttribute('data-test-group') || 'all';
+          renderOverviewTiles(testListCache);
+          refreshTestSidebar();
+        });
+      });
+    }
+
+    function renderTestSidebarHtml(tests) {
+      return groupTestsByCategory(getVisibleTests(tests)).map(function (group) {
+        var groupItems = group.tests.map(function (t) {
+          var tid = escapeHtml(t.id);
+          var name = escapeHtml(t.name);
+          var statusHtml = '';
+          if (testStatusMap[t.id] !== undefined) {
+            var p = testStatusMap[t.id];
+            statusHtml = '<span class="test-sidebar-status ' + (p ? 'pass' : 'fail') + '">' + (p ? 'PASS' : 'FAIL') + '</span>';
+          }
+          return '<div class="test-sidebar-item" data-test-id="' + tid + '">' +
+            '<span class="test-sidebar-name">' + name + '</span>' +
+            '<button type="button" class="test-run-one" data-test-id="' + tid + '" style="font-size:0.75rem; padding:0.15rem 0.45rem;">Run</button>' +
+            statusHtml +
+            '</div>';
+        }).join('');
+        return '<div class="test-sidebar-group">' +
+          '<div class="test-sidebar-group-title">' + escapeHtml(group.name) + '</div>' +
+          groupItems +
+          '</div>';
+      }).join('');
+    }
+
+    function bindSidebarHandlers(sidebar) {
+      sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          if (e.target.classList.contains('test-run-one')) return;
+          showTestDetail(item.getAttribute('data-test-id'));
+        });
+      });
+      sidebar.querySelectorAll('.test-run-one').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var tid = btn.getAttribute('data-test-id');
+          showTestDetail(tid);
+          runTest(tid);
+        });
+      });
+    }
+
+    function refreshTestSidebar() {
+      var sidebar = document.getElementById('test-sidebar');
+      if (!sidebar) return;
+      var visibleTests = getVisibleTests(testListCache);
+      if (!visibleTests.length) {
+        sidebar.innerHTML = '<p class="skill-meta" style="padding:0.65rem 0.75rem; margin:0;">No tests in this group.</p>';
+        activeTestId = null;
+        updateTestRunSkillButton();
+        return;
+      }
+      sidebar.innerHTML = renderTestSidebarHtml(testListCache);
+      bindSidebarHandlers(sidebar);
+      var visibleHasActive = visibleTests.some(function (t) { return t.id === activeTestId; });
+      var nextId = visibleHasActive ? activeTestId : visibleTests[0].id;
+      if (nextId) showTestDetail(nextId);
+    }
+
+    function setTestRunBusy(busy) {
+      testRunBusy = busy;
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = busy; });
+      var runAll = document.getElementById('test-run-all');
+      if (runAll) runAll.disabled = busy;
+      updateTestRunSkillButton();
+    }
+
+    function renderInputMessages(messages) {
+      if (!messages || !messages.length) return '<div class="test-detail-empty">No inputs defined</div>';
+      var html = '';
+      messages.forEach(function (g) {
+        html += '<div class="test-input-group">';
+        if (g.group) html += '<div class="test-input-group-title">' + escapeHtml(g.group) + '</div>';
+        (g.messages || []).forEach(function (m) {
+          html += '<div class="test-input-msg">' + escapeHtml(m) + '</div>';
+        });
+        html += '</div>';
+      });
+      return html;
+    }
+
+    function updateSidebarStatus(testId, passed) {
+      testStatusMap[testId] = passed;
+      var item = document.querySelector('.test-sidebar-item[data-test-id="' + testId + '"]');
+      if (item) {
+        var badge = item.querySelector('.test-sidebar-status');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'test-sidebar-status';
+          item.appendChild(badge);
+        }
+        badge.textContent = passed ? 'PASS' : 'FAIL';
+        badge.className = 'test-sidebar-status ' + (passed ? 'pass' : 'fail');
+      }
+      renderOverviewTiles(testListCache);
+    }
+
+    function showTestDetail(testId) {
+      activeTestId = testId;
+      updateTestRunSkillButton();
+      document.querySelectorAll('.test-sidebar-item').forEach(function (el) {
+        el.classList.toggle('active', el.getAttribute('data-test-id') === testId);
+      });
+      var inputEl = document.getElementById('test-detail-input');
+      var outputEl = document.getElementById('test-detail-output');
+
+      if (testInputsCache[testId]) {
+        inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
+      } else {
+        inputEl.innerHTML = '<div class="test-detail-empty">Loading…</div>';
+        fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            testInputsCache[testId] = d.messages || [];
+            if (activeTestId === testId) inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
+          })
+          .catch(function () {
+            if (activeTestId === testId) inputEl.innerHTML = '<div class="test-detail-empty">Failed to load inputs</div>';
+          });
+      }
+
+      if (testRawResults[testId]) {
+        var parsed = parseTestOutput(testRawResults[testId]);
+        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
+      } else {
+        outputEl.innerHTML = '<div class="test-detail-empty">No output yet. Run the test.</div>';
+      }
+    }
+
+    async function fetchTests() {
+      try {
+        var r = await fetch(API + '/api/tests');
+        var d = await r.json();
+        testListCache = d.tests || [];
+        renderOverviewTiles(testListCache);
+        refreshTestSidebar();
+      } catch (e) {
+        document.getElementById('test-sidebar').innerHTML = '<p class="error" style="padding:0.5rem;">Failed to load tests.</p>';
+      }
+    }
+
+    function setTestOutput(testId, result, passed) {
+      testRawResults[testId] = result;
+      updateSidebarStatus(testId, passed);
+      if (activeTestId === testId) {
+        var outputEl = document.getElementById('test-detail-output');
+        var parsed = parseTestOutput(result);
+        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
+      }
+    }
+
+    async function runTest(id) {
+      var statusEl = document.getElementById('test-run-status');
+      statusEl.textContent = 'Running ' + id + '…';
+      setTestRunBusy(true);
+      try {
+        var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: id }) });
+        var d = await r.json();
+        var results = d.results || [];
+        if (results.length) {
+          var passed = results[0].exitCode === 0;
+          setTestOutput(id, results[0], passed);
+        }
+        statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
+      } catch (e) {
+        var err = 'Error: ' + (e.message || 'Request failed');
+        setTestOutput(id, { stdout: err, stderr: '', exitCode: 1, durationMs: 0 }, false);
+        statusEl.textContent = err;
+      }
+      setTestRunBusy(false);
+    }
+
+    async function runAllTests() {
+      var statusEl = document.getElementById('test-run-status');
+      statusEl.textContent = 'Running all tests…';
+      setTestRunBusy(true);
+      try {
+        var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
+        var d = await r.json();
+        var results = d.results || [];
+        results.forEach(function (x) {
+          setTestOutput(x.testId, x, x.exitCode === 0);
+        });
+        var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
+        statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
+      } catch (e) {
+        statusEl.textContent = 'Error: ' + (e.message || '');
+      }
+      setTestRunBusy(false);
+    }
+
+    wireEl('test-run-skill', 'click', function () {
+      if (activeTestId) runTest(activeTestId);
+    });
+    wireEl('test-run-all', 'click', function () { runAllTests(); });
+
+    var selectedMemoryFileId = null;
+    var selectedMemoryFileReadOnly = false;
+    var identityEditorFileId = null;
+    var activeTile = 'today';
+    var memoryAllLogs = [];
+    var memoryAllNotes = [];
+    var selectedHistoryId = null;
+    var selectedNotesId = null;
+
+    function localDateStr(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    var MEM_TODAY = localDateStr(new Date());
+    var MEM_YESTERDAY = localDateStr(new Date(Date.now() - 86400000));
+    var MEM_TODAY_ID = 'chat-log/day/' + MEM_TODAY;
+    var MEM_YESTERDAY_ID = 'chat-log/day/' + MEM_YESTERDAY;
+
+    function memoryFileLabel(id) {
+      if (id === 'MEMORY.md') return 'MEMORY.md';
+      if (isMemoryChatDayFile(id)) return id.replace(/^chat-log\/day\//, '');
+      if (isMemoryChatLogFile(id)) return id.replace(/^chat-log\//, '').replace(/^group-chat-log\//, 'group /');
+      return id;
+    }
+
+    function sortMemoryFilesNewestFirst(files) {
+      return files.slice().sort(function (a, b) {
+        var ta = typeof a.lastActivityMs === 'number' ? a.lastActivityMs : 0;
+        var tb = typeof b.lastActivityMs === 'number' ? b.lastActivityMs : 0;
+        if (tb !== ta) return tb - ta;
+        return String(b.label || b.id || '').localeCompare(String(a.label || a.id || ''));
+      });
+    }
+
+    function setMemoryTile(tile) {
+      activeTile = tile;
+      document.querySelectorAll('.memory-tile').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tile') === tile);
+      });
+      var panels = ['today','yesterday','longterm','history','notes'];
+      panels.forEach(function (t) {
+        var el = document.getElementById('mem-panel-' + t);
+        if (el) el.classList.toggle('active', t === tile);
+      });
+      if (tile === 'today') loadMemoryLog(MEM_TODAY_ID, 'mem-today-textarea', function(content) {
+        var stat = document.getElementById('mtile-today-stat');
+        var lines = content ? content.split('\n').filter(function(l){return l.trim();}).length : 0;
+        if (stat) stat.textContent = lines ? lines + ' lines' : 'No chats yet';
+      });
+      if (tile === 'yesterday') loadMemoryLog(MEM_YESTERDAY_ID, 'mem-yesterday-textarea', null);
+      if (tile === 'longterm') loadMemoryMd('MEMORY.md', 'mem-longterm-textarea');
+      if (tile === 'history') renderMemoryHistoryList();
+      if (tile === 'notes') renderMemoryNotesList();
+      location.hash = '#memory';
+    }
+
+    async function loadMemoryLog(id, textareaId, onLoad) {
+      var ta = document.getElementById(textareaId);
+      if (!ta) return;
+      ta.value = 'Loading…';
+      try {
+        var r = await fetch(API + '/api/workspace-logs/' + encodeURIComponent(id));
+        if (!r.ok) { ta.value = ''; if (onLoad) onLoad(''); return; }
+        var d = await r.json();
+        ta.value = d.content || '';
+        if (onLoad) onLoad(d.content || '');
+      } catch(e) { ta.value = ''; if (onLoad) onLoad(''); }
+    }
+
+    async function loadMemoryMd(id, textareaId) {
+      var ta = document.getElementById(textareaId);
+      if (!ta) return;
+      ta.value = 'Loading…';
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        if (!r.ok) { ta.value = ''; return; }
+        var d = await r.json();
+        ta.value = d.content || '';
+      } catch(e) { ta.value = ''; }
+    }
+
+    function renderMemoryHistoryList() {
+      var ul = document.getElementById('mem-history-list');
+      if (!ul) return;
+      var list = memoryAllLogs.filter(function(f) {
+        return f.id !== MEM_TODAY_ID && f.id !== MEM_YESTERDAY_ID;
+      });
+      if (!list.length) {
+        ul.innerHTML = '<li class="skill-meta" style="padding:0.25rem 0;">No older history.</li>';
+        return;
+      }
+      ul.innerHTML = list.map(function(f) {
+        var label = isMemoryChatDayFile(f.id) ? f.id.replace(/^chat-log\/day\//, '') : memoryFileLabel(f.id);
+        return '<li class="' + (selectedHistoryId === f.id ? 'selected' : '') + '"><button type="button" class="link mem-history-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(label) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('.mem-history-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { selectHistoryDay(btn.getAttribute('data-id')); });
+      });
+    }
+
+    async function selectHistoryDay(id) {
+      selectedHistoryId = id;
+      var titleEl = document.getElementById('mem-history-detail-title');
+      var metaEl = document.getElementById('mem-history-detail-meta');
+      var ta = document.getElementById('mem-history-textarea');
+      if (titleEl) titleEl.textContent = isMemoryChatDayFile(id) ? id.replace(/^chat-log\/day\//, '') : memoryFileLabel(id);
+      if (metaEl) metaEl.textContent = id;
+      if (ta) ta.value = 'Loading…';
+      document.querySelectorAll('.mem-history-btn').forEach(function(btn) {
+        var li = btn.closest('li');
+        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === id);
+      });
+      try {
+        var r = await fetch(API + '/api/workspace-logs/' + encodeURIComponent(id));
+        if (!r.ok) throw new Error('not found');
+        var d = await r.json();
+        if (ta) ta.value = d.content || '(empty)';
+      } catch(e) { if (ta) ta.value = ''; }
+    }
+
+    function renderMemoryNotesList() {
+      var ul = document.getElementById('mem-notes-list');
+      if (!ul) return;
+      var list = memoryAllNotes;
+      if (!list.length) {
+        ul.innerHTML = '<li class="skill-meta" style="padding:0.25rem 0;">No custom note files.</li>';
+        return;
+      }
+      ul.innerHTML = list.map(function(f) {
+        return '<li class="' + (selectedNotesId === f.id ? 'selected' : '') + '"><button type="button" class="link mem-notes-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label || f.id) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('.mem-notes-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { selectNotesFile(btn.getAttribute('data-id')); });
+      });
+    }
+
+    async function selectNotesFile(id) {
+      selectedNotesId = id;
+      selectedMemoryFileId = id;
+      selectedMemoryFileReadOnly = false;
+      var titleEl = document.getElementById('mem-notes-detail-title');
+      var ta = document.getElementById('mem-notes-textarea');
+      var actionsEl = document.getElementById('mem-notes-actions');
+      if (titleEl) titleEl.textContent = id;
+      if (ta) ta.value = 'Loading…';
+      if (actionsEl) actionsEl.style.display = 'flex';
+      document.querySelectorAll('.mem-notes-btn').forEach(function(btn) {
+        var li = btn.closest('li');
+        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === id);
+      });
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        if (!r.ok) throw new Error('not found');
+        var d = await r.json();
+        if (ta) ta.value = d.content || '';
+      } catch(e) { if (ta) ta.value = ''; }
+    }
+
+    async function fetchMemoryFiles() {
+      try {
+        var [mdRes, logRes] = await Promise.all([
+          fetch(API + '/api/workspace-md'),
+          fetch(API + '/api/workspace-logs'),
+        ]);
+        var mdData = await mdRes.json();
+        var logData = await logRes.json();
+
+        memoryAllLogs = sortMemoryFilesNewestFirst(logData.files || []);
+        // Notes = everything except MEMORY.md (which is long-term)
+        memoryAllNotes = (mdData.files || []).filter(function(f) { return f.id !== 'MEMORY.md'; });
+
+        // Tile stats
+        var todayLog = memoryAllLogs.find(function(f) { return f.id === MEM_TODAY_ID; });
+        var yestLog = memoryAllLogs.find(function(f) { return f.id === MEM_YESTERDAY_ID; });
+        var histCount = memoryAllLogs.filter(function(f) { return f.id !== MEM_TODAY_ID && f.id !== MEM_YESTERDAY_ID; }).length;
+
+        var todayStat = document.getElementById('mtile-today-stat');
+        var yestStat = document.getElementById('mtile-yesterday-stat');
+        var histStat = document.getElementById('mtile-history-stat');
+        var notesStat = document.getElementById('mtile-notes-stat');
+
+        if (todayStat) todayStat.textContent = todayLog ? MEM_TODAY : 'No chats yet';
+        if (yestStat) yestStat.textContent = yestLog ? MEM_YESTERDAY : 'No chats';
+        if (histStat) histStat.textContent = histCount ? histCount + ' days' : 'No older history';
+        if (notesStat) notesStat.textContent = memoryAllNotes.length ? memoryAllNotes.length + ' file' + (memoryAllNotes.length === 1 ? '' : 's') : 'No files';
+
+        // Date labels
+        var todayLabel = document.getElementById('mem-today-date-label');
+        var yestLabel = document.getElementById('mem-yesterday-date-label');
+        if (todayLabel) todayLabel.textContent = MEM_TODAY;
+        if (yestLabel) yestLabel.textContent = MEM_YESTERDAY;
+
+        // Re-render active tile if it's one of the list-based ones
+        if (activeTile === 'history') renderMemoryHistoryList();
+        if (activeTile === 'notes') renderMemoryNotesList();
+        // Auto-load today content
+        if (activeTile === 'today') setMemoryTile('today');
+      } catch(e) {
+        console.error('[memory]', e);
+      }
+    }
+
+    // Legacy compat: selectMemoryFile is still called from hash navigation
+    async function selectMemoryFile(id, readOnly) {
+      selectedMemoryFileId = id;
+      selectedMemoryFileReadOnly = !!readOnly || isMemoryChatLogFile(id);
+      if (!id) return;
+      if (id === MEM_TODAY_ID) { setMemoryTile('today'); return; }
+      if (id === MEM_YESTERDAY_ID) { setMemoryTile('yesterday'); return; }
+      if (id === 'MEMORY.md') { setMemoryTile('longterm'); return; }
+      if (isMemoryChatLogFile(id)) { setMemoryTile('history'); await selectHistoryDay(id); return; }
+      setMemoryTile('notes'); await selectNotesFile(id);
+    }
+
+    // Tile click handlers
+    document.querySelectorAll('.memory-tile').forEach(function(btn) {
+      btn.addEventListener('click', function() { setMemoryTile(btn.getAttribute('data-tile')); });
+    });
+
+    // Long-term save
+    wireEl('mem-longterm-save', 'click', async function() {
+      var content = document.getElementById('mem-longterm-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/MEMORY.md', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('mem-longterm-saved');
+        if (savedEl) { savedEl.style.display = 'inline'; setTimeout(function(){ savedEl.style.display = 'none'; }, 2000); }
+      }
+    });
+
+    // Notes save
+    wireEl('mem-notes-save', 'click', async function() {
+      if (!selectedNotesId) return;
+      var content = document.getElementById('mem-notes-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(selectedNotesId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('mem-notes-saved');
+        if (savedEl) { savedEl.style.display = 'inline'; setTimeout(function(){ savedEl.style.display = 'none'; }, 2000); }
+      }
+    });
+
+    function closeIdentityEditor() {
+      var modal = document.getElementById('identity-editor-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      identityEditorFileId = null;
+      var savedEl = document.getElementById('identity-editor-modal-saved');
+      if (savedEl) savedEl.style.display = 'none';
+    }
+
+    function renderHomeIdentityTiles() {
+      var grid = document.getElementById('home-identity-tiles');
+      if (!grid) return;
+      var identityHtml = IDENTITY_FILE_ORDER.map(function (fileId) {
+        var label = IDENTITY_FILE_LABELS[fileId] || fileId;
+        return '<button type="button" class="soul-tile-link identity-tile-btn" data-file-id="' + escapeHtml(fileId) + '" data-label="' + escapeHtml(label) + '">' +
+          '<span class="soul-tile-icon">◇</span>' +
+          '<span class="soul-tile-title">' + escapeHtml(label) + '</span>' +
+          '<span class="soul-tile-desc">Edit ' + escapeHtml(fileId) + '</span></button>';
+      }).join('');
+      grid.innerHTML = identityHtml +
+        '<a href="#memory" class="soul-tile-link">' +
+        '<span class="soul-tile-icon">◇</span>' +
+        '<span class="soul-tile-title">Memory</span>' +
+        '<span class="soul-tile-desc">Edit MEMORY.md</span></a>';
+      grid.querySelectorAll('.identity-tile-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var fileId = btn.getAttribute('data-file-id');
+          if (fileId) openIdentityEditor(fileId);
+        });
+      });
+    }
+
+    async function openIdentityEditor(fileId) {
+      var label = IDENTITY_FILE_LABELS[fileId] || fileId;
+      identityEditorFileId = fileId;
+      var modal = document.getElementById('identity-editor-modal');
+      var titleEl = document.getElementById('identity-editor-modal-title');
+      var metaEl = document.getElementById('identity-editor-modal-meta');
+      var textarea = document.getElementById('identity-editor-modal-textarea');
+      if (!modal || !titleEl || !metaEl || !textarea) return;
+      titleEl.textContent = label;
+      metaEl.textContent = 'File: ' + fileId;
+      textarea.value = '';
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(fileId));
+        if (!r.ok) throw new Error('Failed to load');
+        var d = await r.json();
+        textarea.value = d.content || '';
+      } catch (e) {
+        textarea.value = '';
+      }
+      textarea.focus();
+    }
+
+    renderHomeIdentityTiles();
+
+    wireClick('identity-editor-modal-cancel', closeIdentityEditor);
+    var identityEditorSaveBtn = document.getElementById('identity-editor-modal-save');
+    if (identityEditorSaveBtn) identityEditorSaveBtn.addEventListener('click', async function () {
+      var id = identityEditorFileId;
+      if (!id) return;
+      var content = document.getElementById('identity-editor-modal-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('identity-editor-modal-saved');
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      }
+    });
+    var identityEditorModal = document.getElementById('identity-editor-modal');
+    if (identityEditorModal) {
+      identityEditorModal.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'identity-editor-modal') closeIdentityEditor();
+      });
+    }
+    var identityEditorCard = document.querySelector('#identity-editor-modal .modal-card');
+    if (identityEditorCard) {
+      identityEditorCard.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+
+    async function renderLlmForm() {
+      const r = await fetch(API + '/api/config');
+      const d = await r.json();
+      const llm = d.llm || {};
+      const maxTokens = Number(llm.maxTokens) || 2048;
+      const models = Array.isArray(llm.models) ? llm.models : [];
+      document.getElementById('llm-max-tokens').value = maxTokens;
+      const container = document.getElementById('llm-models');
+      container.innerHTML = models.map((m, i) => {
+        const baseUrl = (m.baseUrl || '').trim();
+        const apiKey = (m.apiKey || '').trim();
+        const priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
+        return '<div class="llm-model" data-i="' + i + '">' +
+          '<h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3>' +
+          '<div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '" placeholder="openai, lmstudio, anthropic, grok"></div></div>' +
+          '<div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div></div>' +
+          '<div class="form-row"><div class="field"><label>Base URL (optional, for local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '" placeholder="http://127.0.0.1:1234/v1"></div></div>' +
+          '<div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '" placeholder="LLM_1_API_KEY"></div></div>' +
+          '<div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority (use first)</label></div>' +
+          '</div>';
+      }).join('');
+      if (models.length === 0) { container.className = ''; container.innerHTML = '<p class="empty">No models in config. Add entries in Config (read-only) or via setup.</p>'; } else { container.className = 'llm-models-grid'; }
+    }
+
+    wireEl('llm-save', 'click', async () => {
+      const maxTokens = Number(document.getElementById('llm-max-tokens').value) || 2048;
+      const modelCards = document.querySelectorAll('#llm-models .llm-model');
+      const models = Array.from(modelCards).map(card => {
+        const provider = (card.querySelector('[data-f="provider"]').value || '').trim();
+        const model = (card.querySelector('[data-f="model"]').value || '').trim();
+        const baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
+        const apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
+        const priority = card.querySelector('[data-f="priority"]').checked;
+        const o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
+        if (baseUrl) o.baseUrl = baseUrl;
+        if (priority) o.priority = true;
+        return o;
+      });
+      const r = await fetch(API + '/api/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens, models } }) });
+      if (r.ok) {
+        document.getElementById('llm-saved-msg').style.display = 'inline';
+        setTimeout(() => { document.getElementById('llm-saved-msg').style.display = 'none'; }, 2000);
+      }
+    });

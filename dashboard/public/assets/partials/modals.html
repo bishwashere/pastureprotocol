@@ -1,0 +1,87 @@
+<div id="agent-create-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="agent-create-modal-title">
+      <h2 id="agent-create-modal-title">Create agent</h2>
+      <p class="skill-meta" style="margin:0;">Add a new agent persona with its own skills and identity files. Memory starts empty.</p>
+      <div class="field">
+        <label for="agent-create-modal-title-input">Name</label>
+        <input id="agent-create-modal-title-input" type="text" placeholder="e.g. Project Manager, Backend Bot, Alex" autocomplete="off">
+        <p class="field-hint">A display name for this agent. The internal id is generated automatically.</p>
+      </div>
+      <div class="field">
+        <label for="agent-create-modal-from">Copy settings from</label>
+        <select id="agent-create-modal-from"></select>
+        <p class="field-hint">Copies LLM config, skills (minus risky defaults), and identity files. Does not copy memory.</p>
+      </div>
+      <p id="agent-create-modal-error" class="modal-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="agent-create-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="agent-create-modal-submit">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="agent-edit-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card modal-card-agent-edit" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
+      <h2 id="agent-edit-modal-heading">Edit agent</h2>
+      <p class="skill-meta" style="margin:0;">Update title, identity files, skills, and team links.</p>
+      <div class="agent-edit-modal-scroll">
+      <div class="agent-edit-basics">
+        <div class="field">
+          <label for="agent-edit-modal-id">Agent id</label>
+          <input id="agent-edit-modal-id" type="text" readonly disabled>
+        </div>
+        <div class="field">
+          <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
+          <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Identity files</label>
+        <p class="field-hint" style="margin:0;">Soul, WhoAmI, MyHuman, group rules, and memory for this agent.</p>
+        <div id="agent-edit-modal-md-files" class="agent-edit-md-files"></div>
+        <div id="agent-edit-modal-md-editor" style="display:none; margin-top:0.65rem;">
+          <div id="agent-edit-modal-md-label" class="skill-meta" style="margin-bottom:0.35rem;"></div>
+          <textarea id="agent-edit-modal-md-textarea" class="agent-edit-md-textarea" spellcheck="false"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button type="button" id="agent-edit-modal-md-save" class="secondary" style="margin-top:0;">Save file</button>
+            <span id="agent-edit-modal-md-saved">Saved.</span>
+          </div>
+        </div>
+      </div>
+      <div class="field agent-edit-section">
+        <label>Skills</label>
+        <p class="field-hint" style="margin:0;">Click tiles to enable or disable skills for this agent.</p>
+        <div id="agent-edit-modal-skills" class="agent-edit-tiles-grid"></div>
+      </div>
+      <div class="agent-edit-messaging-block">
+        <div id="agent-edit-modal-links-wrap" class="field agent-edit-section">
+          <div id="agent-edit-modal-inbound-wrap" class="field" style="display:none; margin-bottom:0.65rem;">
+            <label>Receives delegation from</label>
+            <p id="agent-edit-modal-inbound" class="skill-meta" style="margin:0;"></p>
+          </div>
+          <label>Can delegate to</label>
+          <p class="field-hint" style="margin:0;">Outbound team links. Other agents that link here show ← on the map (reply path is automatic).</p>
+          <div id="agent-edit-modal-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
+        </div>
+      </div>
+      </div>
+      <p id="agent-edit-modal-error" class="modal-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="agent-edit-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="agent-edit-modal-submit">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="identity-editor-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card modal-card-wide modal-card-editor" role="dialog" aria-modal="true" aria-labelledby="identity-editor-modal-title">
+      <h2 id="identity-editor-modal-title">Identity</h2>
+      <p class="skill-meta" id="identity-editor-modal-meta" style="margin:0;"></p>
+      <textarea id="identity-editor-modal-textarea" class="identity-editor-textarea" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <span id="identity-editor-modal-saved">Saved.</span>
+        <button type="button" id="identity-editor-modal-cancel" class="secondary">Close</button>
+        <button type="button" id="identity-editor-modal-save">Save</button>
+      </div>
+    </div>
+  </div>

@@ -9,36 +9,41 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, '../../dashboard/public');
 const htmlPath = path.join(publicDir, 'index.html');
 const dashboardShell = fs.readFileSync(htmlPath, 'utf8');
+const assetsJsDir = path.join(publicDir, 'assets/js');
+const appJs = fs.readdirSync(assetsJsDir)
+  .filter((name) => /^\d{2}-.*\.js$/.test(name))
+  .sort()
+  .map((name) => fs.readFileSync(path.join(assetsJsDir, name), 'utf8'))
+  .join('\n');
+const loaderJs = fs.readFileSync(path.join(assetsJsDir, '00-loader.js'), 'utf8');
+const dashboardCss = fs.readFileSync(path.join(publicDir, 'assets/css/dashboard.css'), 'utf8');
 const pageFragments = fs.readdirSync(path.join(publicDir, 'pages'))
   .filter((name) => name.endsWith('.html'))
   .map((name) => fs.readFileSync(path.join(publicDir, 'pages', name), 'utf8'));
-const html = [dashboardShell, ...pageFragments].join('\n');
-
-function getInlineScripts(source) {
-  return Array.from(source.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi))
-    .map((match) => match[1]);
-}
+const html = [dashboardShell, dashboardCss, appJs, ...pageFragments].join('\n');
 
 const checks = [
   {
-    name: 'Dashboard inline scripts are syntactically valid',
-    ok: getInlineScripts(dashboardShell).every((script) => {
+    name: 'Dashboard app scripts are syntactically valid',
+    ok: (() => {
       try {
-        new Function(script);
+        new Function(appJs);
         return true;
       } catch (err) {
         console.error(err.message);
         return false;
       }
-    }),
+    })(),
   },
   {
     name: 'Dashboard page fragment loader inserts fetched pages',
-    ok: /id="page-fragments-root"/.test(dashboardShell) && /root\.outerHTML\s*=\s*pages\.map/.test(dashboardShell) && /pages\/'\s*\+\s*page\s*\+\s*'\.html'/.test(dashboardShell) && /\.join\('\\n'\)/.test(dashboardShell),
+    ok: /id="page-fragments-root"/.test(dashboardShell) &&
+      /pages\/'\s*\+\s*page\s*\+\s*'\.html'/.test(loaderJs) &&
+      /root\.outerHTML\s*=/.test(loaderJs),
   },
   {
     name: 'Dashboard fragment wrapper does not remain in layout',
-    ok: !/#page-fragments-root\s*\{[^}]*display:\s*contents/.test(dashboardShell) && /root\.outerHTML\s*=/.test(dashboardShell),
+    ok: !/#page-fragments-root\s*\{[^}]*display:\s*contents/.test(dashboardCss) && /root\.outerHTML\s*=/.test(loaderJs),
   },
   {
     name: 'Test sidebar group heading CSS exists',

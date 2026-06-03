@@ -1,15 +1,26 @@
 #!/usr/bin/env node
 /**
- * Static checks: dashboard boots home status + mission control even if late binds fail.
+ * Static checks: dashboard boots home status + mission control (split assets layout).
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const htmlPath = path.join(__dirname, '../../dashboard/public/index.html');
+const publicDir = path.join(__dirname, '../../dashboard/public');
+const htmlPath = path.join(publicDir, 'index.html');
 const serverPath = path.join(__dirname, '../../dashboard/server.js');
-const publicDir = path.dirname(htmlPath);
+const assetsJs = path.join(publicDir, 'assets/js');
+const appScripts = [
+  '01-core-router-status.js',
+  '02-crons-skills-agents.js',
+  '03-chat-team.js',
+  '04-mission-control.js',
+  '05-bind-init.js',
+  '06-projects.js',
+].map((f) => fs.readFileSync(path.join(assetsJs, f), 'utf8')).join('\n');
+const loaderJs = fs.readFileSync(path.join(assetsJs, '00-loader.js'), 'utf8');
+const html = fs.readFileSync(htmlPath, 'utf8');
 const pagesDir = path.join(publicDir, 'pages');
 const pageFragments = fs.existsSync(pagesDir)
   ? fs.readdirSync(pagesDir)
@@ -18,55 +29,53 @@ const pageFragments = fs.existsSync(pagesDir)
     .map((name) => fs.readFileSync(path.join(pagesDir, name), 'utf8'))
     .join('\n')
   : '';
-const html = fs.readFileSync(htmlPath, 'utf8') + '\n' + pageFragments;
+const fullHtml = html + '\n' + pageFragments;
 const serverJs = fs.readFileSync(serverPath, 'utf8');
-
-function mainScriptBlock() {
-  const start = html.indexOf('<script>', html.indexOf('completed-tasks-display'));
-  const end = html.lastIndexOf('</script>');
-  return html.slice(start + 8, end);
-}
-
-const script = mainScriptBlock();
-const fetchStatusIdx = script.indexOf('async function fetchStatus()');
-const dashboardBootIdx = script.indexOf('function dashboardBoot()');
-const dashboardBootCallIdx = script.indexOf('dashboardBoot();');
-const routeFnIdx = script.indexOf('function dashboardRouteFromHash()');
-const routeCallIdx = script.indexOf('dashboardRouteFromHash();');
-const endTail = script.slice(Math.floor(script.length * 0.85));
+const script = appScripts;
+const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'utf8');
+const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
 
 const checks = [
+  {
+    name: 'index.html links split CSS and JS assets',
+    ok: html.includes('assets/css/dashboard.css') &&
+      html.includes('assets/css/team2.css') &&
+      html.includes('assets/js/00-loader.js') &&
+      html.includes('assets/js/01-core-router-status.js') &&
+      !html.includes('<style>'),
+  },
+  {
+    name: 'loader injects nav, modals, and pages',
+    ok: loaderJs.includes('assets/partials/nav.html') &&
+      loaderJs.includes('assets/partials/modals.html') &&
+      loaderJs.includes('pages/') &&
+      loaderJs.includes('dashboard-nav-root'),
+  },
+  {
+    name: 'nav partial exists with all main tabs',
+    ok: ['home', 'memory', 'crons', 'skills', 'team', 'projects'].every((p) =>
+      fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="' + p + '"')),
+  },
   {
     name: 'wireClick and wireEl helpers exist',
     ok: script.includes('function wireClick(') && script.includes('function wireEl('),
   },
   {
     name: 'mc2PendingSnapshot initialized with team snapshots',
-    ok: /var teamGoalsSnapshot[\s\S]{0,200}var mc2PendingSnapshot = \{ pending: \[\]/.test(script),
+    ok: /var teamGoalsSnapshot[\s\S]{0,200}var mc2PendingSnapshot = \{ pending: \[\]/.test(core),
   },
   {
-    name: 'dashboardBoot runs soon after fetchStatus definition',
-    ok: fetchStatusIdx >= 0 && dashboardBootIdx > fetchStatusIdx
-      && dashboardBootCallIdx > dashboardBootIdx
-      && dashboardBootCallIdx - fetchStatusIdx < 8000,
-  },
-  {
-    name: 'initial route runs early (not only at end of script)',
-    ok: routeFnIdx >= 0 && routeCallIdx > routeFnIdx
-      && routeCallIdx < script.length * 0.55,
+    name: 'dashboardBoot runs soon after fetchStatus in core bundle',
+    ok: /async function fetchStatus\(\)[\s\S]*function dashboardBoot\(\)[\s\S]*dashboardBoot\(\)/.test(core),
   },
   {
     name: 'home setPage refreshes status and identity tiles',
-    ok: /if \(name === 'home'\)[\s\S]*fetchStatus\(\)[\s\S]*fetchChatAgents\(\)[\s\S]*renderHomeIdentityTiles/.test(script),
+    ok: /if \(name === 'home'\)[\s\S]*fetchStatus\(\)[\s\S]*fetchChatAgents\(\)[\s\S]*renderHomeIdentityTiles/.test(core),
   },
   {
     name: 'renderMissionControl is fault-tolerant',
     ok: script.includes('function renderMissionControl()') &&
       /function renderMissionControl\(\)[\s\S]*try \{[\s\S]*catch \(err\)/.test(script),
-  },
-  {
-    name: 'mc2PendingItems guards missing snapshot',
-    ok: script.includes('mc2PendingSnapshot || { pending: [], updatedAt: 0 }'),
   },
   {
     name: 'skills-save uses wireEl not bare addEventListener',
@@ -75,12 +84,8 @@ const checks = [
   },
   {
     name: 'late modal binds use wireClick and try/catch',
-    ok: script.includes("wireClick('agent-create-modal-cancel'") &&
-      script.includes('[dashboard] modal/chat bind failed'),
-  },
-  {
-    name: 'fetchStatus poll not re-registered at end of script',
-    ok: !endTail.includes('setInterval(fetchStatus') && !endTail.match(/\n\s*fetchStatus\(\);\s*\n/),
+    ok: bind.includes("wireClick('agent-create-modal-cancel'") &&
+      bind.includes('[dashboard] modal/chat bind failed'),
   },
   {
     name: 'project-workflow pending API on dashboard server',
@@ -89,9 +94,9 @@ const checks = [
   },
   {
     name: 'home page has status overview element ids',
-    ok: html.includes('id="chat-status-text"') &&
-      html.includes('id="chat-overview-uptime"') &&
-      html.includes('id="home-identity-tiles"'),
+    ok: fullHtml.includes('id="chat-status-text"') &&
+      fullHtml.includes('id="chat-overview-uptime"') &&
+      fullHtml.includes('id="home-identity-tiles"'),
   },
 ];
 

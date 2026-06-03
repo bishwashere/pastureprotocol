@@ -6,8 +6,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const htmlPath = path.join(__dirname, '../../dashboard/public/index.html');
-const publicDir = path.dirname(htmlPath);
+const publicDir = path.join(__dirname, '../../dashboard/public');
+const htmlPath = path.join(publicDir, 'index.html');
+const assetsJsDir = path.join(publicDir, 'assets/js');
+const appJs = fs.existsSync(assetsJsDir)
+  ? fs.readdirSync(assetsJsDir)
+    .filter((name) => /^\d{2}-.*\.js$/.test(name))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(assetsJsDir, name), 'utf8'))
+    .join('\n')
+  : '';
+const dashboardCss = fs.existsSync(path.join(publicDir, 'assets/css/dashboard.css'))
+  ? fs.readFileSync(path.join(publicDir, 'assets/css/dashboard.css'), 'utf8')
+  : '';
 const pagesDir = path.join(publicDir, 'pages');
 const pageFragments = fs.existsSync(pagesDir)
   ? fs.readdirSync(pagesDir)
@@ -16,7 +27,20 @@ const pageFragments = fs.existsSync(pagesDir)
     .map((name) => fs.readFileSync(path.join(pagesDir, name), 'utf8'))
     .join('\n')
   : '';
-const html = fs.readFileSync(htmlPath, 'utf8') + '\n' + pageFragments;
+const partialsDir = path.join(publicDir, 'assets/partials');
+function readPartial(name) {
+  const p = path.join(partialsDir, name);
+  return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
+}
+const html = [
+  fs.readFileSync(htmlPath, 'utf8'),
+  readPartial('nav.html'),
+  readPartial('modals.html'),
+  readPartial('project-edit-modal.html'),
+  dashboardCss,
+  appJs,
+  pageFragments,
+].join('\n');
 
 const checks = [
   {
