@@ -137,6 +137,24 @@ const checks = [
       !fullHtml.includes('>NOW <'),
   },
   {
+    name: 'agent overview cards show event-driven last task summaries',
+    ok: missionControlJs.includes('mc-agent-overview-last-task') &&
+      missionControlJs.includes('Last task:') &&
+      chat.includes('function buildAgentLastTaskSummary') &&
+      chat.includes('window.buildAgentLastTaskSummary = buildAgentLastTaskSummary') &&
+      !missionControlJs.includes('Focus:'),
+  },
+  {
+    name: 'Tasks is default mission control view and navigation hub',
+    ok: missionControlJs.includes("var mc2ActiveView = 'tasks'") &&
+      fullHtml.includes('id="mc2-view-tasks" class="mc-view"') &&
+      fullHtml.includes('id="mc2-view-mission" class="mc-view" role="main" hidden') &&
+      /class="mc-nav-item active"[\s\S]{0,80}data-mc-nav="tasks"/.test(fullHtml) &&
+      missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
+      missionControlJs.includes('mc2OpenTaskForInitiative') &&
+      !fullHtml.includes('data-mc-nav="agents">View all blockers'),
+  },
+  {
     name: 'home page has status overview element ids',
     ok: fullHtml.includes('id="chat-status-text"') &&
       fullHtml.includes('id="chat-overview-uptime"') &&

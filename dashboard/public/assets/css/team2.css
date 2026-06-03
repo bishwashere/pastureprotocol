@@ -784,12 +784,34 @@ button.mc-stat-card-action:focus-visible {
   overflow: hidden;
 }
 
-.mc-agent-overview-focus {
+.mc-agent-overview-focus,
+.mc-agent-overview-last-task {
   color: var(--muted);
   margin: 0.25rem 0 0.35rem;
-  white-space: nowrap;
+}
+
+.mc-agent-overview-last-task-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.12rem;
+}
+
+.mc-agent-overview-last-task-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mc-agent-overview-last-task-line {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #c7d2e3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .mc-agent-overview-stats {
@@ -1618,8 +1640,13 @@ button.mc-stat-card.mc-stat-card-action {
 .mc-kanban-card-meta,
 .mc-kanban-empty,
 .mc-agent-overview-focus,
+.mc-agent-overview-last-task-label,
 .mc-movement-time {
   color: #8795b1;
+}
+
+.mc-agent-overview-last-task-line {
+  color: #c7d2e3;
 }
 
 .mc-agents-overview {
