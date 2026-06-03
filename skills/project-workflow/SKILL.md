@@ -28,9 +28,9 @@ Call when the user:
    Use **`propose_setup`** to preview, then **`apply_setup`** with **`userApproved: true`** after they confirm. **Do not** create missions until the project exists in the catalog.
 3. **`health_check`** — for configured projects, verify description, URL, setup notes, progress log, and linked mission. **Ask the user** for anything important that is missing (`update_project` can save answers).
 4. **`status`** — show current project + mission + task list.
-5. **`propose_plan`** — preview mission title, objective, and suggested tasks (does **not** write yet).
-6. **Ask the user to approve** the plan in plain language.
-7. **`apply_plan`** with **`userApproved: true`** — creates or updates the mission and tasks.
+5. **`propose_plan`** — preview mission title, objective, and suggested tasks (does **not** write yet). Show **tasksForDisplay** and ask for yes/no.
+6. **Wait for explicit yes** — a goal alone (e.g. "increase sign ups") is **not** approval. Wait for **yes / go ahead / create it**.
+7. **`apply_plan`** with **`userApproved: true`** — only after explicit yes; the tool verifies approval in the user's message.
 8. During work: **`log_progress`** after meaningful steps; **`update_task`** when a task moves (todo → doing → done).
 
 **Never** call `apply_setup` or `apply_plan` without explicit user approval.

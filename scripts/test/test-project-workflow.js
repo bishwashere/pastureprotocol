@@ -9,7 +9,7 @@ async function main() {
   process.env.COWCODE_STATE_DIR = stateDir;
   try {
     const { createProject, getProjectGraph } = await import('../../lib/projects-db.js');
-    const { createGoal, getGoal } = await import('../../lib/goals.js');
+    const { createGoal } = await import('../../lib/goals.js');
     const {
       resolveProjectRef,
       lookupProjectRef,
@@ -21,6 +21,9 @@ async function main() {
       listConfiguredProjects,
       proposeProjectPlan,
       applyProjectPlan,
+      hasExplicitUserApproval,
+      formatTasksForDisplay,
+      formatDecisionPrompt,
       updateProjectTaskStatus,
       logProjectProgress,
       syncTurnToProjectWork,
@@ -28,6 +31,12 @@ async function main() {
       isProjectWorkflowTurn,
     } = await import('../../lib/project-workflow.js');
     const { executeProjectWorkflow } = await import('../../lib/executors/project-workflow.js');
+    const {
+      listPendingProposals,
+      approvePendingProposal,
+      rejectPendingProposal,
+      getPendingProposal,
+    } = await import('../../lib/project-workflow-pending.js');
 
     const project = createProject({
       name: 'NextPostAI',
@@ -91,7 +100,7 @@ async function main() {
             url: 'https://newapp.example.com',
             setup_notes: 'MongoDB: mongodb://localhost:27017/newapp',
             userApproved: true,
-          });
+          }, { userText: 'yes go ahead' });
           if (!applied.ok || !applied.project?.id) throw new Error('apply setup failed');
           const found = resolveProjectRef('NewApp');
           if (!found || found.name !== 'NewApp') throw new Error('not in catalog');
@@ -154,16 +163,60 @@ async function main() {
         },
       },
       {
+        name: 'apply plan rejects userApproved without explicit yes',
+        input: 'apply_plan userApproved=true but user said increase sign ups',
+        run: async () => {
+          const blocked = applyProjectPlan(
+            { project: 'NextPostAI', title: 'Grow', tasks: ['A'], userApproved: true },
+            { userText: 'increase customer sign ups' },
+          );
+          if (!blocked.awaitingUserApproval) throw new Error('expected awaitingUserApproval');
+          return 'blocked';
+        },
+      },
+      {
+        name: 'apply plan accepts explicit yes',
+        input: 'yes go ahead and create it',
+        run: async () => {
+          if (!hasExplicitUserApproval('yes go ahead and create the mission')) throw new Error('approval not detected');
+          const applied = applyProjectPlan(
+            {
+              project: 'NextPostAI',
+              title: 'Grow NextPostAI',
+              tasks: [{ title: 'Launch landing page', status: 'todo' }],
+              userApproved: true,
+              ownerAgentId: 'main',
+            },
+            { userText: 'yes go ahead and create the mission' },
+          );
+          if (!applied.ok) throw new Error(applied.error || 'apply failed');
+          return applied.goal.title;
+        },
+      },
+      {
+        name: 'propose plan includes tasksForDisplay',
+        input: 'propose_plan tasks',
+        run: async () => {
+          const preview = proposeProjectPlan({
+            project: 'NextPostAI',
+            tasks: ['One', 'Two'],
+          });
+          if (!preview.tasksForDisplay || preview.tasksForDisplay.length !== 2) throw new Error('tasksForDisplay missing');
+          if (preview.tasksForDisplay[0].id !== 'sg-1') throw new Error('stable id expected');
+          return preview.tasksForDisplay.map((t) => t.id).join(',');
+        },
+      },
+      {
         name: 'apply plan creates linked mission',
-        input: 'apply_plan userApproved=true',
+        input: 'apply_plan userApproved=true with yes',
         run: async () => {
           const applied = applyProjectPlan({
             project: 'NextPostAI',
-            title: 'Grow NextPostAI',
+            title: 'Grow NextPostAI 2',
             tasks: [{ title: 'Launch landing page', status: 'todo' }],
             userApproved: true,
             ownerAgentId: 'main',
-          });
+          }, { userText: 'yes create it' });
           if (!applied.ok || !applied.goal?.id) throw new Error('apply failed');
           if (Number(applied.goal.projectId) !== Number(project.id)) throw new Error('projectId not linked');
           return applied.goal.title;
@@ -173,12 +226,13 @@ async function main() {
         name: 'update task status',
         input: 'update_task doing → done',
         run: async () => {
-          const goal = applyProjectPlan({
-            project: 'NextPostAI',
-            goalId: getGoal(createGoal({ title: 'Temp', objective: 'x', ownerAgentId: 'main' }).id).id,
-            tasks: [{ id: 't1', title: 'Ship feature', status: 'doing' }],
-            userApproved: true,
-          }).goal;
+          const { createGoal } = await import('../../lib/goals.js');
+          const goal = createGoal({
+            title: 'Temp task update',
+            objective: 'x',
+            ownerAgentId: 'main',
+            subgoals: [{ id: 't1', title: 'Ship feature', status: 'doing', progress: 10 }],
+          });
           const updated = updateProjectTaskStatus({
             goalId: goal.id,
             subgoalId: 't1',
@@ -250,6 +304,78 @@ async function main() {
           const parsed = JSON.parse(raw);
           if (!parsed.project) throw new Error('no project in result');
           return parsed.linkedGoalCount + ' linked goals';
+        },
+      },
+      {
+        name: 'propose plan registers dashboard pending',
+        input: 'propose_plan pending store',
+        run: async () => {
+          const preview = proposeProjectPlan({
+            project: 'NextPostAI',
+            title: 'Pending mission',
+            tasks: ['Task A', 'Task B'],
+            ownerAgentId: 'marketer',
+          });
+          if (!preview.ok) throw new Error('preview failed');
+          const store = listPendingProposals();
+          const match = (store.pending || []).find((p) => p.kind === 'mission_plan' && p.projectName === 'NextPostAI');
+          if (!match) throw new Error('pending mission_plan not registered');
+          if (match.tasks.length !== 2) throw new Error('pending tasks missing');
+          return match.id;
+        },
+      },
+      {
+        name: 'dashboard approve pending mission plan',
+        input: 'approve pending mission_plan',
+        run: async () => {
+          const store = listPendingProposals();
+          const item = (store.pending || []).find((p) => p.kind === 'mission_plan' && p.projectName === 'NextPostAI');
+          if (!item) throw new Error('no pending item');
+          const result = await approvePendingProposal(item.id);
+          if (!result.ok || !result.goal?.id) throw new Error(result.error || 'approve failed');
+          if (getPendingProposal(item.id)) throw new Error('pending not cleared');
+          return result.goal.title;
+        },
+      },
+      {
+        name: 'propose setup registers dashboard pending',
+        input: 'propose_setup pending store',
+        run: async () => {
+          const preview = proposeProjectSetup({
+            name: 'DashApp',
+            description: 'Dashboard-only app',
+            url: 'https://dash.app',
+          });
+          if (!preview.ok) throw new Error('preview failed');
+          const store = listPendingProposals();
+          const match = (store.pending || []).find((p) => p.kind === 'project_setup' && p.projectName === 'DashApp');
+          if (!match) throw new Error('pending project_setup not registered');
+          return match.id;
+        },
+      },
+      {
+        name: 'dashboard reject pending setup',
+        input: 'reject pending project_setup',
+        run: async () => {
+          const store = listPendingProposals();
+          const item = (store.pending || []).find((p) => p.kind === 'project_setup' && p.projectName === 'DashApp');
+          if (!item) throw new Error('no pending setup');
+          const result = rejectPendingProposal(item.id);
+          if (!result.ok) throw new Error('reject failed');
+          if (getPendingProposal(item.id)) throw new Error('pending not removed');
+          return 'rejected';
+        },
+      },
+      {
+        name: 'apply plan accepts dashboard approval channel',
+        input: 'approvedVia dashboard',
+        run: async () => {
+          const applied = applyProjectPlan(
+            { project: 'NextPostAI', title: 'Dashboard channel', tasks: ['X'], userApproved: true },
+            { approvedVia: 'dashboard' },
+          );
+          if (!applied.ok) throw new Error(applied.error || 'apply failed');
+          return applied.goal.title;
         },
       },
     ];

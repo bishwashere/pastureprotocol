@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>cowCode Dashboard</title>
-  <link rel="stylesheet" href="team2.css?v=4">
+  <link rel="stylesheet" href="team2.css?v=5">
   <style>
     :root {
       --bg: #0f0f12;
@@ -2707,7 +2707,7 @@
         });
       } else if (name === 'team2') {
         startTeamActivityFeed();
-        fetchAgentMapData().then(function () { renderMissionControl(); });
+        fetchAgentMapData().then(function () { renderMissionControl(); fetchMc2PendingApprovals(); });
       } else {
         stopTeamActivityFeed();
         setTeamPageFullscreen(false);
@@ -7146,12 +7146,14 @@
       fetchTeamMetricsFeed();
       fetchGoalsSnapshot();
       fetchInitiativesSnapshot();
+      fetchMc2PendingApprovals();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
         fetchTeamMetricsFeed();
         fetchGoalsSnapshot();
         fetchInitiativesSnapshot();
+        fetchMc2PendingApprovals();
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
@@ -7487,6 +7489,8 @@
     var mc2TimelineScrollRaf = 0;
     var mc2TimelineHighlightKey = '';
     var mc2TimelineSpyEnabled = false;
+    var mc2PendingSnapshot = { pending: [], updatedAt: 0 };
+    var mc2PendingActionBusy = false;
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -8024,6 +8028,10 @@
           items.push({ kind: 'error', text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)), ts: Number(g.updatedAt) || 0 });
         }
       });
+      mc2PendingItems().forEach(function (p) {
+        var label = mc2PendingKindLabel(p.kind) + ': ' + mc2PendingTitle(p);
+        items.push({ kind: 'warning', text: 'Awaiting approval — ' + escapeHtml(label.slice(0, 72)), ts: Number(p.createdAt) || 0 });
+      });
       items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
       if (!items.length) { el.innerHTML = '<p class="mc-kanban-empty">All clear.</p>'; return; }
       el.innerHTML = items.slice(0, 6).map(function (item) {
@@ -8400,6 +8408,153 @@
       }
     }
 
+    function mc2PendingItems() {
+      return Array.isArray(mc2PendingSnapshot.pending) ? mc2PendingSnapshot.pending : [];
+    }
+
+    function mc2PendingKindLabel(kind) {
+      if (kind === 'project_setup') return 'New project';
+      if (kind === 'mission_plan') return 'Mission plan';
+      return String(kind || 'Proposal');
+    }
+
+    function mc2PendingTitle(item) {
+      if (item.kind === 'project_setup') {
+        return String((item.setup && item.setup.name) || item.projectName || 'New project');
+      }
+      return String((item.mission && item.mission.title) || item.objective || 'Mission plan');
+    }
+
+    function mc2PendingObjective(item) {
+      if (item.kind === 'project_setup') {
+        var setup = item.setup || {};
+        var parts = [];
+        if (setup.description) parts.push(String(setup.description));
+        if (setup.url) parts.push(String(setup.url));
+        return parts.join(' · ');
+      }
+      return String((item.mission && item.mission.objective) || item.objective || '');
+    }
+
+    function mc2PendingTaskLines(item) {
+      var rows = Array.isArray(item.tasksForDisplay) && item.tasksForDisplay.length
+        ? item.tasksForDisplay
+        : (Array.isArray(item.tasks) ? item.tasks : []);
+      return rows.slice(0, 12).map(function (t, i) {
+        var title = typeof t === 'string' ? t : String(t.title || t.name || '');
+        return '<li>' + escapeHtml(String(t.index || i + 1) + '. ' + title) + '</li>';
+      }).join('');
+    }
+
+    function mc2PendingCardHtml(item, compact) {
+      var id = escapeHtml(String(item.id || ''));
+      var kind = escapeHtml(mc2PendingKindLabel(item.kind));
+      var title = escapeHtml(mc2PendingTitle(item));
+      var objective = escapeHtml(mc2PendingObjective(item).slice(0, compact ? 140 : 280));
+      var project = escapeHtml(String(item.projectName || ''));
+      var agent = escapeHtml(String(item.proposedBy || item.ownerAgentId || 'main'));
+      var tasksHtml = item.kind === 'mission_plan' && mc2PendingTaskLines(item)
+        ? '<ul class="mc-pending-task-list">' + mc2PendingTaskLines(item) + '</ul>'
+        : '';
+      var ask = escapeHtml(String(item.askUser || 'Approve to create on the dashboard?').slice(0, 160));
+      return '<div class="mc-pending-card" data-pending-id="' + id + '">' +
+        '<div class="mc-pending-card-head">' +
+          '<h4>' + title + '</h4>' +
+          '<span class="mc-pending-kind">' + kind + '</span>' +
+        '</div>' +
+        (objective ? '<p class="mc-pending-objective">' + objective + '</p>' : '') +
+        '<div class="mc-pending-meta">' +
+          (project ? 'Project: ' + project + ' · ' : '') +
+          'From ' + agent + ' · ' + mc2RelTime(item.createdAt) +
+        '</div>' +
+        tasksHtml +
+        (!compact ? '<div class="mc-pending-meta">' + ask + '</div>' : '') +
+        '<div class="mc-pending-actions">' +
+          '<button type="button" class="mc-pending-btn approve" data-pending-action="approve" data-pending-id="' + id + '">Approve</button>' +
+          '<button type="button" class="mc-pending-btn reject" data-pending-action="reject" data-pending-id="' + id + '">Reject</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function mc2UpdateApprovalsBadge() {
+      var badge = mc2El('mc2-approvals-badge');
+      if (!badge) return;
+      var count = mc2PendingItems().length;
+      badge.textContent = String(count);
+      badge.hidden = count <= 0;
+    }
+
+    function mc2RenderPendingInline(containerId, kindFilter) {
+      var el = mc2El(containerId);
+      if (!el) return;
+      var items = mc2PendingItems().filter(function (p) {
+        return !kindFilter || String(p.kind) === kindFilter;
+      });
+      if (!items.length) { el.innerHTML = ''; return; }
+      el.innerHTML = items.map(function (p) { return mc2PendingCardHtml(p, true); }).join('');
+    }
+
+    function mc2RenderPendingApprovalsBanner() {
+      var el = mc2El('mc2-pending-approvals');
+      if (!el) return;
+      var items = mc2PendingItems();
+      if (!items.length) { el.innerHTML = ''; el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = items.map(function (p) { return mc2PendingCardHtml(p, false); }).join('');
+    }
+
+    async function fetchMc2PendingApprovals() {
+      try {
+        var r = await fetch(API + '/api/project-workflow/pending');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        mc2PendingSnapshot = {
+          pending: Array.isArray(d.pending) ? d.pending : [],
+          updatedAt: Number(d.updatedAt) || 0,
+        };
+      } catch (_) {}
+      mc2UpdateApprovalsBadge();
+      mc2RenderPendingApprovalsBanner();
+      mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
+      mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
+      if (mc2ActiveView === 'mission') mc2RenderAttention();
+    }
+
+    async function mc2HandlePendingAction(pendingId, action) {
+      if (mc2PendingActionBusy || !pendingId) return;
+      mc2PendingActionBusy = true;
+      document.querySelectorAll('.mc-pending-btn').forEach(function (btn) { btn.disabled = true; });
+      try {
+        var path = action === 'approve' ? 'approve' : 'reject';
+        var r = await fetch(API + '/api/project-workflow/pending/' + encodeURIComponent(pendingId) + '/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) {
+          alert(d.error || ('Could not ' + path + ' proposal'));
+          return;
+        }
+        await fetchMc2PendingApprovals();
+        await fetchGoalsSnapshot();
+        await fetchInitiativesSnapshot();
+        if (window.cowCodeProjectsApi && typeof window.cowCodeProjectsApi.listProjects === 'function') {
+          try {
+            mc2ProjectsSnapshot = await window.cowCodeProjectsApi.listProjects();
+          } catch (_) {}
+        }
+        if (mc2ActiveView === 'projects') mc2RenderProjects();
+        if (mc2ActiveView === 'goals') mc2RenderGoals();
+        if (mc2ActiveView === 'tasks') mc2RenderTasks();
+        renderMissionControl();
+      } catch (err) {
+        alert(err && err.message ? err.message : String(err));
+      } finally {
+        mc2PendingActionBusy = false;
+        document.querySelectorAll('.mc-pending-btn').forEach(function (btn) { btn.disabled = false; });
+      }
+    }
+
     function renderMissionControl() {
       mc2RenderMissionProgress();
       mc2RenderKanban();
@@ -8407,6 +8562,10 @@
       mc2RenderMovement();
       mc2RenderAttention();
       mc2UpdateLiveBadge();
+      mc2UpdateApprovalsBadge();
+      mc2RenderPendingApprovalsBanner();
+      mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
+      mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
       mc2ScheduleSidebarProjects();
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'goals') mc2RenderGoals();
@@ -8441,6 +8600,17 @@
     if (mc2AddAgentBtn) {
       mc2AddAgentBtn.addEventListener('click', function () {
         openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+    }
+    var mc2PendingRoot = document.getElementById('page-team2');
+    if (mc2PendingRoot) {
+      mc2PendingRoot.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-pending-action]') : null;
+        if (!btn) return;
+        e.preventDefault();
+        var action = btn.getAttribute('data-pending-action');
+        var pendingId = btn.getAttribute('data-pending-id');
+        if (action && pendingId) mc2HandlePendingAction(pendingId, action);
       });
     }
     document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {

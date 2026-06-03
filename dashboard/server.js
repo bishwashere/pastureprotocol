@@ -38,6 +38,11 @@ import {
   getProjectGraph, createUpdate, editUpdate, deleteUpdate,
   createBranch, deleteBranch,
 } from '../lib/projects-db.js';
+import {
+  listPendingProposals,
+  approvePendingProposal,
+  rejectPendingProposal,
+} from '../lib/project-workflow-pending.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -1708,6 +1713,42 @@ app.patch('/api/projects/:id', (req, res) => {
 app.delete('/api/projects/:id', (req, res) => {
   try { deleteProject(Number(req.params.id)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Project workflow pending approvals (Mission Control UI) ───────────────────
+
+app.get('/api/project-workflow/pending', (_req, res) => {
+  try {
+    res.json(listPendingProposals());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/project-workflow/pending/:id/approve', async (req, res) => {
+  try {
+    const result = await approvePendingProposal(req.params.id);
+    if (!result.ok) {
+      res.status(result.needsApproval ? 409 : 400).json(result);
+      return;
+    }
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/project-workflow/pending/:id/reject', (req, res) => {
+  try {
+    const result = rejectPendingProposal(req.params.id);
+    if (!result.ok) {
+      res.status(404).json(result);
+      return;
+    }
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/projects/:id/graph', (req, res) => {

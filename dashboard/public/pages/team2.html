@@ -30,6 +30,7 @@
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Missions">
             <span class="mc-nav-icon">◎</span><span class="mc-nav-label">Missions</span>
+            <span class="mc-nav-badge" id="mc2-approvals-badge" hidden aria-label="Pending approvals">0</span>
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="tasks" aria-label="Tasks">
             <span class="mc-nav-icon">☑</span><span class="mc-nav-label">Tasks</span>
@@ -77,6 +78,8 @@
             <button type="button" id="mc2-add-agent-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
           </div>
         </header>
+
+        <div id="mc2-pending-approvals" class="mc-pending-approvals" hidden aria-live="polite"></div>
 
         <!-- Mission view -->
         <div id="mc2-view-mission" class="mc-view" role="main">
@@ -176,6 +179,7 @@
 
         <!-- Completed tasks view -->
         <div id="mc2-view-tasks" class="mc-view" hidden>
+          <div id="mc2-tasks-pending" class="mc-pending-inline"></div>
           <div class="mc-activity-toolbar">
             <p class="mc-section-title" id="mc2-tasks-title">COMPLETED TASKS</p>
             <label class="mc-agent-filter" for="mc2-tasks-agent-filter">
@@ -221,6 +225,7 @@
         <!-- Missions view -->
         <div id="mc2-view-goals" class="mc-view" hidden>
           <p class="mc-section-title">MISSIONS</p>
+          <div id="mc2-goals-pending" class="mc-pending-inline"></div>
           <div id="mc2-goals-list" style="display:flex;flex-direction:column;gap:0.45rem;">
             <p style="color:var(--muted);font-size:0.66rem;">Loading missions…</p>
           </div>

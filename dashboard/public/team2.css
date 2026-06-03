@@ -1570,6 +1570,109 @@ body.dashboard-team2-active {
   }
 }
 
+/* Pending project-workflow approvals */
+.mc-pending-approvals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.65rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 196, 64, 0.08), transparent);
+}
+
+.mc-pending-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.mc-pending-card {
+  border: 1px solid rgba(255, 196, 64, 0.35);
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 196, 64, 0.06);
+}
+
+.mc-pending-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.mc-pending-card-head h4 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mc-pending-kind {
+  font-size: 0.58rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mc-pending-objective {
+  font-size: 0.66rem;
+  color: var(--text);
+  margin: 0 0 0.35rem;
+}
+
+.mc-pending-meta {
+  font-size: 0.58rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.mc-pending-task-list {
+  margin: 0.35rem 0 0.55rem;
+  padding-left: 1.1rem;
+  font-size: 0.62rem;
+  color: var(--text);
+}
+
+.mc-pending-task-list li {
+  margin: 0.15rem 0;
+}
+
+.mc-pending-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.mc-pending-btn {
+  font: inherit;
+  font-size: 0.62rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.mc-pending-btn.approve {
+  border-color: rgba(72, 187, 120, 0.55);
+  background: rgba(72, 187, 120, 0.12);
+}
+
+.mc-pending-btn.reject {
+  border-color: rgba(245, 101, 101, 0.45);
+  background: rgba(245, 101, 101, 0.08);
+}
+
+.mc-pending-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 @media (max-width: 900px) {
   body.dashboard-team2-active {
     overflow: auto;
