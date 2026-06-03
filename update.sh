@@ -8,7 +8,7 @@ BRANCH="${PASTURE_BRANCH:-master}"
 TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
 
 # Run from project root (where package.json and index.js exist)
-ROOT="${PASTURE_ROOT:-$PWD}"
+ROOT="${PASTURE_ROOT:-${COWCODE_ROOT:-$PWD}}"
 if [ ! -f "$ROOT/package.json" ] || [ ! -f "$ROOT/index.js" ]; then
   echo ""
   echo "  Run from inside your Pasture Protocol folder, or use:  pasture update"
@@ -43,7 +43,7 @@ fetch_remote_build() {
     echo "$sha"
     return
   fi
-  sha=$(git ls-remote https://github.com/bishwashere/cowCode.git "refs/heads/${BRANCH}" 2>/dev/null \
+  sha=$(git ls-remote https://github.com/bishwashere/pastureprotocol.git "refs/heads/${BRANCH}" 2>/dev/null \
     | awk 'NR==1 { print substr($1, 1, 7) }') || true
   [ -n "$sha" ] && echo "$sha"
 }
@@ -118,13 +118,27 @@ echo "  ------------------------------------------------"
 echo ""
 
 # State dir: config/auth/cron live here (new installs and after migration)
-STATE_DIR="${PASTURE_STATE_DIR:-$HOME/.pasture}"
+STATE_DIR="${PASTURE_STATE_DIR:-${COWCODE_STATE_DIR:-$HOME/.pasture}}"
+LEGACY_STATE="$HOME/.cowcode"
 mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
 
-# One-time migration only: if state dir has no config but ROOT has data, copy to state dir.
-# We never overwrite existing ~/.pasture/config.json (user's priority and model choices are preserved on update).
+# Migrate ~/.cowcode → ~/.pasture when upgrading from cowcode (full state, not install-dir config only).
+if [ -z "${PASTURE_STATE_DIR:-}" ] && [ -z "${COWCODE_STATE_DIR:-}" ] \
+  && [ -d "$LEGACY_STATE" ] && [ -f "$LEGACY_STATE/config.json" ]; then
+  if [ ! -f "$STATE_DIR/config.json" ] || [ ! -d "$STATE_DIR/agents" ]; then
+    echo "  ► Migrating state from $LEGACY_STATE to $STATE_DIR"
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a "$LEGACY_STATE/" "$STATE_DIR/"
+    else
+      mkdir -p "$STATE_DIR"
+      cp -R "$LEGACY_STATE/." "$STATE_DIR/"
+    fi
+  fi
+fi
+
+# Fallback: ancient installs kept config inside the install dir.
 if [ ! -f "$STATE_DIR/config.json" ] && [ -f "$ROOT/config.json" ]; then
-  echo "  ► Migrating config to $STATE_DIR"
+  echo "  ► Migrating config from install dir to $STATE_DIR"
   cp "$ROOT/config.json" "$STATE_DIR/"
   [ -f "$ROOT/.env" ]            && cp "$ROOT/.env" "$STATE_DIR/"
   [ -f "$ROOT/cron/jobs.json" ]  && cp "$ROOT/cron/jobs.json" "$STATE_DIR/cron/"
@@ -159,6 +173,23 @@ fi
 [ -n "$AFTER_BUILD" ] && write_build "$AFTER_BUILD"
 NOW_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
 NOW_BUILD=$(read_build)
+
+# Refresh CLI launchers (cowcode → pasture rename; in-place update keeps same ROOT).
+BIN_DIR="${HOME}/.local/bin"
+mkdir -p "$BIN_DIR"
+cat > "$BIN_DIR/pasture" <<LAUNCHER
+#!/usr/bin/env bash
+export PASTURE_INSTALL_DIR="$ROOT"
+exec node "$ROOT/cli.js" "\$@"
+LAUNCHER
+chmod +x "$BIN_DIR/pasture"
+cat > "$BIN_DIR/cowcode" <<'SHIM'
+#!/usr/bin/env bash
+echo "cowcode is now pasture — update your scripts." >&2
+exec pasture "$@"
+SHIM
+chmod +x "$BIN_DIR/cowcode" 2>/dev/null || true
+
 echo ""
 if [ -n "$NOW_VER" ]; then
   echo "  ✓ Update complete. Now at $(format_version_label "$NOW_VER" "$NOW_BUILD")"

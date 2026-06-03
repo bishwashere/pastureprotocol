@@ -501,8 +501,7 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
-$Extracted = "cowCode-$Branch"
+$Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
 
 $InstallDir = if ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\pastureprotocol" }
 $BinDir = Join-Path $env:USERPROFILE ".local\bin"
@@ -523,19 +522,13 @@ try {
     $Archive = Join-Path $Work "archive.tar.gz"
     $null = Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
     Invoke-Native "Extract archive" { tar -xzf $Archive -C $Work }
-    Write-Host "  [OK] Done."
-    Write-Host ""
-
-    # --- install code ---
-    Write-Host "  > Installing to $InstallDir ..."
-    $Src = Join-Path $Work $Extracted
-    if (-not (Test-Path -LiteralPath $Src)) {
-        Write-Host "  [X] Extracted folder not found: $Src"
-        Write-Host "  [X] Check PASTURE_BRANCH (archive root must be cowCode-<branch>)."
+    $SrcDir = Get-ChildItem -LiteralPath $Work -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $SrcDir) {
+        Write-Host "  [X] Archive extract failed (no top-level folder)."
         Exit-Install 1
     }
-
-    Copy-CowcodeTree -SourceDir $Src -DestDir $InstallDir
+    $Src = $SrcDir.FullName
+    Write-Host "  [OK] Done."
 
     $pkgPath = Join-Path $InstallDir "package.json"
     if (-not (Test-Path -LiteralPath $pkgPath) -or -not (Test-Path -LiteralPath (Join-Path $InstallDir "index.js"))) {

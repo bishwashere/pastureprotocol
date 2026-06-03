@@ -258,11 +258,11 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
-$Extracted = "cowCode-$Branch"
+$Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
 
 $Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
-$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
+$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } elseif ($env:COWCODE_STATE_DIR) { $env:COWCODE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
+$LegacyState = Join-Path $env:USERPROFILE ".cowcode"
 
 if (-not (Test-Path (Join-Path $Root "package.json")) -or -not (Test-Path (Join-Path $Root "index.js"))) {
     Write-Host ""
@@ -284,7 +284,7 @@ try {
         $localVer = Read-PackageJsonVersion (Join-Path $Root "package.json")
         $remoteJson = Join-Path $Work "remote_package.json"
         $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowCode/$BranchPath/package.json?t=$ts"
+        $pkgUri = "https://raw.githubusercontent.com/bishwashere/pastureprotocol/$BranchPath/package.json?t=$ts"
         if (Save-CowcodeDownload -Uri $pkgUri -OutFile $remoteJson -Label "Fetch remote package.json" `
             -MinBytes 16 -TimeoutSec 120 -AllowFail) {
             $remoteVer = Read-PackageJsonVersion $remoteJson
@@ -306,15 +306,26 @@ try {
 
     New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 
+    if (-not $env:PASTURE_STATE_DIR -and -not $env:COWCODE_STATE_DIR) {
+        $legacyConfig = Join-Path $LegacyState "config.json"
+        $stateConfig = Join-Path $StateDir "config.json"
+        $stateAgents = Join-Path $StateDir "agents"
+        if ((Test-Path -LiteralPath $legacyConfig) -and (-not (Test-Path -LiteralPath $stateConfig) -or -not (Test-Path -LiteralPath $stateAgents))) {
+            Write-Host "  > Migrating state from $LegacyState to $StateDir"
+            Copy-Item -LiteralPath (Join-Path $LegacyState "*") -Destination $StateDir -Recurse -Force
+        }
+    }
+
     Write-Host "  > Downloading latest..."
     $Archive = Join-Path $Work "archive.tar.gz"
     $null = Save-CowcodeDownload -Uri $Tarball -OutFile $Archive -Label "Download release tarball" -MinBytes 1024
     Invoke-Native "Extract archive" { tar -xzf $Archive -C $Work }
-    $Src = Join-Path $Work $Extracted
-    if (-not (Test-Path -LiteralPath $Src)) {
-        Write-Host "  [X] Extracted folder not found: $Src"
+    $SrcDir = Get-ChildItem -LiteralPath $Work -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $SrcDir) {
+        Write-Host "  [X] Archive extract failed (no top-level folder)."
         Exit-Update 1
     }
+    $Src = $SrcDir.FullName
 
     Write-Host "  > Updating files..."
     Copy-CowcodeTree -SourceDir $Src -DestDir $Root
