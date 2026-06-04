@@ -88,6 +88,15 @@ function checkWindowsPs1(filename, opts) {
   if (opts.npmCmd && !src.includes('Test-CowcodeSupportedNode')) {
     return { ok: false, detail: `${filename} must reject unsupported Node versions` };
   }
+  if (opts.pastureRepo && !src.includes('bishwashere/pastureprotocol')) {
+    return { ok: false, detail: `${filename} must download from pastureprotocol repo` };
+  }
+  if (opts.pastureRepo && !src.includes('pastureprotocol-$Branch')) {
+    return { ok: false, detail: `${filename} must expect pastureprotocol archive root` };
+  }
+  if (opts.pastureRepo && src.includes('bishwashere/cowCode')) {
+    return { ok: false, detail: `${filename} must not download from legacy cowCode repo` };
+  }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }
 
@@ -99,6 +108,7 @@ function checkInstallPs1() {
     offerNode: true,
     pm2Help: true,
     npmCmd: true,
+    pastureRepo: true,
   });
 }
 
@@ -106,6 +116,7 @@ function checkUpdatePs1() {
   return checkWindowsPs1('update.ps1', {
     exitHelper: 'Exit-Update',
     npmCmd: true,
+    pastureRepo: true,
   });
 }
 
