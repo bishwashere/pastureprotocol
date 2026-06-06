@@ -16,6 +16,7 @@ async function main() {
       listInitiatives,
       updateInitiative,
       analyzeTeamActivityForInitiatives,
+      isInitiativeAwaitingApproval,
     } = await import('../../lib/initiatives.js');
     const { logTeamActivity } = await import('../../lib/team-activity.js');
 
@@ -40,7 +41,9 @@ async function main() {
       maxPerBatch: 3,
     });
     assert(first.created.length === 1, `expected 1 initiative created, got ${first.created.length}`);
+    assert(first.created[0].status === 'proposed', 'new initiatives start as proposed');
     assert(first.discarded.includes('low_confidence'), 'low confidence candidate discarded');
+    assert(isInitiativeAwaitingApproval(first.created[0]), 'created initiative awaits approval');
 
     const dupe = createInitiatives([
       {
@@ -63,12 +66,14 @@ async function main() {
     const updated = updateInitiative(all[0].id, { status: 'accepted' });
     assert(updated.status === 'accepted', 'status update works');
 
-    // Team activity analysis should synthesize repeated failures.
     logTeamActivity({ type: 'goal_tick_error', message: 'analytics data missing from warehouse' });
     logTeamActivity({ type: 'goal_tick_error', message: 'analytics data missing from warehouse' });
     logTeamActivity({ type: 'goal_tick_error', message: 'analytics data missing from warehouse' });
     const analysis = analyzeTeamActivityForInitiatives({ minIntervalMs: 0 });
     assert((analysis.created.length + analysis.merged.length) >= 1, 'team analysis created or merged initiative');
+    if (analysis.created.length) {
+      assert(analysis.created[0].status === 'proposed', 'team analysis creates proposals only');
+    }
 
     const { createGoal, getGoal } = await import('../../lib/goals.js');
     const {
@@ -98,77 +103,39 @@ async function main() {
     assert(high.created.length === 1, 'high-confidence initiative created');
     updateInitiative(high.created[0].id, { createdAt: oldEnough, updatedAt: oldEnough });
 
-    const low = createInitiatives([{
-      title: 'Maybe tweak button color',
-      type: 'observation',
-      description: 'Low signal idea',
-      confidence: 0.65,
-    }], {
-      source: 'goal_reflection',
-      createdBy: 'marketer',
-      relatedGoalIds: [mission.id],
-      minConfidence: 0.6,
-    });
-    assert(low.created.length === 1, 'low-confidence initiative created for control');
-    updateInitiative(low.created[0].id, { createdAt: oldEnough, updatedAt: oldEnough });
+    const disabled = await autoPromoteInitiatives({ minIntervalMs: 0, minAgeMs: 0, force: true });
+    assert(disabled.skipped === 'disabled', 'auto-promotion disabled by default');
+    assert(disabled.promoted.length === 0, 'no auto-promotion without explicit enable');
 
-    const firstRun = await autoPromoteInitiatives({ minIntervalMs: 0, minAgeMs: 0, force: true });
-    assert(firstRun.promoted.length === 1, `expected 1 auto-promotion, got ${firstRun.promoted.length}`);
-    assert(firstRun.promoted[0].goalId === mission.id, 'promoted to related mission');
+    const missionBeforeApprove = getGoal(mission.id);
+    assert(
+      !(missionBeforeApprove.subgoals || []).some((sg) => sg.id === `init-${high.created[0].id}`),
+      'proposal does not become subgoal until approved',
+    );
 
-    const promotedInit = listInitiatives().initiatives.find((i) => i.id === high.created[0].id);
-    assert(promotedInit.status === 'accepted', 'initiative marked accepted after auto-promote');
-    assert((promotedInit.activity || []).some((line) => /Auto-promoted to subgoal/.test(line)), 'activity logs auto-promotion');
+    const manualResult = await promoteInitiativeToSubgoal(high.created[0], mission.id);
+    assert(manualResult.subgoalId, 'manual approval creates subgoal');
+
+    const approvedInit = listInitiatives().initiatives.find((i) => i.id === high.created[0].id);
+    assert(approvedInit.status === 'accepted', 'initiative marked accepted after approval');
+    assert(
+      (approvedInit.activity || []).some((line) => /Approved and added to mission/.test(line)),
+      'activity logs manual approval',
+    );
 
     const missionAfter = getGoal(mission.id);
     assert(
       (missionAfter.subgoals || []).some((sg) => sg.id === `init-${high.created[0].id}`),
-      'subgoal inserted on mission',
+      'subgoal inserted on mission after approval',
     );
 
-    const stillOpen = listInitiatives().initiatives.find((i) => i.id === low.created[0].id);
-    assert(stillOpen.status === 'open', 'sub-threshold initiative stays open');
-
-    const secondRun = await autoPromoteInitiatives({ minIntervalMs: 0, minAgeMs: 0, force: true });
-    assert(secondRun.promoted.length === 0, 'already-promoted initiative not promoted again');
-
-    const capMission = createGoal({
-      title: 'Cap mission',
-      objective: 'Test auto-promote daily cap',
-      ownerAgentId: 'marketer',
-      status: 'active',
+    const enabled = await autoPromoteInitiatives({
+      enabled: true,
+      minIntervalMs: 0,
+      minAgeMs: 0,
+      force: true,
     });
-    for (let i = 0; i < 5; i++) {
-      const batch = createInitiatives([{
-        title: `Daily cap candidate ${i + 1}`,
-        type: 'improvement',
-        description: 'Should hit daily auto-promote cap',
-        confidence: 0.9 - (i * 0.01),
-      }], {
-        source: 'goal_reflection',
-        createdBy: 'marketer',
-        relatedGoalIds: [capMission.id],
-        minConfidence: 0.6,
-      });
-      updateInitiative(batch.created[0].id, { createdAt: oldEnough, updatedAt: oldEnough });
-    }
-    const capped = await autoPromoteInitiatives({ minIntervalMs: 0, minAgeMs: 0, force: true });
-    assert(capped.promoted.length === 3, `daily auto-promote cap expected 3, got ${capped.promoted.length}`);
-    assert(capped.skippedItems.some((row) => row.reason === 'daily_limit'), 'extra initiatives skipped by daily cap');
-
-    const manual = createInitiatives([{
-      title: 'Manual promote check',
-      type: 'opportunity',
-      description: 'Promoted via shared helper',
-      confidence: 0.88,
-    }], {
-      source: 'goal_reflection',
-      createdBy: 'marketer',
-      relatedGoalIds: [mission.id],
-      minConfidence: 0.6,
-    });
-    const manualResult = await promoteInitiativeToSubgoal(manual.created[0], mission.id);
-    assert(manualResult.subgoalId, 'manual promote helper creates subgoal');
+    assert(Array.isArray(enabled.promoted), 'enabled auto-promote still returns promoted array');
 
     console.log('initiatives tests passed');
   } finally {

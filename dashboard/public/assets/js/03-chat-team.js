@@ -577,7 +577,7 @@
     var TEAM_TOP_TAB_DESC = {
       roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.',
       goals: 'Long-running missions your agents work on autonomously — create missions, track tasks, and run or pause work.',
-      initiatives: 'Proactive suggestions from mission reflection and team activity — review and add to missions or create new ones.',
+      initiatives: 'Agent proposals from mission reflection and team activity — review and approve before they become tasks.',
     };
 
     function isGoalPartialWait(goal) {
@@ -1725,8 +1725,8 @@
         var subgoalCount = countGoalSubgoals(g.subgoals);
         var openInitiativesCount = (Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : []).filter(function (it) {
           var related = Array.isArray(it.relatedGoalIds) ? it.relatedGoalIds : [];
-          var status = String(it.status || 'open').toLowerCase();
-          return related.indexOf(id) >= 0 && (status === 'open' || status === 'accepted');
+          var status = String(it.status || 'proposed').toLowerCase();
+          return related.indexOf(id) >= 0 && status === 'proposed';
         }).length;
         var runningTxt = running ? ('Working: ' + escapeHtml(goalOwnerLabel(g))) : '';
         var last = formatGoalTs(g.lastRunAt);
@@ -1739,7 +1739,7 @@
           '<div class="team-goal-meta"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
           '<div class="team-goal-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
           '<div class="team-goal-meta"><strong>Tasks:</strong> ' + escapeHtml(String(subgoalCount)) + '</div>' +
-          '<div class="team-goal-meta"><strong>Open Initiatives:</strong> ' + escapeHtml(String(openInitiativesCount)) + '</div>' +
+          '<div class="team-goal-meta"><strong>Proposed Initiatives:</strong> ' + escapeHtml(String(openInitiativesCount)) + '</div>' +
           '<div class="team-goal-progress"><span style="width:' + pct + '%"></span></div>' +
           '<div class="team-goal-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
           '<div class="team-goal-meta"><strong>Last:</strong> ' + escapeHtml(last) + ' <strong>Next:</strong> ' + escapeHtml(next) + '</div>' +
@@ -1912,8 +1912,8 @@
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            status: 'open',
-            activity: ['Promotion removed by user — review again before promoting'],
+            status: 'proposed',
+            activity: ['Promotion removed by user — review again before approving'],
           }),
         }).catch(function () {});
         await fetchGoalsSnapshot();
@@ -1971,9 +1971,10 @@
         var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
         return goal ? goal.title : gid;
       }).join(', ') : '—';
-      var status = String(initiative.status || 'open').toLowerCase();
+      var status = String(initiative.status || 'proposed').toLowerCase();
       var autoPromoted = initiativeWasAutoPromoted(initiative);
       var onMission = initiativeIsOnMission(initiative);
+      var awaitingApproval = status === 'proposed' && !onMission;
       var activeGoals = activeGoalsForInitiativePicker();
       var defaultGoalId = initiativePromotedGoalId(initiative) ||
         relatedGoals[0] ||
@@ -1991,24 +1992,22 @@
             '</select></label></div>'
         : '<div class="team-initiative-row"><strong>Target mission:</strong> No active missions</div>';
       var badgeHtml = autoPromoted
-        ? '<span class="team-initiative-auto-badge">Auto-promoted</span> '
-        : (onMission ? '<span class="team-initiative-auto-badge">On mission</span> ' : '');
+        ? '<span class="team-initiative-auto-badge">Auto-promoted (legacy)</span> '
+        : (onMission ? '<span class="team-initiative-auto-badge">On mission</span> '
+          : (awaitingApproval ? '<span class="team-initiative-auto-badge">Proposed</span> ' : ''));
       var reviseHtml = onMission
         ? '<button type="button" class="secondary" data-init-action="view-mission">View on mission</button>' +
           '<button type="button" class="secondary" data-init-action="undo-promotion">Undo promotion</button>'
         : '';
-      var reviewHtml = status !== 'rejected'
-        ? '<button type="button" class="secondary" data-init-action="accept">Accept</button>' +
+      var reviewHtml = status !== 'rejected' && !onMission
+        ? '<button type="button" class="secondary" data-init-action="approve-subgoal">Approve → add to mission</button>' +
           '<button type="button" class="secondary" data-init-action="reject">Reject</button>' +
-          (onMission ? '' : (
-            '<button type="button" class="secondary" data-init-action="promote-goal">Create new mission</button>' +
-            '<button type="button" class="secondary" data-init-action="promote-subgoal">Add to mission</button>'
-          ))
-        : '';
+          '<button type="button" class="secondary" data-init-action="promote-goal">Approve as new mission</button>'
+        : (status === 'rejected' ? '' : '');
       detail.innerHTML = '' +
         '<h4>' + badgeHtml + escapeHtml(initiative.title || 'Untitled initiative') + '</h4>' +
         '<div class="team-initiative-row"><strong>Type:</strong> <span class="team-initiative-type">' + escapeHtml(initiative.type || 'observation') + '</span></div>' +
-        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(initiative.status || 'open') + '</span></div>' +
+        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status === 'proposed' ? 'proposed' : (initiative.status || 'proposed')) + '</span></div>' +
         '<div class="team-initiative-row"><strong>Confidence:</strong> ' + escapeHtml(String(Math.round((Number(initiative.confidence) || 0) * 100))) + '%</div>' +
         '<div class="team-initiative-row"><strong>Description:</strong> ' + escapeHtml(initiative.description || '') + '</div>' +
         '<div class="team-initiative-row"><strong>Source:</strong> ' + escapeHtml(initiative.source || '') + '</div>' +
@@ -2036,18 +2035,11 @@
           var action = btn.getAttribute('data-init-action') || '';
           btn.disabled = true;
           try {
-            if (action === 'accept') {
+            if (action === 'reject') {
               await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'accepted' }),
-              }).catch(function () {});
-              await fetchInitiativesSnapshot();
-            } else if (action === 'reject') {
-              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'rejected' }),
+                body: JSON.stringify({ status: 'rejected', activity: ['Rejected by lead'] }),
               }).catch(function () {});
               await fetchInitiativesSnapshot();
             } else if (action === 'promote-goal') {
@@ -2058,7 +2050,7 @@
               }).catch(function () {});
               await fetchGoalsSnapshot();
               await fetchInitiativesSnapshot();
-            } else if (action === 'promote-subgoal') {
+            } else if (action === 'approve-subgoal' || action === 'promote-subgoal') {
               var goalId = goalIdFromPicker();
               if (!goalId) return;
               await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
@@ -2101,10 +2093,11 @@
         var id = String(it.id || '');
         var selected = id === selectedTeamInitiativeId ? ' selected' : '';
         var confidence = Math.round((Number(it.confidence) || 0) * 100);
-        var status = String(it.status || 'open').toLowerCase();
+        var status = String(it.status || 'proposed').toLowerCase();
         var badge = initiativeWasAutoPromoted(it)
-          ? '<span class="team-initiative-auto-badge">Auto-promoted</span> '
-          : (initiativeIsOnMission(it) ? '<span class="team-initiative-auto-badge">On mission</span> ' : '');
+          ? '<span class="team-initiative-auto-badge">Auto-promoted (legacy)</span> '
+          : (initiativeIsOnMission(it) ? '<span class="team-initiative-auto-badge">On mission</span> '
+            : (status === 'proposed' ? '<span class="team-initiative-auto-badge">Proposed</span> ' : ''));
         return '<div class="team-initiative-card' + selected + '" data-initiative-id="' + escapeHtml(id) + '">' +
           '<div class="team-goal-card-head">' +
             '<h4 class="team-goal-card-title">' + badge + escapeHtml(it.title || 'Untitled initiative') + '</h4>' +
@@ -3749,6 +3742,8 @@
         initiative_promotion: 'Initiative Promotion',
         goal_tick: 'Goal Tick',
         curiosity_momentum: 'Curiosity Momentum',
+        curiosity_suggestion: 'Idle Suggestion',
+        curiosity_idle_check: 'Idle Check',
         agent_delegation: 'Agent Delegation',
         user_request: 'User Request',
         agent_turn: 'Agent Task',
@@ -4324,10 +4319,10 @@
       var msg = humanizeTeamActivityMessage(String(message || '')).trim();
       if (!msg) return [];
       var lines = [];
-      var initMatch = msg.match(/initiatives created=(\d+)/i);
+      var initMatch = msg.match(/(?:proposals|initiatives) created=(\d+)/i);
       if (initMatch && Number(initMatch[1]) > 0) {
         var n = Number(initMatch[1]);
-        lines.push('Created ' + n + ' initiative' + (n === 1 ? '' : 's'));
+        lines.push('Proposed ' + n + ' initiative' + (n === 1 ? '' : 's'));
       }
       var mergedMatch = msg.match(/merged=(\d+)/i);
       if (mergedMatch && Number(mergedMatch[1]) > 0 && !initMatch) {
@@ -4336,7 +4331,7 @@
       }
       var parts = msg.split(/\s*\|\s*/).map(function (part) { return part.trim(); }).filter(Boolean);
       parts.forEach(function (part) {
-        if (/^initiatives created=/i.test(part) || /^merged=/i.test(part)) return;
+        if (/^(?:proposals|initiatives) created=/i.test(part) || /^merged=/i.test(part)) return;
         if (/^New subgoals:/i.test(part)) {
           lines.push(part.replace(/^New subgoals:\s*/i, 'Added tasks: '));
           return;
@@ -4418,7 +4413,7 @@
       if (type === 'goal_subgoal_created') {
         return title ? ('Added task: ' + title) : humanizeTeamActivityMessage(msg);
       }
-      if (type === 'curiosity_momentum_done') {
+      if (type === 'curiosity_momentum_done' || type === 'curiosity_suggestion' || type === 'curiosity_idle_check') {
         return humanizeTeamActivityMessage(msg || title);
       }
       if (msg) return humanizeTeamActivityMessage(msg);

@@ -625,6 +625,11 @@ app.post('/api/initiatives/:id/promote', async (req, res) => {
       res.status(404).json({ error: 'Initiative not found' });
       return;
     }
+    const initiativeStatus = String(initiative.status || 'proposed').toLowerCase();
+    if (initiativeStatus === 'rejected') {
+      res.status(409).json({ error: 'Initiative was rejected' });
+      return;
+    }
     if (mode !== 'goal' && mode !== 'subgoal') {
       res.status(400).json({ error: 'mode must be goal or subgoal' });
       return;
@@ -641,7 +646,7 @@ app.post('/api/initiatives/:id/promote', async (req, res) => {
       const updated = updateInitiative(initiative.id, {
         status: 'accepted',
         relatedGoalIds: [goal.id],
-        activity: [`Promoted to goal ${goal.id}`],
+        activity: [`Approved as new mission ${goal.id}`],
       });
       res.json({ initiative: updated, goal });
       return;

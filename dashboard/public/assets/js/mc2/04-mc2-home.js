@@ -59,13 +59,20 @@
       });
     }
 
-    function mc2AutoPromotedInitiativeNeedsAttention(initiative, taskItem) {
-      if (!mc2InitiativeWasAutoPromoted(initiative)) return false;
-      var status = String(initiative && initiative.status || 'open').toLowerCase();
-      if (status === 'rejected' || status === 'completed') return false;
-      if (!taskItem) return false;
-      var taskStatus = String(taskItem.status || '').toLowerCase();
-      return taskStatus !== 'done' && taskStatus !== 'completed' && taskStatus !== 'removed';
+    function mc2ProposedInitiativeNeedsApproval(initiative) {
+      var status = String(initiative && initiative.status || 'proposed').toLowerCase();
+      if (status === 'rejected' || status === 'completed' || status === 'accepted') return false;
+      if (typeof initiativeIsOnMission === 'function' && initiativeIsOnMission(initiative)) return false;
+      return status === 'proposed' || status === 'open';
+    }
+
+    function mc2ProposedInitiativeSubtitle(initiative) {
+      var confidence = Math.round((Number(initiative && initiative.confidence) || 0) * 100);
+      var ts = Number(initiative && initiative.updatedAt) || 0;
+      var parts = ['Awaiting approval'];
+      if (confidence > 0) parts.unshift('Confidence ' + confidence + '%');
+      if (ts) parts.push('proposed ' + mc2ShortWaitTime(ts));
+      return parts.join(' · ');
     }
 
     function mc2InitiativeDiscoveryIcon(initiative) {
@@ -74,9 +81,13 @@
       return '💡';
     }
 
-    function mc2AutoPromotedTagHtml(extraClass) {
+    function mc2ProposedTagHtml(extraClass) {
       var cls = 'mc-kanban-card-tag discovery' + (extraClass ? ' ' + extraClass : '');
-      return '<span class="' + cls + '">Auto-promoted</span>';
+      return '<span class="' + cls + '">Proposed</span>';
+    }
+
+    function mc2AutoPromotedTagHtml(extraClass) {
+      return mc2ProposedTagHtml(extraClass);
     }
 
     function mc2TaskTitleForInitiative(initiative) {
@@ -137,7 +148,7 @@
       return '<div' + attrs + ' role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + escapeHtml(item.title) + '</div>' +
         (item.tag
-          ? '<div class="mc-kanban-card-meta">' + mc2AutoPromotedTagHtml() + '</div>'
+          ? '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>'
           : '') +
         (item.subtitle || item.text
           ? '<div class="mc-kanban-card-meta">' + escapeHtml(item.subtitle || String(item.text || '').replace(/^[^—]+—\s*/, '')) + '</div>'
@@ -153,7 +164,7 @@
       var confidence = Math.round((Number(initiative.confidence) || 0) * 100);
       return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-initiative-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + title + '</div>' +
-        '<div class="mc-kanban-card-meta">' + mc2AutoPromotedTagHtml() + '</div>' +
+        '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>' +
         '<div class="mc-kanban-card-meta">Confidence ' + escapeHtml(String(confidence)) + '%</div>' +
       '</div>';
     }
@@ -287,21 +298,15 @@
       var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : [];
       initiatives.forEach(function (it) {
         var initiativeId = String(it.id || '');
-        var subgoalId = initiativeId ? 'init-' + initiativeId : '';
         var ts = Number(it.updatedAt) || 0;
-        var taskItem = (subgoalId && typeof findMissionTaskItem === 'function')
-          ? findMissionTaskItem({ subgoalId: subgoalId, title: it.title })
-          : null;
-        if (!mc2AutoPromotedInitiativeNeedsAttention(it, taskItem)) return;
+        if (!mc2ProposedInitiativeNeedsApproval(it)) return;
         mc2PushActionRequiredItem(items, {
           kind: 'warning',
           action: 'initiative-review',
           initiativeId: initiativeId,
-          subgoalId: subgoalId,
-          goalId: taskItem ? String(taskItem.goalId || '') : '',
-          title: mc2TaskTitleForInitiative(it),
-          tag: 'Auto-promoted',
-          subtitle: mc2AutoPromotedInitiativeSubtitle(it),
+          title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
+          tag: 'Proposed',
+          subtitle: mc2ProposedInitiativeSubtitle(it),
           ts: ts,
         });
       });
@@ -420,7 +425,7 @@
     function mc2CollectKanbanDiscoveryItems() {
       var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
       return initiatives.filter(function (it) {
-        return mc2InitiativeWasAutoPromoted(it);
+        return mc2ProposedInitiativeNeedsApproval(it);
       }).sort(function (a, b) {
         return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
       });

@@ -15,8 +15,10 @@ async function main() {
     const {
       createDelegatedSubgoal,
       updateDelegatedSubgoalProgress,
+      recordDelegatedSubgoalReply,
       completeDelegatedSubgoal,
       failDelegatedSubgoal,
+      DELEGATED_TASK_STATUSES,
       listDelegatedSubgoalsForAgent,
       listDelegatedSubgoalsForGoal,
       buildDelegatedTasksContextBlock,
@@ -52,8 +54,9 @@ async function main() {
     });
     assert(created?.subgoal?.source === 'delegation', 'subgoal marked as delegation');
     assert(created.subgoal.assignee === 'marketer', 'assignee set');
-    assert(created.subgoal.status === 'doing', 'starts as doing');
+    assert(created.subgoal.status === 'assigned', 'starts as assigned');
     assert(created.subgoal.expectedOutput.includes('3 examples'), 'expected output stored');
+    assert(DELEGATED_TASK_STATUSES.includes('review_ready'), 'delegated task statuses include review_ready');
 
     const goalAfterAssign = getGoal(mission.id);
     const flat = JSON.stringify(goalAfterAssign.subgoals);
@@ -86,14 +89,50 @@ async function main() {
     assert(marketerCtx.currentGoal === mission.title, 'target agent goal from mission');
     assert(marketerCtx.context.some((c) => c.includes('Expected')), 'target agent has expected output context');
 
+    recordDelegatedSubgoalReply({
+      goalId: mission.id,
+      subgoalId: created.subgoal.id,
+      expectedOutput: created.subgoal.expectedOutput,
+    }, {
+      replySummary: [
+        'Delivered the final competitor signup audit.',
+        '1. Competitor A: requires company name and phone; friction points are long form and no social login.',
+        '2. Competitor B: hides pricing and asks for card; friction points are unclear value and payment wall.',
+        '3. Competitor C: asks for role before showing product; friction points are delayed value and survey fatigue.',
+      ].join('\n'),
+    });
+    const reviewGoal = getGoal(mission.id);
+    const reviewSg = (reviewGoal.subgoals || []).find((sg) => sg.id === created.subgoal.id);
+    assert(reviewSg?.status === 'review_ready', 'satisfying reply marks subgoal review_ready');
+    assert(reviewSg?.progress === 90, 'review-ready progress set below done');
+
     completeDelegatedSubgoal({
       goalId: mission.id,
       subgoalId: created.subgoal.id,
-    }, { replySummary: 'Delivered 3 competitor examples' });
+    }, { replySummary: 'Accepted by lead after review.' });
     const doneGoal = getGoal(mission.id);
     const doneSg = (doneGoal.subgoals || []).find((sg) => sg.id === created.subgoal.id);
-    assert(doneSg?.status === 'done', 'subgoal marked done after completion');
-    assert(doneSg?.progress === 100, 'progress set to 100');
+    assert(doneSg?.status === 'done', 'explicit completion marks subgoal done');
+    assert(doneSg?.progress === 100, 'explicit completion sets progress to 100');
+
+    const vague = createDelegatedSubgoal({
+      goalId: mission.id,
+      assignee: 'marketer',
+      delegatedFrom: 'main',
+      title: 'Launch plan',
+      message: 'Create launch plan',
+      expectedOutput: 'launch checklist with channels dates owners and risks',
+      dueInHours: 24,
+    });
+    recordDelegatedSubgoalReply({
+      goalId: mission.id,
+      subgoalId: vague.subgoal.id,
+      expectedOutput: vague.subgoal.expectedOutput,
+    }, { replySummary: 'We should make the launch feel exciting and focus on the right audience.' });
+    const vagueGoal = getGoal(mission.id);
+    const vagueSg = (vagueGoal.subgoals || []).find((sg) => sg.id === vague.subgoal.id);
+    assert(vagueSg?.status === 'in_progress', 'vague specialist reply remains in_progress');
+    assert(vagueSg?.status !== 'done', 'vague specialist reply is not auto-completed');
 
     const blocked = createDelegatedSubgoal({
       goalId: mission.id,
@@ -114,12 +153,12 @@ async function main() {
     updateDelegatedSubgoalProgress({
       goalId: mission.id,
       subgoalId: blocked.subgoal.id,
-      status: 'doing',
+      status: 'in_progress',
       progress: 30,
     });
     const reopened = getGoal(mission.id);
     const reopenedSg = (reopened.subgoals || []).find((sg) => sg.id === blocked.subgoal.id);
-    assert(reopenedSg?.status === 'doing', 'progress update patches status');
+    assert(reopenedSg?.status === 'in_progress', 'progress update patches status');
     assert(reopenedSg?.progress === 30, 'progress update patches pct');
 
     const tickPrompt = buildGoalTickPrompt(getGoal(mission.id), {
