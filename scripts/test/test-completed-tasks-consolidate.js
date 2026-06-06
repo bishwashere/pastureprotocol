@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadCompletedTasksDisplay() {
   const code = readFileSync(
-    join(__dirname, '../../dashboard/public/completed-tasks-display.js'),
+    join(__dirname, '../../dashboard/public/assets/js/completed-tasks-display.js'),
     'utf8',
   );
   const sandbox = { globalThis: {} };

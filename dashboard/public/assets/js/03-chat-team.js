@@ -968,6 +968,7 @@
 
     window.flattenMissionWorkItems = flattenMissionWorkItems;
     window.groupMissionWorkItems = groupMissionWorkItems;
+    window.listCanonicalWorkItems = listCanonicalWorkItems;
 
     function highlightBlockedTarget(el) {
       if (!el || !el.classList) return;
@@ -1214,7 +1215,7 @@
     }
 
     function countCompletedTasksToday() {
-      return listCompletedTasks({ range: 'today' }).length;
+      return listCanonicalWorkItems({ range: 'today', status: 'done' }).length;
     }
 
     function extractTurnDoneSkills(summary) {
@@ -1288,6 +1289,60 @@
         out = window.pastureCompletedTasks.consolidateCompletedTasks(out);
       }
       return out;
+    }
+
+    function listCanonicalWorkItems(opts) {
+      opts = opts || {};
+      var range = String(opts.range || teamAgentPanelRange || 'today').trim();
+      var agentFilter = String(opts.agentId || '').trim();
+      var statusFilter = String(opts.status || '').trim().toLowerCase();
+      var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      items = items.map(function (it) {
+        return Object.assign({ sourceKind: it.kind || 'subgoal' }, it);
+      });
+      var doneMissionTitles = {};
+      items.forEach(function (it) {
+        if (String(it.status || '').toLowerCase() !== 'done') return;
+        var title = String(it.title || '').trim().toLowerCase();
+        if (title) doneMissionTitles[title] = true;
+      });
+
+      listCompletedTasks({ range: range, agentId: agentFilter }).forEach(function (task) {
+        var title = missionTaskDisplayTitle(task);
+        if (doneMissionTitles[String(title || '').trim().toLowerCase()]) return;
+        items.push({
+          kind: 'turn',
+          sourceKind: 'turn',
+          status: 'done',
+          title: title,
+          path: title,
+          assignee: String(task.agentId || '').trim(),
+          agentId: String(task.agentId || '').trim(),
+          completedAt: Number(task.ts) || 0,
+          updatedAt: Number(task.ts) || 0,
+          createdAt: Number(task.ts) || 0,
+          turnTs: Number(task.ts) || 0,
+          prompt: String(task.prompt || ''),
+          summary: String(task.summary || ''),
+          skillCount: Number(task.skillCount) || 0,
+        });
+      });
+
+      if (agentFilter) {
+        items = items.filter(function (it) {
+          return String(it.assignee || it.agentId || '').trim() === agentFilter;
+        });
+      }
+      if (statusFilter) {
+        items = items.filter(function (it) {
+          return String(it.status || '').toLowerCase() === statusFilter;
+        });
+      }
+      return items.sort(function (a, b) {
+        var bt = Number(b.updatedAt || b.completedAt || b.delegatedAt || 0);
+        var at = Number(a.updatedAt || a.completedAt || a.delegatedAt || 0);
+        return bt - at;
+      });
     }
 
     function computeTeamTaskSummary() {

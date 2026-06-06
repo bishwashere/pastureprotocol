@@ -64,9 +64,13 @@
       var progressLabel = isFinite(progress) && progress > 0 ? (progress + '%') : '';
       var goalId = String(item.goalId || '');
       var subgoalId = String(item.subgoalId || '');
-      var selected = mc2SelectedTask &&
-        String(mc2SelectedTask.subgoalId || '') === subgoalId &&
-        String(mc2SelectedTask.goalId || '') === goalId;
+      var selected = mc2SelectedTask && (
+        (goalId || subgoalId)
+          ? String(mc2SelectedTask.subgoalId || '') === subgoalId &&
+            String(mc2SelectedTask.goalId || '') === goalId
+          : Number(mc2SelectedTask.turnTs || 0) === Number(item.turnTs || 0) &&
+            String(mc2SelectedTask.agentId || mc2SelectedTask.assignee || '') === assigneeId
+      );
       var actionsHtml = '';
       if (item.kind === 'subgoal' && goalId && subgoalId && typeof missionTaskActionButtonsHtml === 'function') {
         actionsHtml = missionTaskActionButtonsHtml(goalId, subgoalId, status, {
@@ -113,6 +117,11 @@
         var aid = String(it.assignee || it.agentId || '').trim();
         return aid === mc2TasksAgentFilter;
       });
+    }
+
+    function mc2RenderCanonicalTaskCard(item) {
+      if (item && item.kind === 'turn') return mc2TaskCard(item);
+      return mc2MissionTaskCard(item);
     }
 
     function mc2MissionTaskItemFromEl(el) {
@@ -176,7 +185,10 @@
       mc2SyncAgentFilterControls();
       mc2SetTasksFilter(mc2TasksFilter);
       var titleEl = mc2El('mc2-tasks-title');
-      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var range = teamAgentPanelRange || 'today';
+      var allItems = typeof listCanonicalWorkItems === 'function'
+        ? listCanonicalWorkItems({ range: range })
+        : (typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : []);
       var groups = typeof groupMissionWorkItems === 'function'
         ? groupMissionWorkItems(mc2FilterMissionItems(allItems))
         : { blocked: [], doing: [], todo: [], done: [] };
@@ -208,9 +220,8 @@
       }
 
       if (filter === 'all' || filter === 'done') {
-        var range = teamAgentPanelRange || 'today';
         var rangeLabel = teamAgentRangeLabel(range);
-        var tasks = listCompletedTasks({ range: range, agentId: mc2TasksAgentFilter });
+        var tasks = groups.done;
         if (filter === 'done' && titleEl) {
           titleEl.textContent = 'COMPLETED — ' + rangeLabel.toUpperCase() + ' (' + tasks.length + ')';
         }
@@ -223,7 +234,7 @@
           html += '<p class="mc-kanban-empty">No completed agent turns for this range.</p>';
         } else {
           mc2TimelineSpyEnabled = filter === 'done';
-          html += tasks.map(mc2TaskCard).join('');
+          html += tasks.map(mc2RenderCanonicalTaskCard).join('');
         }
         html += '</div></section>';
       } else {

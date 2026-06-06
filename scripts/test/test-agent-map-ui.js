@@ -9,24 +9,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, '../../dashboard/public');
 const htmlPath = path.join(publicDir, 'index.html');
 const assetsJsDir = path.join(publicDir, 'assets/js');
-const appJs = fs.existsSync(assetsJsDir)
-  ? fs.readdirSync(assetsJsDir)
-    .filter((name) => /^\d{2}-.*\.js$/.test(name))
-    .sort()
-    .map((name) => fs.readFileSync(path.join(assetsJsDir, name), 'utf8'))
-    .join('\n')
-  : '';
+
+function readDashboardJs(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return readDashboardJs(fullPath);
+      if (/^\d{2}-.*\.js$/.test(entry.name)) return [fullPath];
+      return [];
+    })
+    .sort();
+}
+
+const appJs = readDashboardJs(assetsJsDir)
+  .map((filePath) => fs.readFileSync(filePath, 'utf8'))
+  .join('\n');
 const dashboardCss = fs.existsSync(path.join(publicDir, 'assets/css/dashboard.css'))
   ? fs.readFileSync(path.join(publicDir, 'assets/css/dashboard.css'), 'utf8')
   : '';
 const pagesDir = path.join(publicDir, 'pages');
-const pageFragments = fs.existsSync(pagesDir)
-  ? fs.readdirSync(pagesDir)
-    .filter((name) => name.endsWith('.html'))
-    .sort()
-    .map((name) => fs.readFileSync(path.join(pagesDir, name), 'utf8'))
-    .join('\n')
-  : '';
+
+function readHtmlFragments(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return readHtmlFragments(fullPath);
+      if (entry.name.endsWith('.html')) return [fullPath];
+      return [];
+    })
+    .sort();
+}
+
+const pageFragments = readHtmlFragments(pagesDir)
+  .map((filePath) => fs.readFileSync(filePath, 'utf8'))
+  .join('\n');
 const partialsDir = path.join(publicDir, 'assets/partials');
 function readPartial(name) {
   const p = path.join(partialsDir, name);
@@ -103,7 +121,7 @@ const checks = [
     ok: html.includes('id="team-top-tab-desc"') &&
       html.includes('TEAM_TOP_TAB_DESC') &&
       html.includes('Long-running missions your agents work on autonomously') &&
-      html.includes('Proactive suggestions from mission reflection and team activity'),
+      html.includes('Agent proposals from mission reflection and team activity'),
   },
   {
     name: 'Team page includes goals UI and API hooks',
@@ -266,7 +284,7 @@ const checks = [
       html.includes('id="mc2-view-initiatives"') &&
       html.includes('id="mc2-initiatives-list"') &&
       html.includes('id="mc2-initiative-detail"') &&
-      html.includes('data-init-action="promote-subgoal"') &&
+      html.includes('data-init-action="approve-subgoal"') &&
       html.includes('data-init-action="undo-promotion"') &&
       html.includes('initiative_auto_promoted') &&
       html.includes('Added initiative to mission') &&
@@ -352,7 +370,7 @@ const checks = [
       html.includes('id="mc2-tasks-agent-filter"') &&
       html.includes('mc2RenderTasks') &&
       html.includes('mc2OpenTasksView') &&
-      html.includes('flattenMissionWorkItems') &&
+      html.includes('listCanonicalWorkItems') &&
       html.includes('mc2MissionTaskCard') &&
       html.includes('mc2TaskDisplayTitle') &&
       html.includes('mc-task-card') &&
@@ -378,7 +396,7 @@ const checks = [
     ok: html.includes('countBlockedSubgoalsForGoal') &&
       html.includes('goalNeedsAttention') &&
       html.includes('goalAttentionPrompt') &&
-      html.includes('tap to respond'),
+      html.includes('data-mc-task-action="respond"'),
   },
   {
     name: 'Team page blocked badge is clickable',

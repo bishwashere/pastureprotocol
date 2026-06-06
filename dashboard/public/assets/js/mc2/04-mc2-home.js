@@ -371,20 +371,23 @@
 
     function mc2CollectKanbanCompletedItems() {
       var items = [];
-      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var allItems = typeof listCanonicalWorkItems === 'function'
+        ? listCanonicalWorkItems({ range: 'today', status: 'done' })
+        : (typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : []);
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'done') return;
         items.push({
-          kind: 'subgoal',
+          kind: it.kind === 'turn' ? 'turn' : 'subgoal',
           title: it.title,
           goalId: it.goalId,
           subgoalId: it.subgoalId,
           assignee: it.assignee,
+          agentId: it.agentId,
           delegatedFrom: it.delegatedFrom,
-          ts: Number(it.updatedAt) || 0,
+          ts: Number(it.updatedAt || it.completedAt || it.turnTs) || 0,
         });
       });
-      if (typeof listCompletedTasks === 'function') {
+      if (typeof listCanonicalWorkItems !== 'function' && typeof listCompletedTasks === 'function') {
         listCompletedTasks({ range: 'today' }).forEach(function (task) {
           items.push({
             kind: 'turn',

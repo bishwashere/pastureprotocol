@@ -26,6 +26,7 @@ async function main() {
       formatDecisionPrompt,
       updateProjectTaskStatus,
       logProjectProgress,
+      projectWorkflowStatus,
       syncTurnToProjectWork,
       buildProjectWorkflowContextBlock,
       isProjectWorkflowTurn,
@@ -260,6 +261,23 @@ async function main() {
           const countAfter = (after.updates || []).filter((u) => u.branch_id == null).length;
           if (countAfter <= countBefore) throw new Error('update not appended');
           return logged.update.text.slice(0, 40);
+        },
+      },
+      {
+        name: 'health/status exposes listable updates as work items',
+        input: 'status updates are listable',
+        run: async () => {
+          const health = healthCheckProject(project);
+          if (!Array.isArray(health.recentUpdates)) throw new Error('recentUpdates missing');
+          if (!health.recentUpdates.some((u) => /Completed health check/.test(u.text))) {
+            throw new Error('recent update text not exposed');
+          }
+          const status = projectWorkflowStatus({ project: 'NextPostAI', agentId: 'main' });
+          if (!Array.isArray(status.updates) || !status.updates.length) throw new Error('status updates missing');
+          if (!Array.isArray(status.workItems) || !status.workItems.some((w) => w.source === 'project_update' && w.status === 'done')) {
+            throw new Error('project updates not represented as canonical done work items');
+          }
+          return `${status.updates.length} updates`;
         },
       },
       {

@@ -10,7 +10,7 @@
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 import { createTempStateDir, runE2E, runDashboardE2E, isNoLlmError } from './e2e-run.js';
-import { setupAgentTeamFixture, patchAgentConfig, MARKETER_TAGLINE } from './agent-team-fixture.js';
+import { setupAgentTeamFixture, seedAgentTeamStatusFixture, patchAgentConfig, MARKETER_TAGLINE } from './agent-team-fixture.js';
 import { NEW_SESSION_ACK } from '../../lib/chat-session.js';
 
 /** Marketing topic — should route to marketer by specialization, not by name. */
@@ -23,6 +23,10 @@ const ESTABLISH_MARKETING_LANE = 'Taglines, campaigns, and brand stuff should go
 const ASK_ONBOARDING_RISK = 'Users drop off right after signup. What risk should we prioritize first, and what small experiment should we run this week?';
 /** Proactive collaboration framing; should pull in backend specialist for feasibility. */
 const ASK_FEASIBILITY_REVIEW = 'We have an onboarding improvement idea. Can you review technical feasibility and rollout risks before we proceed?';
+/** Natural team-status analytics questions — must be answerable by the LLM from prompt context. */
+const ASK_TEAM_HEADCOUNT_AND_RECENT = 'How many agents are there, and what are the recent movements?';
+const ASK_ALEX_LAST_FIVE = 'What did Alex do in his last five tasks?';
+const ASK_TEAM_ATTENTION_AND_DONE = 'What is in need of attention, and what work has been completed?';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -60,6 +64,29 @@ function assertDelegatedAndNonEmpty(reply, skillsCalled, label = 'delegation exp
     delegated && reply && reply.trim().length > 0,
     `${label}. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 220)}`,
   );
+}
+
+async function assertTeamStatusJudgePass(input, reply, stateDir, criteria) {
+  const { pass, reason } = await judgeUserGotWhatTheyWanted(input, reply, stateDir, {
+    prompt: `You are judging a team-status E2E test. The bot had a seeded team snapshot with these facts:
+- Visible agents: main, marketer, alex (3 total).
+- Alex's recent completed tasks include CI failure review, migration rollback audit, API latency log review, backend rollout checklist, and webhook retry validation.
+- Recent movement includes main delegating OAuth callback investigation to alex.
+- Needs attention includes Alex's OAuth callback investigation blocked by a missing GitHub token.
+- Completed work includes Alex's completed backend tasks and marketer's onboarding email/pricing tagline work.
+
+User asked:
+"${input}"
+
+Bot replied:
+---
+${reply}
+---
+
+Pass only if the reply answers the user naturally from those facts. ${criteria}
+Answer exactly one line beginning YES or NO, followed by one short reason.`,
+  });
+  assert(pass, `Judge: ${reason || 'NO'}`);
 }
 
 async function main() {
@@ -197,6 +224,71 @@ async function main() {
         const mentionsTechnical = /technical|backend|rollout|risk|ci|infrastructure/i.test(reply || '');
         const delegated = skillsCalled.includes('agent-send');
         assert(mentionsTechnical || delegated, `Expected technical feasibility context. reply=${(reply || '').slice(0, 220)}`);
+        return { reply, skillsCalled, stateDir };
+      },
+    },
+    {
+      name: 'LLM answers natural team count and recent movements',
+      input: ASK_TEAM_HEADCOUNT_AND_RECENT,
+      expectMode: 'behavior',
+      run: async () => {
+        const stateDir = createTempStateDir();
+        await setupAgentTeamFixture(stateDir);
+        await seedAgentTeamStatusFixture(stateDir);
+        const { reply, skillsCalled } = await runE2E(ASK_TEAM_HEADCOUNT_AND_RECENT, { stateDir });
+        assert(reply && reply.trim().length > 0, 'Expected non-empty team status reply');
+        assert(/\b(3|three)\b/i.test(reply || ''), `Expected agent count in reply: ${(reply || '').slice(0, 220)}`);
+        assert(/main|marketer|alex/i.test(reply || ''), `Expected agent names in reply: ${(reply || '').slice(0, 220)}`);
+        assert(/oauth|movement|delegat|recent|alex/i.test(reply || ''), `Expected recent movement context: ${(reply || '').slice(0, 220)}`);
+        await assertTeamStatusJudgePass(
+          ASK_TEAM_HEADCOUNT_AND_RECENT,
+          reply,
+          stateDir,
+          'The reply must include the 3-agent count and at least one recent movement such as the OAuth delegation/investigation.',
+        );
+        return { reply, skillsCalled, stateDir };
+      },
+    },
+    {
+      name: 'LLM answers natural last five tasks for a named agent',
+      input: ASK_ALEX_LAST_FIVE,
+      expectMode: 'behavior',
+      run: async () => {
+        const stateDir = createTempStateDir();
+        await setupAgentTeamFixture(stateDir);
+        await seedAgentTeamStatusFixture(stateDir);
+        const { reply, skillsCalled } = await runE2E(ASK_ALEX_LAST_FIVE, { stateDir });
+        assert(reply && reply.trim().length > 0, 'Expected non-empty last-five-tasks reply');
+        const hits = ['ci', 'migration', 'latency', 'rollout', 'webhook', 'oauth']
+          .filter((term) => new RegExp(term, 'i').test(reply || '')).length;
+        assert(hits >= 3, `Expected multiple Alex task facts in reply: ${(reply || '').slice(0, 260)}`);
+        await assertTeamStatusJudgePass(
+          ASK_ALEX_LAST_FIVE,
+          reply,
+          stateDir,
+          'The reply must list or summarize several of Alex\'s recent tasks, not just say Alex exists.',
+        );
+        return { reply, skillsCalled, stateDir };
+      },
+    },
+    {
+      name: 'LLM answers natural attention and completed work summary',
+      input: ASK_TEAM_ATTENTION_AND_DONE,
+      expectMode: 'behavior',
+      run: async () => {
+        const stateDir = createTempStateDir();
+        await setupAgentTeamFixture(stateDir);
+        await seedAgentTeamStatusFixture(stateDir);
+        const { reply, skillsCalled } = await runE2E(ASK_TEAM_ATTENTION_AND_DONE, { stateDir });
+        assert(reply && reply.trim().length > 0, 'Expected non-empty attention/completed reply');
+        assert(/attention|blocked|missing|token|oauth/i.test(reply || ''), `Expected attention context: ${(reply || '').slice(0, 260)}`);
+        assert(/completed|done|ci|email|pricing|tagline|webhook|rollout/i.test(reply || ''), `Expected completed work context: ${(reply || '').slice(0, 260)}`);
+        await assertTeamStatusJudgePass(
+          ASK_TEAM_ATTENTION_AND_DONE,
+          reply,
+          stateDir,
+          'The reply must identify the OAuth/GitHub-token attention item and mention completed work.',
+        );
         return { reply, skillsCalled, stateDir };
       },
     },
