@@ -44,7 +44,7 @@ import {
   buildDurabilitySystemBlock,
   delegationArgsFromDurability,
   delegationRoutingTextFromDurability,
-  prepareWorkDurability,
+  prepareWorkDurabilityWithAi,
 } from '../lib/work-durability.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
@@ -146,7 +146,7 @@ async function main() {
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
   // Step 2: decide work durability before delegation. Persistence must be
   // attached to the turn before agent-send chooses who should do the work.
-  const durabilityDecision = prepareWorkDurability({ userText: message, historyMessages, agentId });
+  const durabilityDecision = await prepareWorkDurabilityWithAi({ userText: message, historyMessages, agentId });
   if (durabilityDecision?.goalId) ctx.goalId = durabilityDecision.goalId;
   if (durabilityDecision) {
     process.stderr.write('[work-durability] ' + JSON.stringify({

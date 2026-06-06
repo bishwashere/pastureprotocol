@@ -14,14 +14,27 @@ async function main() {
     const { createGoal, getGoal } = await import('../../lib/goals.js');
     const {
       classifyWorkDurability,
+      classifyWorkDurabilityWithAi,
       delegationArgsFromDurability,
       delegationRoutingTextFromDurability,
       prepareWorkDurability,
+      prepareWorkDurabilityWithAi,
     } = await import('../../lib/work-durability.js');
 
     const direct = classifyWorkDurability({ userText: 'hi', agentId: 'main' });
     assert(direct.kind === 'direct_answer', 'greeting is direct answer');
     assert(direct.persistence === 'none', 'greeting has no persistence');
+    let llmCalls = 0;
+    const directAi = await classifyWorkDurabilityWithAi({
+      userText: 'hi',
+      agentId: 'main',
+      llmChat: async () => {
+        llmCalls += 1;
+        throw new Error('should not call LLM for deterministic fast path');
+      },
+    });
+    assert(directAi.kind === 'direct_answer', 'AI classifier keeps greeting direct');
+    assert(llmCalls === 0, 'deterministic fast path skips LLM');
 
     const existing = createGoal({
       title: 'Increase customer sign-ups for NextpostAI',
@@ -62,6 +75,46 @@ async function main() {
 
     const routingText = delegationRoutingTextFromDurability(durable, launchMessage);
     assert(/marketing/.test(routingText), 'routing text includes marketing hint after decomposition');
+
+    const messyLaunch = 'I’m launching this next week and need to get the messaging, posts, and page ready.';
+    const aiDurable = await prepareWorkDurabilityWithAi({
+      userText: messyLaunch,
+      agentId: 'main',
+      llmChat: async () => JSON.stringify({
+        workMode: 'new_mission_candidate',
+        requiresPersistence: true,
+        confidence: 0.88,
+        reason: 'User describes a future launch with multiple deliverables.',
+        projectName: 'TestProduct',
+        deliverables: ['Positioning', 'Launch posts', 'Landing page'],
+      }),
+    });
+    assert(aiDurable.classifier === 'ai', 'messy launch uses AI classifier');
+    assert(aiDurable.persistence === 'create_lightweight_mission', 'AI can create durable mission');
+    assert(aiDurable.confidence === 0.88, 'AI confidence retained');
+    assert(aiDurable.goalId, 'AI durable decision creates goal before delegation');
+    const aiGoal = getGoal(aiDurable.goalId);
+    assert(aiGoal?.title === 'Launch TestProduct', 'AI projectName used in mission title');
+    assert((aiGoal?.subgoals || []).length === 3, 'AI deliverables become subgoals');
+
+    const followup = await prepareWorkDurabilityWithAi({
+      userText: 'Make the positioning less corporate',
+      agentId: 'main',
+      historyMessages: [],
+      llmChat: async () => JSON.stringify({
+        goalMatch: 'recent_goal',
+        goalId: aiDurable.goalId,
+        taskMatch: 'positioning',
+        confidence: 0.84,
+        reason: "User refers to 'the positioning', which belongs to the recent launch package.",
+      }),
+    });
+    assert(followup.kind === 'existing_goal_task_update', 'follow-up attaches to existing goal');
+    assert(followup.classifier === 'ai-goal-resolution', 'follow-up uses AI goal resolution');
+    assert(followup.goalId === aiDurable.goalId, 'follow-up keeps launch goal id');
+    assert(followup.subgoalId, 'follow-up finds positioning subgoal');
+    assert(followup.taskMatch === 'positioning', 'task match retained');
+    assert(followup.confidence === 0.84, 'goal resolution confidence retained');
 
     console.log('work-durability tests passed');
   } finally {
