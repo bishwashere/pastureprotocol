@@ -96,6 +96,43 @@ async function runCase(tc) {
 async function main() {
   console.log('Intent planner routing tests (with skill summaries)\n');
 
+  const durablePlan = await planIntent({
+    userText: 'I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.',
+    availableSkillIds: ['project-workflow', 'agent-send', 'memory'],
+    availableSkillSummaries: [
+      { id: 'project-workflow', description: 'Track persistent projects, tasks, and workflow state.' },
+      { id: 'agent-send', description: 'Delegate work to another agent.' },
+      { id: 'memory', description: 'Read or write memory.' },
+    ],
+    delegationContext: {
+      recommendation: {
+        action: 'delegate',
+        targetAgentId: 'marketer',
+        reason: 'Durable routing selected marketer.',
+      },
+    },
+    workDurability: {
+      kind: 'new_mission_candidate',
+      persistence: 'create_lightweight_mission',
+      goalId: 'goal-launch-testproduct',
+      reason: 'Persistent launch work.',
+    },
+    llmChat: async () => JSON.stringify({
+      mode: 'chat',
+      skills: [],
+      executionMode: 'direct_answer',
+      usesExistingWorkIntake: false,
+      plan: 'Answer directly.',
+      answer_style: 'short',
+    }),
+  });
+  if (durablePlan.mode === 'chat') throw new Error(`Durable work was downgraded to chat: ${JSON.stringify(durablePlan)}`);
+  if (!durablePlan.skills.includes('project-workflow')) throw new Error(`Durable plan missing project-workflow: ${JSON.stringify(durablePlan)}`);
+  if (!durablePlan.skills.includes('agent-send')) throw new Error(`Durable delegation plan missing agent-send: ${JSON.stringify(durablePlan)}`);
+  if (durablePlan.executionMode !== 'persistent_delegation') throw new Error(`Expected persistent_delegation: ${JSON.stringify(durablePlan)}`);
+  if (durablePlan.usesExistingWorkIntake !== true) throw new Error(`Expected usesExistingWorkIntake=true: ${JSON.stringify(durablePlan)}`);
+  console.log('  Durable work constraint → ✅  mode=' + durablePlan.mode + ' skills=[' + durablePlan.skills.join(', ') + ']');
+
   const rows = [];
   let failed = 0;
 

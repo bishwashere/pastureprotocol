@@ -42,6 +42,7 @@ import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goal
 import { buildProjectWorkflowContextBlock } from '../lib/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
+  buildDurableDelegationContext,
   delegationArgsFromDurability,
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
@@ -157,7 +158,11 @@ async function main() {
     }) + '\n');
   }
   // Step 3: specialization-aware delegation check before planner (same as index.js private chat).
-  const delegationContext = await buildDelegationContext({
+  const durableDelegationContext = buildDurableDelegationContext(durabilityDecision, {
+    agentId,
+    availableSkillIds: enabledSkillIds,
+  });
+  const delegationContext = durableDelegationContext || await buildDelegationContext({
     agentId,
     userText: delegationRoutingTextFromDurability(durabilityDecision, message),
     availableSkillIds: enabledSkillIds,
@@ -169,7 +174,14 @@ async function main() {
   const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
     ? {
         mode: 'tool',
-        skills: ['agent-send'],
+        skills: [
+          ...(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none' && enabledSkillIds.includes('project-workflow') ? ['project-workflow'] : []),
+          'agent-send',
+        ],
+        executionMode: durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'
+          ? 'persistent_delegation'
+          : 'delegation',
+        usesExistingWorkIntake: !!(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'),
         plan: `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
         answer_style: 'short',
       }
@@ -224,6 +236,7 @@ async function main() {
         availableSkillSummaries: enabledSkillSummaries,
         agentId,
         delegationContext,
+        workDurability: durabilityDecision,
       })
     : null);
   if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');

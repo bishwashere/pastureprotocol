@@ -15,6 +15,7 @@ async function main() {
     const {
       classifyWorkDurability,
       classifyWorkDurabilityWithAi,
+      buildDurableDelegationContext,
       delegationArgsFromDurability,
       delegationRoutingTextFromDurability,
       prepareWorkDurability,
@@ -115,6 +116,78 @@ async function main() {
     assert(followup.subgoalId, 'follow-up finds positioning subgoal');
     assert(followup.taskMatch === 'positioning', 'task match retained');
     assert(followup.confidence === 0.84, 'goal resolution confidence retained');
+
+    const unnumberedLaunch = 'I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.';
+    let decompositionCalls = 0;
+    const decomposed = await prepareWorkDurabilityWithAi({
+      userText: unnumberedLaunch,
+      agentId: 'main',
+      llmChat: async (messages) => {
+        const system = String(messages?.[0]?.content || '');
+        if (system.includes('decompose persistent user work')) {
+          decompositionCalls += 1;
+          return JSON.stringify({
+            subtasks: [
+              {
+                title: 'Create positioning statement',
+                type: 'marketing',
+                suggestedAgent: 'marketer',
+                confidence: 0.91,
+                reason: 'Positioning and launch messaging are marketing tasks.',
+              },
+              {
+                title: 'Create launch posts',
+                type: 'marketing',
+                suggestedAgent: 'marketer',
+                confidence: 0.9,
+                reason: 'Launch posts are marketing content.',
+              },
+              {
+                title: 'Create landing page checklist',
+                type: 'product',
+                suggestedAgent: 'alex',
+                confidence: 0.72,
+                reason: 'Checklist includes product/page implementation review.',
+              },
+              {
+                title: 'Identify missing launch items',
+                type: 'planning',
+                suggestedAgent: 'main',
+                confidence: 0.78,
+                reason: 'Coordinator should identify missing cross-functional work.',
+              },
+            ],
+          });
+        }
+        return JSON.stringify({
+          workMode: 'new_mission_candidate',
+          requiresPersistence: true,
+          confidence: 0.86,
+          reason: 'User describes launch preparation with multiple implied deliverables.',
+          projectName: '',
+          deliverables: [],
+        });
+      },
+    });
+    assert(decompositionCalls === 1, 'AI decomposition called for persistent work');
+    assert(decomposed.decomposition === 'ai-constrained', 'decomposition marked ai-constrained');
+    assert(decomposed.subgoals.length === 4, 'AI decomposition creates four subtasks');
+    const decomposedGoal = getGoal(decomposed.goalId);
+    const typed = decomposedGoal.subgoals || [];
+    assert(typed.some((sg) => sg.title === 'Create positioning statement' && sg.type === 'marketing' && sg.suggestedAgent === 'marketer'), 'positioning task typed for marketer');
+    assert(typed.some((sg) => sg.title === 'Create landing page checklist' && sg.type === 'product' && sg.suggestedAgent === 'alex'), 'landing page task typed for alex');
+    assert(typed.some((sg) => sg.title === 'Identify missing launch items' && sg.type === 'planning' && sg.suggestedAgent === 'main'), 'missing launch items task typed for main');
+
+    const durableRouting = buildDurableDelegationContext(decomposed, {
+      agentId: 'main',
+      availableSkillIds: ['agent-send'],
+    });
+    assert(durableRouting?.recommendation?.action === 'delegate', 'durable work routes to a specialist');
+    assert(durableRouting.recommendation.targetAgentId === 'marketer', 'durable routing selects marketer over keyword tie');
+    assert(durableRouting.recommendation.routingMethod === 'durable-ai', 'durable routing is semantic-first');
+    assert(durableRouting.recommendation.confidence === 0.91, 'durable routing keeps route confidence');
+    assert(durableRouting.recommendation.routes.some((r) => r.task === 'Create landing page checklist' && r.agent === 'alex' && r.confidence === 0.72), 'durable routing includes alex page route');
+    assert(durableRouting.recommendation.routes.some((r) => r.task === 'Create positioning statement' && r.agent === 'marketer'), 'durable routing includes marketer positioning route');
 
     console.log('work-durability tests passed');
   } finally {

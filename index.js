@@ -74,6 +74,7 @@ import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals
 import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
+  buildDurableDelegationContext,
   delegationArgsFromDurability,
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
@@ -1003,13 +1004,19 @@ async function main() {
     }
     // Step 3: specialization-aware delegation check before planner.
     // This runs after durability so agent-send can receive a goalId up front.
-    const delegationContext = !isGroupJid
+    const durableDelegationContext = !isGroupJid
+      ? buildDurableDelegationContext(durabilityDecision, {
+          agentId,
+          availableSkillIds: enabledSkillIds,
+        })
+      : null;
+    const delegationContext = durableDelegationContext || (!isGroupJid
       ? await buildDelegationContext({
           agentId,
           userText: delegationRoutingTextFromDurability(durabilityDecision, text),
           availableSkillIds: enabledSkillIds,
         })
-      : null;
+      : null);
     const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
       ? (delegationContext?.recommendation?.targetAgentId || '')
       : '';
@@ -1017,7 +1024,14 @@ async function main() {
     const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
       ? {
           mode: 'tool',
-          skills: ['agent-send'],
+          skills: [
+            ...(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none' && enabledSkillIds.includes('project-workflow') ? ['project-workflow'] : []),
+            'agent-send',
+          ],
+          executionMode: durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'
+            ? 'persistent_delegation'
+            : 'delegation',
+          usesExistingWorkIntake: !!(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'),
           plan: `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
           answer_style: 'short',
         }
@@ -1072,6 +1086,7 @@ async function main() {
           availableSkillSummaries: enabledSkillSummaries,
           agentId,
           delegationContext,
+          workDurability: durabilityDecision,
         })
       : null);
     if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
