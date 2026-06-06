@@ -82,6 +82,7 @@
     "test:github-context": "node scripts/test/test-github-context.js",
     "test:delegation-routing-details": "node scripts/test/test-delegation-routing-details.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
+    "test:work-durability": "node scripts/test/test-work-durability.js",
     "test:state-migration": "node scripts/test/test-state-migration.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",

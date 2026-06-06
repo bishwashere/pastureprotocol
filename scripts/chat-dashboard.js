@@ -40,6 +40,12 @@ import {
 } from '../lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
 import { buildProjectWorkflowContextBlock } from '../lib/project-workflow.js';
+import {
+  buildDurabilitySystemBlock,
+  delegationArgsFromDurability,
+  delegationRoutingTextFromDurability,
+  prepareWorkDurability,
+} from '../lib/work-durability.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
 import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from '../lib/user-facing-reply.js';
@@ -138,10 +144,22 @@ async function main() {
   // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
   const enabledSkillIds = getEnabledSkillIds({ agentId });
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
-  // Step 2: specialization-aware delegation check before planner (same as index.js private chat).
+  // Step 2: decide work durability before delegation. Persistence must be
+  // attached to the turn before agent-send chooses who should do the work.
+  const durabilityDecision = prepareWorkDurability({ userText: message, historyMessages, agentId });
+  if (durabilityDecision?.goalId) ctx.goalId = durabilityDecision.goalId;
+  if (durabilityDecision) {
+    process.stderr.write('[work-durability] ' + JSON.stringify({
+      kind: durabilityDecision.kind,
+      persistence: durabilityDecision.persistence,
+      goalId: durabilityDecision.goalId || '',
+      createdGoal: !!durabilityDecision.createdGoal,
+    }) + '\n');
+  }
+  // Step 3: specialization-aware delegation check before planner (same as index.js private chat).
   const delegationContext = await buildDelegationContext({
     agentId,
-    userText: message,
+    userText: delegationRoutingTextFromDurability(durabilityDecision, message),
     availableSkillIds: enabledSkillIds,
   });
   const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
@@ -188,7 +206,7 @@ async function main() {
       details: delegationDecision,
     });
   }
-  // Step 3: intent planner — one small LLM call before loading any tool schemas.
+  // Step 4: intent planner — one small LLM call before loading any tool schemas.
   const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
     ? buildCasualChatIntentPlan()
     : null;
@@ -209,7 +227,7 @@ async function main() {
       })
     : null);
   if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
-  // Step 4: load tool schemas based on what the planner returned.
+  // Step 5: load tool schemas based on what the planner returned.
   //   intentPlan === null      → planner failed  → full tools (safe fallback)
   //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
   //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
@@ -227,6 +245,7 @@ async function main() {
   if (sessionRotated) {
     systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
   }
+  systemPrompt += buildDurabilitySystemBlock(durabilityDecision);
   const memoryConfig = getMemoryConfig();
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
@@ -249,6 +268,7 @@ async function main() {
         const forcedRaw = await executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
           message: enrichMessageWithProjectContext(message, historyMessages),
+          ...delegationArgsFromDurability(durabilityDecision, message),
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
