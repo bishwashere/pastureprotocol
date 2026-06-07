@@ -28,8 +28,8 @@ const appJs = readDashboardJs(assetsJsDir)
 const dashboardCss = fs.existsSync(path.join(publicDir, 'assets/css/dashboard.css'))
   ? fs.readFileSync(path.join(publicDir, 'assets/css/dashboard.css'), 'utf8')
   : '';
-const team2Css = fs.existsSync(path.join(publicDir, 'assets/css/team2.css'))
-  ? fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8')
+const team2Css = fs.existsSync(path.join(publicDir, 'assets/css/team.css'))
+  ? fs.readFileSync(path.join(publicDir, 'assets/css/team.css'), 'utf8')
   : '';
 const pagesDir = path.join(publicDir, 'pages');
 
@@ -110,29 +110,18 @@ const checks = [
     ok: html.includes('id="agent-team-ext-btn"') && html.includes('openTeamPage'),
   },
   {
-    name: 'Dedicated team map page exists',
-    ok: html.includes('id="page-team"') && html.includes('id="team-map-canvas"'),
+    name: 'Team page (MC2) exists with correct id',
+    ok: html.includes('id="page-team"') && html.includes('id="mc2-mission-select"'),
   },
   {
-    name: 'Team page has top-level Roster and Missions tabs',
-    ok: html.includes('id="team-top-tab-roster"') &&
-      html.includes('id="team-top-tab-missions"') &&
-      !html.includes('id="team-top-tab-suggestedTasks"') &&
-      html.includes('setTeamTopTab'),
+    name: 'Team page (MC2) has mission select and delete button',
+    ok: html.includes('id="mc2-mission-select"') &&
+      html.includes('id="mc2-mission-delete-btn"') &&
+      html.includes('/api/missions'),
   },
   {
-    name: 'Team top tabs show one-line descriptions on switch',
-    ok: html.includes('id="team-top-tab-desc"') &&
-      html.includes('TEAM_TOP_TAB_DESC') &&
-      html.includes('Long-running missions your agents work on autonomously') &&
-      !html.includes('Agent proposals from mission reflection and team activity'),
-  },
-  {
-    name: 'Team page includes missions UI and API hooks',
-    ok: html.includes('id="team-missions-list"') &&
-      html.includes('id="team-mission-create"') &&
-      html.includes('/api/missions') &&
-      html.includes('fetchMissionsSnapshot'),
+    name: 'Team page (MC2) has mission API hooks',
+    ok: html.includes('/api/missions') && html.includes('fetchMissionsSnapshot'),
   },
   {
     name: 'Team user input modal appears on team main view when mission needs input',
@@ -150,9 +139,8 @@ const checks = [
       html.includes('Research continues'),
   },
   {
-    name: 'Missions tab includes detail pane with task tree',
-    ok: html.includes('id="team-mission-detail"') &&
-      html.includes('renderMissionDetail') &&
+    name: 'MC2 missions view has detail pane and task tree logic',
+    ok: html.includes('renderMissionDetail') &&
       html.includes('renderMissionTaskTree') &&
       html.includes('dependsOn'),
   },
@@ -172,24 +160,8 @@ const checks = [
       /if \(mc2IsChatDerivedDelegatedTask\(sg\)\) return;/.test(html),
   },
   {
-    name: 'Team page includes live activity panel',
-    ok: html.includes('id="team-activity-list"') && html.includes('Live agent activity'),
-  },
-  {
-    name: 'Team activity panel has collapse toggle',
-    ok: html.includes('id="team-activity-toggle"') && html.includes('setTeamActivityExpanded'),
-  },
-  {
-    name: 'Team activity panel defaults to collapsed',
-    ok: html.includes('id="team-activity-wrap" class="team-rail-wrap team-activity-wrap collapsed"') &&
-      html.includes("setTeamRailExpanded(key, false)"),
-  },
-  {
-    name: 'Team page uses right-side split layout',
-    ok: html.includes('class="team-page-body"') &&
-      html.includes('id="team-roster-side"') &&
-      /\.team-roster-side\s*\{[^}]*flex-direction:\s*column/s.test(html) &&
-      /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
+    name: 'MC2 team page has live activity feed hooks',
+    ok: html.includes('startTeamActivityFeed') && html.includes('teamActivityEvents'),
   },
   {
     name: 'Expanded team rail takes full right side alone',
@@ -201,23 +173,9 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
-    name: 'Team side rails include activity context inbox outbox stats',
-    ok: html.includes('setTeamRailExpanded') &&
-      html.includes('id="team-activity-wrap"') &&
-      html.includes('id="team-context-wrap"') &&
-      html.includes('id="team-inbox-wrap"') &&
-      html.includes('id="team-outbox-wrap"') &&
-      html.includes('id="team-stats-wrap"') &&
-      /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-context-wrap"/.test(html),
-  },
-  {
-    name: 'Team page has separate inbox and outbox rails',
-    ok: html.includes('id="team-inbox-wrap"') &&
-      html.includes('id="team-outbox-wrap"') &&
-      html.includes('renderAgentOutbox') &&
-      html.includes('filterFlowsForMailbox') &&
-      html.includes('team-agent-inbox-list') &&
-      html.includes('team-agent-outbox-list'),
+    name: 'MC2 agents view has inbox and outbox logic',
+    ok: html.includes('renderAgentOutbox') &&
+      html.includes('filterFlowsForMailbox'),
   },
   {
     name: 'Team agent rails have time range submenu',
@@ -229,22 +187,8 @@ const checks = [
       html.includes('filterFlowsByTeamAgentRange'),
   },
   {
-    name: 'Active Context is first agent detail rail after activity',
-    ok: (() => {
-      var activityIdx = html.indexOf('id="team-activity-wrap"');
-      var contextIdx = html.indexOf('id="team-context-wrap"');
-      var inboxIdx = html.indexOf('id="team-inbox-wrap"');
-      return activityIdx >= 0 && contextIdx > activityIdx && inboxIdx > contextIdx &&
-        html.includes('id="team-context-toggle"') &&
-        /if \(pageId === 'team'\)[\s\S]*setTeamRailExpanded\('context', false\)/.test(html);
-    })(),
-  },
-  {
-    name: 'Team page includes active context view',
-    ok: html.includes('id="team-context-wrap"') &&
-      html.includes('id="team-agent-context-detail"') &&
-      html.includes('renderAgentContext') &&
-      html.includes('/api/team/context'),
+    name: 'MC2 agents view has active context rendering',
+    ok: html.includes('renderAgentContext') && html.includes('/api/team/context'),
   },
   {
     name: 'Active context panel shows mission thought waiting and last action',
@@ -256,34 +200,18 @@ const checks = [
       html.includes('currentThought'),
   },
   {
-    name: 'Team page has View Active Only toggle',
-    ok: html.includes('id="team-view-active-only"') &&
-      html.includes('View Active Only') &&
-      html.includes('setTeamViewActiveOnly') &&
-      html.includes('getTeamAgentsForView'),
+    name: 'MC2 team page has agent filter and view logic',
+    ok: html.includes('setTeamViewActiveOnly') &&
+      html.includes('getTeamAgentsForView') &&
+      html.includes('mc2SetAgentFilter'),
   },
   {
-    name: 'Team page has cards and tree view tabs',
-    ok: html.includes('id="team-view-tab-cards"') &&
-      html.includes('id="team-view-tab-tree"') &&
-      html.includes('id="team-agent-cards"') &&
-      html.includes('setTeamViewTab'),
-  },
-  {
-    name: 'Team page head has Current Mission and task summary below top tabs',
-    ok: html.includes('id="team-current-mission"') &&
-      html.includes('class="team-page-summary"') &&
-      html.includes('id="team-task-summary"') &&
-      html.includes('renderCurrentMission') &&
+    name: 'MC2 team page mission progress and task summary logic',
+    ok: html.includes('renderCurrentMission') &&
       html.includes('renderTeamTaskSummary') &&
       html.includes('computeTeamTaskSummary') &&
       html.includes('getCurrentMission') &&
-      html.includes('getLiveMissionFromTeamContext') &&
-      html.includes('missionTaskIcon') &&
-      html.includes('Blocked:') &&
-      html.includes('Completed Today') &&
-      /\.team-page-summary[\s\S]*\.team-current-mission/.test(html) &&
-      /\.team-task-summary[\s\S]*\.team-task-badge/.test(html),
+      html.includes('getLiveMissionFromTeamContext'),
   },
   {
     name: 'Team2 presents saved missions as missions',
@@ -455,11 +383,8 @@ const checks = [
       html.includes('formatAgentStateDisplay'),
   },
   {
-    name: 'Team page includes agent metrics stats rail',
-    ok: html.includes('id="team-stats-wrap"') &&
-      html.includes('id="team-agent-stats-detail"') &&
-      html.includes('renderAgentMetrics') &&
-      html.includes('/api/team/metrics'),
+    name: 'Team page has agent metrics rendering logic',
+    ok: html.includes('renderAgentMetrics') && html.includes('/api/team/metrics'),
   },
   {
     name: 'Agent metrics shows tasks delegation and skills',
@@ -480,12 +405,12 @@ const checks = [
       html.includes('team_capability_evaluation'),
   },
   {
-    name: 'Team2 hash route without agent id opens roster map page',
-    ok: /if \(name === 'team2'\)[\s\S]*return \{ name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: null \}/.test(html),
+    name: 'Team hash route without agent id opens MC2 page',
+    ok: /if \(name === 'team'[\s\S]*return \{ name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null \}/.test(html),
   },
   {
-    name: 'Legacy #team/agent hash opens edit modal on roster page',
-    ok: /if \(name === 'team'\)[\s\S]*return \{ name: 'team2'[\s\S]*teamAgentId: decodeURIComponent\(subFile\)/.test(html) &&
+    name: 'Legacy #team/agent hash opens edit modal on team page',
+    ok: /if \(name === 'team'[\s\S]*teamAgentId: decodeURIComponent\(subFile\)/.test(html) &&
       html.includes('openAgentEditModal(teamAgentId)') &&
       !/return \{ name: 'team-agent'/.test(html),
   },
@@ -503,22 +428,20 @@ const checks = [
     ok: /buildInboundLinks\(agents\)/.test(html),
   },
   {
-    name: 'Top nav Team opens Mission Control route and Classic opens roster',
+    name: 'Top nav has single Team link (no separate Classic link)',
     ok: html.includes('data-page="team">Team</a>') &&
-      html.includes('data-page="team2">Classic</a>') &&
+      !html.includes('data-page="team2"') &&
       !html.includes('data-page="agents"'),
   },
   {
-    name: 'Legacy #agents hash redirects to team2 roster route',
-    ok: /if \(name === 'agents'\) name = 'team2';/.test(html),
+    name: 'Legacy #agents hash redirects to team route',
+    ok: /if \(name === 'agents'\) name = 'team';/.test(html),
   },
   {
-    name: 'Team page has full screen toggle',
-    ok: html.includes('id="team-page-fullscreen-btn"') &&
-      html.includes('setTeamPageFullscreen') &&
+    name: 'Team page has fullscreen JS logic',
+    ok: html.includes('setTeamPageFullscreen') &&
       html.includes('toggleTeamPageFullscreen') &&
-      html.includes('body.team-page-fullscreen') &&
-      html.includes("sessionStorage.getItem('teamPageFullscreen')"),
+      html.includes('body.team-page-fullscreen'),
   },
 ];
 
