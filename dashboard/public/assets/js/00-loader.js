@@ -25,7 +25,6 @@
     'view-missions',
     'view-projects',
     'view-activity',
-    'view-stats',
   ];
   function loadMc2ViewsHtml() {
     return mc2ViewFiles.map(function (name) {

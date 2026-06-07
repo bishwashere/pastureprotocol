@@ -322,18 +322,25 @@ const checks = [
     ok: !html.includes('class="mc-nav-item" data-mc-nav="inbox"') &&
       !html.includes('class="mc-nav-item" data-mc-nav="outbox"') &&
       !html.includes('class="mc-nav-item" data-mc-nav="context"') &&
+      !html.includes('mc-nav-label">Settings</span>') &&
+      html.includes('Agent workspace') &&
       html.includes('data-mc2-agents-tab="context"') &&
       html.includes('data-mc2-agents-tab="inbox"') &&
       html.includes('data-mc2-agents-tab="outbox"') &&
+      html.includes('data-mc-agent-workspace="context"') &&
+      html.includes('data-mc-agent-workspace="inbox"') &&
+      html.includes('data-mc-agent-workspace="outbox"') &&
+      html.includes('mc-agent-overview-action') &&
+      html.includes("mc2SetAgentFilter(contextLink.getAttribute('data-mc-agent') || '', 'context')") &&
       html.includes('id="mc2-agents-context-list"') &&
       html.includes('id="mc2-agents-mailbox-feed"') &&
       html.includes('mc2SetAgentsSubView') &&
-      html.includes('data-mc-nav="stats"') &&
+      !html.includes('data-mc-nav="stats"') &&
       html.includes('id="mc2-inbox-agent-filter"') &&
       html.includes('id="mc2-agents-context-agent-filter"') &&
       html.includes('id="mc2-agents-mailbox-agent-filter"') &&
       html.includes('id="mc2-context-agent-filter"') &&
-      html.includes('id="mc2-stats-agent-filter"') &&
+      !html.includes('id="mc2-stats-agent-filter"') &&
       html.includes('class="team-agent-panel-ranges mc2-range-controls"') &&
       html.includes('data-range="today"') &&
       html.includes('data-range="yesterday"') &&
@@ -353,7 +360,7 @@ const checks = [
       html.includes('mc2RenderContext') &&
       html.includes('renderAgentContextCard') &&
       html.includes('renderAgentContextHistory') &&
-      html.includes('mc2RenderStats') &&
+      html.includes('mc2RenderAgentStatsForTaskMenu') &&
       html.includes('renderAgentMetricsCard') &&
       html.includes('mc2SyncAgentFilterControls') &&
       html.includes('mc2InferRangeFromTs') &&

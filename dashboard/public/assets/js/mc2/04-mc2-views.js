@@ -237,19 +237,18 @@
 
     function mc2SetAgentFilter(agentId, nextView) {
       var aid = String(agentId || '').trim();
-      if (nextView === 'context') {
-        mc2OpenTaskDetailForAgent(aid);
-        return;
-      }
       mc2InboxAgentFilter = aid;
       mc2SyncAgentFilterControls();
       if (nextView) {
-        mc2SetView(nextView);
+        if (nextView === 'context' || nextView === 'inbox' || nextView === 'outbox') {
+          mc2SetAgentsSubView(nextView);
+        } else {
+          mc2SetView(nextView);
+        }
         return;
       }
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'context') mc2RenderContext();
-      if (mc2ActiveView === 'stats') mc2RenderStats();
     }
 
     function mc2AgentIdsForFilter() {
@@ -320,27 +319,6 @@
         '</div>';
       }).join('');
       mc2SyncTimelineHighlightForScroll();
-    }
-
-    function mc2RenderStats() {
-      var el = mc2El('mc2-stats-list');
-      if (!el) return;
-      mc2SyncAgentFilterControls();
-      var ids = mc2AgentIdsForFilter();
-      if (!ids.length) {
-        el.innerHTML = '<p class="team-agent-inbox-empty">No agents available.</p>';
-        return;
-      }
-      el.innerHTML = ids.map(function (agentId) {
-        var metrics = (teamAgentMetricsSnapshot.agents || {})[agentId] || {
-          tasksHandled: 0,
-          delegatedOut: 0,
-          received: 0,
-          avgDurationMs: 0,
-          skills: {},
-        };
-        return renderAgentMetricsCard(agentId, metrics);
-      }).join('');
     }
 
     function mc2EventMatchesAgent(event, agentId) {

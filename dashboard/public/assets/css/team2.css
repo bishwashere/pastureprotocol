@@ -904,6 +904,13 @@ button.mc-stat-card-action:focus-visible {
   margin-bottom: 0;
 }
 
+.mc-agents-subapp-hint {
+  margin: 0.18rem 0 0;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
 .mc-agents-subtabs {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1009,6 +1016,29 @@ button.mc-stat-card-action:focus-visible {
 .mc-agent-overview-stats .active  { color: #22c55e; }
 .mc-agent-overview-stats .waiting { color: #eab308; }
 .mc-agent-overview-stats .blocked { color: #ef4444; }
+.mc-agent-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.1rem;
+}
+.mc-agent-overview-action {
+  margin: 0;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.08);
+  color: #ddd6fe;
+  font: inherit;
+  font-size: 0.56rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.mc-agent-overview-action:hover {
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(167, 139, 250, 0.16);
+}
 
 .mc-task-card {
   border: 1px solid var(--border);

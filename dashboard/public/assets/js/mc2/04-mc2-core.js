@@ -103,7 +103,17 @@
         if (contextLink) {
           e.preventDefault();
           e.stopPropagation();
-          mc2OpenTaskDetailForAgent(contextLink.getAttribute('data-mc-agent') || '');
+          mc2SetAgentFilter(contextLink.getAttribute('data-mc-agent') || '', 'context');
+          return;
+        }
+        var agentWorkspaceBtn = e.target && e.target.closest ? e.target.closest('[data-mc-agent-workspace]') : null;
+        if (agentWorkspaceBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          mc2SetAgentFilter(
+            agentWorkspaceBtn.getAttribute('data-mc-agent') || '',
+            agentWorkspaceBtn.getAttribute('data-mc-agent-workspace') || 'context'
+          );
           return;
         }
         var movementRow = e.target && e.target.closest ? e.target.closest('.mc-movement-clickable') : null;

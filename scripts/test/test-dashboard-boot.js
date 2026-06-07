@@ -40,7 +40,7 @@ const html = fs.readFileSync(htmlPath, 'utf8');
 const pagesDir = path.join(publicDir, 'pages');
 const mc2PagesDir = path.join(pagesDir, 'mc2');
 const mc2ViewsHtml = fs.existsSync(mc2PagesDir)
-  ? ['view-home', 'view-tasks', 'view-agents', 'view-context', 'view-missions', 'view-tasks', 'view-projects', 'view-activity', 'view-stats']
+  ? ['view-home', 'view-tasks', 'view-agents', 'view-context', 'view-missions', 'view-projects', 'view-activity']
     .map((name) => fs.readFileSync(path.join(mc2PagesDir, name + '.html'), 'utf8'))
     .join('\n')
   : '';
@@ -217,8 +217,10 @@ const checks = [
     ok: fullHtml.includes('id="mc2-task-drawer"') &&
       missionControlJs.includes('function mc2BuildTaskDetailHtml') &&
       missionControlJs.includes('function mc2OpenTaskDrawer') &&
+      missionControlJs.includes('function mc2RenderAgentStatsForTaskMenu') &&
       missionControlJs.includes('Source Chain') &&
       missionControlJs.includes('Assigned To') &&
+      missionControlJs.includes('Agent report') &&
       missionControlJs.includes('Skills Used') &&
       chat.includes('function enrichMissionTaskItem') &&
       chat.includes('function buildMissionTaskSourceChain') &&

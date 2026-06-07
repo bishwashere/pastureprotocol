@@ -4547,6 +4547,7 @@
     }
 
     window.buildAgentLastTaskSummary = buildAgentLastTaskSummary;
+    window.renderAgentMetricsCard = renderAgentMetricsCard;
 
     window.openMissionWorkInputModal = openMissionWorkInputModal;
     window.patchMissionTaskStatus = patchMissionTaskStatus;

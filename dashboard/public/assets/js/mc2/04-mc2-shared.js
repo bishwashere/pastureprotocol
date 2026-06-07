@@ -116,6 +116,16 @@
       '</section>';
     }
 
+    function mc2RenderAgentStatsForTaskMenu(agentId) {
+      var aid = String(agentId || '').trim();
+      if (!aid || typeof renderAgentMetricsCard !== 'function') return '';
+      var metrics = (teamAgentMetricsSnapshot.agents || {})[aid] || null;
+      return '<section class="mc-task-agent-stats">' +
+        '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">Agent report</p>' +
+        renderAgentMetricsCard(aid, metrics) +
+      '</section>';
+    }
+
     function mc2BuildTaskDetailHtml(item) {
       if (!item) {
         return '<p class="team-agent-inbox-empty" style="margin:0;">Select a task to see its timeline and actions.</p>';
@@ -126,6 +136,7 @@
       if (status === 'done') statusLabel = 'Completed';
       var mission = String(item.missionTitle || '').trim();
       var assignee = String(item.assignee || item.agentId || '').trim();
+      var agentStatsHtml = mc2RenderAgentStatsForTaskMenu(assignee);
       var sourceChain = item.sourceChain || null;
       var inactionImpact = item.inactionImpact || null;
       var reason = String(item.reason || '').trim();
@@ -177,6 +188,7 @@
         actionsHtml +
         '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">Timeline</p>' +
         timelineHtml +
+        agentStatsHtml +
         '<div class="mc-task-detail-links">' + agentLink + '</div>';
     }
 
@@ -270,6 +282,20 @@
       if (!aid) return;
       var ctx = (teamAgentContextSnapshot.agents || {})[aid] || {};
       var item = typeof findMissionTaskForAgent === 'function' ? findMissionTaskForAgent(aid, ctx) : null;
+      if (!item) {
+        item = {
+          kind: 'agent',
+          status: String(ctx.state || 'idle').toLowerCase() === 'error' ? 'blocked' : 'open',
+          title: agentNameById(aid) + ' tasks',
+          agentId: aid,
+          assignee: aid,
+          path: agentNameById(aid),
+          description: String(ctx.currentThought || ctx.currentStep || ctx.lastAction || 'Agent task menu').trim(),
+          reason: String(ctx.waitingFor || ctx.lastAction || '').trim(),
+          updatedAt: Number(ctx.updatedAt) || Date.now(),
+          createdAt: Number(ctx.updatedAt) || Date.now(),
+        };
+      }
       mc2OpenTaskDetail(item, { agentId: aid, filter: item && item.status === 'blocked' ? 'blocked' : 'all' });
     }
 
@@ -285,8 +311,7 @@
         return;
       }
       selectedTeamSuggestedTaskId = id;
-      mc2SetView('suggestedTasks');
-      if (typeof renderSuggestedTasksPanels === 'function') renderSuggestedTasksPanels();
+      mc2OpenTasksView('all');
     }
 
     window.mc2OpenTasksView = mc2OpenTasksView;

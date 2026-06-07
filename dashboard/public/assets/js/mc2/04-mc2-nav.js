@@ -7,7 +7,7 @@
       }
       mc2ActiveView = view;
       var visibleView = (view === 'context' || view === 'inbox' || view === 'outbox') ? 'agents' : view;
-      ['mission', 'agents', 'tasks', 'context', 'missions', 'projects', 'activity', 'stats'].forEach(function (v) {
+      ['mission', 'agents', 'tasks', 'context', 'missions', 'projects', 'activity'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
@@ -19,7 +19,6 @@
       if (view === 'missions') mc2RenderMissions();
       if (view === 'projects') mc2RenderProjects();
       if (visibleView === 'agents') mc2RenderAgentsDetail();
-      if (view === 'stats') mc2RenderStats();
       if (view === 'tasks') mc2RenderTasks();
       mc2SyncTimelineHighlightForScroll();
       if (typeof renderTeamUserInputModal === 'function') renderTeamUserInputModal();

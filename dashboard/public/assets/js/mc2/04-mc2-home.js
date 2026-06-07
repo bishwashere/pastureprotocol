@@ -432,7 +432,7 @@
           if (ctxLink) {
             e.preventDefault();
             e.stopPropagation();
-            mc2OpenTaskDetailForAgent(ctxLink.getAttribute('data-mc-agent') || card.getAttribute('data-mc-agent') || '');
+            mc2SetAgentFilter(ctxLink.getAttribute('data-mc-agent') || card.getAttribute('data-mc-agent') || '', 'context');
             return;
           }
           var aid = card.getAttribute('data-mc-agent');
@@ -608,10 +608,16 @@
               '<span>' + done + ' Done</span>' +
               (waitingCount ? '<span class="waiting">' + waitingCount + ' Waiting</span>' : '') +
             '</div>' +
+            '<div class="mc-agent-overview-actions">' +
+              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="context" data-mc-agent="' + escapeHtml(id) + '">Context</button>' +
+              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="inbox" data-mc-agent="' + escapeHtml(id) + '">Inbox</button>' +
+              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="outbox" data-mc-agent="' + escapeHtml(id) + '">Outbox</button>' +
+            '</div>' +
           '</div>';
         }).join('');
         el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
-          card.addEventListener('click', function () {
+          card.addEventListener('click', function (e) {
+            if (e.target && e.target.closest && e.target.closest('[data-mc-agent-workspace]')) return;
             var aid = card.getAttribute('data-mc-agent');
             if (aid) mc2OpenTaskDetailForAgent(aid);
           });
