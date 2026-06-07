@@ -1,5 +1,5 @@
 /* MC2 shared state, task drawer helpers, kanban card builders */
-/* ── Mission Control (#team2) ─────────────────────────────────────────── */
+/* ── Mission Control (#team) ─────────────────────────────────────────── */
 
     var mc2ActiveView = 'mission';
     var mc2InboxAgentFilter = '';
@@ -43,10 +43,10 @@
       if (!taskId) return;
       var safeId = String(taskId).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       var card = document.querySelector(
-        '#page-team2 .mc-mission-task-card[data-task-id="' + safeId + '"]'
+        '#page-team .mc-mission-task-card[data-task-id="' + safeId + '"]'
       );
       if (card) {
-        document.querySelectorAll('#page-team2 .mc-mission-task-card').forEach(function (c) {
+        document.querySelectorAll('#page-team .mc-mission-task-card').forEach(function (c) {
           c.classList.remove('mc-task-card-selected');
         });
         card.classList.add('mc-task-card-selected');

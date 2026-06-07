@@ -13,7 +13,7 @@ import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
-import { readTeamActivity } from '../lib/team-activity.js';
+import { readTeamActivity, pruneTeamActivityLogToToday } from '../lib/team-activity.js';
 import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
 import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/missions.js';
@@ -575,6 +575,10 @@ app.delete('/api/missions/:id', (req, res) => {
     }
     const result = deleteMission(id);
     try { clearMissionFromAgentContext(result.title); } catch (_) {}
+    // Only prune old activity log entries for pre-migration missions (no per-ID subfolder existed).
+    if (!result.wasMigrated) {
+      try { pruneTeamActivityLogToToday(); } catch (_) {}
+    }
     res.json(result);
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {

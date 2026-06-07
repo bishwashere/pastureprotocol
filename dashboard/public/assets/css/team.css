@@ -1,4 +1,4 @@
-/* Mission Control — #team2 page styles
+/* Mission Control — #team page styles
  * View HTML partials: pages/mc2/view-*.html
  * View JS modules: assets/js/mc2/
  */
@@ -16,19 +16,19 @@
 
 /* ── Body / page shell ─────────────────────────────────────────────────── */
 
-body.dashboard-team2-active {
+body.dashboard-team-active {
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
   padding: 0;
 }
 
-body.dashboard-team2-active > h1,
-body.dashboard-team2-active > nav {
+body.dashboard-team-active > h1,
+body.dashboard-team-active > nav {
   display: none;
 }
 
-#page-team2.active {
+#page-team.active {
   flex: 1 1 0 !important;
   display: flex !important;
   flex-direction: column;
@@ -1696,7 +1696,7 @@ button.mc-attention-item:focus-visible {
 
 /* ── Mission Control visual pass (closer to reference) ────────────────── */
 
-body.dashboard-team2-active {
+body.dashboard-team-active {
   background:
     radial-gradient(circle at 52% 0%, rgba(105, 68, 255, 0.18), transparent 28rem),
     radial-gradient(circle at 82% 8%, rgba(59, 130, 246, 0.09), transparent 18rem),
@@ -2137,7 +2137,7 @@ button.mc-stat-card.mc-stat-card-action {
 
 /* ── Mission Control reference polish ─────────────────────────────────── */
 
-body.dashboard-team2-active {
+body.dashboard-team-active {
   background:
     radial-gradient(circle at 20% -12%, rgba(124, 58, 237, 0.22), transparent 25rem),
     radial-gradient(circle at 82% 4%, rgba(59, 130, 246, 0.14), transparent 22rem),
@@ -2571,7 +2571,7 @@ body.dashboard-team2-active {
 }
 
 @media (max-width: 900px) {
-  body.dashboard-team2-active {
+  body.dashboard-team-active {
     overflow: auto;
   }
 

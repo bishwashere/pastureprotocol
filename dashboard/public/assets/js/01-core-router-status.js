@@ -1,5 +1,5 @@
 const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team2', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -63,10 +63,8 @@ const API = '';
     function isMemoryWorkspaceFile(id) {
       return isMemoryNotesFile(id) || isMemoryChatLogFile(id);
     }
-    /** #team and #team2 URLs show the opposite page (team ↔ team2). */
     function pageIdForRoute(routeName) {
-      if (routeName === 'team') return 'team2';
-      if (routeName === 'team2') return 'team';
+      if (routeName === 'team') return 'team';
       return routeName;
     }
     function setPage(name, memoryFileId, openIdentityFileId, teamAgentId) {
@@ -81,7 +79,6 @@ const API = '';
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
       document.body.classList.toggle('dashboard-team-active', pageId === 'team');
-      document.body.classList.toggle('dashboard-team2-active', pageId === 'team2');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
@@ -91,26 +88,15 @@ const API = '';
         if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
       }
       if (pageId === 'team') {
-        setTeamTopTab('roster');
-        setTeamRailExpanded('context', false);
         startTeamActivityFeed();
-        try {
-          setTeamPageFullscreen(sessionStorage.getItem('teamPageFullscreen') === '1');
-        } catch (e) {
-          setTeamPageFullscreen(false);
-        }
         fetchAgentMapData().then(function () {
           if (teamAgentId) {
             selectTeamInboxAgent(teamAgentId);
             openAgentEditModal(teamAgentId);
-            if (location.hash.indexOf('#team/') === 0) {
-              history.replaceState(null, '', '#team2');
-            }
           }
+          renderMissionControl();
+          fetchMc2PendingApprovals();
         });
-      } else if (pageId === 'team2') {
-        startTeamActivityFeed();
-        fetchAgentMapData().then(function () { renderMissionControl(); fetchMc2PendingApprovals(); });
       } else {
         stopTeamActivityFeed();
         setTeamPageFullscreen(false);
@@ -132,22 +118,16 @@ const API = '';
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
-      if (name === 'agents') name = 'team2';
-      if (name === 'team') {
+      if (name === 'agents') name = 'team';
+      if (name === 'team' || name === 'team') {
         if (subFile) {
-          return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+          return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
         }
         return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
       }
-      if (name === 'team2') {
-        if (subFile) {
-          return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
-        }
-        return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: null };
-      }
       if (name === 'team-agent') {
         return {
-          name: 'team2',
+          name: 'team',
           memoryFile: null,
           openIdentity: null,
           teamAgentId: subFile ? decodeURIComponent(subFile) : null,

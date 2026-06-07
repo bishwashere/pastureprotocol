@@ -29,14 +29,13 @@
     }
 
     /* Wire MC sidebar nav */
-    document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
+    document.querySelectorAll('#page-team .mc-nav-item[data-mc-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
-        if (nav === 'back') { location.hash = '#team2'; return; }
         mc2SetView(nav);
       });
     });
-    document.querySelectorAll('#page-team2 .mc-panel-link[data-mc-nav]').forEach(function (btn) {
+    document.querySelectorAll('#page-team .mc-panel-link[data-mc-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
         if (nav === 'tasks') {
@@ -46,7 +45,7 @@
         if (nav) mc2SetView(nav);
       });
     });
-    document.querySelectorAll('#page-team2 .mc-stat-card-action[data-mc-nav]').forEach(function (btn) {
+    document.querySelectorAll('#page-team .mc-stat-card-action[data-mc-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
         if (nav === 'tasks') {
@@ -96,7 +95,7 @@
       mc2OpenTasksView('all');
     }
 
-    var mc2PendingRoot = document.getElementById('page-team2');
+    var mc2PendingRoot = document.getElementById('page-team');
     if (mc2PendingRoot) {
       mc2PendingRoot.addEventListener('click', function (e) {
         var contextLink = e.target && e.target.closest ? e.target.closest('[data-mc-open-context]') : null;
@@ -154,7 +153,7 @@
         if (action && pendingId) mc2HandlePendingAction(pendingId, action);
       });
     }
-    document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {
+    document.querySelectorAll('#page-team .mc2-agent-filter-select').forEach(function (selectEl) {
       selectEl.addEventListener('change', function () {
         if (selectEl.id === 'mc2-tasks-agent-filter') {
           mc2TasksAgentFilter = selectEl.value || '';
@@ -167,7 +166,7 @@
         mc2SetAgentFilter(selectEl.value || '');
       });
     });
-    document.querySelectorAll('#page-team2 .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
+    document.querySelectorAll('#page-team .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var range = btn.getAttribute('data-range') || 'today';
         if (mc2ActiveView === 'activity' || mc2ActiveView === 'agents' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox' || mc2ActiveView === 'context') {
@@ -203,6 +202,96 @@
           el._wired = true;
           el.addEventListener('keydown', mc2ProjEnterSubmit);
         }
+      });
+    })();
+
+    (function wireMc2MissionSelect() {
+      var sel = mc2El('mc2-mission-select');
+      if (!sel || sel._wired) return;
+      sel._wired = true;
+      sel.addEventListener('change', function () {
+        var id = sel.value || '';
+        selectedTeamMissionId = id;
+        if (typeof renderMissionControl === 'function') renderMissionControl();
+      });
+    })();
+
+    (function wireMc2MissionDeleteButton() {
+      var deleteBtn = mc2El('mc2-mission-delete-btn');
+      var modal = mc2El('mc2-mission-delete-modal');
+      var cancelBtn = mc2El('mc2-mission-delete-cancel');
+      var confirmBtn = mc2El('mc2-mission-delete-confirm');
+      var descEl = mc2El('mc2-mission-delete-desc');
+      var itemsEl = mc2El('mc2-mission-delete-items');
+      if (!deleteBtn || !modal) return;
+
+      function getMc2SelectedMission() {
+        var sel = mc2El('mc2-mission-select');
+        var id = sel ? sel.value : '';
+        if (!id) id = selectedTeamMissionId;
+        if (!id) return null;
+        var missions = Array.isArray(teamMissionsSnapshot && teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+        return missions.find(function (g) { return String(g.id || '') === id; }) || null;
+      }
+
+      deleteBtn.addEventListener('click', function () {
+        var mission = getMc2SelectedMission();
+        if (!mission) { alert('Select a mission first.'); return; }
+        var taskCount = typeof countMissionTasks === 'function' ? countMissionTasks(mission.tasks || []) : 0;
+        var suggestedCount = (Array.isArray(teamSuggestedTasksSnapshot && teamSuggestedTasksSnapshot.suggestedTasks)
+          ? teamSuggestedTasksSnapshot.suggestedTasks : []).filter(function (t) {
+            var ids = Array.isArray(t.relatedMissionIds) ? t.relatedMissionIds : [];
+            return ids.indexOf(String(mission.id || '')) >= 0;
+          }).length;
+        descEl.textContent = 'You are about to permanently delete "' + escapeHtml(mission.title || 'Untitled mission') + '". This cannot be undone.';
+        itemsEl.innerHTML = [
+          '<li><strong>Mission record</strong> — all objectives, progress, plan steps, and history</li>',
+          taskCount > 0 ? '<li><strong>' + taskCount + ' task' + (taskCount === 1 ? '' : 's') + '</strong> embedded in this mission (including delegated tasks)</li>' : '',
+          '<li><strong>Mission memory</strong> — the persistent memory log for this mission</li>',
+          suggestedCount > 0 ? '<li><strong>' + suggestedCount + ' AI suggested task' + (suggestedCount === 1 ? '' : 's') + '</strong> linked exclusively to this mission</li>' : '',
+          '<li><strong>Activity log entries older than today</strong> — pruned if this mission pre-dates the per-ID storage migration</li>',
+        ].filter(Boolean).join('');
+        modal.dataset.pendingMissionId = String(mission.id || '');
+        modal.style.display = 'flex';
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete permanently';
+      });
+
+      cancelBtn && cancelBtn.addEventListener('click', function () {
+        modal.style.display = 'none';
+        delete modal.dataset.pendingMissionId;
+      });
+
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) {
+          modal.style.display = 'none';
+          delete modal.dataset.pendingMissionId;
+        }
+      });
+
+      confirmBtn && confirmBtn.addEventListener('click', async function () {
+        var id = modal.dataset.pendingMissionId;
+        if (!id) return;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting…';
+        try {
+          var resp = await fetch(API + '/api/missions/' + encodeURIComponent(id), { method: 'DELETE' });
+          if (resp.ok) {
+            modal.style.display = 'none';
+            delete modal.dataset.pendingMissionId;
+            selectedTeamMissionId = '';
+            await fetchMissionsSnapshot();
+            if (typeof fetchSuggestedTasksSnapshot === 'function') await fetchSuggestedTasksSnapshot();
+            if (typeof renderMissionControl === 'function') renderMissionControl();
+          } else {
+            var body = await resp.json().catch(function () { return {}; });
+            alert('Delete failed: ' + (body.error || resp.status));
+          }
+        } catch (err) {
+          alert('Delete failed: ' + String(err && err.message || err));
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete permanently';
       });
     })();
 

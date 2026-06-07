@@ -1116,7 +1116,7 @@
     }
 
     function ensureMissionControlPage() {
-      var mcPage = document.getElementById('page-team2');
+      var mcPage = document.getElementById('page-team');
       if (mcPage && mcPage.classList.contains('active')) return true;
       var route = (location.hash || '').slice(1).split('/')[0];
       if (route === 'team' || route === 'agents') return true;
@@ -3409,7 +3409,7 @@
       renderAgentOutbox();
       renderAgentContext();
       renderTeamTaskSummary();
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') &&
+      if (document.getElementById('page-team') && document.getElementById('page-team').classList.contains('active') &&
         typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
         renderMissionControl();
       }
@@ -3430,7 +3430,7 @@
       renderCurrentMission();
       renderTeamTaskSummary();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') &&
+      if (document.getElementById('page-team') && document.getElementById('page-team').classList.contains('active') &&
         typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
         renderMissionControl();
       }
@@ -3552,7 +3552,7 @@
     }
 
     function isTeamMainViewActive() {
-      if (document.body.classList.contains('dashboard-team2-active')) {
+      if (document.body.classList.contains('dashboard-team-active')) {
         return true;
       }
       if (document.body.classList.contains('dashboard-team-active')) {
@@ -4715,7 +4715,7 @@
     });
     document.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        if (btn.closest('#page-team2')) return;
+        if (btn.closest('#page-team')) return;
         setTeamAgentPanelRange(btn.getAttribute('data-range'));
       });
     });
@@ -4793,7 +4793,7 @@
           taskCount > 0 ? '<li><strong>' + taskCount + ' task' + (taskCount === 1 ? '' : 's') + '</strong> embedded in this mission (including any delegated tasks)</li>' : '',
           '<li><strong>Mission memory</strong> — the persistent memory log (memory.md) for this mission</li>',
           suggestedCount > 0 ? '<li><strong>' + suggestedCount + ' AI suggested task' + (suggestedCount === 1 ? '' : 's') + '</strong> linked exclusively to this mission</li>' : '',
-          '<li>Inbox / outbox history events in the activity log are <em>not</em> deleted</li>',
+          '<li><strong>Activity log entries older than today</strong> — pruned from the inbox/outbox history</li>',
         ].filter(Boolean).join('');
         modal.dataset.pendingMissionId = String(mission.id || '');
         modal.style.display = 'flex';

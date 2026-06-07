@@ -31,12 +31,12 @@
       return fetchText('pages/mc2/' + name + '.html');
     }).join('\n');
   }
-  var pages = ['home', 'memory', 'crons', 'skills', 'agents', 'team', 'team2', 'team-agent', 'groups', 'llm', 'tide', 'config', 'test', 'projects'];
+  var pages = ['home', 'memory', 'crons', 'skills', 'agents', 'team', 'team-agent', 'groups', 'llm', 'tide', 'config', 'test', 'projects'];
   var root = document.getElementById('page-fragments-root');
   if (!root) return;
   root.outerHTML = pages.map(function (page) {
     var html = fetchText('pages/' + page + '.html');
-    if (page === 'team2') {
+    if (page === 'team') {
       html = html.replace('<!-- MC2_VIEWS -->', loadMc2ViewsHtml());
     }
     return html;

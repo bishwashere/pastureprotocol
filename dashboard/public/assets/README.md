@@ -7,7 +7,7 @@ The dashboard shell is `../index.html` (small). Everything else loads from here.
 | Path | Purpose |
 |------|---------|
 | `css/dashboard.css` | Global dashboard styles (was inline in index.html) |
-| `css/team2.css` | Mission Control (`#team2`) styles |
+| `css/team.css` | Mission Control (`#team`) styles |
 | `partials/nav.html` | Top navigation (Home, Memory, Crons, …) |
 | `partials/modals.html` | Agent create/edit, identity editor modals |
 | `partials/project-edit-modal.html` | Projects page edit modal |
@@ -15,7 +15,7 @@ The dashboard shell is `../index.html` (small). Everything else loads from here.
 | `js/01-core-router-status.js` | Routing, status, home boot |
 | `js/02-crons-skills-agents.js` | Crons, skills, agents pages |
 | `js/03-chat-team.js` | Chat + classic team view |
-| `js/04-mission-control.js` | Mission Control (`#team2`) |
+| `js/04-mission-control.js` | Mission Control (`#team`) |
 | `js/05-bind-init.js` | Modal/chat wiring, resize observers |
 | `js/06-projects.js` | Projects canvas API |
 | `js/completed-tasks-display.js` | Shared task display helpers |

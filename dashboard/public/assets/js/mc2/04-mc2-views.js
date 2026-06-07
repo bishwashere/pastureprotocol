@@ -365,7 +365,7 @@
           return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
         }).join('');
       }
-      document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {
+      document.querySelectorAll('#page-team .mc2-agent-filter-select').forEach(function (selectEl) {
         var isTasks = selectEl.id === 'mc2-tasks-agent-filter';
         var selected = isTasks ? mc2TasksAgentFilter : mc2InboxAgentFilter;
         var html = optionsHtml(selected);

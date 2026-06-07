@@ -11,7 +11,7 @@
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
-      document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
+      document.querySelectorAll('#page-team .mc-nav-item[data-mc-nav]').forEach(function (btn) {
         var nav = btn.getAttribute('data-mc-nav');
         btn.classList.toggle('active', nav === visibleView);
       });
@@ -111,7 +111,7 @@
       var key = TEAM_AGENT_RANGE_LABELS[String(rangeKey || '').trim()] ? String(rangeKey) : 'today';
       var changed = key !== mc2TimelineHighlightKey;
       mc2TimelineHighlightKey = key;
-      document.querySelectorAll('#page-team2 .mc2-range-controls').forEach(function (group) {
+      document.querySelectorAll('#page-team .mc2-range-controls').forEach(function (group) {
         var activeBtn = null;
         group.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
           var active = btn.getAttribute('data-range') === key;
