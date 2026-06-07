@@ -4768,6 +4768,81 @@
     if (teamMissionsRefreshEl) {
       teamMissionsRefreshEl.addEventListener('click', function () { fetchMissionsSnapshot(); });
     }
+
+    (function wireMissionDeleteButton() {
+      var deleteBtn = document.getElementById('team-mission-delete-btn');
+      var modal = document.getElementById('team-mission-delete-modal');
+      var cancelBtn = document.getElementById('team-mission-delete-cancel');
+      var confirmBtn = document.getElementById('team-mission-delete-confirm');
+      var descEl = document.getElementById('team-mission-delete-desc');
+      var itemsEl = document.getElementById('team-mission-delete-items');
+      if (!deleteBtn || !modal) return;
+
+      function showDeleteModal(mission) {
+        if (!mission) return;
+        var taskCount = countMissionTasks(mission.tasks || []);
+        var suggestedCount = (Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks)
+          ? teamSuggestedTasksSnapshot.suggestedTasks
+          : []).filter(function (t) {
+            var ids = Array.isArray(t.relatedMissionIds) ? t.relatedMissionIds : [];
+            return ids.indexOf(String(mission.id || '')) >= 0;
+          }).length;
+        descEl.textContent = 'You are about to permanently delete "' + escapeHtml(mission.title || 'Untitled mission') + '". This cannot be undone.';
+        itemsEl.innerHTML = [
+          '<li><strong>Mission record</strong> — all objectives, progress, plan steps, and history</li>',
+          taskCount > 0 ? '<li><strong>' + taskCount + ' task' + (taskCount === 1 ? '' : 's') + '</strong> embedded in this mission (including any delegated tasks)</li>' : '',
+          '<li><strong>Mission memory</strong> — the persistent memory log (memory.md) for this mission</li>',
+          suggestedCount > 0 ? '<li><strong>' + suggestedCount + ' AI suggested task' + (suggestedCount === 1 ? '' : 's') + '</strong> linked exclusively to this mission</li>' : '',
+          '<li>Inbox / outbox history events in the activity log are <em>not</em> deleted</li>',
+        ].filter(Boolean).join('');
+        modal.dataset.pendingMissionId = String(mission.id || '');
+        modal.style.display = 'flex';
+        confirmBtn.disabled = false;
+      }
+
+      deleteBtn.addEventListener('click', function () {
+        var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+        var mission = missions.find(function (g) { return String(g.id || '') === selectedTeamMissionId; });
+        if (!mission) { alert('Select a mission first.'); return; }
+        showDeleteModal(mission);
+      });
+
+      cancelBtn && cancelBtn.addEventListener('click', function () {
+        modal.style.display = 'none';
+        delete modal.dataset.pendingMissionId;
+      });
+
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) {
+          modal.style.display = 'none';
+          delete modal.dataset.pendingMissionId;
+        }
+      });
+
+      confirmBtn && confirmBtn.addEventListener('click', async function () {
+        var id = modal.dataset.pendingMissionId;
+        if (!id) return;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting…';
+        try {
+          var resp = await fetch(API + '/api/missions/' + encodeURIComponent(id), { method: 'DELETE' });
+          if (resp.ok) {
+            modal.style.display = 'none';
+            delete modal.dataset.pendingMissionId;
+            selectedTeamMissionId = '';
+            await fetchMissionsSnapshot();
+            await fetchSuggestedTasksSnapshot();
+          } else {
+            var body = await resp.json().catch(function () { return {}; });
+            alert('Delete failed: ' + (body.error || resp.status));
+          }
+        } catch (err) {
+          alert('Delete failed: ' + String(err && err.message || err));
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete permanently';
+      });
+    }());
     var teamSuggestedTasksRefreshEl = document.getElementById('team-suggestedTasks-refresh');
     if (teamSuggestedTasksRefreshEl) {
       teamSuggestedTasksRefreshEl.addEventListener('click', function () { fetchSuggestedTasksSnapshot(); });

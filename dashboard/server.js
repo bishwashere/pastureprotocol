@@ -14,9 +14,9 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSy
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
 import { readTeamActivity } from '../lib/team-activity.js';
-import { readAllAgentContext } from '../lib/agent-context-state.js';
+import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
-import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput } from '../lib/missions.js';
+import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/missions.js';
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
@@ -557,6 +557,25 @@ app.patch('/api/missions/:id', (req, res) => {
     const patch = req.body || {};
     const mission = updateMission(id, patch);
     res.json({ mission });
+  } catch (err) {
+    if (/not found/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/missions/:id', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'mission id is required' });
+      return;
+    }
+    const result = deleteMission(id);
+    try { clearMissionFromAgentContext(result.title); } catch (_) {}
+    res.json(result);
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {
       res.status(404).json({ error: err.message });

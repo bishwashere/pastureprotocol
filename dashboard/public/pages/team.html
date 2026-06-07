@@ -165,7 +165,22 @@
           <div class="team-missions-main">
             <div class="team-missions-head">
               <h3 style="margin:0; font-size:0.9rem;">Missions</h3>
-              <button type="button" id="team-missions-refresh" class="secondary" style="margin:0;">Refresh</button>
+              <div style="display:flex;gap:0.35rem;align-items:center;">
+                <button type="button" id="team-missions-refresh" class="secondary" style="margin:0;">Refresh</button>
+                <button type="button" id="team-mission-delete-btn" class="secondary" style="margin:0;color:var(--color-danger,#d63031);" title="Delete selected mission">Delete</button>
+              </div>
+            </div>
+            <!-- Mission delete confirmation modal -->
+            <div id="team-mission-delete-modal" role="dialog" aria-modal="true" aria-labelledby="team-mission-delete-title" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+              <div style="background:var(--color-bg,#fff);border-radius:0.75rem;padding:1.5rem 1.75rem;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+                <h4 id="team-mission-delete-title" style="margin:0 0 0.75rem;">Delete mission?</h4>
+                <p id="team-mission-delete-desc" style="margin:0 0 1rem;font-size:0.9rem;line-height:1.5;"></p>
+                <ul id="team-mission-delete-items" style="margin:0 0 1.25rem;padding-left:1.25rem;font-size:0.85rem;line-height:1.6;"></ul>
+                <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                  <button type="button" id="team-mission-delete-cancel" class="secondary" style="margin:0;">Cancel</button>
+                  <button type="button" id="team-mission-delete-confirm" style="margin:0;background:var(--color-danger,#d63031);color:#fff;border:none;">Delete permanently</button>
+                </div>
+              </div>
             </div>
             <div class="team-missions-new">
               <input id="team-mission-title" type="text" placeholder="Mission title (optional)">

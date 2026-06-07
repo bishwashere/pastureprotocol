@@ -16,6 +16,8 @@ async function main() {
       getMission,
       createMission,
       updateMission,
+      deleteMission,
+      getMissionDir,
       listDueMissions,
       processDueMissionsInStore,
       runMissionTick,
@@ -322,6 +324,19 @@ async function main() {
     assert(listDueMissions().some((g) => g.id === created.id), 'mission is due again after user response');
     const memoryAfterRespond = readMissionMemory(created.id, { maxChars: 5000 });
     assert(/User input received:/.test(memoryAfterRespond), 'memory stores user input response');
+
+    // deleteMission
+    const toDelete = createMission({ title: 'Temp mission', objective: 'Delete me', ownerAgentId: 'main' });
+    assert(getMission(toDelete.id) !== null, 'delete target mission created');
+    const missionDir = getMissionDir(toDelete.id);
+    const deleteResult = deleteMission(toDelete.id);
+    assert(deleteResult.deleted === true, 'deleteMission returns deleted:true');
+    assert(deleteResult.title === 'Temp mission', 'deleteMission returns correct title');
+    assert(getMission(toDelete.id) === null, 'deleted mission no longer in store');
+    assert(!existsSync(missionDir), 'mission directory removed after delete');
+    let notFoundErr = null;
+    try { deleteMission(toDelete.id); } catch (e) { notFoundErr = e; }
+    assert(notFoundErr && /not found/i.test(notFoundErr.message), 'deleting non-existent mission throws');
 
     console.log('missions tests passed');
   } finally {
