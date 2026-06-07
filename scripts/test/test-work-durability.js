@@ -16,6 +16,7 @@ async function main() {
       classifyWorkDurability,
       classifyWorkDurabilityWithAi,
       buildDurableDelegationContext,
+      buildDurabilitySystemBlock,
       delegationArgsFromDurability,
       delegationRoutingTextFromDurability,
       prepareWorkDurability,
@@ -162,6 +163,55 @@ async function main() {
     assert(noActionResult.kind !== 'new_mission_candidate', 'general project mention does not auto-create mission');
     assert(noActionResult.kind !== 'mission_suggest', 'general project mention does not suggest mission either');
     assert(!noActionResult.missionId, 'general project mention creates no mission');
+
+    // ── Layer: confirmation detection ─────────────────────────────────────────
+    // After agent asked "Should I create a mission for betapp?", user says "yes".
+    // detectMissionConfirmation should fire and produce new_mission_candidate.
+    const fakeAgentSuggestHistory = [
+      { role: 'user', content: 'how can i improve betapp customer signups' },
+      { role: 'assistant', content: 'Here are some ideas... Would you like me to open a tracked mission for betapp so this work can be delegated and followed up?' },
+    ];
+    let confirmLlmCalls = 0;
+    const confirmResult = await prepareWorkDurabilityWithAi({
+      userText: 'yes',
+      agentId: 'main',
+      historyMessages: fakeAgentSuggestHistory,
+      llmChat: async (messages) => {
+        const system = String(messages?.[0]?.content || '');
+        if (system.includes('decompose persistent user work')) {
+          return JSON.stringify({ subtasks: [{ title: 'Improve betapp signup funnel', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.85, reason: 'Signup improvement.' }] });
+        }
+        confirmLlmCalls += 1;
+        return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Simple yes reply.' });
+      },
+    });
+    assert(confirmLlmCalls === 0, 'confirmed mission skips AI durability classifier');
+    assert(confirmResult.kind === 'new_mission_candidate', 'confirmed yes creates new mission');
+    assert(confirmResult.persistence === 'create_lightweight_mission', 'confirmed yes persists mission');
+    assert(confirmResult.projectName === 'betapp', 'confirmed yes captures project from history');
+    assert(confirmResult.missionId, 'confirmed yes creates mission before delegation');
+    assert(confirmResult.decomposition === 'ai-constrained', 'confirmed yes decomposes into subtasks');
+
+    // Non-affirmative reply should NOT trigger confirmation even with mission history.
+    const nonAffirmResult = await prepareWorkDurabilityWithAi({
+      userText: 'not sure yet',
+      agentId: 'main',
+      historyMessages: fakeAgentSuggestHistory,
+      llmChat: async () => JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Uncertain reply.' }),
+    });
+    assert(nonAffirmResult.kind !== 'new_mission_candidate', 'uncertain reply does not create mission');
+
+    // ── Layer: delegationRoutingTextFromDurability for mission_suggest ─────────
+    // mission_suggest has persistence:'none' but should include project name in routing.
+    const suggestDecision = { kind: 'mission_suggest', persistence: 'none', projectName: 'betapp', title: 'betapp work' };
+    const suggestRoutingText = delegationRoutingTextFromDurability(suggestDecision, 'how can i improve betapp signups');
+    assert(suggestRoutingText.includes('betapp'), 'mission_suggest routing text includes project name');
+
+    // ── Layer: buildDurabilitySystemBlock for mission_suggest ─────────────────
+    const suggestBlock = buildDurabilitySystemBlock(suggestDecision);
+    assert(suggestBlock.includes('INSTRUCTION'), 'mission_suggest system block has agent instruction');
+    assert(suggestBlock.includes('betapp'), 'mission_suggest system block includes project name');
+    assert(suggestBlock.includes('Do NOT create a mission yet'), 'mission_suggest system block tells agent to wait');
 
     const followup = await prepareWorkDurabilityWithAi({
       userText: 'Make the positioning less corporate',
