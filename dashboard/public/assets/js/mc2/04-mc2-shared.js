@@ -328,6 +328,30 @@
       return name.slice(0, 2).toUpperCase();
     }
 
+    var MC2_AGENT_COLORS = [
+      '#6366f1', // indigo
+      '#ec4899', // pink
+      '#f59e0b', // amber
+      '#10b981', // emerald
+      '#3b82f6', // blue
+      '#ef4444', // red
+      '#8b5cf6', // violet
+      '#14b8a6', // teal
+      '#f97316', // orange
+      '#84cc16', // lime
+      '#06b6d4', // cyan
+      '#e879f9', // fuchsia
+    ];
+
+    function agentColorFromId(id) {
+      var s = String(id || 'main');
+      var hash = 0;
+      for (var i = 0; i < s.length; i++) {
+        hash = (hash * 31 + s.charCodeAt(i)) & 0xfffffff;
+      }
+      return MC2_AGENT_COLORS[hash % MC2_AGENT_COLORS.length];
+    }
+
     function mc2RelTime(ts) {
       var ms = Date.now() - Number(ts || 0);
       if (ms < 0) ms = 0;
@@ -355,15 +379,17 @@
     function mc2AvatarHtml(a, opts) {
       var large = opts && opts.large;
       var cls = 'mc-agent-avatar' + (large ? ' mc-agent-avatar--large' : '');
+      var color = agentColorFromId(a && a.id);
+      var borderStyle = ' style="border-color:' + color + '"';
       if (a && a.avatarUrl) {
         return (
-          '<div class="' + cls + ' mc-agent-avatar--img">' +
+          '<div class="' + cls + ' mc-agent-avatar--img"' + borderStyle + '>' +
             '<img src="' + escapeHtml(a.avatarUrl) + '" alt="' + escapeHtml(agentCardShortName(a)) + '" loading="lazy">' +
           '</div>'
         );
       }
       var initials = mc2AgentInitials(a);
-      return '<div class="' + cls + '">' + escapeHtml(initials) + '</div>';
+      return '<div class="' + cls + '"' + borderStyle + '>' + escapeHtml(initials) + '</div>';
     }
 
     function mc2NormalizeTaskPrompt(raw) {

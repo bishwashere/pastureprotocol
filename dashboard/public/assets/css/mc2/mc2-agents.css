@@ -16,6 +16,8 @@
   font-size: 0.6rem;
   font-weight: 700;
   flex-shrink: 0;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
 
 /* Image avatar — fills the circle when a real picture is available */
