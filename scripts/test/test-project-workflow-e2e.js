@@ -18,6 +18,28 @@
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 import { createTempStateDir, runE2E, isNoLlmError } from './e2e-run.js';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+
+/**
+ * Write a minimal agents/main/agent.json to the temp stateDir BEFORE the first
+ * runE2E call. Without this, ensureMainAgentInitialized() (which runs at agent
+ * startup inside the child process) sees an empty agent.json and falls back to
+ * copying the legacy config.json — which may include 'agent-send' in skills.enabled
+ * from the user's real setup. That causes the LLM to call agent-send, which then
+ * fails with "Known agents: none." because no team is configured in the fresh dir.
+ *
+ * A non-empty agent.json skips the legacy migration. The agent gets DEFAULT_ENABLED
+ * skills (no agent-send), which is the correct baseline for single-agent project work.
+ */
+function initMainAgentStub(stateDir) {
+  mkdirSync(join(stateDir, 'agents', 'main'), { recursive: true });
+  writeFileSync(
+    join(stateDir, 'agents', 'main', 'config.json'),
+    JSON.stringify({ title: 'Main' }, null, 2),
+    'utf8',
+  );
+}
 
 /**
  * Seeds only the project catalog entry (name, description, url).
@@ -85,6 +107,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
           description: 'AI-powered marketing platform that helps creators schedule and optimize social posts',
@@ -122,6 +145,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         const { reply, skillsCalled } = await runE2E(
           "I've been building a SaaS called TideApp that helps small teams track their weekly sprints. I want to start growing it.",
           { stateDir },
@@ -156,6 +180,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         // Turn 1 — give the agent enough context to work with
         await runE2E(
           "I want to grow a product called TideApp — it's a sprint tracking tool for small engineering teams. The URL is tideapp.io.",
@@ -190,6 +215,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
           description: 'AI-powered marketing platform for creators',
@@ -231,6 +257,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         // Turn 1 — introduce a brand-new project
         await runE2E(
           "We have a product called PastureDemo — it helps cattle farmers track herd health on their phones. I want to create a plan to get our first 50 paying customers.",
@@ -272,6 +299,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
           description: 'AI marketing platform that helps creators schedule and optimize social media posts',
@@ -307,6 +335,7 @@ async function main() {
       expectMode: 'behavior',
       run: async () => {
         const stateDir = createTempStateDir();
+        initMainAgentStub(stateDir);
         // Completely clean state — no project, no mission, no history
         const { reply, skillsCalled } = await runE2E(
           "I want to get more customers. What's the plan?",
