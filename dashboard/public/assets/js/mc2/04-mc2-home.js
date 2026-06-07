@@ -40,13 +40,15 @@
       var missionSel = mc2El('mc2-mission-select');
       if (missionSel) {
         var missionList = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
-        var activeMissions = missionList.filter(function (g) { return String(g.status || 'active').toLowerCase() === 'active'; });
         var currentMission = getCurrentMissionMission();
-        missionSel.innerHTML = (activeMissions.length === 0 ? '<option value="">No active mission</option>' : '') +
-          activeMissions.map(function (g) {
+        var statusLabel = { active: '', paused: ' [paused]', blocked: ' [blocked]', completed: ' [done]' };
+        missionSel.innerHTML = (missionList.length === 0 ? '<option value="">No missions</option>' : '') +
+          missionList.map(function (g) {
             var gid = String(g.id || '');
+            var status = String(g.status || 'active').toLowerCase();
             var sel = currentMission && String(currentMission.id || '') === gid ? ' selected' : '';
-            return '<option value="' + escapeHtml(gid) + '"' + sel + '>' + escapeHtml(String(g.title || g.objective || 'Untitled mission')) + '</option>';
+            var label = escapeHtml(String(g.title || g.objective || 'Untitled mission')) + escapeHtml(statusLabel[status] || (' [' + status + ']'));
+            return '<option value="' + escapeHtml(gid) + '"' + sel + '>' + label + '</option>';
           }).join('');
       }
     }
