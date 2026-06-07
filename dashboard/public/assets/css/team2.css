@@ -1084,12 +1084,21 @@ button.mc-mission-task-card {
   color: var(--muted);
   font-size: 0.62rem;
 }
-.mc-task-card-initiative {
+.mc-task-card-suggestedTask {
   color: #93c5fd;
   font-size: 0.62rem;
   font-weight: 600;
 }
-.mc2-initiatives-main.team-initiatives-main {
+.mc-task-card-label {
+  color: var(--text);
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  border-radius: 999px;
+  padding: 0.05rem 0.32rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+.mc2-suggestedTasks-main.team-suggestedTasks-main {
   margin-top: 0;
 }
 .mc-movement-clickable {
@@ -1099,20 +1108,20 @@ button.mc-mission-task-card {
   background: rgba(167, 139, 250, 0.08);
   border-radius: 6px;
 }
-.team-goal-task-actions,
-.team-goal-detail-actions {
+.team-mission-task-actions,
+.team-mission-detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.3rem;
 }
-.team-goal-subgoal-node > summary {
+.team-mission-task-node > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
 }
-.team-goal-task-btn {
+.team-mission-task-btn {
   font-size: 0.62rem !important;
   padding: 0.15rem 0.4rem !important;
   margin: 0 !important;
@@ -1320,7 +1329,7 @@ button.mc-mission-task-card {
   max-height: none;
 }
 .mc-kanban-card-completed,
-.mc-kanban-card[data-mc-kanban-kind="subgoal"],
+.mc-kanban-card[data-mc-kanban-kind="task"],
 .mc-task-card[data-mc-turn-task] {
   cursor: pointer;
 }

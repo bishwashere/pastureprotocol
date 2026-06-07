@@ -20,4 +20,4 @@ Requires `ssh-inspect` in `skills.enabled` and at least one registered server (`
 - Check disk usage on {server1} and uptime on {server2} — tell me both.
 
 ### Unreachable host
-- What log files do you see on cowcode-e2e-unreachable-host?
+- What log files do you see on pasture-e2e-unreachable-host?

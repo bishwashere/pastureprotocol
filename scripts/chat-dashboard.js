@@ -38,7 +38,7 @@ import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
 } from '../lib/projects-context.js';
-import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
+import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from '../lib/missions-context.js';
 import { buildProjectWorkflowContextBlock } from '../lib/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
@@ -148,13 +148,13 @@ async function main() {
   // Step 2: decide work durability before delegation. Persistence must be
   // attached to the turn before agent-send chooses who should do the work.
   const durabilityDecision = await prepareWorkDurabilityWithAi({ userText: message, historyMessages, agentId });
-  if (durabilityDecision?.goalId) ctx.goalId = durabilityDecision.goalId;
+  if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
   if (durabilityDecision) {
     process.stderr.write('[work-durability] ' + JSON.stringify({
       kind: durabilityDecision.kind,
       persistence: durabilityDecision.persistence,
-      goalId: durabilityDecision.goalId || '',
-      createdGoal: !!durabilityDecision.createdGoal,
+      missionId: durabilityDecision.missionId || '',
+      createdMission: !!durabilityDecision.createdMission,
     }) + '\n');
   }
   // Step 3: specialization-aware delegation check before planner (same as index.js private chat).
@@ -222,13 +222,13 @@ async function main() {
   const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
     ? buildCasualChatIntentPlan()
     : null;
-  const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
-    ? getGoalsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
+  const missionsIntentHint = !presetDelegationPlan && !casualIntentPlan
+    ? getMissionsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
     : null;
   const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
     ? getGithubSourceIntentHint(message, enabledSkillIds)
     : null;
-  const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+  const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
     ? await planIntent({
         userText: message,
         historyMessages,
@@ -263,8 +263,8 @@ async function main() {
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
   if (!isNonTaskMessage(message)) {
-    const goalsBlock = buildGoalsContextBlock({ userText: message, historyMessages, agentId });
-    if (goalsBlock) systemPrompt += goalsBlock;
+    const missionsBlock = buildMissionsContextBlock({ userText: message, historyMessages, agentId });
+    if (missionsBlock) systemPrompt += missionsBlock;
     const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
     if (projectsBlock) systemPrompt += projectsBlock;
     const workflowBlock = buildProjectWorkflowContextBlock({ userText: message, historyMessages, agentId });
@@ -288,7 +288,7 @@ async function main() {
           textToSend = forced.reply.trim();
           skillsCalled = ['agent-send'];
         } else if (forced && typeof forced.error === 'string') {
-          textToSend = `[CowCode] ${forced.error.trim()}`;
+          textToSend = `[Pasture] ${forced.error.trim()}`;
           skillsCalled = ['agent-send'];
         }
       } catch (_) {}

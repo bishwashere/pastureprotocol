@@ -22,7 +22,7 @@ branches  - id, project_id, parent_update_id (which update it branches from), na
 
 The Projects tracker is a **catalog** (name, URL, description) injected into the system prompt and **me** skill. When you ask "what projects do I have?", agents answer from this list.
 
-Questions like "what is this about?" / "find out" are **not** a separate "project research" mode. They should match an **active Goal** (objectives, plan, subgoals) when the goal title/objective aligns with a tracker entry or the user's message. Agents continue that goal with tools (browse, github, memory, read, search) before asking you to pick GitHub vs local path. The dashboard **Goals** tab is where ongoing work lives; this page is for tracking updates and links.
+Questions like "what is this about?" / "find out" are **not** a separate "project research" mode. They should match an **active Mission** (objectives, plan, tasks) when the mission title/objective aligns with a tracker entry or the user's message. Agents continue that mission with tools (browse, github, memory, read, search) before asking you to pick GitHub vs local path. The dashboard **Missions** tab is where ongoing work lives; this page is for tracking updates and links.
 
 ## Conversation → dashboard workflow
 
@@ -32,12 +32,12 @@ When you tell an agent to **work on a project** in normal language, the **projec
 1. **Health check** — confirms URL, description, setup notes, progress log, and linked mission; asks for anything missing.
 2. **Analyze & propose** — suggests a mission title and task list (preview only).
 3. **Your approval** — the agent waits before creating missions or bulk task changes.
-4. **Apply** — creates/updates the mission (goal) linked to the project and subgoals as tasks.
+4. **Apply** — creates/updates the mission (mission) linked to the project and tasks as tasks.
 5. **Track** — logs progress to the project update chain and updates task status as work moves.
 
 After each meaningful turn, progress is also mirrored automatically on the **Projects** page and linked **Missions** tab in Mission Control.
 
-Example: *"Work on NextPostAI — what should we do next?"* → health check → proposed tasks → you approve → mission appears under **Missions** with subgoals; updates show on **Projects** and completed turns on **Tasks/Cards**.
+Example: *"Work on NextPostAI — what should we do next?"* → health check → proposed tasks → you approve → mission appears under **Missions** with tasks; updates show on **Projects** and completed turns on **Tasks/Cards**.
 
 ## Connectors
 

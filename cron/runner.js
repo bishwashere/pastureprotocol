@@ -111,7 +111,7 @@ async function runJobOnce({ job, sock, selfJid }) {
     child.on('error', reject);
     child.stdin.end(payload, 'utf8');
   });
-  const text = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
+  const text = isTelegramChatId(jid) ? textToSend.replace(/^\[Pasture\]\s*/i, '').trim() : textToSend;
   if (text) {
     await sendCronReply(jid, text);
     const workspaceDir = getWorkspaceDir();
@@ -172,7 +172,7 @@ export async function runJob({ job, sock, selfJid }) {
     }
   }
   try {
-    await sendCronReply(jid, `[CowCode] Moo — reminder "${job.name}" didn't go through. ${toUserMessage(lastErr)}`);
+    await sendCronReply(jid, `[Pasture] Moo — reminder "${job.name}" didn't go through. ${toUserMessage(lastErr)}`);
   } catch (_) {}
 }
 

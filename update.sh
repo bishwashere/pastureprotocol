@@ -8,7 +8,7 @@ BRANCH="${PASTURE_BRANCH:-master}"
 TARBALL="https://github.com/bishwashere/pastureprotocol/archive/refs/heads/${BRANCH}.tar.gz"
 
 # Run from project root (where package.json and index.js exist)
-ROOT="${PASTURE_ROOT:-${COWCODE_ROOT:-$PWD}}"
+ROOT="${PASTURE_ROOT:-${PASTURE_ROOT:-$PWD}}"
 if [ ! -f "$ROOT/package.json" ] || [ ! -f "$ROOT/index.js" ]; then
   echo ""
   echo "  Run from inside your Pasture Protocol folder, or use:  pasture update"
@@ -118,12 +118,12 @@ echo "  ------------------------------------------------"
 echo ""
 
 # State dir: config/auth/cron live here (new installs and after migration)
-STATE_DIR="${PASTURE_STATE_DIR:-${COWCODE_STATE_DIR:-$HOME/.pasture}}"
-LEGACY_STATE="$HOME/.cowcode"
+STATE_DIR="${PASTURE_STATE_DIR:-${PASTURE_STATE_DIR:-$HOME/.pasture}}"
+LEGACY_STATE="$HOME/.pasture"
 mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
 
-# Migrate ~/.cowcode → ~/.pasture when upgrading from cowcode (full state, not install-dir config only).
-if [ -z "${PASTURE_STATE_DIR:-}" ] && [ -z "${COWCODE_STATE_DIR:-}" ] \
+# Migrate ~/.pasture → ~/.pasture when upgrading from pasture (full state, not install-dir config only).
+if [ -z "${PASTURE_STATE_DIR:-}" ] && [ -z "${PASTURE_STATE_DIR:-}" ] \
   && [ -d "$LEGACY_STATE" ] && [ -f "$LEGACY_STATE/config.json" ]; then
   if [ ! -f "$STATE_DIR/config.json" ] || [ ! -d "$STATE_DIR/agents" ]; then
     echo "  ► Migrating state from $LEGACY_STATE to $STATE_DIR"
@@ -174,7 +174,7 @@ fi
 NOW_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
 NOW_BUILD=$(read_build)
 
-# Refresh CLI launchers (cowcode → pasture rename; in-place update keeps same ROOT).
+# Refresh CLI launchers (pasture → pasture rename; in-place update keeps same ROOT).
 BIN_DIR="${HOME}/.local/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/pasture" <<LAUNCHER
@@ -183,12 +183,12 @@ export PASTURE_INSTALL_DIR="$ROOT"
 exec node "$ROOT/cli.js" "\$@"
 LAUNCHER
 chmod +x "$BIN_DIR/pasture"
-cat > "$BIN_DIR/cowcode" <<'SHIM'
+cat > "$BIN_DIR/pasture" <<'SHIM'
 #!/usr/bin/env bash
-echo "cowcode is now pasture — update your scripts." >&2
+echo "pasture is now pasture — update your scripts." >&2
 exec pasture "$@"
 SHIM
-chmod +x "$BIN_DIR/cowcode" 2>/dev/null || true
+chmod +x "$BIN_DIR/pasture" 2>/dev/null || true
 
 echo ""
 if [ -n "$NOW_VER" ]; then

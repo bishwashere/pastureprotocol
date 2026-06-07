@@ -49,7 +49,7 @@ function assertNoTools(skillsCalled) {
 async function runUnitTests() {
   const { isNonTaskMessage } = await import('../../lib/evaluate-team-capability.js');
   const { buildCasualChatIntentPlan, planIntent } = await import('../../lib/intent-planner.js');
-  const { getGoalsDiscoveryIntentHint, isWorkOrDiscoveryRequest } = await import('../../lib/goals-context.js');
+  const { getMissionsDiscoveryIntentHint, isWorkOrDiscoveryRequest } = await import('../../lib/missions-context.js');
 
   const rows = [];
 
@@ -96,9 +96,9 @@ async function runUnitTests() {
   });
 
   assert(!isWorkOrDiscoveryRequest('hi'), 'hi is not work request');
-  assert(!getGoalsDiscoveryIntentHint('hi', [], ['search', 'browse'], 'main'), 'no goals hint for hi');
+  assert(!getMissionsDiscoveryIntentHint('hi', [], ['search', 'browse'], 'main'), 'no missions hint for hi');
   rows.push({
-    name: 'no goals discovery for hi',
+    name: 'no missions discovery for hi',
     input: 'hi',
     output: 'no hint',
     status: 'pass',

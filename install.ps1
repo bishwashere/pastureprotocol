@@ -17,7 +17,7 @@ $CowcodeNodeRoot = Join-Path $env:LOCALAPPDATA "pastureprotocol\node"
 $CowcodeNodeDir = Join-Path $CowcodeNodeRoot $CowcodeNodeZipName
 
 function Test-CowcodeInteractive {
-    if ($env:PASTURE_NONINTERACTIVE -eq "1" -or $env:COWCODE_NONINTERACTIVE -eq "1") { return $false }
+    if ($env:PASTURE_NONINTERACTIVE -eq "1" -or $env:PASTURE_NONINTERACTIVE -eq "1") { return $false }
     return ($Host.Name -eq "ConsoleHost")
 }
 
@@ -563,14 +563,14 @@ try {
 set PASTURE_INSTALL_DIR=$InstallDir
 set PASTURE_NODE_DIR=$CowcodeNodeDir
 if exist "%PASTURE_NODE_DIR%\node.exe" set PATH=%PASTURE_NODE_DIR%;%APPDATA%\npm;%PATH%
-if exist "%COWCODE_NODE_DIR%\node.exe" set PATH=%COWCODE_NODE_DIR%;%APPDATA%\npm;%PATH%
+if exist "%PASTURE_NODE_DIR%\node.exe" set PATH=%PASTURE_NODE_DIR%;%APPDATA%\npm;%PATH%
 node "$InstallDir\cli.js" %*
 "@
         Set-Content -Path $Launcher -Value $cmdContent -Encoding ASCII -ErrorAction Stop
-        $LegacyLauncher = Join-Path $BinDir "cowcode.cmd"
+        $LegacyLauncher = Join-Path $BinDir "pasture.cmd"
         $legacyContent = @"
 @echo off
-echo cowcode is now pasture - update your scripts. 1>&2
+echo pasture is now pasture - update your scripts. 1>&2
 call "$Launcher" %*
 "@
         Set-Content -Path $LegacyLauncher -Value $legacyContent -Encoding ASCII -ErrorAction SilentlyContinue

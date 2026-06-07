@@ -39,13 +39,13 @@ async function main() {
       historyMessages: [],
     });
     assert(block.includes('Dashboard projects'), 'catalog block');
-    assert(block.includes('Active goal'), 'points to goals');
+    assert(block.includes('Active mission'), 'points to missions');
     assert(block.includes('nextpostai.com'), 'url in list');
 
     const enriched = enrichMessageWithProjectContext('find out what it is about');
     assert(enriched.includes('Projects tracker'), 'enriched delegation');
     assert(enriched.includes('nextpostai'), 'project name in enrichment');
-    assert(enriched.includes('matching Goal'), 'enriched points to goal');
+    assert(enriched.includes('matching Mission'), 'enriched points to mission');
 
     const profile = formatProjectsProfileLine();
     assert(profile.includes('1 project'), `profile: ${profile}`);

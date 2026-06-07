@@ -70,7 +70,7 @@ import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
-import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
+import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from './lib/missions-context.js';
 import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
@@ -91,7 +91,7 @@ import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
-import { startGoalEngine } from './lib/goal-engine.js';
+import { startMissionEngine } from './lib/mission-engine.js';
 import {
   buildAnswerCompletenessProbePrompt,
 } from './lib/conversation-context.js';
@@ -388,40 +388,40 @@ async function main() {
     return;
   }
 
-  // Persistent autonomous goals loop (agent background work above single turns).
+  // Persistent autonomous missions loop (agent background work above single turns).
   try {
     const cfg = loadConfig();
-    const loopMs = Number(cfg?.goals?.loopMs) || 60_000;
-    startGoalEngine({
+    const loopMs = Number(cfg?.missions?.loopMs) || 60_000;
+    startMissionEngine({
       loopMs,
-      runGoalTurn: async (goal, prompt) =>
+      runMissionTurn: async (mission, prompt) =>
         runInternalAgentTurn({
-          targetAgentId: goal?.ownerAgentId || DEFAULT_AGENT_ID,
+          targetAgentId: mission?.ownerAgentId || DEFAULT_AGENT_ID,
           userText: prompt,
           callerAgentId: DEFAULT_AGENT_ID,
           depth: 1,
-          callChain: [DEFAULT_AGENT_ID, goal?.ownerAgentId || DEFAULT_AGENT_ID],
+          callChain: [DEFAULT_AGENT_ID, mission?.ownerAgentId || DEFAULT_AGENT_ID],
           persistHistory: true,
         }),
       onLog: (event) => {
         const baseDetails = event?.details && typeof event.details === 'object' ? event.details : {};
         logTeamActivity({
-          type: event.type || 'goal_tick',
+          type: event.type || 'mission_tick',
           agentId: event.ownerAgentId || event.agentId || DEFAULT_AGENT_ID,
           status: event.status || 'ok',
-          message: event.message || event.title || 'Goal tick',
+          message: event.message || event.title || 'Mission tick',
           title: event.title || baseDetails.title || '',
           details: {
             ...baseDetails,
-            goalId: event.goalId || baseDetails.goalId || '',
+            missionId: event.missionId || baseDetails.missionId || '',
             title: event.title || baseDetails.title || '',
           },
         });
       },
     });
-    console.log('[goals] engine started');
+    console.log('[missions] engine started');
   } catch (err) {
-    console.log('[goals] engine failed to start:', getErrorMessageForLog(err));
+    console.log('[missions] engine failed to start:', getErrorMessageForLog(err));
   }
 
   let sock;
@@ -651,7 +651,7 @@ async function main() {
       }
       if (sendOk) {
         const rawText = sanitizeOutboundText((textToSend || '').trim());
-        let text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
+        let text = isTelegramChatId(tideJid) ? rawText.replace(/^\[Pasture\]\s*/i, '').trim() : rawText;
         const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
         if (!text || (text.length < 50 && nothingPhrases.test(text))) {
           text = "What would you like to do next?";
@@ -892,7 +892,7 @@ async function main() {
     return groupBlock ? (basePrompt + '\n\n' + groupBlock) : basePrompt;
   }
 
-  /** Normalize text for the user (no [CowCode], no "agent replied:" wrappers). */
+  /** Normalize text for the user (no [Pasture], no "agent replied:" wrappers). */
   function sanitizeOutboundText(text) {
     if (text == null) return '';
     const normalized = String(text)
@@ -993,17 +993,17 @@ async function main() {
     const durabilityDecision = !isGroupJid
       ? await prepareWorkDurabilityWithAi({ userText: text, historyMessages, agentId })
       : null;
-    if (durabilityDecision?.goalId) ctx.goalId = durabilityDecision.goalId;
+    if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
     if (durabilityDecision) {
       console.log('[work-durability]', JSON.stringify({
         kind: durabilityDecision.kind,
         persistence: durabilityDecision.persistence,
-        goalId: durabilityDecision.goalId || '',
-        createdGoal: !!durabilityDecision.createdGoal,
+        missionId: durabilityDecision.missionId || '',
+        createdMission: !!durabilityDecision.createdMission,
       }));
     }
     // Step 3: specialization-aware delegation check before planner.
-    // This runs after durability so agent-send can receive a goalId up front.
+    // This runs after durability so agent-send can receive a missionId up front.
     const durableDelegationContext = !isGroupJid
       ? buildDurableDelegationContext(durabilityDecision, {
           agentId,
@@ -1072,13 +1072,13 @@ async function main() {
     const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(text)
       ? buildCasualChatIntentPlan()
       : null;
-    const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
-      ? getGoalsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
+    const missionsIntentHint = !presetDelegationPlan && !casualIntentPlan
+      ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
     const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
       ? getGithubSourceIntentHint(text, enabledSkillIds)
       : null;
-    const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+    const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
@@ -1128,8 +1128,8 @@ async function main() {
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
       if (!isNonTaskMessage(text)) {
-        const goalsBlock = buildGoalsContextBlock({ userText: text, historyMessages, agentId });
-        if (goalsBlock) systemPromptWithPlan += goalsBlock;
+        const missionsBlock = buildMissionsContextBlock({ userText: text, historyMessages, agentId });
+        if (missionsBlock) systemPromptWithPlan += missionsBlock;
         const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
         if (projectsBlock) systemPromptWithPlan += projectsBlock;
         const workflowBlock = buildProjectWorkflowContextBlock({ userText: text, historyMessages, agentId });
@@ -1167,7 +1167,7 @@ async function main() {
         } else if (forced && typeof forced.error === 'string') {
           console.log('[agent-router] forced agent-send failed:', forced.error);
           turnResult = {
-            textToSend: `[CowCode] ${forced.error.trim()}`,
+            textToSend: `[Pasture] ${forced.error.trim()}`,
             skillsCalled: ['agent-send'],
           };
         }
@@ -1206,7 +1206,7 @@ async function main() {
     );
     const replyForProbe = sanitizeOutboundText((resultToUse?.textToSend || '').trim());
     const textForSendProbe = isTelegramChatId(jid)
-      ? replyForProbe.replace(/^\[CowCode\]\s*/i, '').trim()
+      ? replyForProbe.replace(/^\[Pasture\]\s*/i, '').trim()
       : replyForProbe;
     if (
       !isGroupJid &&
@@ -1656,8 +1656,8 @@ async function main() {
       }
       if (!userText) continue;
 
-      // Do not treat our own CowCode replies as user input.
-      if (userText.startsWith('[CowCode]')) continue;
+      // Do not treat our own Pasture replies as user input.
+      if (userText.startsWith('[Pasture]')) continue;
 
       // Skip only when this is clearly our echo: fromMe and the text exactly matches what we last sent to this chat.
       const lastWeSent = lastSentByJid.get(jid);
@@ -1753,14 +1753,14 @@ async function main() {
           forceVoiceReply: userSentVoice,
         }).catch((err) => {
           console.error('Background agent error:', err.message);
-          const errorText = '[CowCode] Moo — ' + toUserMessage(err);
+          const errorText = '[Pasture] Moo — ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
             pendingReplies.push({ jid, text: errorText });
           });
         });
       } catch (err) {
         console.error('LLM error:', err.message);
-        const errorText = '[CowCode] Moo — ' + toUserMessage(err);
+        const errorText = '[Pasture] Moo — ' + toUserMessage(err);
         try {
           await sock.sendMessage(jid, { text: errorText });
         } catch (_) {

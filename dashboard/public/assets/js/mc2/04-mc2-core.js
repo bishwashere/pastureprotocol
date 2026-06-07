@@ -4,7 +4,7 @@
       mc2UpdateLiveBadge();
       mc2UpdateApprovalsBadge();
       mc2RenderPendingApprovalsBanner();
-      mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
+      mc2RenderPendingInline('mc2-missions-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
       mc2ScheduleSidebarProjects();
     }
@@ -65,28 +65,28 @@
     }
     function mc2HandleMovementClick(row) {
       if (!row) return;
-      var goalId = row.getAttribute('data-goal-id') || '';
-      var subgoalId = row.getAttribute('data-subgoal-id') || '';
-      var initiativeId = row.getAttribute('data-initiative-id') || '';
+      var missionId = row.getAttribute('data-mission-id') || '';
+      var taskId = row.getAttribute('data-task-id') || '';
+      var suggestedTaskId = row.getAttribute('data-suggestedTask-id') || '';
       var agentId = row.getAttribute('data-agent-id') || '';
       var item = typeof findMissionTaskItem === 'function'
-        ? findMissionTaskItem({ goalId: goalId, subgoalId: subgoalId, agentId: agentId })
+        ? findMissionTaskItem({ missionId: missionId, taskId: taskId, agentId: agentId })
         : null;
-      if (!item && initiativeId) {
+      if (!item && suggestedTaskId) {
         item = typeof findMissionTaskItem === 'function'
-          ? findMissionTaskItem({ subgoalId: 'init-' + initiativeId, goalId: goalId })
+          ? findMissionTaskItem({ taskId: 'init-' + suggestedTaskId, missionId: missionId })
           : null;
       }
       if (item) {
         mc2OpenTaskDetail(item, { filter: 'all' });
         return;
       }
-      if (initiativeId) {
-        mc2OpenTaskForInitiative(initiativeId);
+      if (suggestedTaskId) {
+        mc2OpenTaskForSuggestedTask(suggestedTaskId);
         return;
       }
-      if (goalId) {
-        mc2OpenTaskDetail(null, { goalId: goalId, subgoalId: subgoalId, filter: 'all' });
+      if (missionId) {
+        mc2OpenTaskDetail(null, { missionId: missionId, taskId: taskId, filter: 'all' });
         return;
       }
       if (agentId) {

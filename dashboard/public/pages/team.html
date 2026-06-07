@@ -13,8 +13,7 @@
         </div>
         <div class="team-top-tabs" role="tablist">
           <button type="button" id="team-top-tab-roster" class="team-top-tab active" data-team-top="roster" role="tab" aria-selected="true">Roster</button>
-          <button type="button" id="team-top-tab-goals" class="team-top-tab" data-team-top="goals" role="tab" aria-selected="false">Goals</button>
-          <button type="button" id="team-top-tab-initiatives" class="team-top-tab" data-team-top="initiatives" role="tab" aria-selected="false">Initiatives</button>
+          <button type="button" id="team-top-tab-missions" class="team-top-tab" data-team-top="missions" role="tab" aria-selected="false">Missions</button>
         </div>
         <p id="team-top-tab-desc" class="skill-meta" style="margin:0 0 0.45rem 0;">Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.</p>
         <div class="team-page-summary">
@@ -162,37 +161,23 @@
             </div>
           </div>
         </div>
-        <div id="team-goals-view" class="team-goals-view" hidden>
-          <div class="team-goals-main">
-            <div class="team-goals-head">
-              <h3 style="margin:0; font-size:0.9rem;">Goals</h3>
-              <button type="button" id="team-goals-refresh" class="secondary" style="margin:0;">Refresh</button>
+        <div id="team-missions-view" class="team-missions-view" hidden>
+          <div class="team-missions-main">
+            <div class="team-missions-head">
+              <h3 style="margin:0; font-size:0.9rem;">Missions</h3>
+              <button type="button" id="team-missions-refresh" class="secondary" style="margin:0;">Refresh</button>
             </div>
-            <div class="team-goals-new">
-              <input id="team-goal-title" type="text" placeholder="Goal title (optional)">
-              <input id="team-goal-objective" type="text" placeholder="High-level objective">
-              <select id="team-goal-owner"></select>
-              <button type="button" id="team-goal-create" style="margin:0;">New Goal</button>
+            <div class="team-missions-new">
+              <input id="team-mission-title" type="text" placeholder="Mission title (optional)">
+              <input id="team-mission-objective" type="text" placeholder="High-level objective">
+              <select id="team-mission-owner"></select>
+              <button type="button" id="team-mission-create" style="margin:0;">New Mission</button>
             </div>
-            <div id="team-goals-list" class="team-goals-list">
-              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No goals yet.</p>
+            <div id="team-missions-list" class="team-missions-list">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No missions yet.</p>
             </div>
-            <div id="team-goal-detail" class="team-goal-detail">
-              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a goal to view details and subgoals.</p>
-            </div>
-          </div>
-        </div>
-        <div id="team-initiatives-view" class="team-initiatives-view" hidden>
-          <div class="team-initiatives-main">
-            <div class="team-goals-head">
-              <h3 style="margin:0; font-size:0.9rem;">Initiatives</h3>
-              <button type="button" id="team-initiatives-refresh" class="secondary" style="margin:0;">Refresh</button>
-            </div>
-            <div id="team-initiatives-list" class="team-initiatives-list">
-              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>
-            </div>
-            <div id="team-initiative-detail" class="team-initiative-detail">
-              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>
+            <div id="team-mission-detail" class="team-mission-detail">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a mission to view details and tasks.</p>
             </div>
           </div>
         </div>

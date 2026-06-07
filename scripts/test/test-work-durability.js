@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-work-durability-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createGoal, getGoal } = await import('../../lib/goals.js');
+    const { createMission, getMission } = await import('../../lib/missions.js');
     const {
       classifyWorkDurability,
       classifyWorkDurabilityWithAi,
@@ -37,7 +37,7 @@ async function main() {
     assert(directAi.kind === 'direct_answer', 'AI classifier keeps greeting direct');
     assert(llmCalls === 0, 'deterministic fast path skips LLM');
 
-    const existing = createGoal({
+    const existing = createMission({
       title: 'Increase customer sign-ups for NextpostAI',
       objective: 'Improve the signup funnel',
       ownerAgentId: 'main',
@@ -47,8 +47,15 @@ async function main() {
       userText: 'continue the Increase customer sign-ups for NextpostAI work',
       agentId: 'main',
     });
-    assert(attached.kind === 'existing_goal_task_update', 'existing goal update classified');
-    assert(attached.goalId === existing.id, 'existing goal attached before delegation');
+    assert(attached.kind === 'existing_mission_task_update', 'existing mission update classified');
+    assert(attached.missionId === existing.id, 'existing mission attached before delegation');
+
+    const metaStatus = prepareWorkDurability({
+      userText: 'How many tasks or todos are there with agents?',
+      agentId: 'main',
+    });
+    assert(metaStatus.persistence === 'none', 'task count question is not persisted');
+    assert(!metaStatus.missionId, 'task count question does not attach to existing mission');
 
     const launchMessage = [
       'I’m launching a small product called TestProduct next week. It helps solo founders turn rough product notes into launch content.',
@@ -61,18 +68,18 @@ async function main() {
     const durable = prepareWorkDurability({ userText: launchMessage, agentId: 'main' });
     assert(durable.kind === 'new_mission_candidate', 'launch work classified as new mission');
     assert(durable.persistence === 'create_lightweight_mission', 'launch work creates lightweight mission');
-    assert(durable.goalId, 'new mission has goal id before delegation');
-    assert(durable.createdGoal === true, 'goal created by durability step');
-    const goal = getGoal(durable.goalId);
-    assert(goal?.title === 'Launch TestProduct', 'mission title uses product name');
-    const subgoalTitles = (goal?.subgoals || []).map((sg) => sg.title).join(' | ').toLowerCase();
-    assert(subgoalTitles.includes('positioning'), 'positioning subgoal created');
-    assert(subgoalTitles.includes('launch posts'), 'launch posts subgoal created');
-    assert(subgoalTitles.includes('landing page checklist'), 'landing page checklist subgoal created');
+    assert(durable.missionId, 'new mission has mission id before delegation');
+    assert(durable.createdMission === true, 'mission created by durability step');
+    const mission = getMission(durable.missionId);
+    assert(mission?.title === 'Launch TestProduct', 'mission title uses product name');
+    const taskTitles = (mission?.tasks || []).map((sg) => sg.title).join(' | ').toLowerCase();
+    assert(taskTitles.includes('positioning'), 'positioning task created');
+    assert(taskTitles.includes('launch posts'), 'launch posts task created');
+    assert(taskTitles.includes('landing page checklist'), 'landing page checklist task created');
 
     const args = delegationArgsFromDurability(durable, launchMessage);
-    assert(args.goalId === durable.goalId, 'delegation args include goal id');
-    assert(/positioning/i.test(args.expectedOutput), 'delegation expected output includes subgoals');
+    assert(args.missionId === durable.missionId, 'delegation args include mission id');
+    assert(/positioning/i.test(args.expectedOutput), 'delegation expected output includes tasks');
 
     const routingText = delegationRoutingTextFromDurability(durable, launchMessage);
     assert(/marketing/.test(routingText), 'routing text includes marketing hint after decomposition');
@@ -93,29 +100,29 @@ async function main() {
     assert(aiDurable.classifier === 'ai', 'messy launch uses AI classifier');
     assert(aiDurable.persistence === 'create_lightweight_mission', 'AI can create durable mission');
     assert(aiDurable.confidence === 0.88, 'AI confidence retained');
-    assert(aiDurable.goalId, 'AI durable decision creates goal before delegation');
-    const aiGoal = getGoal(aiDurable.goalId);
-    assert(aiGoal?.title === 'Launch TestProduct', 'AI projectName used in mission title');
-    assert((aiGoal?.subgoals || []).length === 3, 'AI deliverables become subgoals');
+    assert(aiDurable.missionId, 'AI durable decision creates mission before delegation');
+    const aiMission = getMission(aiDurable.missionId);
+    assert(aiMission?.title === 'Launch TestProduct', 'AI projectName used in mission title');
+    assert((aiMission?.tasks || []).length === 3, 'AI deliverables become tasks');
 
     const followup = await prepareWorkDurabilityWithAi({
       userText: 'Make the positioning less corporate',
       agentId: 'main',
       historyMessages: [],
       llmChat: async () => JSON.stringify({
-        goalMatch: 'recent_goal',
-        goalId: aiDurable.goalId,
+        missionMatch: 'recent_mission',
+        missionId: aiDurable.missionId,
         taskMatch: 'positioning',
         confidence: 0.84,
         reason: "User refers to 'the positioning', which belongs to the recent launch package.",
       }),
     });
-    assert(followup.kind === 'existing_goal_task_update', 'follow-up attaches to existing goal');
-    assert(followup.classifier === 'ai-goal-resolution', 'follow-up uses AI goal resolution');
-    assert(followup.goalId === aiDurable.goalId, 'follow-up keeps launch goal id');
-    assert(followup.subgoalId, 'follow-up finds positioning subgoal');
+    assert(followup.kind === 'existing_mission_task_update', 'follow-up attaches to existing mission');
+    assert(followup.classifier === 'ai-mission-resolution', 'follow-up uses AI mission resolution');
+    assert(followup.missionId === aiDurable.missionId, 'follow-up keeps launch mission id');
+    assert(followup.taskId, 'follow-up finds positioning task');
     assert(followup.taskMatch === 'positioning', 'task match retained');
-    assert(followup.confidence === 0.84, 'goal resolution confidence retained');
+    assert(followup.confidence === 0.84, 'mission resolution confidence retained');
 
     const unnumberedLaunch = 'I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.';
     let decompositionCalls = 0;
@@ -171,9 +178,9 @@ async function main() {
     });
     assert(decompositionCalls === 1, 'AI decomposition called for persistent work');
     assert(decomposed.decomposition === 'ai-constrained', 'decomposition marked ai-constrained');
-    assert(decomposed.subgoals.length === 4, 'AI decomposition creates four subtasks');
-    const decomposedGoal = getGoal(decomposed.goalId);
-    const typed = decomposedGoal.subgoals || [];
+    assert(decomposed.tasks.length === 4, 'AI decomposition creates four subtasks');
+    const decomposedMission = getMission(decomposed.missionId);
+    const typed = decomposedMission.tasks || [];
     assert(typed.some((sg) => sg.title === 'Create positioning statement' && sg.type === 'marketing' && sg.suggestedAgent === 'marketer'), 'positioning task typed for marketer');
     assert(typed.some((sg) => sg.title === 'Create landing page checklist' && sg.type === 'product' && sg.suggestedAgent === 'alex'), 'landing page task typed for alex');
     assert(typed.some((sg) => sg.title === 'Identify missing launch items' && sg.type === 'planning' && sg.suggestedAgent === 'main'), 'missing launch items task typed for main');

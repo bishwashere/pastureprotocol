@@ -10,10 +10,10 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-assert(source.includes('function mc2AutoPromotedInitiativeNeedsAttention'), 'attention helper exists');
-assert(source.includes("status === 'rejected' || status === 'completed'"), 'rejected and completed initiatives clear attention');
-assert(source.includes('if (!taskItem) return false'), 'removed promoted subgoals clear attention');
-assert(source.includes("taskStatus !== 'done' && taskStatus !== 'completed' && taskStatus !== 'removed'"), 'finished promoted subgoals clear attention');
-assert(source.includes('if (!mc2AutoPromotedInitiativeNeedsAttention(it, taskItem)) return'), 'collector uses attention helper');
+assert(source.includes('function mc2ProposedSuggestedTaskNeedsApproval'), 'attention helper exists');
+assert(source.includes("status === 'rejected' || status === 'completed' || status === 'accepted'"), 'finished suggestedTasks clear attention');
+assert(source.includes('suggestedTaskIsOnMission(suggestedTask)'), 'tasks already on missions clear proposal attention');
+assert(source.includes("return status === 'proposed' || status === 'open'"), 'only open proposals need attention');
+assert(source.includes('return mc2ProposedSuggestedTaskNeedsApproval(it);'), 'collector uses attention helper');
 
 console.log('mc2 attention clearing tests passed');

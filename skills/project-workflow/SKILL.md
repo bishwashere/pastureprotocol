@@ -6,7 +6,7 @@ description: Bridge conversation to dashboard Projects and Missions — list con
 
 # Project workflow
 
-Connects **natural conversation** to the dashboard **Projects** tracker, **Missions** (goals/subgoals), and **Tasks** views.
+Connects **natural conversation** to the dashboard **Projects** tracker, **Missions** (missions/tasks), and **Tasks** views.
 
 ## When to use
 
@@ -29,7 +29,7 @@ Call when the user:
 3. **`health_check`** — for configured projects, verify description, URL, setup notes, progress log, and linked mission. **Ask the user** for anything important that is missing (`update_project` can save answers).
 4. **`status`** — show current project + mission + task list.
 5. **`propose_plan`** — preview mission title, objective, and suggested tasks (does **not** write yet). Show **tasksForDisplay** and ask for yes/no.
-6. **Wait for explicit yes** — a goal alone (e.g. "increase sign ups") is **not** approval. Wait for **yes / go ahead / create it**.
+6. **Wait for explicit yes** — a mission alone (e.g. "increase sign ups") is **not** approval. Wait for **yes / go ahead / create it**.
 7. **`apply_plan`** with **`userApproved: true`** — only after explicit yes; the tool verifies approval in the user's message.
 8. During work: **`log_progress`** after meaningful steps; **`update_task`** when a task moves (todo → doing → done).
 
@@ -49,7 +49,7 @@ Pass **`action`** (or **`command`**) on every call.
 | `status` | Combined project + mission + tasks snapshot |
 | `propose_plan` | Preview mission + tasks for a **configured** project |
 | `apply_plan` | Create/update mission — requires `userApproved: true` |
-| `update_task` | Set subgoal status (`todo`/`doing`/`done`/`blocked`) on `goalId` |
+| `update_task` | Set task status (`todo`/`doing`/`done`/`blocked`) on `missionId` |
 | `log_progress` | Append project update + refresh mission activity |
 
 ## Tool schema
@@ -93,7 +93,7 @@ project_workflow_status
   description: Current status for a project and/or mission — tasks, progress, health.
   parameters:
     project: string
-    goalId: string
+    missionId: string
 
 project_workflow_propose_plan
   description: Preview a mission and task list for a configured project. Does not write until user approves.
@@ -107,17 +107,17 @@ project_workflow_apply_plan
   description: Create or update mission and tasks after user approval. Requires userApproved true.
   parameters:
     project: string
-    goalId: string
+    missionId: string
     title: string
     objective: string
     tasks: array
     userApproved: boolean
 
 project_workflow_update_task
-  description: Update a mission subgoal/task status on the dashboard.
+  description: Update a mission task/task status on the dashboard.
   parameters:
-    goalId: string
-    subgoalId: string
+    missionId: string
+    taskId: string
     title: string
     status: string
 
@@ -125,6 +125,6 @@ project_workflow_log_progress
   description: Log progress to the project update chain and mission activity feed.
   parameters:
     project: string
-    goalId: string
+    missionId: string
     text: string
 ```

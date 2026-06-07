@@ -66,7 +66,7 @@ await testAsync('runSkillInstall saves GitHub token to secrets.json', async () =
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const result = await runSkillInstall('github', ROOT, {
-      ask: async () => 'bishwashere/cowCode',
+      ask: async () => 'bishwashere/Pasture',
       promptSecret: async () => 'ghp_test_token_for_install',
     });
     if (!result.ok) throw new Error(result.message);
@@ -78,7 +78,7 @@ await testAsync('runSkillInstall saves GitHub token to secrets.json', async () =
     }
     const config = JSON.parse(readFileSync(join(stateDir, 'config.json'), 'utf8'));
     if (!config.skills.enabled.includes('github')) throw new Error('github not enabled');
-    if (config.skills.github.defaultRepo !== 'bishwashere/cowCode') {
+    if (config.skills.github.defaultRepo !== 'bishwashere/Pasture') {
       throw new Error('defaultRepo not saved');
     }
   } finally {

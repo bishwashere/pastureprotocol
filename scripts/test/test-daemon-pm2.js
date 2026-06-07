@@ -94,8 +94,8 @@ function checkWindowsPs1(filename, opts) {
   if (opts.pastureRepo && !src.includes('pastureprotocol-$Branch')) {
     return { ok: false, detail: `${filename} must expect pastureprotocol archive root` };
   }
-  if (opts.pastureRepo && src.includes('bishwashere/cowCode')) {
-    return { ok: false, detail: `${filename} must not download from legacy cowCode repo` };
+  if (opts.pastureRepo && src.includes('bishwashere/Pasture')) {
+    return { ok: false, detail: `${filename} must not download from legacy Pasture repo` };
   }
   return { ok: true, detail: `${filename} hardened for PS 5.1` };
 }

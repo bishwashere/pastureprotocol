@@ -73,7 +73,7 @@ function buildDefaultJudgePrompt(userMessage, botReply, skillHint) {
     search:
       'The reply must deliver search or navigation results: real content from the web (time, weather, snippet, or page content). A reply that only says it cannot search, or gives setup/error without any fetched content, is NO.',
     speech:
-      'The reply must reflect that the speech skill was used: for transcribe, the transcript or summary; for synthesize/reply_as_voice, confirmation that audio was generated or sent. A reply that only explains the skill or refuses without trying is NO. If the user asked for voice and the bot clearly could not (e.g. not configured), a short explanation is acceptable only if no voice was requested as the main goal.',
+      'The reply must reflect that the speech skill was used: for transcribe, the transcript or summary; for synthesize/reply_as_voice, confirmation that audio was generated or sent. A reply that only explains the skill or refuses without trying is NO. If the user asked for voice and the bot clearly could not (e.g. not configured), a short explanation is acceptable only if no voice was requested as the main mission.',
     gog:
       'The reply must show that gog was used: real data from Gmail/Calendar/Drive/etc., or a clear "no results" / empty list. A reply that only says it cannot use gog, or gives setup/error without attempting the requested action, is NO. If not configured, a brief explanation is acceptable.',
     'agent-send':

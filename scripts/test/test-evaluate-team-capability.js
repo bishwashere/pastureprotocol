@@ -55,6 +55,13 @@ async function run() {
   assert(ctx?.teamCapability, 'Expected teamCapability on delegation context');
   assert(!ctx?.recommendation?.targetAgentId, 'Fitness should not auto-select delegate target');
 
+  const metaStatus = evaluateTeamCapability({
+    agentId: 'main',
+    userText: 'How many tasks or todos are there with agents?',
+    availableSkillIds: ids,
+  });
+  assert(metaStatus === null, 'Tracker status questions should not auto-route to a teammate');
+
   const toolRaw = await executeEvaluateTeamCapability({ agentId: 'main' }, { request: 'I want to get in shape this summer' });
   const toolOut = JSON.parse(toolRaw);
   assert(Array.isArray(toolOut.agents) && toolOut.agents.length >= 2, 'Tool should return ranked agents');

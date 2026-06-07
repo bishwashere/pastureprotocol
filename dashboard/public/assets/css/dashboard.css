@@ -108,8 +108,8 @@
       gap: 0.65rem;
     }
     .team-roster-view,
-    .team-goals-view,
-    .team-initiatives-view {
+    .team-missions-view,
+    .team-suggestedTasks-view {
       flex: 1 1 0;
       min-height: 0;
       min-width: 0;
@@ -117,8 +117,8 @@
       gap: 0.65rem;
     }
     .team-roster-view[hidden],
-    .team-goals-view[hidden],
-    .team-initiatives-view[hidden] {
+    .team-missions-view[hidden],
+    .team-suggestedTasks-view[hidden] {
       display: none !important;
     }
     .team-map-wrap {
@@ -259,7 +259,7 @@
       cursor: default;
       opacity: 0.55;
     }
-    .team-current-mission-subgoal-list li.mission-blocked {
+    .team-current-mission-task-list li.mission-blocked {
       color: #ef4444;
     }
     .team-blocked-highlight {
@@ -322,33 +322,33 @@
       color: var(--text);
       font-weight: 600;
     }
-    .team-current-mission-subgoals {
+    .team-current-mission-tasks {
       margin: 0.45rem 0 0 0;
       padding-top: 0.35rem;
       border-top: 1px solid var(--border);
     }
-    .team-current-mission-subgoals h4 {
+    .team-current-mission-tasks h4 {
       margin: 0 0 0.3rem 0;
       font-size: 0.68rem;
       font-weight: 600;
       color: var(--text);
     }
-    .team-current-mission-subgoal-list {
+    .team-current-mission-task-list {
       margin: 0;
       padding: 0;
       list-style: none;
     }
-    .team-current-mission-subgoal-list li {
+    .team-current-mission-task-list li {
       margin: 0 0 0.18rem 0;
       color: var(--muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .team-current-mission-subgoal-list li.mission-doing {
+    .team-current-mission-task-list li.mission-doing {
       color: var(--text);
     }
-    .team-current-mission-subgoal-list li.mission-done {
+    .team-current-mission-task-list li.mission-done {
       color: #22c55e;
     }
     .team-current-mission-empty {
@@ -490,7 +490,7 @@
       min-height: 0;
       overflow: auto;
     }
-    .team-goals-main {
+    .team-missions-main {
       flex: 1 1 0;
       min-width: 0;
       min-height: 0;
@@ -502,14 +502,14 @@
       background: var(--bg);
       padding: 0.55rem;
     }
-    .team-goals-head {
+    .team-missions-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 0.5rem;
       flex-wrap: wrap;
     }
-    .team-goals-list {
+    .team-missions-list {
       flex: 1 1 0;
       min-height: 0;
       overflow: auto;
@@ -518,7 +518,7 @@
       gap: 0.55rem;
       padding: 0.1rem;
     }
-    .team-goal-card {
+    .team-mission-card {
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--card);
@@ -527,57 +527,57 @@
       line-height: 1.35;
       cursor: pointer;
     }
-    .team-goal-card.selected {
+    .team-mission-card.selected {
       border-color: var(--accent);
       box-shadow: 0 0 0 1px rgba(91, 181, 255, 0.28);
     }
-    .team-goal-card-head {
+    .team-mission-card-head {
       display: flex;
       justify-content: space-between;
       gap: 0.45rem;
       margin-bottom: 0.35rem;
       align-items: baseline;
     }
-    .team-goal-card-title {
+    .team-mission-card-title {
       margin: 0;
       font-size: 0.76rem;
       font-weight: 600;
     }
-    .team-goal-status {
+    .team-mission-status {
       font-size: 0.66rem;
       padding: 0.08rem 0.35rem;
       border-radius: 999px;
       text-transform: capitalize;
     }
-    .team-goal-status.active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-    .team-goal-status.paused { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
-    .team-goal-status.completed { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .team-goal-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-    .team-goal-progress {
+    .team-mission-status.active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .team-mission-status.paused { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
+    .team-mission-status.completed { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .team-mission-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .team-mission-progress {
       margin: 0.35rem 0;
       height: 0.32rem;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.08);
       overflow: hidden;
     }
-    .team-goal-progress > span {
+    .team-mission-progress > span {
       display: block;
       height: 100%;
       background: var(--accent);
       width: 0;
     }
-    .team-goal-meta {
+    .team-mission-meta {
       color: var(--muted);
       font-size: 0.68rem;
       margin-top: 0.2rem;
     }
-    .team-goal-actions {
+    .team-mission-actions {
       margin-top: 0.45rem;
       display: flex;
       gap: 0.35rem;
       flex-wrap: wrap;
     }
-    .team-goal-detail {
+    .team-mission-detail {
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--card);
@@ -586,63 +586,63 @@
       line-height: 1.4;
       min-height: 7rem;
     }
-    .team-goal-detail h4 {
+    .team-mission-detail h4 {
       margin: 0 0 0.35rem 0;
       font-size: 0.8rem;
     }
-    .team-goal-detail-row {
+    .team-mission-detail-row {
       margin: 0.15rem 0;
       color: var(--muted);
     }
-    .team-goal-subgoals {
+    .team-mission-tasks {
       margin-top: 0.55rem;
       border-top: 1px dashed var(--border);
       padding-top: 0.45rem;
     }
-    .team-goal-subgoals h5 {
+    .team-mission-tasks h5 {
       margin: 0 0 0.35rem 0;
       font-size: 0.72rem;
       color: var(--text);
     }
-    .team-goal-subgoal-node {
+    .team-mission-task-node {
       margin: 0.2rem 0 0.2rem 0.55rem;
       padding-left: 0.3rem;
       border-left: 1px dashed rgba(255, 255, 255, 0.18);
     }
-    .team-goal-subgoal-node > summary {
+    .team-mission-task-node > summary {
       cursor: pointer;
       list-style: none;
       color: var(--text);
       margin-left: -0.25rem;
     }
-    .team-goal-subgoal-node > summary::-webkit-details-marker {
+    .team-mission-task-node > summary::-webkit-details-marker {
       display: none;
     }
-    .team-goal-subgoal-row {
+    .team-mission-task-row {
       display: inline-flex;
       gap: 0.35rem;
       align-items: baseline;
       flex-wrap: wrap;
     }
-    .team-goal-subgoal-title {
+    .team-mission-task-title {
       font-weight: 600;
       color: var(--text);
     }
-    .team-goal-subgoal-meta {
+    .team-mission-task-meta {
       color: var(--muted);
       font-size: 0.67rem;
     }
-    .team-goal-subgoal-status {
+    .team-mission-task-status {
       font-size: 0.64rem;
       border-radius: 999px;
       padding: 0.04rem 0.35rem;
       text-transform: capitalize;
     }
-    .team-goal-subgoal-status.todo { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
-    .team-goal-subgoal-status.doing { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-    .team-goal-subgoal-status.done { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-    .team-goal-subgoal-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-    .team-initiatives-main {
+    .team-mission-task-status.todo { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
+    .team-mission-task-status.doing { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+    .team-mission-task-status.done { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .team-mission-task-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .team-suggestedTasks-main {
       flex: 1 1 0;
       min-width: 0;
       min-height: 0;
@@ -654,7 +654,7 @@
       background: var(--bg);
       padding: 0.55rem;
     }
-    .team-initiatives-list {
+    .team-suggestedTasks-list {
       flex: 1 1 0;
       min-height: 0;
       overflow: auto;
@@ -663,7 +663,7 @@
       gap: 0.55rem;
       padding: 0.1rem;
     }
-    .team-initiative-card {
+    .team-suggestedTask-card {
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--card);
@@ -672,11 +672,11 @@
       line-height: 1.35;
       cursor: pointer;
     }
-    .team-initiative-card.selected {
+    .team-suggestedTask-card.selected {
       border-color: var(--accent);
       box-shadow: 0 0 0 1px rgba(91, 181, 255, 0.28);
     }
-    .team-initiative-type {
+    .team-suggestedTask-type {
       font-size: 0.65rem;
       border-radius: 999px;
       padding: 0.05rem 0.35rem;
@@ -684,11 +684,11 @@
       background: rgba(255, 255, 255, 0.08);
       color: var(--muted);
     }
-    .team-initiative-status.open { color: #facc15; }
-    .team-initiative-status.accepted { color: #60a5fa; }
-    .team-initiative-status.rejected { color: #ef4444; }
-    .team-initiative-status.completed { color: #22c55e; }
-    .team-initiative-detail {
+    .team-suggestedTask-status.open { color: #facc15; }
+    .team-suggestedTask-status.accepted { color: #60a5fa; }
+    .team-suggestedTask-status.rejected { color: #ef4444; }
+    .team-suggestedTask-status.completed { color: #22c55e; }
+    .team-suggestedTask-detail {
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--card);
@@ -697,15 +697,15 @@
       line-height: 1.4;
       min-height: 8rem;
     }
-    .team-initiative-detail h4 {
+    .team-suggestedTask-detail h4 {
       margin: 0 0 0.35rem 0;
       font-size: 0.8rem;
     }
-    .team-initiative-row {
+    .team-suggestedTask-row {
       margin: 0.18rem 0;
       color: var(--muted);
     }
-    .team-initiative-auto-badge {
+    .team-suggestedTask-auto-badge {
       display: inline-block;
       font-size: 0.62rem;
       font-weight: 600;
@@ -718,20 +718,20 @@
       vertical-align: middle;
       margin-right: 0.25rem;
     }
-    .team-initiative-actions {
+    .team-suggestedTask-actions {
       margin-top: 0.45rem;
       display: flex;
       gap: 0.35rem;
       flex-wrap: wrap;
     }
-    .team-goals-new {
+    .team-missions-new {
       display: grid;
       grid-template-columns: 1fr 1fr auto auto;
       gap: 0.4rem;
       align-items: center;
     }
-    .team-goals-new input,
-    .team-goals-new select {
+    .team-missions-new input,
+    .team-missions-new select {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
@@ -741,7 +741,7 @@
       font-size: 0.72rem;
     }
     @media (max-width: 980px) {
-      .team-goals-new {
+      .team-missions-new {
         grid-template-columns: 1fr;
       }
     }

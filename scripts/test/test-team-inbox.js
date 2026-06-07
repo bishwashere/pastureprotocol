@@ -25,7 +25,7 @@ function run() {
   assert(start.inbox.context === 'Project = nextpostai.com', 'context on start');
 
   const done = buildTurnDoneInboxDetails({
-    textToSend: '[CowCode] 1) Idea A\n2) Idea B',
+    textToSend: '[Pasture] 1) Idea A\n2) Idea B',
     skillsCalled: ['search', 'memory'],
     ctx: { jid: 'internal:main->marketer' },
   });

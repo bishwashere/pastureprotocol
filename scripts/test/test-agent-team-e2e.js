@@ -19,7 +19,7 @@ const ASK_COMPANY_TAGLINE = "What's our company tagline for marketing materials?
 const ASK_CI_FAILURE = 'Can you investigate why our GitHub CI check is failing and propose a fix?';
 /** Conversational team context only; turn 2 must not name any agent or skill. */
 const ESTABLISH_MARKETING_LANE = 'Taglines, campaigns, and brand stuff should go through whoever owns marketing on the team.';
-/** Initiative-style risk framing; should still use marketing specialist lane. */
+/** SuggestedTask-style risk framing; should still use marketing specialist lane. */
 const ASK_ONBOARDING_RISK = 'Users drop off right after signup. What risk should we prioritize first, and what small experiment should we run this week?';
 /** Proactive collaboration framing; should pull in backend specialist for feasibility. */
 const ASK_FEASIBILITY_REVIEW = 'We have an onboarding improvement idea. Can you review technical feasibility and rollout risks before we proceed?';
@@ -200,7 +200,7 @@ async function main() {
       },
     },
     {
-      name: 'initiative-style risk prompt gives natural risk+experiment guidance',
+      name: 'suggestedTask-style risk prompt gives natural risk+experiment guidance',
       input: ASK_ONBOARDING_RISK,
       expectMode: 'behavior',
       run: async () => {

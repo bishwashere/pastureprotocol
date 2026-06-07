@@ -409,7 +409,7 @@
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
-        renderGoalsOwnerOptions();
+        renderMissionsOwnerOptions();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
@@ -420,7 +420,7 @@
         renderAgentContext();
         renderAgentMetrics();
         renderTeamAgentCards();
-        renderGoalsOwnerOptions();
+        renderMissionsOwnerOptions();
         return agentMapData;
       }
     }
@@ -576,31 +576,30 @@
 
     var TEAM_TOP_TAB_DESC = {
       roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.',
-      goals: 'Long-running missions your agents work on autonomously — create missions, track tasks, and run or pause work.',
-      initiatives: 'Agent proposals from mission reflection and team activity — review and approve before they become tasks.',
+      missions: 'Long-running missions your agents work on autonomously — create missions, track tasks, and run or pause work.',
     };
 
-    function isGoalPartialWait(goal) {
-      var w = goal && goal.waitCondition;
+    function isMissionPartialWait(mission) {
+      var w = mission && mission.waitCondition;
       if (!w || typeof w !== 'object') return false;
       return String(w.kind || '').toLowerCase() === 'partial';
     }
 
-    function goalImplementationBlockedLabel(goal) {
-      if (!goal) return '';
-      var w = goal.waitCondition;
-      var reason = String((w && (w.reason || w.condition)) || goal.blockedReason || '').trim();
-      if (isGoalPartialWait(goal)) {
+    function missionImplementationBlockedLabel(mission) {
+      if (!mission) return '';
+      var w = mission.waitCondition;
+      var reason = String((w && (w.reason || w.condition)) || mission.blockedReason || '').trim();
+      if (isMissionPartialWait(mission)) {
         var appliesTo = (w && (w.waitAppliesTo || w.scope)) || 'implementation';
         return reason || ('Implementation blocked (' + appliesTo + ') — research continues');
       }
       return reason;
     }
 
-    function formatGoalImplementationAttention(goal) {
-      var title = escapeHtml(String(goal.title || goal.objective || 'Mission').slice(0, 48));
-      var ask = String(goal.needsUserInput || '').trim();
-      var reason = goalImplementationBlockedLabel(goal);
+    function formatMissionImplementationAttention(mission) {
+      var title = escapeHtml(String(mission.title || mission.objective || 'Mission').slice(0, 48));
+      var ask = String(mission.needsUserInput || '').trim();
+      var reason = missionImplementationBlockedLabel(mission);
       var text = title + ': Implementation blocked — research continues';
       if (reason && reason !== 'Implementation blocked — research continues') {
         text += ' (' + escapeHtml(reason.slice(0, 56)) + ')';
@@ -610,52 +609,42 @@
     }
 
     function setTeamTopTab(tab) {
-      teamTopTab = tab === 'goals' ? 'goals' : (tab === 'initiatives' ? 'initiatives' : 'roster');
+      teamTopTab = tab === 'missions' ? 'missions' : 'roster';
       var rosterTab = document.getElementById('team-top-tab-roster');
-      var goalsTab = document.getElementById('team-top-tab-goals');
-      var initiativesTab = document.getElementById('team-top-tab-initiatives');
+      var missionsTab = document.getElementById('team-top-tab-missions');
       var tabDesc = document.getElementById('team-top-tab-desc');
       var rosterView = document.getElementById('team-roster-view');
-      var goalsView = document.getElementById('team-goals-view');
-      var initiativesView = document.getElementById('team-initiatives-view');
+      var missionsView = document.getElementById('team-missions-view');
       if (tabDesc) tabDesc.textContent = TEAM_TOP_TAB_DESC[teamTopTab] || TEAM_TOP_TAB_DESC.roster;
       if (rosterTab) {
         rosterTab.classList.toggle('active', teamTopTab === 'roster');
         rosterTab.setAttribute('aria-selected', teamTopTab === 'roster' ? 'true' : 'false');
       }
-      if (goalsTab) {
-        goalsTab.classList.toggle('active', teamTopTab === 'goals');
-        goalsTab.setAttribute('aria-selected', teamTopTab === 'goals' ? 'true' : 'false');
-      }
-      if (initiativesTab) {
-        initiativesTab.classList.toggle('active', teamTopTab === 'initiatives');
-        initiativesTab.setAttribute('aria-selected', teamTopTab === 'initiatives' ? 'true' : 'false');
+      if (missionsTab) {
+        missionsTab.classList.toggle('active', teamTopTab === 'missions');
+        missionsTab.setAttribute('aria-selected', teamTopTab === 'missions' ? 'true' : 'false');
       }
       if (rosterView) rosterView.hidden = teamTopTab !== 'roster';
-      if (goalsView) goalsView.hidden = teamTopTab !== 'goals';
-      if (initiativesView) initiativesView.hidden = teamTopTab !== 'initiatives';
-      if (teamTopTab === 'goals' && (!teamGoalsSnapshot.goals || !teamGoalsSnapshot.goals.length)) {
-        fetchGoalsSnapshot();
-      }
-      if (teamTopTab === 'initiatives' && (!teamInitiativesSnapshot.initiatives || !teamInitiativesSnapshot.initiatives.length)) {
-        fetchInitiativesSnapshot();
+      if (missionsView) missionsView.hidden = teamTopTab !== 'missions';
+      if (teamTopTab === 'missions' && (!teamMissionsSnapshot.missions || !teamMissionsSnapshot.missions.length)) {
+        fetchMissionsSnapshot();
       }
       if (typeof renderTeamUserInputModal === 'function') renderTeamUserInputModal();
     }
 
-    function formatGoalTs(ts) {
+    function formatMissionTs(ts) {
       var n = Number(ts);
       if (!isFinite(n) || n <= 0) return 'never';
       return new Date(n).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function goalOwnerLabel(goal) {
-      return agentNameById(goal && goal.ownerAgentId ? goal.ownerAgentId : 'main');
+    function missionOwnerLabel(mission) {
+      return agentNameById(mission && mission.ownerAgentId ? mission.ownerAgentId : 'main');
     }
 
-    function activeGoalLabelForAgent(agentId) {
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
-      var owned = goals.filter(function (g) {
+    function activeMissionLabelForAgent(agentId) {
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+      var owned = missions.filter(function (g) {
         return String(g.ownerAgentId || '') === String(agentId || '') &&
           String(g.status || 'active').toLowerCase() === 'active';
       });
@@ -668,7 +657,7 @@
       return String(g.title || '').trim() || String(g.objective || '').trim();
     }
 
-    var EPHEMERAL_GOAL_LABELS = {
+    var EPHEMERAL_MISSION_LABELS = {
       'Answer user question': 1,
       'Handle delegated task': 1,
       'Improve onboarding conversion': 1,
@@ -678,21 +667,21 @@
       'Generate marketing ideas': 1,
     };
 
-    function isEphemeralGoalLabel(label) {
+    function isEphemeralMissionLabel(label) {
       var g = String(label || '').trim();
-      return !g || !!EPHEMERAL_GOAL_LABELS[g];
+      return !g || !!EPHEMERAL_MISSION_LABELS[g];
     }
 
     function missionLabelForAgent(agentId, ctx) {
       var row = ctx || {};
       var state = String(row.state || 'idle').toLowerCase();
-      var stored = String(row.currentGoal || '').trim();
+      var stored = String(row.currentMission || '').trim();
       if (state === 'idle') {
-        return activeGoalLabelForAgent(agentId) || '';
+        return activeMissionLabelForAgent(agentId) || '';
       }
-      if (stored && !isEphemeralGoalLabel(stored)) return stored;
-      var fromGoals = activeGoalLabelForAgent(agentId);
-      return fromGoals || stored || '';
+      if (stored && !isEphemeralMissionLabel(stored)) return stored;
+      var fromMissions = activeMissionLabelForAgent(agentId);
+      return fromMissions || stored || '';
     }
 
     function isAgentContextActive(ctx) {
@@ -723,93 +712,93 @@
       var agentId = pickLiveMissionAgentId();
       if (!agentId) return null;
       var ctx = (teamAgentContextSnapshot.agents || {})[agentId] || {};
-      var goalLabel = missionLabelForAgent(agentId, ctx);
+      var missionLabel = missionLabelForAgent(agentId, ctx);
       var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
       var waitingFor = String(ctx.waitingFor || '').trim();
       var lastAction = String(ctx.lastAction || '').trim();
-      if (!goalLabel && !thought && !waitingFor && !lastAction) return null;
-      if (!goalLabel && thought) goalLabel = thought.length > 120 ? thought.slice(0, 119) + '…' : thought;
-      if (!goalLabel) goalLabel = 'Active team work';
-      var subgoals = [];
-      if (thought) subgoals.push({ title: thought, status: 'doing' });
+      if (!missionLabel && !thought && !waitingFor && !lastAction) return null;
+      if (!missionLabel && thought) missionLabel = thought.length > 120 ? thought.slice(0, 119) + '…' : thought;
+      if (!missionLabel) missionLabel = 'Active team work';
+      var tasks = [];
+      if (thought) tasks.push({ title: thought, status: 'doing' });
       if (waitingFor) {
-        subgoals.push({
+        tasks.push({
           title: 'Waiting on ' + agentNameById(waitingFor),
           status: 'todo',
         });
       }
-      if (lastAction) subgoals.push({ title: lastAction, status: 'done' });
+      if (lastAction) tasks.push({ title: lastAction, status: 'done' });
       return {
         live: true,
-        title: goalLabel,
+        title: missionLabel,
         objective: thought,
         ownerAgentId: agentId,
         progressLabel: 'In progress',
-        subgoals: subgoals,
+        tasks: tasks,
       };
     }
 
-    function getCurrentMissionGoal() {
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals.slice() : [];
-      if (!goals.length) return null;
+    function getCurrentMissionMission() {
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions.slice() : [];
+      if (!missions.length) return null;
       var isActive = function (g) {
         return String(g && g.status || 'active').toLowerCase() === 'active';
       };
-      if (selectedTeamGoalId) {
-        var selected = goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; });
+      if (selectedTeamMissionId) {
+        var selected = missions.find(function (g) { return String(g.id || '') === selectedTeamMissionId; });
         if (selected && isActive(selected)) return selected;
       }
-      var running = goals.find(function (g) { return !!g.running && isActive(g); });
+      var running = missions.find(function (g) { return !!g.running && isActive(g); });
       if (running) return running;
-      var active = goals.filter(isActive);
+      var active = missions.filter(isActive);
       active.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
       if (active.length) return active[0];
-      if (selectedTeamGoalId) {
-        var anySelected = goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; });
+      if (selectedTeamMissionId) {
+        var anySelected = missions.find(function (g) { return String(g.id || '') === selectedTeamMissionId; });
         if (anySelected) return anySelected;
       }
-      goals.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
-      return goals[0] || null;
+      missions.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      return missions[0] || null;
     }
 
-    function teamHasSavedGoals() {
-      return Array.isArray(teamGoalsSnapshot.goals) && teamGoalsSnapshot.goals.length > 0;
+    function teamHasSavedMissions() {
+      return Array.isArray(teamMissionsSnapshot.missions) && teamMissionsSnapshot.missions.length > 0;
     }
 
     function getCurrentMission() {
-      var stored = getCurrentMissionGoal();
-      if (stored) return { kind: 'stored', goal: stored };
+      var stored = getCurrentMissionMission();
+      if (stored) return { kind: 'stored', mission: stored };
       var live = getLiveMissionFromTeamContext();
-      if (live) return { kind: 'live', mission: live, noSavedGoal: !teamHasSavedGoals() };
+      if (live) return { kind: 'live', mission: live, noSavedMission: !teamHasSavedMissions() };
       return null;
     }
 
-    function missionSubgoalIcon(status) {
-      var s = normalizeSubgoalStatus(status);
+    function missionTaskIcon(status) {
+      var s = normalizeTaskStatus(status);
       if (s === 'done') return '✓';
       if (s === 'doing') return '→';
       if (s === 'blocked') return '⊘';
       return '○';
     }
 
-    function missionSubgoalClass(status) {
-      var s = normalizeSubgoalStatus(status);
+    function missionTaskClass(status) {
+      var s = normalizeTaskStatus(status);
       if (s === 'done') return 'mission-done';
       if (s === 'doing') return 'mission-doing';
       if (s === 'blocked') return 'mission-blocked';
       return 'mission-todo';
     }
 
-    function dashboardSubgoalBlockedByWait(subgoal, waitCondition) {
-      if (!subgoal || !isGoalPartialWait({ waitCondition: waitCondition })) return false;
+    function dashboardTaskBlockedByWait(task, waitCondition) {
+      if (!task || !isMissionPartialWait({ waitCondition: waitCondition })) return false;
       var w = waitCondition || {};
-      var blockedIds = Array.isArray(w.blockedSubgoalIds) ? w.blockedSubgoalIds : (
-        Array.isArray(w.appliesToSubgoalIds) ? w.appliesToSubgoalIds : []
+      var blockedIds = Array.isArray(w.blockedTaskIds) ? w.blockedTaskIds : (
+        Array.isArray(w.appliesToTaskIds) ? w.appliesToTaskIds : []
       );
-      var sgId = String(subgoal.id || '').trim();
+      var sgId = String(task.id || '').trim();
       if (sgId && blockedIds.some(function (id) { return String(id || '').trim() === sgId; })) return true;
       var appliesTo = String(w.waitAppliesTo || w.scope || 'implementation').toLowerCase();
-      var hay = (sgId + ' ' + String(subgoal.title || '') + ' ' + String(subgoal.description || '')).toLowerCase();
+      var hay = (sgId + ' ' + String(task.title || '') + ' ' + String(task.description || '')).toLowerCase();
       var scope = /research|explore|benchmark|competitor|audit|interview|survey|discover/.test(hay) ? 'research'
         : /instrument|tracking|analytics|posthog|ga4|mixpanel|pixel|funnel/.test(hay) ? 'instrumentation'
         : /deploy|release|launch|production|prod|go-live|ship/.test(hay) ? 'deployment'
@@ -823,20 +812,20 @@
       return false;
     }
 
-    function walkGoalSubgoalsForBlocked(subgoals, goalId, goal, out) {
+    function walkMissionTasksForBlocked(tasks, missionId, mission, out) {
       var refs = out || [];
-      var waitCondition = goal && goal.waitCondition;
-      (subgoals || []).forEach(function (sg) {
+      var waitCondition = mission && mission.waitCondition;
+      (tasks || []).forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         var sgId = String(sg.id || '').trim();
         var title = String(sg.title || '').trim();
-        var status = normalizeSubgoalStatus(sg.status);
+        var status = normalizeTaskStatus(sg.status);
         var blocked = status === 'blocked' ||
-          (String(sg.status || '').toLowerCase() !== 'done' && dashboardSubgoalBlockedByWait(sg, waitCondition));
+          (String(sg.status || '').toLowerCase() !== 'done' && dashboardTaskBlockedByWait(sg, waitCondition));
         if (blocked) {
-          refs.push({ kind: 'subgoal', goalId: goalId, subgoalId: sgId, title: title });
+          refs.push({ kind: 'task', missionId: missionId, taskId: sgId, title: title });
         }
-        walkGoalSubgoalsForBlocked(sg.subgoals, goalId, goal, refs);
+        walkMissionTasksForBlocked(sg.tasks, missionId, mission, refs);
       });
       return refs;
     }
@@ -847,18 +836,18 @@
       Object.keys(agents).forEach(function (id) {
         var ctx = agents[id] || {};
         if (String(ctx.state || 'idle').toLowerCase() === 'error') {
-          refs.push({ kind: 'agent', goalId: '', subgoalId: '', agentId: id });
+          refs.push({ kind: 'agent', missionId: '', taskId: '', agentId: id });
         }
       });
-      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
-        var goalId = String(g.id || '').trim();
-        if (!goalId) return;
+      (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).forEach(function (g) {
+        var missionId = String(g.id || '').trim();
+        if (!missionId) return;
         if (String(g.status || '').toLowerCase() === 'blocked') {
-          refs.push({ kind: 'goal', goalId: goalId, subgoalId: '', agentId: '' });
-        } else if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
-          refs.push({ kind: 'goal', goalId: goalId, subgoalId: '', agentId: '', partial: true });
+          refs.push({ kind: 'mission', missionId: missionId, taskId: '', agentId: '' });
+        } else if (isMissionPartialWait(g) || String(g.needsUserInput || '').trim()) {
+          refs.push({ kind: 'mission', missionId: missionId, taskId: '', agentId: '', partial: true });
         }
-        walkGoalSubgoalsForBlocked(g.subgoals, goalId, g, refs);
+        walkMissionTasksForBlocked(g.tasks, missionId, g, refs);
       });
       return refs;
     }
@@ -867,72 +856,97 @@
       var refs = findBlockedWorkRefs();
       var i;
       for (i = 0; i < refs.length; i++) {
-        if (refs[i].kind === 'subgoal') return refs[i];
+        if (refs[i].kind === 'task') return refs[i];
       }
       for (i = 0; i < refs.length; i++) {
-        if (refs[i].kind === 'goal') return refs[i];
+        if (refs[i].kind === 'mission') return refs[i];
       }
       return refs[0] || null;
     }
 
-    function effectiveSubgoalStatus(subgoal, goal) {
-      var status = normalizeSubgoalStatus(subgoal && subgoal.status);
+    function effectiveTaskStatus(task, mission) {
+      var status = normalizeTaskStatus(task && task.status);
       if (status === 'done') return 'done';
       if (status === 'blocked') return 'blocked';
-      if (goal && dashboardSubgoalBlockedByWait(subgoal, goal.waitCondition)) return 'blocked';
+      if (mission && dashboardTaskBlockedByWait(task, mission.waitCondition)) return 'blocked';
       return status;
+    }
+
+    function mc2LooksLikeProjectMetaTaskText(text) {
+      var normalized = String(text || '').toLowerCase()
+        .replace(/[^a-z0-9\s_-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!normalized) return false;
+      if (!/\b(tasks?|todos?|items?|goals?|missions?|initiatives?|logs?|history|updates?|counts?|duplicates?)\b/.test(normalized)) return false;
+      if (/\b(create|draft|write|build|implement|investigate|audit|research|review|prepare|design|ship|fix|analyze|plan|improve|increase|launch|instrument|validate)\b/.test(normalized) &&
+        !/\b(remove|dedupe|de-duplicate|clean up)\b.*\bduplicates?\b/.test(normalized)) {
+        return false;
+      }
+      return /\b(how many|count|total|list|show|which|what are|what is|status|done|pending|open|to do|todo)\b/.test(normalized) ||
+        /\b(you said|you re saying|are you saying|which one is correct|correct|wrong|is that right)\b/.test(normalized) ||
+        /\b(remove|dedupe|de-duplicate|clean up)\b.*\bduplicates?\b/.test(normalized);
+    }
+
+    function mc2IsChatDerivedDelegatedTask(task) {
+      if (!task || String(task.source || '').trim() !== 'delegation') return false;
+      return mc2LooksLikeProjectMetaTaskText(task.description) ||
+        mc2LooksLikeProjectMetaTaskText(task.expectedOutput) ||
+        mc2LooksLikeProjectMetaTaskText(task.title);
     }
 
     function flattenMissionWorkItems() {
       var items = [];
-      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
+      (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).forEach(function (g) {
         var missionTitle = String(g.title || g.objective || 'Untitled mission').trim();
-        var goalId = String(g.id || '').trim();
-        if (!goalId) return;
-        var goalStatus = String(g.status || 'active').toLowerCase();
-        if (goalStatus === 'blocked') {
+        var missionId = String(g.id || '').trim();
+        if (!missionId) return;
+        var missionStatus = String(g.status || 'active').toLowerCase();
+        if (missionStatus === 'blocked') {
           items.push({
-            kind: 'goal',
+            kind: 'mission',
             status: 'blocked',
             title: missionTitle,
             missionTitle: missionTitle,
-            goalId: goalId,
-            subgoalId: '',
+            missionId: missionId,
+            taskId: '',
             path: missionTitle,
             assignee: String(g.ownerAgentId || '').trim(),
-            progress: normalizeSubgoalProgress(g.progress && g.progress.pct),
+            progress: normalizeTaskProgress(g.progress && g.progress.pct),
             description: String(g.blockedReason || g.objective || '').trim(),
           });
         }
-        function walk(subgoals, pathParts) {
-          (subgoals || []).forEach(function (sg) {
+        function walk(tasks, pathParts) {
+          (tasks || []).forEach(function (sg) {
             if (!sg || typeof sg !== 'object') return;
+            if (mc2IsChatDerivedDelegatedTask(sg)) return;
             var title = String(sg.title || '').trim() || 'Untitled task';
             var parts = pathParts.concat(title);
-            var status = effectiveSubgoalStatus(sg, g);
-            var subgoalId = String(sg.id || '').trim();
+            var status = effectiveTaskStatus(sg, g);
+            var taskId = String(sg.id || '').trim();
             items.push({
-              kind: 'subgoal',
+              kind: 'task',
               status: status,
               title: title,
               missionTitle: missionTitle,
-              goalId: goalId,
-              subgoalId: subgoalId,
-              fromInitiative: /^init-/.test(subgoalId),
+              missionId: missionId,
+              taskId: taskId,
+              fromSuggestedTask: /^init-/.test(taskId),
+              labels: Array.isArray(sg.labels) ? sg.labels.slice() : [],
               path: parts.join(' → '),
               assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
               delegatedFrom: String(sg.delegatedFrom || '').trim(),
               delegatedAt: Number(sg.delegatedAt) || 0,
               source: String(sg.source || '').trim(),
               dueAt: Number(sg.dueAt) || 0,
-              progress: normalizeSubgoalProgress(sg.progress),
+              progress: normalizeTaskProgress(sg.progress),
               description: String(sg.description || '').trim(),
               updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
             });
-            walk(sg.subgoals, parts);
+            walk(sg.tasks, parts);
           });
         }
-        walk(g.subgoals, [missionTitle]);
+        walk(g.tasks, [missionTitle]);
       });
       var agents = teamAgentContextSnapshot.agents || {};
       Object.keys(agents).forEach(function (id) {
@@ -943,8 +957,8 @@
             status: 'blocked',
             title: String(ctx.currentThought || ctx.lastAction || 'Agent blocked').trim(),
             missionTitle: '',
-            goalId: '',
-            subgoalId: '',
+            missionId: '',
+            taskId: '',
             agentId: id,
             path: agentNameById(id),
             assignee: id,
@@ -978,68 +992,68 @@
       }, 2200);
     }
 
-    function openSubgoalAncestors(el) {
+    function openTaskAncestors(el) {
       var node = el;
       while (node) {
-        if (node.tagName === 'DETAILS' && node.classList && node.classList.contains('team-goal-subgoal-node')) {
+        if (node.tagName === 'DETAILS' && node.classList && node.classList.contains('team-mission-task-node')) {
           node.open = true;
         }
         node = node.parentElement;
       }
     }
 
-    function scrollToFirstBlockedSubgoalTag() {
+    function scrollToFirstBlockedTaskTag() {
       var el = document.querySelector(
-        '#mc2-goal-detail .team-goal-subgoal-status.blocked, #team-goal-detail .team-goal-subgoal-status.blocked, ' +
-        '#team-current-mission .team-goal-subgoal-status.blocked, #team-current-mission li.mission-blocked'
+        '#mc2-mission-detail .team-mission-task-status.blocked, #team-mission-detail .team-mission-task-status.blocked, ' +
+        '#team-current-mission .team-mission-task-status.blocked, #team-current-mission li.mission-blocked'
       );
       if (!el) return false;
-      openSubgoalAncestors(el);
+      openTaskAncestors(el);
       try { el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
-      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : (el.closest('[data-subgoal-id]') || el));
+      highlightBlockedTarget(el.classList && el.classList.contains('team-mission-task-status') ? el : (el.closest('[data-task-id]') || el));
       return true;
     }
 
-    function scrollToBlockedSubgoalMarker(subgoalId, title) {
-      var id = String(subgoalId || '').trim();
+    function scrollToBlockedTaskMarker(taskId, title) {
+      var id = String(taskId || '').trim();
       var el = null;
       if (id) {
-        el = document.querySelector('[data-subgoal-id="' + id + '"] .team-goal-subgoal-status.blocked') ||
-          document.querySelector('[data-mission-subgoal-id="' + id + '"]');
+        el = document.querySelector('[data-task-id="' + id + '"] .team-mission-task-status.blocked') ||
+          document.querySelector('[data-mission-task-id="' + id + '"]');
       }
       if (!el && title) {
-        var rows = document.querySelectorAll('.team-goal-subgoal-row[data-subgoal-id]');
+        var rows = document.querySelectorAll('.team-mission-task-row[data-task-id]');
         for (var i = 0; i < rows.length; i++) {
-          var rowTitle = rows[i].querySelector('.team-goal-subgoal-title');
+          var rowTitle = rows[i].querySelector('.team-mission-task-title');
           if (rowTitle && String(rowTitle.textContent || '').trim() === String(title).trim()) {
-            el = rows[i].querySelector('.team-goal-subgoal-status.blocked') || rows[i];
+            el = rows[i].querySelector('.team-mission-task-status.blocked') || rows[i];
             break;
           }
         }
       }
       if (!el) return false;
-      openSubgoalAncestors(el);
+      openTaskAncestors(el);
       try { el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
-      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : (el.closest('[data-subgoal-id]') || el));
+      highlightBlockedTarget(el.classList && el.classList.contains('team-mission-task-status') ? el : (el.closest('[data-task-id]') || el));
       return true;
     }
 
     function scheduleScrollToBlockedTarget(ref, attempt) {
       var tries = Number(attempt) || 0;
       var hit = false;
-      if (ref && ref.kind === 'subgoal') {
-        hit = scrollToBlockedSubgoalMarker(ref.subgoalId, ref.title) || scrollToFirstBlockedSubgoalTag();
-      } else if (ref && ref.kind === 'goal') {
-        var goalStatus = document.querySelector('#team-goal-detail .team-goal-status.blocked, #mc2-goal-detail .team-goal-status.blocked');
-        if (goalStatus) {
-          try { goalStatus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
-          highlightBlockedTarget(goalStatus);
+      if (ref && ref.kind === 'task') {
+        hit = scrollToBlockedTaskMarker(ref.taskId, ref.title) || scrollToFirstBlockedTaskTag();
+      } else if (ref && ref.kind === 'mission') {
+        var missionStatus = document.querySelector('#team-mission-detail .team-mission-status.blocked, #mc2-mission-detail .team-mission-status.blocked');
+        if (missionStatus) {
+          try { missionStatus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
+          highlightBlockedTarget(missionStatus);
           hit = true;
         } else {
-          hit = scrollToFirstBlockedSubgoalTag();
+          hit = scrollToFirstBlockedTaskTag();
         }
       } else {
-        hit = scrollToFirstBlockedSubgoalTag();
+        hit = scrollToFirstBlockedTaskTag();
       }
       if (hit || tries >= 20) return;
       setTimeout(function () { scheduleScrollToBlockedTarget(ref, tries + 1); }, 100);
@@ -1061,20 +1075,20 @@
           mc2OpenTaskDetailForAgent(ref.agentId);
           return true;
         }
-        var goalId = String(ref.goalId || '').trim();
-        if (goalId) {
+        var missionId = String(ref.missionId || '').trim();
+        if (missionId) {
           var item = typeof findMissionTaskItem === 'function'
             ? findMissionTaskItem({
-              goalId: goalId,
-              subgoalId: ref.subgoalId,
+              missionId: missionId,
+              taskId: ref.taskId,
               title: ref.title,
               agentId: ref.agentId,
             })
             : null;
           mc2OpenTaskDetail(item, {
-            goalId: goalId,
-            subgoalId: ref.subgoalId,
-            filter: ref.kind === 'subgoal' ? 'blocked' : 'all',
+            missionId: missionId,
+            taskId: ref.taskId,
+            filter: ref.kind === 'task' ? 'blocked' : 'all',
           });
           return true;
         }
@@ -1083,19 +1097,19 @@
         mc2OpenTasksView('blocked');
         return true;
       }
-      var mission = typeof getCurrentMissionGoal === 'function' ? getCurrentMissionGoal() : null;
-      if (ref.kind === 'subgoal' && mission && String(mission.id || '') === String(ref.goalId || '')) {
+      var mission = typeof getCurrentMissionMission === 'function' ? getCurrentMissionMission() : null;
+      if (ref.kind === 'task' && mission && String(mission.id || '') === String(ref.missionId || '')) {
         renderCurrentMission();
-        if (scrollToBlockedSubgoalMarker(ref.subgoalId, ref.title)) return true;
+        if (scrollToBlockedTaskMarker(ref.taskId, ref.title)) return true;
       }
-      selectedTeamGoalId = String(ref.goalId || '');
+      selectedTeamMissionId = String(ref.missionId || '');
       if (typeof mc2SetView === 'function') {
         mc2SetView('tasks');
         if (typeof mc2RenderTasks === 'function') mc2RenderTasks();
         return true;
       } else if (typeof setTeamTopTab === 'function') {
-        setTeamTopTab('goals');
-        renderGoalsList();
+        setTeamTopTab('missions');
+        renderMissionsList();
         scheduleScrollToBlockedTarget(ref, 0);
       }
       return true;
@@ -1124,8 +1138,8 @@
         return true;
       }
       if (typeof setTeamTopTab === 'function') {
-        setTeamTopTab('goals');
-        renderGoalsList();
+        setTeamTopTab('missions');
+        renderMissionsList();
         scheduleScrollToBlockedTarget(null, 0);
         return true;
       }
@@ -1134,15 +1148,15 @@
 
     window.navigateToBlockedWork = navigateToBlockedWork;
 
-    function flattenMissionSubgoals(subgoals, out, depth) {
-      var list = Array.isArray(subgoals) ? subgoals : [];
+    function flattenMissionTasks(tasks, out, depth) {
+      var list = Array.isArray(tasks) ? tasks : [];
       var acc = out || [];
       var level = Number(depth) || 0;
       if (level > 4 || acc.length >= 12) return acc;
       list.forEach(function (sg) {
         if (!sg || typeof sg !== 'object' || acc.length >= 12) return;
         acc.push(sg);
-        flattenMissionSubgoals(sg.subgoals, acc, level + 1);
+        flattenMissionTasks(sg.tasks, acc, level + 1);
       });
       return acc;
     }
@@ -1157,59 +1171,59 @@
           '<p class="team-current-mission-empty">No active mission. Team is idle — create a mission or send a task in chat.</p>';
         return;
       }
-      var goal = current.kind === 'live' ? current.mission : current.goal;
-      var liveOnly = current.kind === 'live' && !!current.noSavedGoal;
-      var goalLabel = String(goal.title || '').trim() || String(goal.objective || '').trim() || 'Untitled mission';
-      var progressText = goal.progressLabel
-        ? String(goal.progressLabel)
-        : (normalizeSubgoalProgress(goal.progress && goal.progress.pct) + '%');
-      var owner = goalOwnerLabel(goal);
-      var subgoals = current.kind === 'live'
-        ? (Array.isArray(goal.subgoals) ? goal.subgoals : [])
-        : flattenMissionSubgoals(Array.isArray(goal.subgoals) ? goal.subgoals : [], [], 0);
-      var subgoalsHtml = subgoals.length
-        ? '<ul class="team-current-mission-subgoal-list">' + subgoals.map(function (sg) {
+      var mission = current.kind === 'live' ? current.mission : current.mission;
+      var liveOnly = current.kind === 'live' && !!current.noSavedMission;
+      var missionLabel = String(mission.title || '').trim() || String(mission.objective || '').trim() || 'Untitled mission';
+      var progressText = mission.progressLabel
+        ? String(mission.progressLabel)
+        : (normalizeTaskProgress(mission.progress && mission.progress.pct) + '%');
+      var owner = missionOwnerLabel(mission);
+      var tasks = current.kind === 'live'
+        ? (Array.isArray(mission.tasks) ? mission.tasks : [])
+        : flattenMissionTasks(Array.isArray(mission.tasks) ? mission.tasks : [], [], 0);
+      var tasksHtml = tasks.length
+        ? '<ul class="team-current-mission-task-list">' + tasks.map(function (sg) {
           var title = String(sg.title || '').trim() || 'Untitled task';
-          var status = normalizeSubgoalStatus(sg.status);
-          var icon = missionSubgoalIcon(status);
-          var cls = missionSubgoalClass(status);
+          var status = normalizeTaskStatus(sg.status);
+          var icon = missionTaskIcon(status);
+          var cls = missionTaskClass(status);
           var sgId = String(sg.id || '').trim();
           var statusTag = status === 'blocked'
-            ? ' <span class="team-goal-subgoal-status blocked">blocked</span>'
+            ? ' <span class="team-mission-task-status blocked">blocked</span>'
             : '';
-          return '<li class="' + cls + '" data-mission-subgoal-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
+          return '<li class="' + cls + '" data-mission-task-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
             escapeHtml(icon + ' ' + title) + statusTag + '</li>';
         }).join('') + '</ul>'
         : '<p class="team-current-mission-empty" style="margin:0;">No tasks yet.</p>';
-      var goalHeading = liveOnly ? 'Activity' : 'Mission';
+      var missionHeading = liveOnly ? 'Activity' : 'Mission';
       var noteHtml = liveOnly
         ? '<p class="team-current-mission-empty" style="margin:0.35rem 0 0;">No saved mission yet — this is live agent context from chat. Create a mission to track objectives and tasks.</p>'
         : '';
       panel.innerHTML = '' +
         '<h3 class="team-current-mission-title">Current Mission</h3>' +
-        (liveOnly ? '<p class="team-current-mission-meta" style="margin:0 0 0.35rem;"><em>Live work (not a saved goal)</em></p>' : '') +
-        '<p class="team-current-mission-meta"><strong>' + goalHeading + ':</strong> ' + escapeHtml(goalLabel) + '</p>' +
+        (liveOnly ? '<p class="team-current-mission-meta" style="margin:0 0 0.35rem;"><em>Live work (not a saved mission)</em></p>' : '') +
+        '<p class="team-current-mission-meta"><strong>' + missionHeading + ':</strong> ' + escapeHtml(missionLabel) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(progressText) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Owner:</strong> ' + escapeHtml(owner) + '</p>' +
-        '<div class="team-current-mission-subgoals">' +
+        '<div class="team-current-mission-tasks">' +
           '<h4>' + (liveOnly ? 'Steps' : 'Tasks') + '</h4>' +
-          subgoalsHtml +
+          tasksHtml +
         '</div>' +
         noteHtml;
     }
 
-    function collectSubgoalsByStatus(subgoals, acc) {
+    function collectTasksByStatus(tasks, acc) {
       var out = acc || { todo: [], doing: [], blocked: [] };
-      (subgoals || []).forEach(function (sg) {
+      (tasks || []).forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         var title = String(sg.title || '').trim();
-        var status = normalizeSubgoalStatus(sg.status);
+        var status = normalizeTaskStatus(sg.status);
         if (title) {
           if (status === 'todo') out.todo.push(title);
           else if (status === 'doing') out.doing.push(title);
           else if (status === 'blocked') out.blocked.push(title);
         }
-        collectSubgoalsByStatus(sg.subgoals, out);
+        collectTasksByStatus(sg.tasks, out);
       });
       return out;
     }
@@ -1296,37 +1310,41 @@
       var range = String(opts.range || teamAgentPanelRange || 'today').trim();
       var agentFilter = String(opts.agentId || '').trim();
       var statusFilter = String(opts.status || '').trim().toLowerCase();
+      var includeTurns = opts.includeTurns === true;
       var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       items = items.map(function (it) {
-        return Object.assign({ sourceKind: it.kind || 'subgoal' }, it);
-      });
-      var doneMissionTitles = {};
-      items.forEach(function (it) {
-        if (String(it.status || '').toLowerCase() !== 'done') return;
-        var title = String(it.title || '').trim().toLowerCase();
-        if (title) doneMissionTitles[title] = true;
+        return Object.assign({ sourceKind: it.kind || 'task' }, it);
       });
 
-      listCompletedTasks({ range: range, agentId: agentFilter }).forEach(function (task) {
-        var title = missionTaskDisplayTitle(task);
-        if (doneMissionTitles[String(title || '').trim().toLowerCase()]) return;
-        items.push({
-          kind: 'turn',
-          sourceKind: 'turn',
-          status: 'done',
-          title: title,
-          path: title,
-          assignee: String(task.agentId || '').trim(),
-          agentId: String(task.agentId || '').trim(),
-          completedAt: Number(task.ts) || 0,
-          updatedAt: Number(task.ts) || 0,
-          createdAt: Number(task.ts) || 0,
-          turnTs: Number(task.ts) || 0,
-          prompt: String(task.prompt || ''),
-          summary: String(task.summary || ''),
-          skillCount: Number(task.skillCount) || 0,
+      if (includeTurns) {
+        var doneMissionTitles = {};
+        items.forEach(function (it) {
+          if (String(it.status || '').toLowerCase() !== 'done') return;
+          var title = String(it.title || '').trim().toLowerCase();
+          if (title) doneMissionTitles[title] = true;
         });
-      });
+
+        listCompletedTasks({ range: range, agentId: agentFilter }).forEach(function (task) {
+          var title = missionTaskDisplayTitle(task);
+          if (doneMissionTitles[String(title || '').trim().toLowerCase()]) return;
+          items.push({
+            kind: 'turn',
+            sourceKind: 'turn',
+            status: 'done',
+            title: title,
+            path: title,
+            assignee: String(task.agentId || '').trim(),
+            agentId: String(task.agentId || '').trim(),
+            completedAt: Number(task.ts) || 0,
+            updatedAt: Number(task.ts) || 0,
+            createdAt: Number(task.ts) || 0,
+            turnTs: Number(task.ts) || 0,
+            prompt: String(task.prompt || ''),
+            summary: String(task.summary || ''),
+            skillCount: Number(task.skillCount) || 0,
+          });
+        });
+      }
 
       if (agentFilter) {
         items = items.filter(function (it) {
@@ -1364,24 +1382,24 @@
         }
       });
 
-      var subgoals = { todo: [], doing: [], blocked: [] };
+      var tasks = { todo: [], doing: [], blocked: [] };
       var blockedReasons = [];
       var implementationBlockedLabels = [];
-      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
+      (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).forEach(function (g) {
         var status = String(g.status || '').toLowerCase();
         if (status === 'blocked') {
           blocked++;
           var reason = String(g.blockedReason || g.title || g.objective || '').trim();
           if (reason) blockedReasons.push(reason);
-        } else if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
-          implementationBlockedLabels.push(goalImplementationBlockedLabel(g) || String(g.needsUserInput || '').trim());
+        } else if (isMissionPartialWait(g) || String(g.needsUserInput || '').trim()) {
+          implementationBlockedLabels.push(missionImplementationBlockedLabel(g) || String(g.needsUserInput || '').trim());
         }
-        collectSubgoalsByStatus(g.subgoals, subgoals);
+        collectTasksByStatus(g.tasks, tasks);
       });
-      blocked += subgoals.blocked.length;
+      blocked += tasks.blocked.length;
 
       var blockedLabel = '';
-      if (subgoals.blocked.length) blockedLabel = subgoals.blocked[0];
+      if (tasks.blocked.length) blockedLabel = tasks.blocked[0];
       else if (implementationBlockedLabels.length) {
         blockedLabel = implementationBlockedLabels[0] + '. Research continues.';
       } else if (blockedReasons.length) blockedLabel = blockedReasons[0];
@@ -1392,7 +1410,7 @@
         var w = waitingAgents[0].ctx;
         var waitFor = String(w.waitingFor || '').trim();
         if (waitFor) blockedLabel = 'Waiting for ' + agentNameById(waitFor) + ' response';
-        else blockedLabel = String(w.currentThought || w.currentStep || w.currentGoal || '').trim();
+        else blockedLabel = String(w.currentThought || w.currentStep || w.currentMission || '').trim();
       }
 
       return {
@@ -1427,87 +1445,87 @@
       }
     }
 
-    function normalizeSubgoalStatus(status) {
+    function normalizeTaskStatus(status) {
       var s = String(status || '').toLowerCase();
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
       return 'todo';
     }
 
-    function normalizeSubgoalProgress(value) {
+    function normalizeTaskProgress(value) {
       var n = Number(value);
       if (!isFinite(n)) return 0;
       return Math.max(0, Math.min(100, Math.round(n)));
     }
 
-    function countGoalSubgoals(subgoals) {
-      if (!Array.isArray(subgoals) || !subgoals.length) return 0;
+    function countMissionTasks(tasks) {
+      if (!Array.isArray(tasks) || !tasks.length) return 0;
       var total = 0;
-      subgoals.forEach(function (sg) {
-        total += 1 + countGoalSubgoals(sg && sg.subgoals);
+      tasks.forEach(function (sg) {
+        total += 1 + countMissionTasks(sg && sg.tasks);
       });
       return total;
     }
 
-    function indexGoalSubgoals(subgoals, out) {
-      if (!Array.isArray(subgoals)) return out;
+    function indexMissionTasks(tasks, out) {
+      if (!Array.isArray(tasks)) return out;
       var index = out || {};
-      subgoals.forEach(function (sg) {
+      tasks.forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         var id = String(sg.id || '').trim();
         if (id) index[id] = sg;
-        indexGoalSubgoals(sg.subgoals, index);
+        indexMissionTasks(sg.tasks, index);
       });
       return index;
     }
 
-    function initiativeIdFromSubgoalId(subgoalId) {
-      var m = String(subgoalId || '').match(/^init-(.+)$/);
+    function suggestedTaskIdFromTaskId(taskId) {
+      var m = String(taskId || '').match(/^init-(.+)$/);
       return m ? m[1] : '';
     }
 
-    function findInitiativeForSubgoalId(subgoalId) {
-      var initId = initiativeIdFromSubgoalId(subgoalId);
+    function findSuggestedTaskForTaskId(taskId) {
+      var initId = suggestedTaskIdFromTaskId(taskId);
       if (!initId) return null;
-      return (Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : []).find(function (it) {
+      return (Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : []).find(function (it) {
         return String(it.id || '') === initId;
       }) || null;
     }
 
-    function openInitiativeForSubgoal(subgoalId) {
-      var sid = String(subgoalId || '').trim();
+    function openSuggestedTaskForTask(taskId) {
+      var sid = String(taskId || '').trim();
       if (!sid) return false;
       if (typeof mc2OpenTaskDetail === 'function' && typeof findMissionTaskItem === 'function') {
-        var item = findMissionTaskItem({ subgoalId: sid });
+        var item = findMissionTaskItem({ taskId: sid });
         if (item) {
           mc2OpenTaskDetail(item, { filter: 'all' });
           return true;
         }
       }
-      var initId = initiativeIdFromSubgoalId(sid);
+      var initId = suggestedTaskIdFromTaskId(sid);
       if (!initId) return false;
-      if (typeof mc2OpenTaskForInitiative === 'function') {
-        mc2OpenTaskForInitiative(initId);
+      if (typeof mc2OpenTaskForSuggestedTask === 'function') {
+        mc2OpenTaskForSuggestedTask(initId);
         return true;
       }
-      selectedTeamInitiativeId = initId;
-      if (typeof mc2SetView === 'function') mc2SetView('initiatives');
-      if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
+      selectedTeamSuggestedTaskId = initId;
+      if (typeof mc2SetView === 'function') mc2SetView('suggestedTasks');
+      if (typeof renderSuggestedTasksPanels === 'function') renderSuggestedTasksPanels();
       return true;
     }
 
-    function missionTaskActionButtonsHtml(goalId, subgoalId, status, opts) {
+    function missionTaskActionButtonsHtml(missionId, taskId, status, opts) {
       opts = opts || {};
-      var gid = String(goalId || '').trim();
-      var sid = String(subgoalId || '').trim();
+      var gid = String(missionId || '').trim();
+      var sid = String(taskId || '').trim();
       if (!gid || !sid) return '';
-      var st = normalizeSubgoalStatus(status);
-      var fromInit = !!opts.fromInitiative || /^init-/.test(sid);
-      var btnClass = opts.compact ? 'team-goal-task-btn secondary' : 'mc-task-card-btn';
-      var primaryClass = opts.compact ? 'team-goal-task-btn secondary' : 'mc-task-card-btn primary';
+      var st = normalizeTaskStatus(status);
+      var fromInit = !!opts.fromSuggestedTask || /^init-/.test(sid);
+      var btnClass = opts.compact ? 'team-mission-task-btn secondary' : 'mc-task-card-btn';
+      var primaryClass = opts.compact ? 'team-mission-task-btn secondary' : 'mc-task-card-btn primary';
       var parts = [];
       function btn(action, label, primary) {
         return '<button type="button" class="' + (primary ? primaryClass : btnClass) + '" data-mc-task-action="' + escapeHtml(action) + '"' +
-          ' data-goal-id="' + escapeHtml(gid) + '" data-subgoal-id="' + escapeHtml(sid) + '">' + escapeHtml(label) + '</button>';
+          ' data-mission-id="' + escapeHtml(gid) + '" data-task-id="' + escapeHtml(sid) + '">' + escapeHtml(label) + '</button>';
       }
       if (st === 'blocked') {
         parts.push(btn('respond', 'Respond', true));
@@ -1518,31 +1536,31 @@
         parts.push(btn('mark-open', 'Reopen', false));
       }
       parts.push(btn('remove', 'Remove', false));
-      if (fromInit) parts.push(btn('review-initiative', 'Review initiative', false));
+      if (fromInit) parts.push(btn('review-suggestedTask', 'Review suggestedTask', false));
       if (!opts.inDetailPanel) parts.push(btn('in-mission', 'Mission tree', false));
-      var wrapClass = opts.compact ? 'team-goal-task-actions' : 'mc-task-card-actions';
+      var wrapClass = opts.compact ? 'team-mission-task-actions' : 'mc-task-card-actions';
       return '<div class="' + wrapClass + '">' + parts.join('') + '</div>';
     }
 
-    async function removeMissionTask(goalId, subgoalId) {
-      var gid = String(goalId || '').trim();
-      var sid = String(subgoalId || '').trim();
+    async function removeMissionTask(missionId, taskId) {
+      var gid = String(missionId || '').trim();
+      var sid = String(taskId || '').trim();
       if (!gid || !sid) return false;
       if (!window.confirm('Remove this task from the mission? Agents will stop tracking it here.')) return false;
-      var initiative = findInitiativeForSubgoalId(sid);
-      if (initiative) return undoInitiativePromotion(initiative);
-      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+      var suggestedTask = findSuggestedTaskForTaskId(sid);
+      if (suggestedTask) return undoSuggestedTaskPromotion(suggestedTask);
+      var mission = (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
         return String(g.id || '') === gid;
       });
-      if (!goal) return false;
+      if (!mission) return false;
       try {
-        var r = await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+        var r = await fetch(API + '/api/missions/' + encodeURIComponent(gid), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subgoals: removeSubgoalFromTree(goal.subgoals, sid) }),
+          body: JSON.stringify({ tasks: removeTaskFromTree(mission.tasks, sid) }),
         });
         if (!r.ok) return false;
-        await fetchGoalsSnapshot();
+        await fetchMissionsSnapshot();
         if (typeof renderMissionControl === 'function') renderMissionControl();
         return true;
       } catch (_) {
@@ -1559,15 +1577,15 @@
           e.preventDefault();
           e.stopPropagation();
           var action = String(btn.getAttribute('data-mc-task-action') || '');
-          var goalId = btn.getAttribute('data-goal-id');
-          var subgoalId = btn.getAttribute('data-subgoal-id');
+          var missionId = btn.getAttribute('data-mission-id');
+          var taskId = btn.getAttribute('data-task-id');
           var card = btn.closest('.mc-mission-task-card');
           var item = card && typeof mc2MissionTaskItemFromEl === 'function'
             ? mc2MissionTaskItemFromEl(card)
             : {
-              kind: 'subgoal',
-              goalId: goalId,
-              subgoalId: subgoalId,
+              kind: 'task',
+              missionId: missionId,
+              taskId: taskId,
               title: card ? card.getAttribute('data-title') : '',
               status: card ? card.getAttribute('data-status') : 'todo',
             };
@@ -1576,39 +1594,39 @@
             return;
           }
           if (action === 'unblock' || action === 'mark-open') {
-            if (typeof patchMissionSubgoalStatus === 'function') {
-              patchMissionSubgoalStatus(goalId, subgoalId, 'todo');
+            if (typeof patchMissionTaskStatus === 'function') {
+              patchMissionTaskStatus(missionId, taskId, 'todo');
             }
             return;
           }
           if (action === 'mark-done') {
-            if (typeof patchMissionSubgoalStatus === 'function') {
-              patchMissionSubgoalStatus(goalId, subgoalId, 'done');
+            if (typeof patchMissionTaskStatus === 'function') {
+              patchMissionTaskStatus(missionId, taskId, 'done');
             }
             return;
           }
           if (action === 'remove') {
-            removeMissionTask(goalId, subgoalId);
+            removeMissionTask(missionId, taskId);
             return;
           }
-          if (action === 'review-initiative') {
-            openInitiativeForSubgoal(subgoalId);
+          if (action === 'review-suggestedTask') {
+            openSuggestedTaskForTask(taskId);
             return;
           }
           if ((action === 'in-mission' || action === 'details') && card && typeof mc2ShowMissionTaskDetails === 'function') {
             mc2ShowMissionTaskDetails(card);
-          } else if ((action === 'in-mission' || action === 'details') && goalId && typeof mc2OpenTaskDetail === 'function') {
-            mc2OpenTaskDetail(null, { goalId: goalId, subgoalId: subgoalId, filter: 'all' });
-          } else if ((action === 'in-mission' || action === 'details') && goalId) {
-            selectedTeamGoalId = goalId;
-            if (typeof mc2SetView === 'function') mc2SetView('goals');
-            if (typeof mc2RenderGoals === 'function') {
-              Promise.resolve(mc2RenderGoals()).then(function () {
-                if (subgoalId && typeof scheduleScrollToBlockedTarget === 'function') {
+          } else if ((action === 'in-mission' || action === 'details') && missionId && typeof mc2OpenTaskDetail === 'function') {
+            mc2OpenTaskDetail(null, { missionId: missionId, taskId: taskId, filter: 'all' });
+          } else if ((action === 'in-mission' || action === 'details') && missionId) {
+            selectedTeamMissionId = missionId;
+            if (typeof mc2SetView === 'function') mc2SetView('missions');
+            if (typeof mc2RenderMissions === 'function') {
+              Promise.resolve(mc2RenderMissions()).then(function () {
+                if (taskId && typeof scheduleScrollToBlockedTarget === 'function') {
                   scheduleScrollToBlockedTarget({
-                    kind: 'subgoal',
-                    goalId: goalId,
-                    subgoalId: subgoalId,
+                    kind: 'task',
+                    missionId: missionId,
+                    taskId: taskId,
                     title: '',
                   }, 0);
                 }
@@ -1619,128 +1637,128 @@
       });
     }
 
-    async function runMissionGoalAction(goalId, action) {
-      var gid = String(goalId || '').trim();
+    async function runMissionMissionAction(missionId, action) {
+      var gid = String(missionId || '').trim();
       if (!gid) return;
-      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+      var mission = (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
         return String(g.id || '') === gid;
       });
-      if (!goal) return;
+      if (!mission) return;
       if (action === 'run') {
         try {
-          await fetch(API + '/api/goals/' + encodeURIComponent(gid) + '/run', { method: 'POST' });
+          await fetch(API + '/api/missions/' + encodeURIComponent(gid) + '/run', { method: 'POST' });
         } catch (_) {}
-        fetchGoalsSnapshot();
+        fetchMissionsSnapshot();
         return;
       }
       if (action === 'toggle') {
-        var status = String(goal.status || 'active').toLowerCase();
+        var status = String(mission.status || 'active').toLowerCase();
         var nextStatus = status === 'active' ? 'paused' : 'active';
         try {
-          await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+          await fetch(API + '/api/missions/' + encodeURIComponent(gid), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: nextStatus }),
           });
         } catch (_) {}
-        fetchGoalsSnapshot();
+        fetchMissionsSnapshot();
         return;
       }
       if (action === 'respond' && typeof openTeamUserInputModal === 'function') {
-        openTeamUserInputModal(goal, { ask: goalAttentionPrompt(goal) });
+        openTeamUserInputModal(mission, { ask: missionAttentionPrompt(mission) });
       }
     }
 
-    function wireMissionGoalDetailActions(detailEl, goal) {
-      if (!detailEl || !goal) return;
-      var goalId = String(goal.id || '');
-      detailEl.querySelectorAll('[data-mc-goal-action]').forEach(function (btn) {
-        if (btn._wiredMissionGoal) return;
-        btn._wiredMissionGoal = true;
+    function wireMissionMissionDetailActions(detailEl, mission) {
+      if (!detailEl || !mission) return;
+      var missionId = String(mission.id || '');
+      detailEl.querySelectorAll('[data-mc-mission-action]').forEach(function (btn) {
+        if (btn._wiredMissionMission) return;
+        btn._wiredMissionMission = true;
         btn.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
-          runMissionGoalAction(goalId, btn.getAttribute('data-mc-goal-action'));
+          runMissionMissionAction(missionId, btn.getAttribute('data-mc-mission-action'));
         });
       });
       wireMissionTaskActions(detailEl);
     }
 
-    function renderGoalSubgoalTree(subgoals, lookup, depth, goalId) {
-      var list = Array.isArray(subgoals) ? subgoals : [];
+    function renderMissionTaskTree(tasks, lookup, depth, missionId) {
+      var list = Array.isArray(tasks) ? tasks : [];
       if (!list.length) return '';
       var level = Number(depth) || 0;
-      var gid = String(goalId || '').trim();
+      var gid = String(missionId || '').trim();
       return list.map(function (sg) {
         if (!sg || typeof sg !== 'object') return '';
         var title = String(sg.title || '').trim() || 'Untitled task';
-        var status = normalizeSubgoalStatus(sg.status);
-        var progress = normalizeSubgoalProgress(sg.progress);
+        var status = normalizeTaskStatus(sg.status);
+        var progress = normalizeTaskProgress(sg.progress);
         var assignee = String(sg.assignee || '').trim();
-        var deps = Array.isArray(sg.depends_on) ? sg.depends_on.slice(0, 8) : [];
+        var deps = Array.isArray(sg.dependsOn) ? sg.dependsOn.slice(0, 8) : [];
         var depsLabel = deps.map(function (depId) {
           var key = String(depId || '').trim();
           var dep = lookup[key];
           return dep && dep.title ? dep.title : key;
         }).filter(Boolean).join(', ');
         var sgKey = String(sg.id || '').trim();
-        var children = renderGoalSubgoalTree(sg.subgoals, lookup, level + 1, gid);
-        var initBadge = /^init-/.test(sgKey) ? '<span class="team-initiative-auto-badge">From initiative</span> ' : '';
+        var children = renderMissionTaskTree(sg.tasks, lookup, level + 1, gid);
+        var initBadge = /^init-/.test(sgKey) ? '<span class="team-suggestedTask-auto-badge">From suggestedTask</span> ' : '';
         var actionsHtml = gid && sgKey
-          ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromInitiative: /^init-/.test(sgKey) })
+          ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromSuggestedTask: /^init-/.test(sgKey) })
           : '';
-        var summary = '<span class="team-goal-subgoal-row" data-subgoal-id="' + escapeHtml(sgKey) + '">' +
+        var summary = '<span class="team-mission-task-row" data-task-id="' + escapeHtml(sgKey) + '">' +
           initBadge +
-          '<span class="team-goal-subgoal-title">' + escapeHtml(title) + '</span>' +
-          '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
-          '<span class="team-goal-subgoal-meta">' + escapeHtml(String(progress)) + '%</span>' +
-          (assignee ? '<span class="team-goal-subgoal-meta">assignee: ' + escapeHtml(agentNameById(assignee)) + '</span>' : '') +
-          (depsLabel ? '<span class="team-goal-subgoal-meta">depends on: ' + escapeHtml(depsLabel) + '</span>' : '') +
+          '<span class="team-mission-task-title">' + escapeHtml(title) + '</span>' +
+          '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '<span class="team-mission-task-meta">' + escapeHtml(String(progress)) + '%</span>' +
+          (assignee ? '<span class="team-mission-task-meta">assignee: ' + escapeHtml(agentNameById(assignee)) + '</span>' : '') +
+          (depsLabel ? '<span class="team-mission-task-meta">depends on: ' + escapeHtml(depsLabel) + '</span>' : '') +
         '</span>' + actionsHtml;
-        return '<details class="team-goal-subgoal-node" ' + (level < 1 ? 'open' : '') + '>' +
+        return '<details class="team-mission-task-node" ' + (level < 1 ? 'open' : '') + '>' +
           '<summary>' + summary + '</summary>' +
           (children || '') +
         '</details>';
       }).join('');
     }
 
-    function renderGoalDetail(goal, detailEl) {
-      var detail = detailEl || document.getElementById('team-goal-detail');
+    function renderMissionDetail(mission, detailEl) {
+      var detail = detailEl || document.getElementById('team-mission-detail');
       if (!detail) return;
-      if (!goal || typeof goal !== 'object') {
+      if (!mission || typeof mission !== 'object') {
         detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a mission to view details and tasks.</p>';
         return;
       }
-      var status = String(goal.status || 'active').toLowerCase();
-      var pct = normalizeSubgoalProgress(goal.progress && goal.progress.pct);
-      var goalId = String(goal.id || '');
-      var subgoals = Array.isArray(goal.subgoals) ? goal.subgoals : [];
-      var subgoalLookup = indexGoalSubgoals(subgoals, {});
-      var subgoalTree = renderGoalSubgoalTree(subgoals, subgoalLookup, 0, goalId);
-      var needsInput = typeof goalNeedsAttention === 'function' ? goalNeedsAttention(goal) : false;
+      var status = String(mission.status || 'active').toLowerCase();
+      var pct = normalizeTaskProgress(mission.progress && mission.progress.pct);
+      var missionId = String(mission.id || '');
+      var tasks = Array.isArray(mission.tasks) ? mission.tasks : [];
+      var taskLookup = indexMissionTasks(tasks, {});
+      var taskTree = renderMissionTaskTree(tasks, taskLookup, 0, missionId);
+      var needsInput = typeof missionNeedsAttention === 'function' ? missionNeedsAttention(mission) : false;
       var toggleLabel = status === 'active' ? 'Pause mission' : (status === 'paused' ? 'Resume mission' : 'Activate mission');
       detail.innerHTML = '' +
-        '<h4>' + escapeHtml(goal.title || 'Untitled mission') + ' <span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span></h4>' +
-        '<div class="team-goal-detail-row"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(goal)) + '</div>' +
-        '<div class="team-goal-detail-row"><strong>Objective:</strong> ' + escapeHtml(String(goal.objective || '')) + '</div>' +
-        '<div class="team-goal-detail-row"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</div>' +
-        (goal.lastActivity ? '<div class="team-goal-detail-row"><strong>Latest activity:</strong> ' + escapeHtml(String(goal.lastActivity)) + '</div>' : '') +
-        '<div class="team-initiative-actions team-goal-detail-actions">' +
-          '<button type="button" class="secondary" data-mc-goal-action="run" data-goal-id="' + escapeHtml(goalId) + '">Run now</button>' +
-          '<button type="button" class="secondary" data-mc-goal-action="toggle" data-goal-id="' + escapeHtml(goalId) + '">' + escapeHtml(toggleLabel) + '</button>' +
+        '<h4>' + escapeHtml(mission.title || 'Untitled mission') + ' <span class="team-mission-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span></h4>' +
+        '<div class="team-mission-detail-row"><strong>Owner:</strong> ' + escapeHtml(missionOwnerLabel(mission)) + '</div>' +
+        '<div class="team-mission-detail-row"><strong>Objective:</strong> ' + escapeHtml(String(mission.objective || '')) + '</div>' +
+        '<div class="team-mission-detail-row"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</div>' +
+        (mission.lastActivity ? '<div class="team-mission-detail-row"><strong>Latest activity:</strong> ' + escapeHtml(String(mission.lastActivity)) + '</div>' : '') +
+        '<div class="team-suggestedTask-actions team-mission-detail-actions">' +
+          '<button type="button" class="secondary" data-mc-mission-action="run" data-mission-id="' + escapeHtml(missionId) + '">Run now</button>' +
+          '<button type="button" class="secondary" data-mc-mission-action="toggle" data-mission-id="' + escapeHtml(missionId) + '">' + escapeHtml(toggleLabel) + '</button>' +
           (needsInput
-            ? '<button type="button" class="secondary" data-mc-goal-action="respond" data-goal-id="' + escapeHtml(goalId) + '">Give input</button>'
+            ? '<button type="button" class="secondary" data-mc-mission-action="respond" data-mission-id="' + escapeHtml(missionId) + '">Give input</button>'
             : '') +
         '</div>' +
-        '<div class="team-goal-subgoals">' +
+        '<div class="team-mission-tasks">' +
           '<h5>Tasks — you can change or remove any task below</h5>' +
-          (subgoalTree || '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">No tasks yet.</p>') +
+          (taskTree || '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">No tasks yet.</p>') +
         '</div>';
-      wireMissionGoalDetailActions(detail, goal);
+      wireMissionMissionDetailActions(detail, mission);
     }
 
-    function renderGoalsOwnerOptions() {
-      var el = document.getElementById('team-goal-owner');
+    function renderMissionsOwnerOptions() {
+      var el = document.getElementById('team-mission-owner');
       if (!el) return;
       var agents = agentMapData || [];
       if (!agents.length) {
@@ -1753,217 +1771,217 @@
       }).join('');
     }
 
-    function renderGoalsList() {
-      var wrap = document.getElementById('team-goals-list');
+    function renderMissionsList() {
+      var wrap = document.getElementById('team-missions-list');
       if (!wrap) return;
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals.slice() : [];
-      goals.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
-      if (!goals.length) {
-        selectedTeamGoalId = '';
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions.slice() : [];
+      missions.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (!missions.length) {
+        selectedTeamMissionId = '';
         wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No missions yet.</p>';
-        renderGoalDetail(null);
+        renderMissionDetail(null);
         renderCurrentMission();
         renderTeamTaskSummary();
         return;
       }
-      if (!selectedTeamGoalId || !goals.some(function (g) { return String(g.id || '') === selectedTeamGoalId; })) {
-        selectedTeamGoalId = String(goals[0].id || '');
+      if (!selectedTeamMissionId || !missions.some(function (g) { return String(g.id || '') === selectedTeamMissionId; })) {
+        selectedTeamMissionId = String(missions[0].id || '');
       }
-      wrap.innerHTML = goals.map(function (g) {
+      wrap.innerHTML = missions.map(function (g) {
         var id = String(g.id || '');
         var status = String(g.status || 'active').toLowerCase();
         var pct = Number(g.progress && g.progress.pct);
         if (!isFinite(pct)) pct = 0;
         pct = Math.max(0, Math.min(100, Math.round(pct)));
         var running = !!g.running;
-        var selected = id === selectedTeamGoalId ? ' selected' : '';
-        var subgoalCount = countGoalSubgoals(g.subgoals);
-        var openInitiativesCount = (Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : []).filter(function (it) {
-          var related = Array.isArray(it.relatedGoalIds) ? it.relatedGoalIds : [];
+        var selected = id === selectedTeamMissionId ? ' selected' : '';
+        var taskCount = countMissionTasks(g.tasks);
+        var openSuggestedTasksCount = (Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : []).filter(function (it) {
+          var related = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
           var status = String(it.status || 'proposed').toLowerCase();
           return related.indexOf(id) >= 0 && status === 'proposed';
         }).length;
-        var runningTxt = running ? ('Working: ' + escapeHtml(goalOwnerLabel(g))) : '';
-        var last = formatGoalTs(g.lastRunAt);
-        var next = formatGoalTs(g.nextRunAt);
-        return '<div class="team-goal-card' + selected + '" data-goal-id="' + escapeHtml(id) + '">' +
-          '<div class="team-goal-card-head">' +
-            '<h4 class="team-goal-card-title">' + escapeHtml(g.title || 'Untitled mission') + '</h4>' +
-            '<span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+        var runningTxt = running ? ('Working: ' + escapeHtml(missionOwnerLabel(g))) : '';
+        var last = formatMissionTs(g.lastRunAt);
+        var next = formatMissionTs(g.nextRunAt);
+        return '<div class="team-mission-card' + selected + '" data-mission-id="' + escapeHtml(id) + '">' +
+          '<div class="team-mission-card-head">' +
+            '<h4 class="team-mission-card-title">' + escapeHtml(g.title || 'Untitled mission') + '</h4>' +
+            '<span class="team-mission-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
-          '<div class="team-goal-meta"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
-          '<div class="team-goal-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
-          '<div class="team-goal-meta"><strong>Tasks:</strong> ' + escapeHtml(String(subgoalCount)) + '</div>' +
-          '<div class="team-goal-meta"><strong>Proposed Initiatives:</strong> ' + escapeHtml(String(openInitiativesCount)) + '</div>' +
-          '<div class="team-goal-progress"><span style="width:' + pct + '%"></span></div>' +
-          '<div class="team-goal-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
-          '<div class="team-goal-meta"><strong>Last:</strong> ' + escapeHtml(last) + ' <strong>Next:</strong> ' + escapeHtml(next) + '</div>' +
-          (runningTxt ? '<div class="team-goal-meta"><strong>' + runningTxt + '</strong></div>' : '') +
-          (g.lastActivity ? '<div class="team-goal-meta"><strong>Activity:</strong> ' + escapeHtml(g.lastActivity) + '</div>' : '') +
-          '<div class="team-goal-actions">' +
-            '<button type="button" class="secondary" data-goal-run="' + escapeHtml(id) + '" style="margin:0;">Run now</button>' +
-            '<button type="button" class="secondary" data-goal-toggle="' + escapeHtml(id) + '" style="margin:0;">' + (status === 'active' ? 'Pause' : (status === 'paused' ? 'Resume' : 'Activate')) + '</button>' +
+          '<div class="team-mission-meta"><strong>Owner:</strong> ' + escapeHtml(missionOwnerLabel(g)) + '</div>' +
+          '<div class="team-mission-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
+          '<div class="team-mission-meta"><strong>Tasks:</strong> ' + escapeHtml(String(taskCount)) + '</div>' +
+          '<div class="team-mission-meta"><strong>Proposed Suggested Tasks:</strong> ' + escapeHtml(String(openSuggestedTasksCount)) + '</div>' +
+          '<div class="team-mission-progress"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="team-mission-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
+          '<div class="team-mission-meta"><strong>Last:</strong> ' + escapeHtml(last) + ' <strong>Next:</strong> ' + escapeHtml(next) + '</div>' +
+          (runningTxt ? '<div class="team-mission-meta"><strong>' + runningTxt + '</strong></div>' : '') +
+          (g.lastActivity ? '<div class="team-mission-meta"><strong>Activity:</strong> ' + escapeHtml(g.lastActivity) + '</div>' : '') +
+          '<div class="team-mission-actions">' +
+            '<button type="button" class="secondary" data-mission-run="' + escapeHtml(id) + '" style="margin:0;">Run now</button>' +
+            '<button type="button" class="secondary" data-mission-toggle="' + escapeHtml(id) + '" style="margin:0;">' + (status === 'active' ? 'Pause' : (status === 'paused' ? 'Resume' : 'Activate')) + '</button>' +
           '</div>' +
         '</div>';
       }).join('');
-      renderGoalDetail(goals.find(function (g) { return String(g.id || '') === selectedTeamGoalId; }) || goals[0]);
+      renderMissionDetail(missions.find(function (g) { return String(g.id || '') === selectedTeamMissionId; }) || missions[0]);
       renderCurrentMission();
       renderTeamTaskSummary();
 
-      wrap.querySelectorAll('button[data-goal-run]').forEach(function (btn) {
+      wrap.querySelectorAll('button[data-mission-run]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {
           e.preventDefault();
           e.stopPropagation();
-          var id = btn.getAttribute('data-goal-run');
+          var id = btn.getAttribute('data-mission-run');
           if (!id) return;
           btn.disabled = true;
           try {
-            await fetch(API + '/api/goals/' + encodeURIComponent(id) + '/run', { method: 'POST' });
+            await fetch(API + '/api/missions/' + encodeURIComponent(id) + '/run', { method: 'POST' });
           } catch (_) {}
           btn.disabled = false;
-          fetchGoalsSnapshot();
+          fetchMissionsSnapshot();
         });
       });
-      wrap.querySelectorAll('button[data-goal-toggle]').forEach(function (btn) {
+      wrap.querySelectorAll('button[data-mission-toggle]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {
           e.preventDefault();
           e.stopPropagation();
-          var id = btn.getAttribute('data-goal-toggle');
+          var id = btn.getAttribute('data-mission-toggle');
           if (!id) return;
-          var goal = goals.find(function (g) { return String(g.id) === id; });
-          if (!goal) return;
-          var nextStatus = goal.status === 'active' ? 'paused' : 'active';
+          var mission = missions.find(function (g) { return String(g.id) === id; });
+          if (!mission) return;
+          var nextStatus = mission.status === 'active' ? 'paused' : 'active';
           btn.disabled = true;
           try {
-            await fetch(API + '/api/goals/' + encodeURIComponent(id), {
+            await fetch(API + '/api/missions/' + encodeURIComponent(id), {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ status: nextStatus }),
             });
           } catch (_) {}
           btn.disabled = false;
-          fetchGoalsSnapshot();
+          fetchMissionsSnapshot();
         });
       });
-      wrap.querySelectorAll('.team-goal-card').forEach(function (card) {
+      wrap.querySelectorAll('.team-mission-card').forEach(function (card) {
         card.addEventListener('click', function () {
-          var id = String(card.getAttribute('data-goal-id') || '').trim();
+          var id = String(card.getAttribute('data-mission-id') || '').trim();
           if (!id) return;
-          selectedTeamGoalId = id;
-          renderGoalsList();
+          selectedTeamMissionId = id;
+          renderMissionsList();
         });
       });
     }
 
-    function missionTitleForGoalId(goalId) {
-      var gid = String(goalId || '').trim();
+    function missionTitleForMissionId(missionId) {
+      var gid = String(missionId || '').trim();
       if (!gid) return '';
-      var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === gid; });
-      return goal ? String(goal.title || goal.objective || gid).trim() : gid;
+      var mission = (teamMissionsSnapshot.missions || []).find(function (g) { return String(g.id || '') === gid; });
+      return mission ? String(mission.title || mission.objective || gid).trim() : gid;
     }
 
-    function humanizeInitiativeActivityLine(line) {
+    function humanizeSuggestedTaskActivityLine(line) {
       var s = String(line || '');
-      return s.replace(/(?:Auto-promoted|Promoted) to subgoal in (goal-[a-z0-9-]+)/gi, function (_m, gid) {
-        var name = missionTitleForGoalId(gid);
+      return s.replace(/(?:Auto-promoted|Promoted) to task in (mission-[a-z0-9-]+)/gi, function (_m, gid) {
+        var name = missionTitleForMissionId(gid);
         return 'Added to mission: ' + (name || gid);
       });
     }
 
-    function initiativeSubgoalId(initiative) {
-      var id = String(initiative && initiative.id || '').trim();
+    function suggestedTaskTaskId(suggestedTask) {
+      var id = String(suggestedTask && suggestedTask.id || '').trim();
       return id ? 'init-' + id : '';
     }
 
-    function initiativeActivityLines(initiative) {
-      var raw = initiative && initiative.activity;
+    function suggestedTaskActivityLines(suggestedTask) {
+      var raw = suggestedTask && suggestedTask.activity;
       if (!raw) return [];
       if (Array.isArray(raw)) return raw.map(function (line) { return String(line || ''); });
       return [String(raw)];
     }
 
-    function initiativeWasAutoPromoted(initiative) {
-      return initiativeActivityLines(initiative).some(function (line) {
-        return line.indexOf('Auto-promoted to subgoal in ') >= 0;
+    function suggestedTaskWasAutoPromoted(suggestedTask) {
+      return suggestedTaskActivityLines(suggestedTask).some(function (line) {
+        return line.indexOf('Auto-promoted to task in ') >= 0;
       });
     }
 
-    function goalTreeHasSubgoalId(subgoals, subgoalId) {
-      var sid = String(subgoalId || '').trim();
+    function missionTreeHasTaskId(tasks, taskId) {
+      var sid = String(taskId || '').trim();
       if (!sid) return false;
-      var stack = Array.isArray(subgoals) ? subgoals.slice() : [];
+      var stack = Array.isArray(tasks) ? tasks.slice() : [];
       while (stack.length) {
         var sg = stack.pop();
         if (!sg || typeof sg !== 'object') continue;
         if (String(sg.id || '') === sid) return true;
-        if (Array.isArray(sg.subgoals) && sg.subgoals.length) stack.push.apply(stack, sg.subgoals);
+        if (Array.isArray(sg.tasks) && sg.tasks.length) stack.push.apply(stack, sg.tasks);
       }
       return false;
     }
 
-    function initiativePromotedGoalId(initiative) {
-      if (!initiative || typeof initiative !== 'object') return '';
-      var lines = initiativeActivityLines(initiative);
+    function suggestedTaskPromotedMissionId(suggestedTask) {
+      if (!suggestedTask || typeof suggestedTask !== 'object') return '';
+      var lines = suggestedTaskActivityLines(suggestedTask);
       var i;
       for (i = 0; i < lines.length; i++) {
-        var m = lines[i].match(/(?:Auto-)?[Pp]romoted to subgoal in (goal-[a-z0-9-]+)/i);
+        var m = lines[i].match(/(?:Auto-)?[Pp]romoted to task in (mission-[a-z0-9-]+)/i);
         if (m) return m[1];
       }
-      var subId = initiativeSubgoalId(initiative);
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
-      for (i = 0; i < goals.length; i++) {
-        if (goalTreeHasSubgoalId(goals[i].subgoals, subId)) return String(goals[i].id || '');
+      var subId = suggestedTaskTaskId(suggestedTask);
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+      for (i = 0; i < missions.length; i++) {
+        if (missionTreeHasTaskId(missions[i].tasks, subId)) return String(missions[i].id || '');
       }
-      var related = Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [];
+      var related = Array.isArray(suggestedTask.relatedMissionIds) ? suggestedTask.relatedMissionIds : [];
       return String(related[0] || '').trim();
     }
 
-    function initiativeIsOnMission(initiative) {
-      var subId = initiativeSubgoalId(initiative);
+    function suggestedTaskIsOnMission(suggestedTask) {
+      var subId = suggestedTaskTaskId(suggestedTask);
       if (!subId) return false;
-      return (teamGoalsSnapshot.goals || []).some(function (g) {
-        return goalTreeHasSubgoalId(g.subgoals, subId);
+      return (teamMissionsSnapshot.missions || []).some(function (g) {
+        return missionTreeHasTaskId(g.tasks, subId);
       });
     }
 
-    function activeGoalsForInitiativePicker() {
-      return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).filter(function (g) {
+    function activeMissionsForSuggestedTaskPicker() {
+      return (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).filter(function (g) {
         return String(g.status || '').toLowerCase() === 'active';
       });
     }
 
-    function removeSubgoalFromTree(subgoals, subgoalId) {
-      var sid = String(subgoalId || '').trim();
+    function removeTaskFromTree(tasks, taskId) {
+      var sid = String(taskId || '').trim();
       var out = [];
-      (subgoals || []).forEach(function (sg) {
+      (tasks || []).forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         if (String(sg.id || '') === sid) return;
         var next = Object.assign({}, sg);
-        if (Array.isArray(next.subgoals) && next.subgoals.length) {
-          next.subgoals = removeSubgoalFromTree(next.subgoals, sid);
+        if (Array.isArray(next.tasks) && next.tasks.length) {
+          next.tasks = removeTaskFromTree(next.tasks, sid);
         }
         out.push(next);
       });
       return out;
     }
 
-    async function undoInitiativePromotion(initiative) {
-      if (!initiative || !initiative.id) return false;
-      var goalId = initiativePromotedGoalId(initiative);
-      var subId = initiativeSubgoalId(initiative);
-      if (!goalId || !subId) return false;
-      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
-        return String(g.id || '') === goalId;
+    async function undoSuggestedTaskPromotion(suggestedTask) {
+      if (!suggestedTask || !suggestedTask.id) return false;
+      var missionId = suggestedTaskPromotedMissionId(suggestedTask);
+      var subId = suggestedTaskTaskId(suggestedTask);
+      if (!missionId || !subId) return false;
+      var mission = (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
+        return String(g.id || '') === missionId;
       });
-      if (!goal) return false;
+      if (!mission) return false;
       try {
-        var gr = await fetch(API + '/api/goals/' + encodeURIComponent(goalId), {
+        var gr = await fetch(API + '/api/missions/' + encodeURIComponent(missionId), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subgoals: removeSubgoalFromTree(goal.subgoals, subId) }),
+          body: JSON.stringify({ tasks: removeTaskFromTree(mission.tasks, subId) }),
         });
         if (!gr.ok) return false;
-        await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+        await fetch(API + '/api/suggestedTasks/' + encodeURIComponent(suggestedTask.id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1971,8 +1989,8 @@
             activity: ['Promotion removed by user — review again before approving'],
           }),
         }).catch(function () {});
-        await fetchGoalsSnapshot();
-        await fetchInitiativesSnapshot();
+        await fetchMissionsSnapshot();
+        await fetchSuggestedTasksSnapshot();
         if (typeof renderMissionControl === 'function') renderMissionControl();
         return true;
       } catch (_) {
@@ -1980,110 +1998,110 @@
       }
     }
 
-    function viewInitiativeOnMission(initiative) {
-      var goalId = initiativePromotedGoalId(initiative);
-      var subId = initiativeSubgoalId(initiative);
+    function viewSuggestedTaskOnMission(suggestedTask) {
+      var missionId = suggestedTaskPromotedMissionId(suggestedTask);
+      var subId = suggestedTaskTaskId(suggestedTask);
       if (subId && typeof mc2OpenTaskDetail === 'function' && typeof findMissionTaskItem === 'function') {
-        var item = findMissionTaskItem({ goalId: goalId, subgoalId: subId, title: initiative && initiative.title });
+        var item = findMissionTaskItem({ missionId: missionId, taskId: subId, title: suggestedTask && suggestedTask.title });
         if (item) {
           mc2OpenTaskDetail(item, { filter: 'all' });
           return;
         }
       }
-      if (typeof mc2OpenTaskForInitiative === 'function' && initiative && initiative.id) {
-        mc2OpenTaskForInitiative(initiative.id);
+      if (typeof mc2OpenTaskForSuggestedTask === 'function' && suggestedTask && suggestedTask.id) {
+        mc2OpenTaskForSuggestedTask(suggestedTask.id);
         return;
       }
-      if (!goalId) return;
+      if (!missionId) return;
       if (typeof mc2OpenTaskDetail === 'function') {
-        mc2OpenTaskDetail(null, { goalId: goalId, subgoalId: subId, filter: 'all' });
+        mc2OpenTaskDetail(null, { missionId: missionId, taskId: subId, filter: 'all' });
         return;
       }
-      selectedTeamGoalId = goalId;
-      if (typeof mc2SetView === 'function') mc2SetView('goals');
-      Promise.resolve(typeof mc2RenderGoals === 'function' ? mc2RenderGoals() : null).then(function () {
+      selectedTeamMissionId = missionId;
+      if (typeof mc2SetView === 'function') mc2SetView('missions');
+      Promise.resolve(typeof mc2RenderMissions === 'function' ? mc2RenderMissions() : null).then(function () {
         if (typeof scheduleScrollToBlockedTarget === 'function') {
           scheduleScrollToBlockedTarget({
-            kind: subId ? 'subgoal' : 'goal',
-            goalId: goalId,
-            subgoalId: subId,
-            title: initiative.title || '',
+            kind: subId ? 'task' : 'mission',
+            missionId: missionId,
+            taskId: subId,
+            title: suggestedTask.title || '',
           }, 0);
         }
       });
-      renderGoalsList();
+      renderMissionsList();
     }
 
-    function renderInitiativeDetail(initiative, detailEl) {
-      var detail = detailEl || document.getElementById('team-initiative-detail');
+    function renderSuggestedTaskDetail(suggestedTask, detailEl) {
+      var detail = detailEl || document.getElementById('team-suggestedTask-detail');
       if (!detail) return;
-      if (!initiative || typeof initiative !== 'object') {
-        detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>';
+      if (!suggestedTask || typeof suggestedTask !== 'object') {
+        detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an suggestedTask to review and promote.</p>';
         return;
       }
-      var relatedGoals = Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [];
-      var relatedLabel = relatedGoals.length ? relatedGoals.map(function (gid) {
-        var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
-        return goal ? goal.title : gid;
+      var relatedMissions = Array.isArray(suggestedTask.relatedMissionIds) ? suggestedTask.relatedMissionIds : [];
+      var relatedLabel = relatedMissions.length ? relatedMissions.map(function (gid) {
+        var mission = (teamMissionsSnapshot.missions || []).find(function (g) { return String(g.id || '') === String(gid); });
+        return mission ? mission.title : gid;
       }).join(', ') : '—';
-      var status = String(initiative.status || 'proposed').toLowerCase();
-      var autoPromoted = initiativeWasAutoPromoted(initiative);
-      var onMission = initiativeIsOnMission(initiative);
+      var status = String(suggestedTask.status || 'proposed').toLowerCase();
+      var autoPromoted = suggestedTaskWasAutoPromoted(suggestedTask);
+      var onMission = suggestedTaskIsOnMission(suggestedTask);
       var awaitingApproval = status === 'proposed' && !onMission;
-      var activeGoals = activeGoalsForInitiativePicker();
-      var defaultGoalId = initiativePromotedGoalId(initiative) ||
-        relatedGoals[0] ||
-        (activeGoals[0] && activeGoals[0].id) ||
+      var activeMissions = activeMissionsForSuggestedTaskPicker();
+      var defaultMissionId = suggestedTaskPromotedMissionId(suggestedTask) ||
+        relatedMissions[0] ||
+        (activeMissions[0] && activeMissions[0].id) ||
         '';
-      var goalPickerHtml = activeGoals.length
-        ? '<div class="team-initiative-row"><label><strong>Target mission:</strong> ' +
-            '<select class="team-init-goal-picker" data-init-goal-picker="1">' +
-            activeGoals.map(function (g) {
+      var missionPickerHtml = activeMissions.length
+        ? '<div class="team-suggestedTask-row"><label><strong>Target mission:</strong> ' +
+            '<select class="team-init-mission-picker" data-init-mission-picker="1">' +
+            activeMissions.map(function (g) {
               var gid = String(g.id || '');
-              var selected = gid === String(defaultGoalId) ? ' selected' : '';
+              var selected = gid === String(defaultMissionId) ? ' selected' : '';
               return '<option value="' + escapeHtml(gid) + '"' + selected + '>' +
                 escapeHtml(String(g.title || g.objective || gid)) + '</option>';
             }).join('') +
             '</select></label></div>'
-        : '<div class="team-initiative-row"><strong>Target mission:</strong> No active missions</div>';
+        : '<div class="team-suggestedTask-row"><strong>Target mission:</strong> No active missions</div>';
       var badgeHtml = autoPromoted
-        ? '<span class="team-initiative-auto-badge">Auto-promoted (legacy)</span> '
-        : (onMission ? '<span class="team-initiative-auto-badge">On mission</span> '
-          : (awaitingApproval ? '<span class="team-initiative-auto-badge">Proposed</span> ' : ''));
+        ? '<span class="team-suggestedTask-auto-badge">Auto-promoted (legacy)</span> '
+        : (onMission ? '<span class="team-suggestedTask-auto-badge">On mission</span> '
+          : (awaitingApproval ? '<span class="team-suggestedTask-auto-badge">Proposed</span> ' : ''));
       var reviseHtml = onMission
         ? '<button type="button" class="secondary" data-init-action="view-mission">View on mission</button>' +
           '<button type="button" class="secondary" data-init-action="undo-promotion">Undo promotion</button>'
         : '';
       var reviewHtml = status !== 'rejected' && !onMission
-        ? '<button type="button" class="secondary" data-init-action="approve-subgoal">Approve → add to mission</button>' +
+        ? '<button type="button" class="secondary" data-init-action="approve-task">Approve → add to mission</button>' +
           '<button type="button" class="secondary" data-init-action="reject">Reject</button>' +
-          '<button type="button" class="secondary" data-init-action="promote-goal">Approve as new mission</button>'
+          '<button type="button" class="secondary" data-init-action="promote-mission">Approve as new mission</button>'
         : (status === 'rejected' ? '' : '');
       detail.innerHTML = '' +
-        '<h4>' + badgeHtml + escapeHtml(initiative.title || 'Untitled initiative') + '</h4>' +
-        '<div class="team-initiative-row"><strong>Type:</strong> <span class="team-initiative-type">' + escapeHtml(initiative.type || 'observation') + '</span></div>' +
-        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status === 'proposed' ? 'proposed' : (initiative.status || 'proposed')) + '</span></div>' +
-        '<div class="team-initiative-row"><strong>Confidence:</strong> ' + escapeHtml(String(Math.round((Number(initiative.confidence) || 0) * 100))) + '%</div>' +
-        '<div class="team-initiative-row"><strong>Description:</strong> ' + escapeHtml(initiative.description || '') + '</div>' +
-        '<div class="team-initiative-row"><strong>Source:</strong> ' + escapeHtml(initiative.source || '') + '</div>' +
-        '<div class="team-initiative-row"><strong>Created by:</strong> ' + escapeHtml(agentNameById(initiative.createdBy || 'main')) + '</div>' +
-        '<div class="team-initiative-row"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
-        goalPickerHtml +
-        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml(
-          initiativeActivityLines(initiative).map(humanizeInitiativeActivityLine).join(' | ') || '—'
+        '<h4>' + badgeHtml + escapeHtml(suggestedTask.title || 'Untitled suggestedTask') + '</h4>' +
+        '<div class="team-suggestedTask-row"><strong>Type:</strong> <span class="team-suggestedTask-type">' + escapeHtml(suggestedTask.type || 'observation') + '</span></div>' +
+        '<div class="team-suggestedTask-row"><strong>Status:</strong> <span class="team-suggestedTask-status ' + escapeHtml(status) + '">' + escapeHtml(status === 'proposed' ? 'proposed' : (suggestedTask.status || 'proposed')) + '</span></div>' +
+        '<div class="team-suggestedTask-row"><strong>Confidence:</strong> ' + escapeHtml(String(Math.round((Number(suggestedTask.confidence) || 0) * 100))) + '%</div>' +
+        '<div class="team-suggestedTask-row"><strong>Description:</strong> ' + escapeHtml(suggestedTask.description || '') + '</div>' +
+        '<div class="team-suggestedTask-row"><strong>Source:</strong> ' + escapeHtml(suggestedTask.source || '') + '</div>' +
+        '<div class="team-suggestedTask-row"><strong>Created by:</strong> ' + escapeHtml(agentNameById(suggestedTask.createdBy || 'main')) + '</div>' +
+        '<div class="team-suggestedTask-row"><strong>Related missions:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
+        missionPickerHtml +
+        '<div class="team-suggestedTask-row"><strong>Activity:</strong> ' + escapeHtml(
+          suggestedTaskActivityLines(suggestedTask).map(humanizeSuggestedTaskActivityLine).join(' | ') || '—'
         ) + '</div>' +
-        '<div class="team-initiative-row"><strong>Specialist reviews:</strong> ' + escapeHtml((initiative.specialistReviews || []).join(' | ') || '—') + '</div>' +
-        '<div class="team-initiative-actions">' + reviseHtml + reviewHtml + '</div>';
-      wireInitiativeDetailActions(detail, initiative);
+        '<div class="team-suggestedTask-row"><strong>Specialist reviews:</strong> ' + escapeHtml((suggestedTask.specialistReviews || []).join(' | ') || '—') + '</div>' +
+        '<div class="team-suggestedTask-actions">' + reviseHtml + reviewHtml + '</div>';
+      wireSuggestedTaskDetailActions(detail, suggestedTask);
     }
 
-    function wireInitiativeDetailActions(detailEl, initiative) {
-      if (!detailEl || !initiative || !initiative.id) return;
-      function goalIdFromPicker() {
-        var picker = detailEl.querySelector('[data-init-goal-picker]');
+    function wireSuggestedTaskDetailActions(detailEl, suggestedTask) {
+      if (!detailEl || !suggestedTask || !suggestedTask.id) return;
+      function missionIdFromPicker() {
+        var picker = detailEl.querySelector('[data-init-mission-picker]');
         if (picker && picker.value) return String(picker.value).trim();
-        return initiativePromotedGoalId(initiative) ||
-          ((Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [])[0] || '');
+        return suggestedTaskPromotedMissionId(suggestedTask) ||
+          ((Array.isArray(suggestedTask.relatedMissionIds) ? suggestedTask.relatedMissionIds : [])[0] || '');
       }
       detailEl.querySelectorAll('[data-init-action]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
@@ -2091,35 +2109,35 @@
           btn.disabled = true;
           try {
             if (action === 'reject') {
-              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+              await fetch(API + '/api/suggestedTasks/' + encodeURIComponent(suggestedTask.id), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'rejected', activity: ['Rejected by lead'] }),
               }).catch(function () {});
-              await fetchInitiativesSnapshot();
-            } else if (action === 'promote-goal') {
-              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+              await fetchSuggestedTasksSnapshot();
+            } else if (action === 'promote-mission') {
+              await fetch(API + '/api/suggestedTasks/' + encodeURIComponent(suggestedTask.id) + '/promote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'goal' }),
+                body: JSON.stringify({ mode: 'mission' }),
               }).catch(function () {});
-              await fetchGoalsSnapshot();
-              await fetchInitiativesSnapshot();
-            } else if (action === 'approve-subgoal' || action === 'promote-subgoal') {
-              var goalId = goalIdFromPicker();
-              if (!goalId) return;
-              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+              await fetchMissionsSnapshot();
+              await fetchSuggestedTasksSnapshot();
+            } else if (action === 'approve-task' || action === 'promote-task') {
+              var missionId = missionIdFromPicker();
+              if (!missionId) return;
+              await fetch(API + '/api/suggestedTasks/' + encodeURIComponent(suggestedTask.id) + '/promote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'subgoal', goalId: goalId }),
+                body: JSON.stringify({ mode: 'task', missionId: missionId }),
               }).catch(function () {});
-              await fetchGoalsSnapshot();
-              await fetchInitiativesSnapshot();
+              await fetchMissionsSnapshot();
+              await fetchSuggestedTasksSnapshot();
             } else if (action === 'view-mission') {
-              viewInitiativeOnMission(initiative);
+              viewSuggestedTaskOnMission(suggestedTask);
             } else if (action === 'undo-promotion') {
-              if (!window.confirm('Remove this initiative from the mission and reopen it for review?')) return;
-              await undoInitiativePromotion(initiative);
+              if (!window.confirm('Remove this suggestedTask from the mission and reopen it for review?')) return;
+              await undoSuggestedTaskPromotion(suggestedTask);
             }
           } finally {
             btn.disabled = false;
@@ -2128,61 +2146,61 @@
       });
     }
 
-    function renderInitiativesPanel(opts) {
+    function renderSuggestedTasksPanel(opts) {
       opts = opts || {};
-      var wrap = document.getElementById(opts.listId || 'team-initiatives-list');
-      var detailEl = document.getElementById(opts.detailId || 'team-initiative-detail');
+      var wrap = document.getElementById(opts.listId || 'team-suggestedTasks-list');
+      var detailEl = document.getElementById(opts.detailId || 'team-suggestedTask-detail');
       if (!wrap) return;
-      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
-      initiatives.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
-      if (!initiatives.length) {
-        if (!selectedTeamInitiativeId) selectedTeamInitiativeId = '';
-        wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>';
-        if (detailEl) renderInitiativeDetail(null, detailEl);
+      var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks.slice() : [];
+      suggestedTasks.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (!suggestedTasks.length) {
+        if (!selectedTeamSuggestedTaskId) selectedTeamSuggestedTaskId = '';
+        wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No suggestedTasks yet.</p>';
+        if (detailEl) renderSuggestedTaskDetail(null, detailEl);
         return;
       }
-      if (!selectedTeamInitiativeId || !initiatives.some(function (i) { return String(i.id || '') === selectedTeamInitiativeId; })) {
-        selectedTeamInitiativeId = String(initiatives[0].id || '');
+      if (!selectedTeamSuggestedTaskId || !suggestedTasks.some(function (i) { return String(i.id || '') === selectedTeamSuggestedTaskId; })) {
+        selectedTeamSuggestedTaskId = String(suggestedTasks[0].id || '');
       }
-      wrap.innerHTML = initiatives.map(function (it) {
+      wrap.innerHTML = suggestedTasks.map(function (it) {
         var id = String(it.id || '');
-        var selected = id === selectedTeamInitiativeId ? ' selected' : '';
+        var selected = id === selectedTeamSuggestedTaskId ? ' selected' : '';
         var confidence = Math.round((Number(it.confidence) || 0) * 100);
         var status = String(it.status || 'proposed').toLowerCase();
-        var badge = initiativeWasAutoPromoted(it)
-          ? '<span class="team-initiative-auto-badge">Auto-promoted (legacy)</span> '
-          : (initiativeIsOnMission(it) ? '<span class="team-initiative-auto-badge">On mission</span> '
-            : (status === 'proposed' ? '<span class="team-initiative-auto-badge">Proposed</span> ' : ''));
-        return '<div class="team-initiative-card' + selected + '" data-initiative-id="' + escapeHtml(id) + '">' +
-          '<div class="team-goal-card-head">' +
-            '<h4 class="team-goal-card-title">' + badge + escapeHtml(it.title || 'Untitled initiative') + '</h4>' +
-            '<span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+        var badge = suggestedTaskWasAutoPromoted(it)
+          ? '<span class="team-suggestedTask-auto-badge">Auto-promoted (legacy)</span> '
+          : (suggestedTaskIsOnMission(it) ? '<span class="team-suggestedTask-auto-badge">On mission</span> '
+            : (status === 'proposed' ? '<span class="team-suggestedTask-auto-badge">Proposed</span> ' : ''));
+        return '<div class="team-suggestedTask-card' + selected + '" data-suggestedTask-id="' + escapeHtml(id) + '">' +
+          '<div class="team-mission-card-head">' +
+            '<h4 class="team-mission-card-title">' + badge + escapeHtml(it.title || 'Untitled suggestedTask') + '</h4>' +
+            '<span class="team-suggestedTask-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
-          '<div class="team-goal-meta"><span class="team-initiative-type">' + escapeHtml(it.type || 'observation') + '</span></div>' +
-          '<div class="team-goal-meta"><strong>Confidence:</strong> ' + escapeHtml(String(confidence)) + '%</div>' +
-          '<div class="team-goal-meta"><strong>Source:</strong> ' + escapeHtml(it.source || '') + '</div>' +
-          '<div class="team-goal-meta">' + escapeHtml(String(it.description || '').slice(0, 180)) + '</div>' +
+          '<div class="team-mission-meta"><span class="team-suggestedTask-type">' + escapeHtml(it.type || 'observation') + '</span></div>' +
+          '<div class="team-mission-meta"><strong>Confidence:</strong> ' + escapeHtml(String(confidence)) + '%</div>' +
+          '<div class="team-mission-meta"><strong>Source:</strong> ' + escapeHtml(it.source || '') + '</div>' +
+          '<div class="team-mission-meta">' + escapeHtml(String(it.description || '').slice(0, 180)) + '</div>' +
         '</div>';
       }).join('');
-      var selectedInitiative = initiatives.find(function (i) { return String(i.id || '') === selectedTeamInitiativeId; }) || initiatives[0];
-      if (detailEl) renderInitiativeDetail(selectedInitiative, detailEl);
-      wrap.querySelectorAll('.team-initiative-card').forEach(function (card) {
+      var selectedSuggestedTask = suggestedTasks.find(function (i) { return String(i.id || '') === selectedTeamSuggestedTaskId; }) || suggestedTasks[0];
+      if (detailEl) renderSuggestedTaskDetail(selectedSuggestedTask, detailEl);
+      wrap.querySelectorAll('.team-suggestedTask-card').forEach(function (card) {
         card.addEventListener('click', function () {
-          var id = String(card.getAttribute('data-initiative-id') || '').trim();
+          var id = String(card.getAttribute('data-suggestedTask-id') || '').trim();
           if (!id) return;
-          selectedTeamInitiativeId = id;
-          renderInitiativesPanels();
+          selectedTeamSuggestedTaskId = id;
+          renderSuggestedTasksPanels();
         });
       });
     }
 
-    function renderInitiativesPanels() {
-      renderInitiativesPanel({ listId: 'team-initiatives-list', detailId: 'team-initiative-detail' });
-      renderInitiativesPanel({ listId: 'mc2-initiatives-list', detailId: 'mc2-initiative-detail' });
+    function renderSuggestedTasksPanels() {
+      renderSuggestedTasksPanel({ listId: 'team-suggestedTasks-list', detailId: 'team-suggestedTask-detail' });
+      renderSuggestedTasksPanel({ listId: 'mc2-suggestedTasks-list', detailId: 'mc2-suggestedTask-detail' });
     }
 
-    function renderInitiativesList() {
-      renderInitiativesPanels();
+    function renderSuggestedTasksList() {
+      renderSuggestedTasksPanels();
     }
 
     function renderTeamAgentCards() {
@@ -2245,14 +2263,14 @@
     function resolveAgentContextDisplay(agentId, ctx) {
       var row = ctx || { state: 'idle' };
       var state = String(row.state || 'idle').toLowerCase();
-      var goal = missionLabelForAgent(agentId, row);
+      var mission = missionLabelForAgent(agentId, row);
       var thought = String(row.currentThought || row.currentStep || '').trim();
       if (!thought && String(row.state || '') === 'idle') thought = 'Standing by for the next task.';
       var waitingOn = String(row.waitingFor || '').trim()
         ? agentNameById(row.waitingFor)
         : 'None';
       var lastAction = String(row.lastAction || '').trim() || 'None';
-      return { goal: goal, thought: thought, waitingOn: waitingOn, lastAction: lastAction, state: row.state };
+      return { mission: mission, thought: thought, waitingOn: waitingOn, lastAction: lastAction, state: row.state };
     }
 
     function renderAgentContextField(label, value, mutedWhenNone) {
@@ -2270,7 +2288,7 @@
           '<h4>' + escapeHtml(label) + '</h4>' +
           formatContextStateBadge(display.state) +
         '</div>';
-      html += renderAgentContextField('Current Mission:', display.goal, true);
+      html += renderAgentContextField('Current Mission:', display.mission, true);
       html += renderAgentContextField('Current Thought:', display.thought, false);
       html += renderAgentContextField('Waiting On:', display.waitingOn, true);
       html += renderAgentContextField('Last Action:', display.lastAction, true);
@@ -2292,7 +2310,7 @@
         var label = agentDisplayLabel(a);
         var display = resolveAgentContextDisplay(id, ctx);
         var bits = [];
-        if (display.goal) bits.push(display.goal);
+        if (display.mission) bits.push(display.mission);
         if (display.thought && display.thought !== 'Standing by for the next task.') {
           bits.push(display.thought);
         } else if (display.waitingOn !== 'None') {
@@ -2790,11 +2808,11 @@
 
     function humanizeTeamActivityMessage(msg) {
       return String(msg || '')
-        .replace(/Auto-promoted initiative to subgoal:/gi, 'Added initiative to mission:')
-        .replace(/Auto-promoted to subgoal in/gi, 'Added to mission')
-        .replace(/Promoted to subgoal in/gi, 'Added to mission')
-        .replace(/\bsubgoal\b/gi, 'task')
-        .replace(/\bsubgoals\b/gi, 'tasks');
+        .replace(/Auto-promoted suggestedTask to task:/gi, 'Added suggestedTask to mission:')
+        .replace(/Auto-promoted to task in/gi, 'Added to mission')
+        .replace(/Promoted to task in/gi, 'Added to mission')
+        .replace(/\btask\b/gi, 'task')
+        .replace(/\btasks\b/gi, 'tasks');
     }
 
     function activityNavFromEvent(ev) {
@@ -2802,32 +2820,32 @@
       var type = String(ev.type || '');
       var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
       var agentId = String(ev.agentId || ev.ownerAgentId || '');
-      var goalId = String(ev.goalId || details.goalId || '');
-      var subgoalId = String(ev.subgoalId || details.subgoalId || '');
-      var initiativeId = String(details.initiativeId || '');
-      if (type === 'initiative_auto_promoted') {
+      var missionId = String(ev.missionId || details.missionId || '');
+      var taskId = String(ev.taskId || details.taskId || '');
+      var suggestedTaskId = String(details.suggestedTaskId || '');
+      if (type === 'suggestedTask_auto_promoted') {
         return {
           view: 'tasks',
-          goalId: goalId,
-          subgoalId: subgoalId,
-          initiativeId: initiativeId,
+          missionId: missionId,
+          taskId: taskId,
+          suggestedTaskId: suggestedTaskId,
           agentId: agentId,
         };
       }
       if (type === 'delegation_task_assigned') {
-        return { view: 'tasks', goalId: goalId, subgoalId: subgoalId, agentId: agentId };
+        return { view: 'tasks', missionId: missionId, taskId: taskId, agentId: agentId };
       }
-      if (type === 'goal_subgoal_created') {
-        return { view: 'tasks', goalId: goalId, subgoalId: subgoalId, agentId: agentId };
+      if (type === 'mission_task_created') {
+        return { view: 'tasks', missionId: missionId, taskId: taskId, agentId: agentId };
       }
-      if (type === 'goal_tick_done' || type === 'goal_tick_error' || type === 'goal_tick_start') {
-        return { view: 'tasks', goalId: goalId, agentId: agentId };
+      if (type === 'mission_tick_done' || type === 'mission_tick_error' || type === 'mission_tick_start') {
+        return { view: 'tasks', missionId: missionId, agentId: agentId };
       }
       if (type === 'turn_start' || type === 'turn_done') {
         return { view: 'tasks', agentId: agentId };
       }
       if (type.indexOf('delegation_') === 0) {
-        return { view: 'tasks', agentId: agentId, goalId: goalId, subgoalId: subgoalId };
+        return { view: 'tasks', agentId: agentId, missionId: missionId, taskId: taskId };
       }
       if (type.indexOf('skill_') === 0) {
         return { view: 'tasks', agentId: agentId };
@@ -2908,16 +2926,16 @@
       if (type === 'turn_done') {
         return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> finished the task. ' + escapeHtml(msg || '');
       }
-      if (type === 'initiative_auto_promoted') {
+      if (type === 'suggestedTask_auto_promoted') {
         var initTitle = String(event.title || (details && details.title) || '').trim();
         if (!initTitle && msg) {
-          var titleFromMsg = msg.match(/(?:Auto-promoted initiative to subgoal:|Added initiative to mission:)\s*(.+?)\s*\(\d+%/i);
+          var titleFromMsg = msg.match(/(?:Auto-promoted suggestedTask to task:|Added suggestedTask to mission:)\s*(.+?)\s*\(\d+%/i);
           if (titleFromMsg) initTitle = String(titleFromMsg[1] || '').trim();
         }
-        var missionName = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
+        var missionName = missionTitleForMissionId(String(event.missionId || (details && details.missionId) || ''));
         var confMatch = msg.match(/\((\d+)%\s*confidence\)/i);
         var confPct = confMatch ? confMatch[1] : '';
-        var line = 'Added <span class="accent">' + escapeHtml(initTitle || 'initiative') + '</span> to mission';
+        var line = 'Added <span class="accent">' + escapeHtml(initTitle || 'suggestedTask') + '</span> to mission';
         if (missionName) line += ' <span class="accent">' + escapeHtml(missionName) + '</span>';
         if (confPct) line += ' (' + escapeHtml(confPct) + '% confidence)';
         line += ' — tap to open <span class="accent">Tasks</span>';
@@ -2966,10 +2984,10 @@
       if (type === 'delegation_error') {
         return 'Delegation to <span class="accent">' + escapeHtml(target || 'agent') + '</span> failed: ' + escapeHtml(msg || 'Error');
       }
-      if (type === 'initiative_auto_promoted') {
+      if (type === 'suggestedTask_auto_promoted') {
         var initTitleSub = String(event.title || (details && details.title) || '').trim();
-        var missionNameSub = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
-        var lineSub = 'Added <span class="accent">' + escapeHtml(initTitleSub || 'initiative') + '</span> to mission';
+        var missionNameSub = missionTitleForMissionId(String(event.missionId || (details && details.missionId) || ''));
+        var lineSub = 'Added <span class="accent">' + escapeHtml(initTitleSub || 'suggestedTask') + '</span> to mission';
         if (missionNameSub) lineSub += ' <span class="accent">' + escapeHtml(missionNameSub) + '</span>';
         lineSub += ' — tap for Tasks';
         return lineSub;
@@ -3195,8 +3213,8 @@
     }
 
     var MC2_PINNED_MOVEMENT_TYPES = {
-      initiative_auto_promoted: true,
-      initiative_scan_done: true,
+      suggestedTask_auto_promoted: true,
+      suggestedTask_scan_done: true,
     };
 
     function buildMissionControlMovementGroups(maxGroups) {
@@ -3267,9 +3285,9 @@
       var navAttrs = '';
       if (nav && nav.view) {
         navAttrs = ' data-mc-movement-nav="' + escapeHtml(nav.view) + '"';
-        if (nav.goalId) navAttrs += ' data-goal-id="' + escapeHtml(nav.goalId) + '"';
-        if (nav.subgoalId) navAttrs += ' data-subgoal-id="' + escapeHtml(nav.subgoalId) + '"';
-        if (nav.initiativeId) navAttrs += ' data-initiative-id="' + escapeHtml(nav.initiativeId) + '"';
+        if (nav.missionId) navAttrs += ' data-mission-id="' + escapeHtml(nav.missionId) + '"';
+        if (nav.taskId) navAttrs += ' data-task-id="' + escapeHtml(nav.taskId) + '"';
+        if (nav.suggestedTaskId) navAttrs += ' data-suggestedTask-id="' + escapeHtml(nav.suggestedTaskId) + '"';
         if (nav.agentId) navAttrs += ' data-agent-id="' + escapeHtml(nav.agentId) + '"';
       }
       if (opts.style === 'team') {
@@ -3438,17 +3456,17 @@
       renderTeamAgentCards();
     }
 
-    async function fetchGoalsSnapshot() {
+    async function fetchMissionsSnapshot() {
       try {
-        var r = await fetch(API + '/api/goals');
+        var r = await fetch(API + '/api/missions');
         if (!r.ok) return;
         var d = await r.json().catch(function () { return {}; });
-        teamGoalsSnapshot = {
-          goals: Array.isArray(d.goals) ? d.goals : [],
+        teamMissionsSnapshot = {
+          missions: Array.isArray(d.missions) ? d.missions : [],
           updatedAt: Number(d.updatedAt) || 0,
         };
       } catch (_) {}
-      renderGoalsList();
+      renderMissionsList();
       renderAgentContext();
       renderCurrentMission();
       renderTeamTaskSummary();
@@ -3458,7 +3476,7 @@
       if (!shouldPauseTeamDashboardRefresh()) renderTeamUserInputModal();
     }
 
-    var teamUserInputGoalId = '';
+    var teamUserInputMissionId = '';
     var teamUserInputDismissed = {};
     var teamUserInputModalWired = false;
     var teamUserInputSubmitBusy = false;
@@ -3480,48 +3498,48 @@
       } catch (_) {}
     }
 
-    function countBlockedSubgoalsForGoal(goal) {
-      if (!goal) return 0;
+    function countBlockedTasksForMission(mission) {
+      if (!mission) return 0;
       var count = 0;
-      function walk(subgoals) {
-        (subgoals || []).forEach(function (sg) {
+      function walk(tasks) {
+        (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          if (effectiveSubgoalStatus(sg, goal) === 'blocked') count++;
-          walk(sg.subgoals);
+          if (effectiveTaskStatus(sg, mission) === 'blocked') count++;
+          walk(sg.tasks);
         });
       }
-      walk(goal.subgoals);
+      walk(mission.tasks);
       return count;
     }
 
-    function goalAttentionPrompt(goal) {
-      if (!goal) return '';
-      var ask = String(goal.needsUserInput || '').trim();
+    function missionAttentionPrompt(mission) {
+      if (!mission) return '';
+      var ask = String(mission.needsUserInput || '').trim();
       if (ask) return ask;
-      var blockedN = countBlockedSubgoalsForGoal(goal);
+      var blockedN = countBlockedTasksForMission(mission);
       if (blockedN > 0) {
         return 'This mission has ' + blockedN + ' blocked task(s). Tell the team what to do next — e.g. your analytics choice, "use default", or step-by-step instructions to unblock.';
       }
-      if (isGoalPartialWait(goal)) {
-        return goalImplementationBlockedLabel(goal) || 'Implementation is paused until you confirm the next step. Reply with your choice or "use default".';
+      if (isMissionPartialWait(mission)) {
+        return missionImplementationBlockedLabel(mission) || 'Implementation is paused until you confirm the next step. Reply with your choice or "use default".';
       }
-      if (String(goal.status || '').toLowerCase() === 'blocked') {
-        return String(goal.blockedReason || '').trim() || 'This mission is blocked. What should the team do next?';
+      if (String(mission.status || '').toLowerCase() === 'blocked') {
+        return String(mission.blockedReason || '').trim() || 'This mission is blocked. What should the team do next?';
       }
       return '';
     }
 
-    function goalNeedsAttention(goal) {
-      if (!goal) return false;
-      if (String(goal.needsUserInput || '').trim()) return true;
-      if (countBlockedSubgoalsForGoal(goal) > 0) return true;
-      if (isGoalPartialWait(goal)) return true;
-      if (String(goal.status || '').toLowerCase() === 'blocked') return true;
+    function missionNeedsAttention(mission) {
+      if (!mission) return false;
+      if (String(mission.needsUserInput || '').trim()) return true;
+      if (countBlockedTasksForMission(mission) > 0) return true;
+      if (isMissionPartialWait(mission)) return true;
+      if (String(mission.status || '').toLowerCase() === 'blocked') return true;
       return false;
     }
 
-    function teamUserInputDismissKey(goal) {
-      return String(goal.id || '') + '::' + goalAttentionPrompt(goal).slice(0, 240);
+    function teamUserInputDismissKey(mission) {
+      return String(mission.id || '') + '::' + missionAttentionPrompt(mission).slice(0, 240);
     }
 
     function isTeamUserInputModalOpen() {
@@ -3543,9 +3561,9 @@
       return false;
     }
 
-    function getGoalsNeedingUserInput() {
-      return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).filter(function (g) {
-        return goalNeedsAttention(g);
+    function getMissionsNeedingUserInput() {
+      return (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).filter(function (g) {
+        return missionNeedsAttention(g);
       }).sort(function (a, b) {
         return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
       });
@@ -3568,24 +3586,24 @@
       if (!modal) return;
       modal.classList.remove('open');
       modal.setAttribute('aria-hidden', 'true');
-      teamUserInputGoalId = '';
+      teamUserInputMissionId = '';
       showTeamUserInputModalError('');
     }
 
-    function openTeamUserInputModal(goal, opts) {
+    function openTeamUserInputModal(mission, opts) {
       opts = opts || {};
       var modal = document.getElementById('team-user-input-modal');
       var missionEl = document.getElementById('team-user-input-modal-mission');
       var questionEl = document.getElementById('team-user-input-modal-question');
       var quickEl = document.getElementById('team-user-input-modal-quick');
       var textEl = document.getElementById('team-user-input-modal-text');
-      if (!modal || !goal) return;
-      var id = String(goal.id || '');
-      var ask = String(opts.ask || goal.needsUserInput || '').trim();
-      if (!ask) ask = goalAttentionPrompt(goal);
+      if (!modal || !mission) return;
+      var id = String(mission.id || '');
+      var ask = String(opts.ask || mission.needsUserInput || '').trim();
+      if (!ask) ask = missionAttentionPrompt(mission);
       if (!id || !ask) return;
-      teamUserInputGoalId = id;
-      if (missionEl) missionEl.textContent = String(goal.title || 'Untitled mission');
+      teamUserInputMissionId = id;
+      if (missionEl) missionEl.textContent = String(mission.title || 'Untitled mission');
       if (questionEl) questionEl.textContent = ask;
       if (textEl) textEl.value = '';
       showTeamUserInputModalError('');
@@ -3605,48 +3623,48 @@
     }
 
     function openMissionWorkInputModal(item) {
-      if (!item || !item.goalId) return false;
-      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
-        return String(g.id || '') === String(item.goalId || '');
+      if (!item || !item.missionId) return false;
+      var mission = (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
+        return String(g.id || '') === String(item.missionId || '');
       });
-      if (!goal) return false;
-      var ask = goalAttentionPrompt(goal);
-      if (item.title && item.kind === 'subgoal') {
+      if (!mission) return false;
+      var ask = missionAttentionPrompt(mission);
+      if (item.title && item.kind === 'task') {
         ask = 'Blocked task: "' + String(item.title) + '". ' + ask;
       }
-      openTeamUserInputModal(goal, { ask: ask });
+      openTeamUserInputModal(mission, { ask: ask });
       return true;
     }
 
-    async function patchMissionSubgoalStatus(goalId, subgoalId, nextStatus) {
-      var gid = String(goalId || '').trim();
-      var sid = String(subgoalId || '').trim();
+    async function patchMissionTaskStatus(missionId, taskId, nextStatus) {
+      var gid = String(missionId || '').trim();
+      var sid = String(taskId || '').trim();
       if (!gid || !sid) return false;
-      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+      var mission = (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
         return String(g.id || '') === gid;
       });
-      if (!goal) return false;
-      function patchTree(subgoals) {
-        return (subgoals || []).map(function (sg) {
+      if (!mission) return false;
+      function patchTree(tasks) {
+        return (tasks || []).map(function (sg) {
           if (!sg || typeof sg !== 'object') return sg;
           var next = Object.assign({}, sg);
           if (String(next.id || '') === sid) {
             next.status = nextStatus;
           }
-          if (Array.isArray(next.subgoals) && next.subgoals.length) {
-            next.subgoals = patchTree(next.subgoals);
+          if (Array.isArray(next.tasks) && next.tasks.length) {
+            next.tasks = patchTree(next.tasks);
           }
           return next;
         });
       }
       try {
-        var r = await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+        var r = await fetch(API + '/api/missions/' + encodeURIComponent(gid), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subgoals: patchTree(goal.subgoals) }),
+          body: JSON.stringify({ tasks: patchTree(mission.tasks) }),
         });
         if (!r.ok) return false;
-        await fetchGoalsSnapshot();
+        await fetchMissionsSnapshot();
         if (typeof renderMissionControl === 'function') renderMissionControl();
         return true;
       } catch (_) {
@@ -3654,12 +3672,12 @@
       }
     }
 
-    function findGoalById(goalId) {
-      var gid = String(goalId || '').trim();
+    function findMissionById(missionId) {
+      var gid = String(missionId || '').trim();
       if (!gid) return null;
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
-      for (var i = 0; i < goals.length; i++) {
-        if (String(goals[i].id || '') === gid) return goals[i];
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+      for (var i = 0; i < missions.length; i++) {
+        if (String(missions[i].id || '') === gid) return missions[i];
       }
       return null;
     }
@@ -3771,21 +3789,14 @@
       });
     }
 
-    function initiativeWasAutoPromoted(initiative) {
-      var lines = Array.isArray(initiative && initiative.activity) ? initiative.activity : [];
-      return lines.some(function (line) {
-        return String(line || '').indexOf('Auto-promoted to subgoal in ') >= 0;
-      });
-    }
-
-    function countGoalTicksBefore(goalId, beforeTs) {
-      var gid = String(goalId || '').trim();
+    function countMissionTicksBefore(missionId, beforeTs) {
+      var gid = String(missionId || '').trim();
       if (!gid) return 0;
       var cutoff = Number(beforeTs) || Date.now();
       var ticks = (teamActivityEvents || []).filter(function (ev) {
         return ev &&
-          String(ev.type || '') === 'goal_tick_start' &&
-          String(ev.goalId || '') === gid &&
+          String(ev.type || '') === 'mission_tick_start' &&
+          String(ev.missionId || '') === gid &&
           Number(ev.ts) <= cutoff;
       }).sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); });
       return ticks.length;
@@ -3793,9 +3804,9 @@
 
     function formatMissionSourceLabel(kind) {
       var labels = {
-        initiative_auto_promotion: 'Initiative Auto Promotion',
-        initiative_promotion: 'Initiative Promotion',
-        goal_tick: 'Goal Tick',
+        suggestedTask_auto_promotion: 'SuggestedTask Auto Promotion',
+        suggestedTask_promotion: 'SuggestedTask Promotion',
+        mission_tick: 'Mission Tick',
         curiosity_momentum: 'Curiosity Momentum',
         curiosity_suggestion: 'Idle Suggestion',
         curiosity_idle_check: 'Idle Check',
@@ -3808,22 +3819,22 @@
     }
 
     function findTaskOriginEvents(item) {
-      var subgoalId = String(item && item.subgoalId || '');
-      var goalId = String(item && item.goalId || '');
+      var taskId = String(item && item.taskId || '');
+      var missionId = String(item && item.missionId || '');
       var titleNeedle = String(item && item.title || '').trim().toLowerCase().slice(0, 40);
       var out = { promoteEv: null, createEv: null, assignEv: null };
       (teamActivityEvents || []).forEach(function (ev) {
         if (!ev) return;
         var type = String(ev.type || '');
         var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
-        var evSubId = String(details.subgoalId || ev.subgoalId || '');
-        var evGoalId = String(details.goalId || ev.goalId || '');
-        var matchSub = subgoalId && evSubId === subgoalId;
-        var matchGoalTitle = !matchSub && goalId && evGoalId === goalId && titleNeedle &&
+        var evSubId = String(details.taskId || ev.taskId || '');
+        var evMissionId = String(details.missionId || ev.missionId || '');
+        var matchSub = taskId && evSubId === taskId;
+        var matchMissionTitle = !matchSub && missionId && evMissionId === missionId && titleNeedle &&
           (String(ev.title || details.title || ev.message || '').toLowerCase().indexOf(titleNeedle.slice(0, 24)) >= 0);
-        if (!matchSub && !matchGoalTitle) return;
-        if (type === 'initiative_auto_promoted' && !out.promoteEv) out.promoteEv = ev;
-        if (type === 'goal_subgoal_created' && !out.createEv) out.createEv = ev;
+        if (!matchSub && !matchMissionTitle) return;
+        if (type === 'suggestedTask_auto_promoted' && !out.promoteEv) out.promoteEv = ev;
+        if (type === 'mission_task_created' && !out.createEv) out.createEv = ev;
         if (type === 'delegation_task_assigned' && !out.assignEv) out.assignEv = ev;
       });
       return out;
@@ -3838,28 +3849,28 @@
         source: '',
         sourceKind: 'mission_planning',
         confidence: null,
-        initiativeTitle: '',
-        initiativeId: '',
+        suggestedTaskTitle: '',
+        suggestedTaskId: '',
       };
-      var goalId = String(item.goalId || '');
-      var subgoalId = String(item.subgoalId || '');
-      var initiative = typeof findInitiativeForSubgoalId === 'function'
-        ? findInitiativeForSubgoalId(subgoalId)
+      var missionId = String(item.missionId || '');
+      var taskId = String(item.taskId || '');
+      var suggestedTask = typeof findSuggestedTaskForTaskId === 'function'
+        ? findSuggestedTaskForTaskId(taskId)
         : null;
       var origin = findTaskOriginEvents(item);
       var promoteEv = origin.promoteEv;
       var createEv = origin.createEv;
       var assignEv = origin.assignEv;
 
-      if (initiative || promoteEv || /^init-/.test(subgoalId)) {
-        var auto = (initiative && initiativeWasAutoPromoted(initiative)) || !!promoteEv;
-        chain.sourceKind = auto ? 'initiative_auto_promotion' : 'initiative_promotion';
+      if (suggestedTask || promoteEv || /^init-/.test(taskId)) {
+        var auto = (suggestedTask && suggestedTaskWasAutoPromoted(suggestedTask)) || !!promoteEv;
+        chain.sourceKind = auto ? 'suggestedTask_auto_promotion' : 'suggestedTask_promotion';
         chain.source = formatMissionSourceLabel(chain.sourceKind);
-        chain.initiativeId = initiative
-          ? String(initiative.id || '')
-          : initiativeIdFromSubgoalId(subgoalId);
-        chain.initiativeTitle = initiative ? String(initiative.title || '') : String(item.title || '');
-        var conf = initiative ? Number(initiative.confidence) : NaN;
+        chain.suggestedTaskId = suggestedTask
+          ? String(suggestedTask.id || '')
+          : suggestedTaskIdFromTaskId(taskId);
+        chain.suggestedTaskTitle = suggestedTask ? String(suggestedTask.title || '') : String(item.title || '');
+        var conf = suggestedTask ? Number(suggestedTask.confidence) : NaN;
         if (!isFinite(conf) && promoteEv) {
           var confMatch = String(promoteEv.message || '').match(/\((\d+)%\s*confidence\)/i);
           if (confMatch) conf = Number(confMatch[1]) / 100;
@@ -3867,15 +3878,15 @@
         if (isFinite(conf) && conf > 0) {
           chain.confidence = Math.round(conf <= 1 ? conf * 100 : conf);
         }
-        var originTs = (initiative && Number(initiative.createdAt)) ||
+        var originTs = (suggestedTask && Number(suggestedTask.createdAt)) ||
           (promoteEv && Number(promoteEv.ts)) ||
           Number(item.createdAt) || Date.now();
-        var tickGoalId = goalId ||
-          (initiative && Array.isArray(initiative.relatedGoalIds) && initiative.relatedGoalIds[0]) ||
-          String(promoteEv && promoteEv.goalId || '');
-        var tickNum = countGoalTicksBefore(tickGoalId, originTs);
-        chain.createdBy = tickNum ? ('Goal Tick #' + tickNum) : 'Initiative Scan';
-        chain.agentId = (initiative && String(initiative.createdBy || '')) ||
+        var tickMissionId = missionId ||
+          (suggestedTask && Array.isArray(suggestedTask.relatedMissionIds) && suggestedTask.relatedMissionIds[0]) ||
+          String(promoteEv && promoteEv.missionId || '');
+        var tickNum = countMissionTicksBefore(tickMissionId, originTs);
+        chain.createdBy = tickNum ? ('Mission Tick #' + tickNum) : 'SuggestedTask Scan';
+        chain.agentId = (suggestedTask && String(suggestedTask.createdBy || '')) ||
           String(promoteEv && (promoteEv.agentId || promoteEv.ownerAgentId) || '') ||
           String(item.assignee || item.agentId || '');
         chain.agent = agentNameById(chain.agentId) || chain.agentId || '—';
@@ -3889,21 +3900,21 @@
         chain.agent = agentNameById(chain.agentId) || '—';
         var delegator = String(item.delegatedFrom || (assignEv && assignEv.agentId) || '').trim();
         chain.createdBy = delegator ? agentNameById(delegator) : 'Agent Delegation';
-        if (assignEv && goalId) {
-          var dTick = countGoalTicksBefore(goalId, assignEv.ts);
-          if (dTick) chain.createdBy = 'Goal Tick #' + dTick;
+        if (assignEv && missionId) {
+          var dTick = countMissionTicksBefore(missionId, assignEv.ts);
+          if (dTick) chain.createdBy = 'Mission Tick #' + dTick;
         }
         return chain;
       }
 
       if (createEv) {
         var createMsg = String(createEv.message || '');
-        var isCuriosity = /curiosity subgoal/i.test(createMsg);
-        chain.sourceKind = isCuriosity ? 'curiosity_momentum' : 'goal_tick';
+        var isCuriosity = /curiosity task/i.test(createMsg);
+        chain.sourceKind = isCuriosity ? 'curiosity_momentum' : 'mission_tick';
         chain.source = formatMissionSourceLabel(chain.sourceKind);
-        var cGoalId = goalId || String(createEv.goalId || '');
-        var cTick = countGoalTicksBefore(cGoalId, createEv.ts);
-        chain.createdBy = cTick ? ('Goal Tick #' + cTick) : (isCuriosity ? 'Curiosity Cycle' : 'Goal Tick');
+        var cMissionId = missionId || String(createEv.missionId || '');
+        var cTick = countMissionTicksBefore(cMissionId, createEv.ts);
+        chain.createdBy = cTick ? ('Mission Tick #' + cTick) : (isCuriosity ? 'Curiosity Cycle' : 'Mission Tick');
         chain.agentId = String(createEv.agentId || createEv.ownerAgentId || item.assignee || item.agentId || '');
         chain.agent = agentNameById(chain.agentId) || '—';
         return chain;
@@ -3918,25 +3929,25 @@
         return chain;
       }
 
-      var goal = goalId ? findGoalById(goalId) : null;
-      if (goal && String(goal.needsUserInput || '').trim()) {
+      var mission = missionId ? findMissionById(missionId) : null;
+      if (mission && String(mission.needsUserInput || '').trim()) {
         chain.sourceKind = 'user_request';
         chain.source = formatMissionSourceLabel(chain.sourceKind);
         chain.createdBy = 'User';
-        chain.agentId = String(item.assignee || goal.ownerAgentId || '');
+        chain.agentId = String(item.assignee || mission.ownerAgentId || '');
         chain.agent = agentNameById(chain.agentId) || '—';
         return chain;
       }
 
       chain.source = formatMissionSourceLabel('mission_planning');
-      var fallbackTick = countGoalTicksBefore(goalId, item.createdAt || Date.now());
-      chain.createdBy = fallbackTick ? ('Goal Tick #' + fallbackTick) : 'Mission Planning';
-      chain.agentId = String(item.assignee || (goal && goal.ownerAgentId) || item.agentId || '');
+      var fallbackTick = countMissionTicksBefore(missionId, item.createdAt || Date.now());
+      chain.createdBy = fallbackTick ? ('Mission Tick #' + fallbackTick) : 'Mission Planning';
+      chain.agentId = String(item.assignee || (mission && mission.ownerAgentId) || item.agentId || '');
       chain.agent = agentNameById(chain.agentId) || '—';
       return chain;
     }
 
-    var MISSION_TASK_INITIATIVE_ARCHIVE_DAYS = 3;
+    var MISSION_TASK_AI_SUGGESTED_ARCHIVE_DAYS = 3;
     var MISSION_TASK_MANUAL_INIT_ARCHIVE_DAYS = 7;
 
     function formatInactionDaysRemaining(deadlineTs) {
@@ -3948,11 +3959,11 @@
       return days + ' days';
     }
 
-    function missionTaskImpactFromInitiative(initiative) {
-      if (!initiative) return 'Medium';
-      var initType = String(initiative.type || 'observation').toLowerCase();
+    function missionTaskImpactFromSuggestedTask(suggestedTask) {
+      if (!suggestedTask) return 'Medium';
+      var initType = String(suggestedTask.type || 'observation').toLowerCase();
       if (initType === 'risk' || initType === 'gap' || initType === 'warning') return 'High';
-      var conf = Number(initiative.confidence);
+      var conf = Number(suggestedTask.confidence);
       if (!isFinite(conf)) return 'Medium';
       var pct = conf <= 1 ? conf * 100 : conf;
       if (pct >= 80) return 'High';
@@ -3978,11 +3989,11 @@
         };
       }
 
-      var goal = item.goalId ? findGoalById(item.goalId) : null;
-      var initiative = (item.fromInitiative || /^init-/.test(String(item.subgoalId || '')))
-        ? findInitiativeForSubgoalId(item.subgoalId)
+      var mission = item.missionId ? findMissionById(item.missionId) : null;
+      var suggestedTask = (item.fromSuggestedTask || /^init-/.test(String(item.taskId || '')))
+        ? findSuggestedTaskForTaskId(item.taskId)
         : null;
-      var autoPromoted = initiative && initiativeWasAutoPromoted(initiative);
+      var autoPromoted = suggestedTask && suggestedTaskWasAutoPromoted(suggestedTask);
 
       function pack(required, impact, summary, autoArchiveIn, extraLines) {
         var lines = [
@@ -4007,42 +4018,42 @@
         var blockedMsg = status === 'blocked'
           ? 'Mission progress blocked until you respond to this task.'
           : 'Agent remains blocked until the underlying issue is resolved.';
-        if (goal && String(goal.needsUserInput || '').trim()) {
+        if (mission && String(mission.needsUserInput || '').trim()) {
           blockedMsg = 'Mission progress blocked until reviewed.';
         }
         return pack(true, 'High', blockedMsg, null);
       }
 
-      if (goal) {
-        var needsInput = String(goal.needsUserInput || '').trim();
-        var partialWait = typeof isGoalPartialWait === 'function' && isGoalPartialWait(goal);
+      if (mission) {
+        var needsInput = String(mission.needsUserInput || '').trim();
+        var partialWait = typeof isMissionPartialWait === 'function' && isMissionPartialWait(mission);
         if (needsInput) {
           return pack(true, 'High', 'Mission progress blocked until you respond.', null);
         }
         if (partialWait) {
           return pack(true, 'High', 'Implementation blocked — mission continues research only until resolved.', null);
         }
-        if (String(goal.status || '').toLowerCase() === 'blocked') {
+        if (String(mission.status || '').toLowerCase() === 'blocked') {
           return pack(true, 'High', 'Mission progress blocked until reviewed.', null);
         }
       }
 
-      if (autoPromoted && initiative) {
-        var promotedTs = Number(initiative.updatedAt || initiative.createdAt || item.createdAt) || Date.now();
-        var archiveDeadline = promotedTs + (MISSION_TASK_INITIATIVE_ARCHIVE_DAYS * 86400000);
-        var impact = missionTaskImpactFromInitiative(initiative);
+      if (autoPromoted && suggestedTask) {
+        var promotedTs = Number(suggestedTask.updatedAt || suggestedTask.createdAt || item.createdAt) || Date.now();
+        var archiveDeadline = promotedTs + (MISSION_TASK_AI_SUGGESTED_ARCHIVE_DAYS * 86400000);
+        var impact = missionTaskImpactFromSuggestedTask(suggestedTask);
         var archiveIn = formatInactionDaysRemaining(archiveDeadline);
         var advisory = 'Agents keep working on other tasks. Unreviewed auto-promoted tasks archive and leave the mission after ' +
-          MISSION_TASK_INITIATIVE_ARCHIVE_DAYS + ' days.';
+          MISSION_TASK_AI_SUGGESTED_ARCHIVE_DAYS + ' days.';
         return pack(false, impact, advisory, archiveIn);
       }
 
-      if (initiative && typeof initiativeIsOnMission === 'function' && initiativeIsOnMission(initiative)) {
-        var manualTs = Number(initiative.updatedAt || item.createdAt) || Date.now();
+      if (suggestedTask && typeof suggestedTaskIsOnMission === 'function' && suggestedTaskIsOnMission(suggestedTask)) {
+        var manualTs = Number(suggestedTask.updatedAt || item.createdAt) || Date.now();
         var manualArchive = formatInactionDaysRemaining(manualTs + (MISSION_TASK_MANUAL_INIT_ARCHIVE_DAYS * 86400000));
         return pack(
           false,
-          missionTaskImpactFromInitiative(initiative),
+          missionTaskImpactFromSuggestedTask(suggestedTask),
           'Task stays on the mission board. Review or undo promotion when convenient.',
           manualArchive
         );
@@ -4088,7 +4099,7 @@
     function enrichMissionTaskItem(item) {
       if (!item) return null;
       var out = Object.assign({}, item);
-      var goal = out.goalId ? findGoalById(out.goalId) : null;
+      var mission = out.missionId ? findMissionById(out.missionId) : null;
       var events = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(out, 40) : [];
       var createdEv = null;
       var assignedEv = null;
@@ -4096,7 +4107,7 @@
       var completedEv = null;
       events.forEach(function (ev) {
         var type = String(ev && ev.type || '');
-        if (type === 'goal_subgoal_created' && !createdEv) createdEv = ev;
+        if (type === 'mission_task_created' && !createdEv) createdEv = ev;
         if (type === 'delegation_task_assigned' && !assignedEv) assignedEv = ev;
         if (type === 'delegation_start' && !delegatedEv) delegatedEv = ev;
         if (type === 'turn_done' && !completedEv) completedEv = ev;
@@ -4105,7 +4116,7 @@
       if (!out.createdAt) {
         if (createdEv) out.createdAt = Number(createdEv.ts) || 0;
         else if (out.delegatedAt) out.createdAt = Number(out.delegatedAt) || 0;
-        else if (goal && goal.createdAt) out.createdAt = Number(goal.createdAt) || 0;
+        else if (mission && mission.createdAt) out.createdAt = Number(mission.createdAt) || 0;
         else if (out.turnTs) out.createdAt = Number(out.turnTs) || 0;
       }
       if (!out.completedAt && String(out.status || '').toLowerCase() === 'done') {
@@ -4118,9 +4129,9 @@
           out.createdByLabel = agentNameById(out.delegatedFrom) || out.delegatedFrom;
         } else if (createdEv && String(createdEv.agentId || '').trim()) {
           out.createdByLabel = agentNameById(createdEv.agentId);
-        } else if (out.fromInitiative) {
+        } else if (out.fromSuggestedTask) {
           out.createdByLabel = createdEv && createdEv.agentId ? agentNameById(createdEv.agentId) : 'Agent';
-        } else if (goal && String(goal.needsUserInput || '').trim()) {
+        } else if (mission && String(mission.needsUserInput || '').trim()) {
           out.createdByLabel = 'User';
         } else {
           out.createdByLabel = 'User';
@@ -4128,8 +4139,8 @@
       }
       if (!out.reason) {
         out.reason = String(out.description || '').trim();
-        if (!out.reason && goal) {
-          out.reason = String(goal.needsUserInput || goal.objective || '').trim();
+        if (!out.reason && mission) {
+          out.reason = String(mission.needsUserInput || mission.objective || '').trim();
         }
         if (!out.reason && out.prompt) out.reason = String(out.prompt).trim();
         if (!out.reason && out.summary) out.reason = String(out.summary).trim();
@@ -4148,13 +4159,13 @@
         if (!skills.length && out.turnTs && out.assignee) {
           skills = extractSkillsFromTurnEvents(out.assignee || out.agentId, out.turnTs || out.completedAt);
         }
-        if (!skills.length && goal && String(goal.source || '').indexOf('workflow') >= 0) {
+        if (!skills.length && mission && String(mission.source || '').indexOf('workflow') >= 0) {
           skills.push('project-workflow');
         }
         out.skillsUsed = skills;
       }
-      if (!out.missionTitle && goal) {
-        out.missionTitle = String(goal.title || goal.objective || '').trim();
+      if (!out.missionTitle && mission) {
+        out.missionTitle = String(mission.title || mission.objective || '').trim();
       }
       if (!out.assignee && out.agentId) out.assignee = out.agentId;
       out.sourceChain = buildMissionTaskSourceChain(out);
@@ -4182,12 +4193,12 @@
       raw.forEach(function (ev) {
         var type = String(ev && ev.type || '');
         var ts = Number(ev.ts) || 0;
-        if (type === 'goal_subgoal_created') push(ts, 'Created');
+        if (type === 'mission_task_created') push(ts, 'Created');
         else if (type === 'delegation_task_assigned') push(ts, 'Assigned');
         else if (type === 'delegation_start') push(ts, 'Delegated');
         else if (type === 'turn_start') push(ts, 'Started');
         else if (type === 'turn_done') push(ts, 'Completed');
-        else if (type === 'initiative_auto_promoted') push(ts, 'Added to mission');
+        else if (type === 'suggestedTask_auto_promoted') push(ts, 'Added to mission');
         else if (type === 'skill_start' || type === 'skill_done') {
           var skill = String(ev.skillId || 'work').replace(/[-_]/g, ' ');
           push(ts, (type === 'skill_done' ? 'Finished ' : 'Started ') + skill);
@@ -4219,21 +4230,21 @@
     function findMissionTaskItem(opts) {
       opts = opts || {};
       var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
-      var goalId = String(opts.goalId || '').trim();
-      var subgoalId = String(opts.subgoalId || '').trim();
+      var missionId = String(opts.missionId || '').trim();
+      var taskId = String(opts.taskId || '').trim();
       var agentId = String(opts.agentId || '').trim();
       var title = String(opts.title || '').trim().toLowerCase();
       var i;
-      if (subgoalId) {
+      if (taskId) {
         for (i = 0; i < items.length; i++) {
-          if (String(items[i].subgoalId || '') === subgoalId) {
-            if (!goalId || String(items[i].goalId || '') === goalId) return items[i];
+          if (String(items[i].taskId || '') === taskId) {
+            if (!missionId || String(items[i].missionId || '') === missionId) return items[i];
           }
         }
       }
       if (agentId) {
         var agentItems = items.filter(function (it) {
-          return it.kind === 'subgoal' &&
+          return it.kind === 'task' &&
             String(it.assignee || it.agentId || '') === agentId &&
             String(it.status || '') !== 'done';
         });
@@ -4244,13 +4255,13 @@
         }
         if (agentItems.length) return agentItems[0];
       }
-      if (title && !subgoalId && !goalId) {
+      if (title && !taskId && !missionId) {
         var byTitleOnly = findMissionTaskItemByTitle(title);
         if (byTitleOnly) return byTitleOnly;
       }
-      if (title && goalId) {
+      if (title && missionId) {
         for (i = 0; i < items.length; i++) {
-          if (String(items[i].goalId || '') === goalId &&
+          if (String(items[i].missionId || '') === missionId &&
             String(items[i].title || '').toLowerCase().indexOf(title.slice(0, 40)) >= 0) {
             return items[i];
           }
@@ -4264,13 +4275,13 @@
       if (!aid) return null;
       var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       var active = items.filter(function (it) {
-        return it.kind === 'subgoal' &&
+        return it.kind === 'task' &&
           String(it.assignee || it.agentId || '') === aid &&
           (it.status === 'blocked' || it.status === 'doing' || it.status === 'todo');
       });
       if (active.length === 1) return active[0];
       ctx = ctx || (teamAgentContextSnapshot.agents || {})[aid] || {};
-      var needle = String(ctx.currentStep || ctx.currentGoal || ctx.currentThought || ctx.lastAction || '').trim().toLowerCase();
+      var needle = String(ctx.currentStep || ctx.currentMission || ctx.currentThought || ctx.lastAction || '').trim().toLowerCase();
       if (needle) {
         for (var i = 0; i < active.length; i++) {
           var t = String(active[i].title || '').toLowerCase();
@@ -4283,24 +4294,24 @@
     function buildMissionTaskTimeline(item, limit) {
       limit = Math.max(4, Number(limit) || 14);
       if (!item) return [];
-      var goalId = String(item.goalId || '');
-      var subgoalId = String(item.subgoalId || '');
+      var missionId = String(item.missionId || '');
+      var taskId = String(item.taskId || '');
       var assignee = String(item.assignee || item.agentId || '');
       var titleNeedle = String(item.title || '').trim().toLowerCase().slice(0, 48);
       var matched = [];
       (teamActivityEvents || []).forEach(function (ev) {
         if (!ev) return;
         var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
-        var evGoalId = String(details.goalId || ev.goalId || '');
-        var evSubId = String(details.subgoalId || '');
+        var evMissionId = String(details.missionId || ev.missionId || '');
+        var evSubId = String(details.taskId || '');
         var hit = false;
-        if (subgoalId && evSubId === subgoalId) hit = true;
-        if (!hit && subgoalId && String(ev.type || '') === 'initiative_auto_promoted' &&
+        if (taskId && evSubId === taskId) hit = true;
+        if (!hit && taskId && String(ev.type || '') === 'suggestedTask_auto_promoted' &&
           String(ev.title || details.title || '').toLowerCase().indexOf(titleNeedle.slice(0, 24)) >= 0) {
           hit = true;
         }
-        if (!hit && goalId && evGoalId === goalId) {
-          if (!subgoalId || !titleNeedle) hit = true;
+        if (!hit && missionId && evMissionId === missionId) {
+          if (!taskId || !titleNeedle) hit = true;
           else {
             var blob = (String(ev.message || '') + ' ' + String(ev.title || details.title || '')).toLowerCase();
             if (blob.indexOf(titleNeedle.slice(0, 24)) >= 0) hit = true;
@@ -4333,8 +4344,8 @@
         if (msg) line += ' — ' + msg;
       } else if (type === 'delegation_done') {
         line = target + ' replied to ' + agent;
-      } else if (type === 'initiative_auto_promoted') {
-        line = 'Added to mission' + (msg ? ': ' + humanizeTeamActivityMessage(msg).replace(/^Added initiative to mission:\s*/i, '') : '');
+      } else if (type === 'suggestedTask_auto_promoted') {
+        line = 'Added to mission' + (msg ? ': ' + humanizeTeamActivityMessage(msg).replace(/^Added suggestedTask to mission:\s*/i, '') : '');
       } else if (type === 'skill_start' || type === 'skill_done') {
         line = agent + ' ' + (type === 'skill_done' ? 'finished' : 'started') + ' ' + String(ev.skillId || 'work');
       } else if (type === 'turn_start') {
@@ -4370,25 +4381,25 @@
       return '';
     }
 
-    function parseGoalTickActivityLines(message) {
+    function parseMissionTickActivityLines(message) {
       var msg = humanizeTeamActivityMessage(String(message || '')).trim();
       if (!msg) return [];
       var lines = [];
-      var initMatch = msg.match(/(?:proposals|initiatives) created=(\d+)/i);
+      var initMatch = msg.match(/(?:proposals|suggestedTasks) created=(\d+)/i);
       if (initMatch && Number(initMatch[1]) > 0) {
         var n = Number(initMatch[1]);
-        lines.push('Proposed ' + n + ' initiative' + (n === 1 ? '' : 's'));
+        lines.push('Proposed ' + n + ' suggestedTask' + (n === 1 ? '' : 's'));
       }
       var mergedMatch = msg.match(/merged=(\d+)/i);
       if (mergedMatch && Number(mergedMatch[1]) > 0 && !initMatch) {
         var m = Number(mergedMatch[1]);
-        lines.push('Merged ' + m + ' initiative' + (m === 1 ? '' : 's'));
+        lines.push('Merged ' + m + ' suggestedTask' + (m === 1 ? '' : 's'));
       }
       var parts = msg.split(/\s*\|\s*/).map(function (part) { return part.trim(); }).filter(Boolean);
       parts.forEach(function (part) {
-        if (/^(?:proposals|initiatives) created=/i.test(part) || /^merged=/i.test(part)) return;
-        if (/^New subgoals:/i.test(part)) {
-          lines.push(part.replace(/^New subgoals:\s*/i, 'Added tasks: '));
+        if (/^(?:proposals|suggestedTasks) created=/i.test(part) || /^merged=/i.test(part)) return;
+        if (/^New tasks:/i.test(part)) {
+          lines.push(part.replace(/^New tasks:\s*/i, 'Added tasks: '));
           return;
         }
         if (/^Summary:/i.test(part)) {
@@ -4451,21 +4462,21 @@
         }
         return humanizeAgentSkillLabel(event.skillId, event.action, msg);
       }
-      if (type === 'goal_tick_done' || type === 'goal_tick_start') {
-        return parseGoalTickActivityLines(msg || title).join('\n');
+      if (type === 'mission_tick_done' || type === 'mission_tick_start') {
+        return parseMissionTickActivityLines(msg || title).join('\n');
       }
-      if (type === 'initiative_scan_done') {
+      if (type === 'suggestedTask_scan_done') {
         var created = msg.match(/created=(\d+)/i);
         if (created && Number(created[1]) > 0) {
           var n = Number(created[1]);
-          return 'Created ' + n + ' initiative' + (n === 1 ? '' : 's');
+          return 'Created ' + n + ' suggestedTask' + (n === 1 ? '' : 's');
         }
       }
-      if (type === 'initiative_auto_promoted') {
+      if (type === 'suggestedTask_auto_promoted') {
         var initTitle = title || String(details.title || '').trim();
-        return initTitle ? ('Added initiative: ' + initTitle) : 'Added initiative to mission';
+        return initTitle ? ('Added suggestedTask: ' + initTitle) : 'Added suggestedTask to mission';
       }
-      if (type === 'goal_subgoal_created') {
+      if (type === 'mission_task_created') {
         return title ? ('Added task: ' + title) : humanizeTeamActivityMessage(msg);
       }
       if (type === 'curiosity_momentum_done' || type === 'curiosity_suggestion' || type === 'curiosity_idle_check') {
@@ -4538,7 +4549,7 @@
     window.buildAgentLastTaskSummary = buildAgentLastTaskSummary;
 
     window.openMissionWorkInputModal = openMissionWorkInputModal;
-    window.patchMissionSubgoalStatus = patchMissionSubgoalStatus;
+    window.patchMissionTaskStatus = patchMissionTaskStatus;
     window.findMissionTaskItem = findMissionTaskItem;
     window.findMissionTaskItemByTitle = findMissionTaskItemByTitle;
     window.findMissionTaskForAgent = findMissionTaskForAgent;
@@ -4553,11 +4564,11 @@
     window.missionTaskDisplayTitle = missionTaskDisplayTitle;
     window.wireMissionTaskActions = wireMissionTaskActions;
     window.missionTaskActionButtonsHtml = missionTaskActionButtonsHtml;
-    window.runMissionGoalAction = runMissionGoalAction;
+    window.runMissionMissionAction = runMissionMissionAction;
     window.removeMissionTask = removeMissionTask;
-    window.openInitiativeForSubgoal = openInitiativeForSubgoal;
-    window.goalNeedsAttention = goalNeedsAttention;
-    window.countBlockedSubgoalsForGoal = countBlockedSubgoalsForGoal;
+    window.openSuggestedTaskForTask = openSuggestedTaskForTask;
+    window.missionNeedsAttention = missionNeedsAttention;
+    window.countBlockedTasksForMission = countBlockedTasksForMission;
 
     function renderTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');
@@ -4567,29 +4578,29 @@
         return;
       }
       if (!modal) return;
-      var goals = getGoalsNeedingUserInput().filter(function (g) {
+      var missions = getMissionsNeedingUserInput().filter(function (g) {
         return !teamUserInputDismissed[teamUserInputDismissKey(g)];
       });
       if (modalOpen) {
-        if (teamUserInputGoalId) {
-          var current = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; });
+        if (teamUserInputMissionId) {
+          var current = missions.find(function (g) { return String(g.id || '') === teamUserInputMissionId; });
           if (current) return;
         }
-        if (!goals.length) return;
-        var queued = goals[0];
-        if (teamUserInputGoalId === String(queued.id || '')) return;
+        if (!missions.length) return;
+        var queued = missions[0];
+        if (teamUserInputMissionId === String(queued.id || '')) return;
         openTeamUserInputModal(queued);
         return;
       }
-      if (!goals.length) {
+      if (!missions.length) {
         closeTeamUserInputModal();
         return;
       }
-      openTeamUserInputModal(goals[0]);
+      openTeamUserInputModal(missions[0]);
     }
 
     async function submitTeamUserInputResponse(responseText) {
-      if (teamUserInputSubmitBusy || !teamUserInputGoalId) return;
+      if (teamUserInputSubmitBusy || !teamUserInputMissionId) return;
       var text = String(responseText || '').trim();
       if (!text) {
         showTeamUserInputModalError('Enter a response or pick a quick option.');
@@ -4600,7 +4611,7 @@
       if (submitBtn) submitBtn.disabled = true;
       showTeamUserInputModalError('');
       try {
-        var r = await fetch(API + '/api/goals/' + encodeURIComponent(teamUserInputGoalId) + '/respond', {
+        var r = await fetch(API + '/api/missions/' + encodeURIComponent(teamUserInputMissionId) + '/respond', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ response: text }),
@@ -4611,7 +4622,7 @@
           return;
         }
         closeTeamUserInputModal();
-        await fetchGoalsSnapshot();
+        await fetchMissionsSnapshot();
         if (typeof renderMissionControl === 'function') renderMissionControl();
       } catch (err) {
         showTeamUserInputModalError(err && err.message ? err.message : String(err));
@@ -4626,9 +4637,9 @@
       teamUserInputModalWired = true;
       loadTeamUserInputDismissed();
       wireClick('team-user-input-modal-dismiss', function () {
-        var goals = getGoalsNeedingUserInput();
-        var goal = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; }) || goals[0];
-        if (goal) teamUserInputDismissed[teamUserInputDismissKey(goal)] = true;
+        var missions = getMissionsNeedingUserInput();
+        var mission = missions.find(function (g) { return String(g.id || '') === teamUserInputMissionId; }) || missions[0];
+        if (mission) teamUserInputDismissed[teamUserInputDismissKey(mission)] = true;
         saveTeamUserInputDismissed();
         closeTeamUserInputModal();
       });
@@ -4644,9 +4655,9 @@
       });
       wireEl('team-user-input-modal', 'click', function (ev) {
         if (ev.target === ev.currentTarget) {
-          var goals = getGoalsNeedingUserInput();
-          var goal = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; }) || goals[0];
-          if (goal) teamUserInputDismissed[teamUserInputDismissKey(goal)] = true;
+          var missions = getMissionsNeedingUserInput();
+          var mission = missions.find(function (g) { return String(g.id || '') === teamUserInputMissionId; }) || missions[0];
+          if (mission) teamUserInputDismissed[teamUserInputDismissKey(mission)] = true;
           saveTeamUserInputDismissed();
           closeTeamUserInputModal();
         }
@@ -4662,18 +4673,18 @@
     }
     wireTeamUserInputModal();
 
-    async function fetchInitiativesSnapshot() {
+    async function fetchSuggestedTasksSnapshot() {
       try {
-        var r = await fetch(API + '/api/initiatives');
+        var r = await fetch(API + '/api/suggestedTasks');
         if (!r.ok) return;
         var d = await r.json().catch(function () { return {}; });
-        teamInitiativesSnapshot = {
-          initiatives: Array.isArray(d.initiatives) ? d.initiatives : [],
+        teamSuggestedTasksSnapshot = {
+          suggestedTasks: Array.isArray(d.suggestedTasks) ? d.suggestedTasks : [],
           updatedAt: Number(d.updatedAt) || 0,
         };
       } catch (_) {}
-      renderInitiativesList();
-      renderGoalsList();
+      renderSuggestedTasksList();
+      renderMissionsList();
     }
 
     function startTeamActivityFeed() {
@@ -4681,15 +4692,15 @@
       fetchTeamActivityFeed();
       fetchTeamContextFeed();
       fetchTeamMetricsFeed();
-      fetchGoalsSnapshot();
-      fetchInitiativesSnapshot();
+      fetchMissionsSnapshot();
+      fetchSuggestedTasksSnapshot();
       if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
         fetchTeamMetricsFeed();
-        fetchGoalsSnapshot();
-        fetchInitiativesSnapshot();
+        fetchMissionsSnapshot();
+        fetchSuggestedTasksSnapshot();
         if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       }, TEAM_ACTIVITY_POLL_MS);
     }
@@ -4723,16 +4734,12 @@
     setTeamViewTab('cards');
 
     var teamTopTabRosterEl = document.getElementById('team-top-tab-roster');
-    var teamTopTabGoalsEl = document.getElementById('team-top-tab-goals');
-    var teamTopTabInitiativesEl = document.getElementById('team-top-tab-initiatives');
+    var teamTopTabMissionsEl = document.getElementById('team-top-tab-missions');
     if (teamTopTabRosterEl) {
       teamTopTabRosterEl.addEventListener('click', function () { setTeamTopTab('roster'); });
     }
-    if (teamTopTabGoalsEl) {
-      teamTopTabGoalsEl.addEventListener('click', function () { setTeamTopTab('goals'); });
-    }
-    if (teamTopTabInitiativesEl) {
-      teamTopTabInitiativesEl.addEventListener('click', function () { setTeamTopTab('initiatives'); });
+    if (teamTopTabMissionsEl) {
+      teamTopTabMissionsEl.addEventListener('click', function () { setTeamTopTab('missions'); });
     }
     setTeamTopTab('roster');
 
@@ -4756,24 +4763,24 @@
       });
     }
 
-    var teamGoalsRefreshEl = document.getElementById('team-goals-refresh');
-    if (teamGoalsRefreshEl) {
-      teamGoalsRefreshEl.addEventListener('click', function () { fetchGoalsSnapshot(); });
+    var teamMissionsRefreshEl = document.getElementById('team-missions-refresh');
+    if (teamMissionsRefreshEl) {
+      teamMissionsRefreshEl.addEventListener('click', function () { fetchMissionsSnapshot(); });
     }
-    var teamInitiativesRefreshEl = document.getElementById('team-initiatives-refresh');
-    if (teamInitiativesRefreshEl) {
-      teamInitiativesRefreshEl.addEventListener('click', function () { fetchInitiativesSnapshot(); });
+    var teamSuggestedTasksRefreshEl = document.getElementById('team-suggestedTasks-refresh');
+    if (teamSuggestedTasksRefreshEl) {
+      teamSuggestedTasksRefreshEl.addEventListener('click', function () { fetchSuggestedTasksSnapshot(); });
     }
-    var mc2InitiativesRefreshEl = document.getElementById('mc2-initiatives-refresh');
-    if (mc2InitiativesRefreshEl) {
-      mc2InitiativesRefreshEl.addEventListener('click', function () { fetchInitiativesSnapshot(); });
+    var mc2SuggestedTasksRefreshEl = document.getElementById('mc2-suggestedTasks-refresh');
+    if (mc2SuggestedTasksRefreshEl) {
+      mc2SuggestedTasksRefreshEl.addEventListener('click', function () { fetchSuggestedTasksSnapshot(); });
     }
-    var teamGoalCreateEl = document.getElementById('team-goal-create');
-    if (teamGoalCreateEl) {
-      teamGoalCreateEl.addEventListener('click', async function () {
-        var titleEl = document.getElementById('team-goal-title');
-        var objectiveEl = document.getElementById('team-goal-objective');
-        var ownerEl = document.getElementById('team-goal-owner');
+    var teamMissionCreateEl = document.getElementById('team-mission-create');
+    if (teamMissionCreateEl) {
+      teamMissionCreateEl.addEventListener('click', async function () {
+        var titleEl = document.getElementById('team-mission-title');
+        var objectiveEl = document.getElementById('team-mission-objective');
+        var ownerEl = document.getElementById('team-mission-owner');
         var title = titleEl ? String(titleEl.value || '').trim() : '';
         var objective = objectiveEl ? String(objectiveEl.value || '').trim() : '';
         var ownerAgentId = ownerEl ? String(ownerEl.value || '').trim() : 'main';
@@ -4781,9 +4788,9 @@
           if (objectiveEl) objectiveEl.focus();
           return;
         }
-        teamGoalCreateEl.disabled = true;
+        teamMissionCreateEl.disabled = true;
         try {
-          var resp = await fetch(API + '/api/goals', {
+          var resp = await fetch(API + '/api/missions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: title, objective: objective, ownerAgentId: ownerAgentId }),
@@ -4791,11 +4798,11 @@
           if (resp.ok) {
             if (titleEl) titleEl.value = '';
             if (objectiveEl) objectiveEl.value = '';
-            await fetchGoalsSnapshot();
-            setTeamTopTab('goals');
+            await fetchMissionsSnapshot();
+            setTeamTopTab('missions');
           }
         } catch (_) {}
-        teamGoalCreateEl.disabled = false;
+        teamMissionCreateEl.disabled = false;
       });
     }
 

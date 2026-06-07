@@ -11,40 +11,41 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-delegated-tasks-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createGoal, getGoal } = await import('../../lib/goals.js');
+    const { createMission, getMission } = await import('../../lib/missions.js');
     const {
-      createDelegatedSubgoal,
-      updateDelegatedSubgoalProgress,
-      recordDelegatedSubgoalReply,
-      completeDelegatedSubgoal,
-      failDelegatedSubgoal,
+      createDelegatedTask,
+      updateDelegatedTaskProgress,
+      recordDelegatedTaskReply,
+      completeDelegatedTask,
+      failDelegatedTask,
       DELEGATED_TASK_STATUSES,
-      listDelegatedSubgoalsForAgent,
-      listDelegatedSubgoalsForGoal,
+      listDelegatedTasksForAgent,
+      listDelegatedTasksForMission,
       buildDelegatedTasksContextBlock,
-      resolveGoalForDelegation,
+      resolveMissionForDelegation,
+      shouldPersistDelegatedTask,
     } = await import('../../lib/delegated-tasks.js');
-    const { buildGoalTickPrompt } = await import('../../lib/goals.js');
+    const { buildMissionTickPrompt } = await import('../../lib/missions.js');
     const { onAgentWaitingFor, readAgentContext } = await import('../../lib/agent-context-state.js');
 
-    const mission = createGoal({
+    const mission = createMission({
       title: 'Improve onboarding',
       objective: 'Increase activation rate',
       ownerAgentId: 'main',
       status: 'active',
-      subgoals: [
-        { id: 'research', title: 'Baseline metrics', status: 'doing', progress: 20, assignee: 'main', subgoals: [] },
+      tasks: [
+        { id: 'research', title: 'Baseline metrics', status: 'doing', progress: 20, assignee: 'main', tasks: [] },
       ],
     });
 
-    const resolved = resolveGoalForDelegation({
+    const resolved = resolveMissionForDelegation({
       callerAgentId: 'main',
       message: 'Continue improve onboarding research',
     });
-    assert(resolved?.id === mission.id, 'resolveGoalForDelegation finds active goal');
+    assert(resolved?.id === mission.id, 'resolveMissionForDelegation finds active mission');
 
-    const created = createDelegatedSubgoal({
-      goalId: mission.id,
+    const created = createDelegatedTask({
+      missionId: mission.id,
       assignee: 'marketer',
       delegatedFrom: 'main',
       title: 'Competitor signup audit',
@@ -52,22 +53,38 @@ async function main() {
       expectedOutput: '3 examples with 2 friction points each',
       dueInHours: 24,
     });
-    assert(created?.subgoal?.source === 'delegation', 'subgoal marked as delegation');
-    assert(created.subgoal.assignee === 'marketer', 'assignee set');
-    assert(created.subgoal.status === 'assigned', 'starts as assigned');
-    assert(created.subgoal.expectedOutput.includes('3 examples'), 'expected output stored');
+    assert(created?.task?.source === 'delegation', 'task marked as delegation');
+    assert(created.task.assignee === 'marketer', 'assignee set');
+    assert(created.task.status === 'assigned', 'starts as assigned');
+    assert(created.task.expectedOutput.includes('3 examples'), 'expected output stored');
     assert(DELEGATED_TASK_STATUSES.includes('review_ready'), 'delegated task statuses include review_ready');
+    assert(
+      shouldPersistDelegatedTask({
+        title: 'Competitor signup audit',
+        message: 'Review 3 competitor signup flows and list friction points.',
+        expectedOutput: '3 examples with 2 friction points each',
+      }),
+      'concrete delegated work should persist',
+    );
+    assert(
+      !shouldPersistDelegatedTask({
+        title: 'Increase customer sign-ups for NextpostAI',
+        message: 'How many tasks or todos are there with agents?',
+        expectedOutput: 'How many tasks or todos are there with agents?',
+      }),
+      'tracker status questions should not persist as delegated tasks',
+    );
 
-    const goalAfterAssign = getGoal(mission.id);
-    const flat = JSON.stringify(goalAfterAssign.subgoals);
-    assert(flat.includes('Competitor signup audit'), 'subgoal persisted on goal');
+    const missionAfterAssign = getMission(mission.id);
+    const flat = JSON.stringify(missionAfterAssign.tasks);
+    assert(flat.includes('Competitor signup audit'), 'task persisted on mission');
 
-    const forMarketer = listDelegatedSubgoalsForAgent('marketer');
+    const forMarketer = listDelegatedTasksForAgent('marketer');
     assert(forMarketer.length === 1, 'marketer has one delegated task');
-    assert(forMarketer[0].subgoalId === created.subgoal.id, 'listed subgoal id matches');
+    assert(forMarketer[0].taskId === created.task.id, 'listed task id matches');
 
-    const forGoal = listDelegatedSubgoalsForGoal(mission.id);
-    assert(forGoal.length === 1, 'goal lists delegated subgoal');
+    const forMission = listDelegatedTasksForMission(mission.id);
+    assert(forMission.length === 1, 'mission lists delegated task');
 
     const block = buildDelegatedTasksContextBlock('marketer');
     assert(/Assigned delegated tasks/.test(block), 'context block generated');
@@ -78,21 +95,21 @@ async function main() {
       targetAgentId: 'marketer',
       task: 'Review 3 competitor signup flows',
       delegatedTask: {
-        goalId: mission.id,
-        goalTitle: mission.title,
-        subgoalId: created.subgoal.id,
-        expectedOutput: created.subgoal.expectedOutput,
-        dueAt: created.subgoal.dueAt,
+        missionId: mission.id,
+        missionTitle: mission.title,
+        taskId: created.task.id,
+        expectedOutput: created.task.expectedOutput,
+        dueAt: created.task.dueAt,
       },
     });
     const marketerCtx = readAgentContext('marketer');
-    assert(marketerCtx.currentGoal === mission.title, 'target agent goal from mission');
+    assert(marketerCtx.currentMission === mission.title, 'target agent mission from mission');
     assert(marketerCtx.context.some((c) => c.includes('Expected')), 'target agent has expected output context');
 
-    recordDelegatedSubgoalReply({
-      goalId: mission.id,
-      subgoalId: created.subgoal.id,
-      expectedOutput: created.subgoal.expectedOutput,
+    recordDelegatedTaskReply({
+      missionId: mission.id,
+      taskId: created.task.id,
+      expectedOutput: created.task.expectedOutput,
     }, {
       replySummary: [
         'Delivered the final competitor signup audit.',
@@ -101,22 +118,22 @@ async function main() {
         '3. Competitor C: asks for role before showing product; friction points are delayed value and survey fatigue.',
       ].join('\n'),
     });
-    const reviewGoal = getGoal(mission.id);
-    const reviewSg = (reviewGoal.subgoals || []).find((sg) => sg.id === created.subgoal.id);
-    assert(reviewSg?.status === 'review_ready', 'satisfying reply marks subgoal review_ready');
+    const reviewMission = getMission(mission.id);
+    const reviewSg = (reviewMission.tasks || []).find((sg) => sg.id === created.task.id);
+    assert(reviewSg?.status === 'review_ready', 'satisfying reply marks task review_ready');
     assert(reviewSg?.progress === 90, 'review-ready progress set below done');
 
-    completeDelegatedSubgoal({
-      goalId: mission.id,
-      subgoalId: created.subgoal.id,
+    completeDelegatedTask({
+      missionId: mission.id,
+      taskId: created.task.id,
     }, { replySummary: 'Accepted by lead after review.' });
-    const doneGoal = getGoal(mission.id);
-    const doneSg = (doneGoal.subgoals || []).find((sg) => sg.id === created.subgoal.id);
-    assert(doneSg?.status === 'done', 'explicit completion marks subgoal done');
+    const doneMission = getMission(mission.id);
+    const doneSg = (doneMission.tasks || []).find((sg) => sg.id === created.task.id);
+    assert(doneSg?.status === 'done', 'explicit completion marks task done');
     assert(doneSg?.progress === 100, 'explicit completion sets progress to 100');
 
-    const vague = createDelegatedSubgoal({
-      goalId: mission.id,
+    const vague = createDelegatedTask({
+      missionId: mission.id,
       assignee: 'marketer',
       delegatedFrom: 'main',
       title: 'Launch plan',
@@ -124,50 +141,50 @@ async function main() {
       expectedOutput: 'launch checklist with channels dates owners and risks',
       dueInHours: 24,
     });
-    recordDelegatedSubgoalReply({
-      goalId: mission.id,
-      subgoalId: vague.subgoal.id,
-      expectedOutput: vague.subgoal.expectedOutput,
+    recordDelegatedTaskReply({
+      missionId: mission.id,
+      taskId: vague.task.id,
+      expectedOutput: vague.task.expectedOutput,
     }, { replySummary: 'We should make the launch feel exciting and focus on the right audience.' });
-    const vagueGoal = getGoal(mission.id);
-    const vagueSg = (vagueGoal.subgoals || []).find((sg) => sg.id === vague.subgoal.id);
+    const vagueMission = getMission(mission.id);
+    const vagueSg = (vagueMission.tasks || []).find((sg) => sg.id === vague.task.id);
     assert(vagueSg?.status === 'in_progress', 'vague specialist reply remains in_progress');
     assert(vagueSg?.status !== 'done', 'vague specialist reply is not auto-completed');
 
-    const blocked = createDelegatedSubgoal({
-      goalId: mission.id,
+    const blocked = createDelegatedTask({
+      missionId: mission.id,
       assignee: 'alex',
       delegatedFrom: 'main',
       title: 'CI failure triage',
       message: 'Investigate CI failures',
       dueInHours: 12,
     });
-    failDelegatedSubgoal({
-      goalId: mission.id,
-      subgoalId: blocked.subgoal.id,
+    failDelegatedTask({
+      missionId: mission.id,
+      taskId: blocked.task.id,
     }, 'Agent timeout');
-    const blockedGoal = getGoal(mission.id);
-    const blockedSg = (blockedGoal.subgoals || []).find((sg) => sg.id === blocked.subgoal.id);
-    assert(blockedSg?.status === 'blocked', 'failed delegation marks subgoal blocked');
+    const blockedMission = getMission(mission.id);
+    const blockedSg = (blockedMission.tasks || []).find((sg) => sg.id === blocked.task.id);
+    assert(blockedSg?.status === 'blocked', 'failed delegation marks task blocked');
 
-    updateDelegatedSubgoalProgress({
-      goalId: mission.id,
-      subgoalId: blocked.subgoal.id,
+    updateDelegatedTaskProgress({
+      missionId: mission.id,
+      taskId: blocked.task.id,
       status: 'in_progress',
       progress: 30,
     });
-    const reopened = getGoal(mission.id);
-    const reopenedSg = (reopened.subgoals || []).find((sg) => sg.id === blocked.subgoal.id);
+    const reopened = getMission(mission.id);
+    const reopenedSg = (reopened.tasks || []).find((sg) => sg.id === blocked.task.id);
     assert(reopenedSg?.status === 'in_progress', 'progress update patches status');
     assert(reopenedSg?.progress === 30, 'progress update patches pct');
 
-    const tickPrompt = buildGoalTickPrompt(getGoal(mission.id), {
-      memoryPath: '/tmp/goal-memory.md',
-      goalMemory: '',
+    const tickPrompt = buildMissionTickPrompt(getMission(mission.id), {
+      memoryPath: '/tmp/mission-memory.md',
+      missionMemory: '',
     });
-    assert(/Open delegated assignments/.test(tickPrompt), 'goal tick prompt lists delegated work');
-    assert(/agent-send creates persistent delegated subgoals/.test(tickPrompt), 'goal tick prompt explains structured delegation');
-    assert(/taskTitle/.test(tickPrompt), 'goal tick schema includes delegation fields');
+    assert(/Open delegated assignments/.test(tickPrompt), 'mission tick prompt lists delegated work');
+    assert(/agent-send creates persistent delegated tasks/.test(tickPrompt), 'mission tick prompt explains structured delegation');
+    assert(/taskTitle/.test(tickPrompt), 'mission tick schema includes delegation fields');
 
     console.log('test-delegated-tasks: all assertions passed');
   } finally {

@@ -114,7 +114,7 @@ async function main() {
     workDurability: {
       kind: 'new_mission_candidate',
       persistence: 'create_lightweight_mission',
-      goalId: 'goal-launch-testproduct',
+      missionId: 'mission-launch-testproduct',
       reason: 'Persistent launch work.',
     },
     llmChat: async () => JSON.stringify({

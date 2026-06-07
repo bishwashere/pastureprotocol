@@ -30,7 +30,7 @@ async function main() {
     });
     let main = readAgentContext('main');
     assert(main.state === 'working', 'main working on turn start');
-    assert(main.currentGoal === '', `no inferred goal in currentGoal: ${main.currentGoal}`);
+    assert(main.currentMission === '', `no inferred mission in currentMission: ${main.currentMission}`);
     assert(main.currentThought && main.currentThought.includes('blog ideas'), `thought reflects task: ${main.currentThought}`);
     assert(main.currentThought && main.currentThought.includes('Reviewing'), `thought: ${main.currentThought}`);
     assert(main.lastAction === 'Received user message', `lastAction: ${main.lastAction}`);
@@ -40,7 +40,7 @@ async function main() {
       agentId: 'main',
       targetAgentId: 'marketer',
       task: 'blog ideas for nextpostai.com',
-      targetGoal: 'Generate marketing ideas',
+      targetMission: 'Generate marketing ideas',
     });
     main = readAgentContext('main');
     const marketer = readAgentContext('marketer');
@@ -49,7 +49,7 @@ async function main() {
     assert(main.lastAction && main.lastAction.includes('Delegated'), `delegation action: ${main.lastAction}`);
     assert(main.currentThought && main.currentThought.includes('Waiting'), `waiting thought: ${main.currentThought}`);
     assert(marketer.state === 'working', 'marketer working');
-    assert(marketer.currentGoal === 'Generate marketing ideas', 'marketer goal set');
+    assert(marketer.currentMission === 'Generate marketing ideas', 'marketer mission set');
     assert(marketer.lastAction && marketer.lastAction.includes('Received delegated'), `marketer last: ${marketer.lastAction}`);
 
     onAgentTurnStart({
@@ -65,7 +65,7 @@ async function main() {
     onAgentTurnDone({ agentId: 'marketer' });
     const marketerIdle = readAgentContext('marketer');
     assert(marketerIdle.state === 'idle', 'marketer idle after delegation');
-    assert(marketerIdle.currentGoal === '', `marketer goal cleared when idle: ${marketerIdle.currentGoal}`);
+    assert(marketerIdle.currentMission === '', `marketer mission cleared when idle: ${marketerIdle.currentMission}`);
 
     onAgentDelegationDone({ callerAgentId: 'main', targetAgentId: 'marketer' });
     assert(readAgentContext('marketer').state === 'idle', 'marketer idle after delegation done');
@@ -89,13 +89,13 @@ async function main() {
     });
     onAgentSkillStart({ agentId: 'developer', skillId: 'read' });
     const dev = readAgentContext('developer');
-    assert(dev.currentGoal === '', `no inferred dev goal: ${dev.currentGoal}`);
+    assert(dev.currentMission === '', `no inferred dev mission: ${dev.currentMission}`);
     assert(dev.currentStep === 'Reading files', `dev step: ${dev.currentStep}`);
 
     onAgentTurnDone({ agentId: 'developer' });
     const devIdle = readAgentContext('developer');
     assert(devIdle.state === 'idle', 'developer idle after turn');
-    assert(devIdle.currentGoal === '', `developer goal cleared when idle: ${devIdle.currentGoal}`);
+    assert(devIdle.currentMission === '', `developer mission cleared when idle: ${devIdle.currentMission}`);
 
     onAgentTurnStart({
       agentId: 'main',
@@ -104,7 +104,7 @@ async function main() {
     });
     onAgentTurnDone({ agentId: 'main' });
     const mainIdle = readAgentContext('main');
-    assert(mainIdle.currentGoal === '', `stale Answer user question cleared: ${mainIdle.currentGoal}`);
+    assert(mainIdle.currentMission === '', `stale Answer user question cleared: ${mainIdle.currentMission}`);
     assert(mainIdle.currentThought.includes('Standing by'), `main idle thought: ${mainIdle.currentThought}`);
 
     const { writeFileSync, mkdirSync } = await import('fs');
@@ -117,7 +117,7 @@ async function main() {
         main: {
           agentId: 'main',
           state: 'idle',
-          currentGoal: 'Answer user question',
+          currentMission: 'Answer user question',
           currentThought: 'Standing by for the next task.',
           currentStep: '',
           waitingFor: '',
@@ -130,7 +130,7 @@ async function main() {
       updatedAt: Date.now(),
     }), 'utf8');
     const staleRead = readAgentContext('main');
-    assert(staleRead.currentGoal === '', `read sanitizes stale idle goal: ${staleRead.currentGoal}`);
+    assert(staleRead.currentMission === '', `read sanitizes stale idle mission: ${staleRead.currentMission}`);
 
     const all = readAllAgentContext();
     assert(all.agents.main, 'snapshot includes main');

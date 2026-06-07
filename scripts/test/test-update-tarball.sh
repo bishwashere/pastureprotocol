@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify install/update tarball extract finds pastureprotocol-master (not hardcoded cowCode-*).
+# Verify install/update tarball extract finds pastureprotocol-master (not hardcoded Pasture-*).
 set -e
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK=$(mktemp -d)

@@ -27,7 +27,7 @@ if (!chatId || !String(chatId).trim()) {
 }
 
 const bot = new TelegramBot(token.trim(), { polling: false });
-const text = `CowCode send test: ${new Date().toISOString()}`;
+const text = `Pasture send test: ${new Date().toISOString()}`;
 
 try {
   const sent = await bot.sendMessage(chatId.trim(), text);

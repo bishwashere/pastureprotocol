@@ -11,33 +11,33 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-curiosity-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createGoal, getGoal, getGoalMemoryPath } = await import('../../lib/goals.js');
+    const { createMission, getMission, getMissionMemoryPath } = await import('../../lib/missions.js');
     const {
       buildCuriosityMomentumPrompt,
-      listCuriosityCandidateGoals,
+      listCuriosityCandidateMissions,
       parseCuriositySuggestion,
       applyCuriositySuggestion,
-      runCuriosityMomentumForGoal,
+      runCuriosityMomentumForMission,
       runCuriosityMomentumCycle,
     } = await import('../../lib/curiosity-momentum.js');
 
-    const mission = createGoal({
+    const mission = createMission({
       title: 'Grow signups',
       objective: 'Increase signups',
       ownerAgentId: 'marketer',
       status: 'active',
-      subgoals: [
-        { id: 'research', title: 'Competitor signup research', status: 'todo', progress: 0, assignee: 'marketer', subgoals: [] },
+      tasks: [
+        { id: 'research', title: 'Competitor signup research', status: 'todo', progress: 0, assignee: 'marketer', tasks: [] },
       ],
     });
 
     const prompt = buildCuriosityMomentumPrompt(mission, {
-      memoryPath: '/tmp/goal-memory.md',
-      goalMemory: 'Previous tick reviewed landing page.',
+      memoryPath: '/tmp/mission-memory.md',
+      missionMemory: 'Previous tick reviewed landing page.',
       idleHours: 2.5,
     });
     assert(/IDLE SUGGESTION check/.test(prompt), 'curiosity prompt is suggestion-only');
-    assert(/NOT a goal tick/.test(prompt), 'curiosity prompt says it is not a goal tick');
+    assert(/NOT a mission tick/.test(prompt), 'curiosity prompt says it is not a mission tick');
     assert(/Do NOT bump progressPct/.test(prompt), 'curiosity prompt forbids progress changes');
     assert(/hasSafeNextStep/.test(prompt), 'curiosity prompt includes suggestion schema');
 
@@ -46,53 +46,53 @@ async function main() {
       suggestion: 'Read package.json for analytics deps',
       safeNextStep: 'Confirm analytics stack via package.json',
       rationale: 'Read-only and matches open research',
-      existingSubgoalId: 'research',
+      existingTaskId: 'research',
     }));
     assert(parsed.hasSafeNextStep === true, 'parser accepts safe suggestion');
     assert(parsed.suggestion.includes('package.json'), 'parser keeps suggestion text');
 
-    const idleMission = createGoal({
+    const idleMission = createMission({
       title: 'Idle mission',
       objective: 'Should appear as curiosity candidate',
       ownerAgentId: 'main',
       status: 'active',
     });
     const oldTouch = Date.now() - (3 * 60 * 60_000);
-    const { updateGoal } = await import('../../lib/goals.js');
-    updateGoal(idleMission.id, {
+    const { updateMission } = await import('../../lib/missions.js');
+    updateMission(idleMission.id, {
       lastRunAt: oldTouch,
       lastCuriosityAt: 0,
       nextRunAt: Date.now() + 60_000,
     });
-    updateGoal(mission.id, { lastRunAt: Date.now() - (30 * 60_000), nextRunAt: Date.now() + 60_000 });
+    updateMission(mission.id, { lastRunAt: Date.now() - (30 * 60_000), nextRunAt: Date.now() + 60_000 });
 
-    const candidates = listCuriosityCandidateGoals({
+    const candidates = listCuriosityCandidateMissions({
       now: Date.now(),
       idleMs: 2 * 60 * 60_000,
     });
     assert(candidates.some((g) => g.id === idleMission.id), 'idle mission listed as curiosity candidate');
     assert(!candidates.some((g) => g.id === mission.id), 'recently active mission not a curiosity candidate');
 
-    const dueMission = createGoal({
+    const dueMission = createMission({
       title: 'Due for tick',
-      objective: 'Should be handled by goal engine instead',
+      objective: 'Should be handled by mission engine instead',
       ownerAgentId: 'main',
       status: 'active',
     });
-    updateGoal(dueMission.id, {
+    updateMission(dueMission.id, {
       lastRunAt: oldTouch,
       lastCuriosityAt: 0,
       nextRunAt: Date.now() - 1000,
     });
-    const candidatesExcludingDue = listCuriosityCandidateGoals({
+    const candidatesExcludingDue = listCuriosityCandidateMissions({
       now: Date.now(),
       idleMs: 2 * 60 * 60_000,
     });
     assert(!candidatesExcludingDue.some((g) => g.id === dueMission.id), 'due missions excluded from curiosity');
 
-    const beforePct = getGoal(idleMission.id).progress.pct;
-    const tickResult = await runCuriosityMomentumForGoal(idleMission.id, {
-      runGoalTurn: async () => ({
+    const beforePct = getMission(idleMission.id).progress.pct;
+    const tickResult = await runCuriosityMomentumForMission(idleMission.id, {
+      runMissionTurn: async () => ({
         textToSend: JSON.stringify({
           hasSafeNextStep: true,
           suggestion: 'Draft 3 competitor signup notes.',
@@ -103,42 +103,42 @@ async function main() {
       }),
     });
     assert(tickResult.suggestion.hasSafeNextStep === true, 'curiosity pass returns suggestion');
-    assert(/Idle suggestion:/.test(tickResult.goal.lastActivity), 'goal lastActivity tagged as idle suggestion');
-    assert(Number(getGoal(idleMission.id).lastCuriosityAt) > 0, 'lastCuriosityAt recorded');
-    assert(getGoal(idleMission.id).progress.pct === beforePct, 'curiosity does not change progress');
-    assert((getGoal(idleMission.id).subgoals || []).length === 0, 'curiosity does not create subgoals');
-    const memoryPath = getGoalMemoryPath(idleMission.id);
-    assert(existsSync(memoryPath), 'curiosity appends goal memory file');
-    assert(/Idle suggestion:/.test(readFileSync(memoryPath, 'utf8')), 'goal memory records idle suggestion');
+    assert(/Idle suggestion:/.test(tickResult.mission.lastActivity), 'mission lastActivity tagged as idle suggestion');
+    assert(Number(getMission(idleMission.id).lastCuriosityAt) > 0, 'lastCuriosityAt recorded');
+    assert(getMission(idleMission.id).progress.pct === beforePct, 'curiosity does not change progress');
+    assert((getMission(idleMission.id).tasks || []).length === 0, 'curiosity does not create tasks');
+    const memoryPath = getMissionMemoryPath(idleMission.id);
+    assert(existsSync(memoryPath), 'curiosity appends mission memory file');
+    assert(/Idle suggestion:/.test(readFileSync(memoryPath, 'utf8')), 'mission memory records idle suggestion');
 
-    const noStepMission = createGoal({
+    const noStepMission = createMission({
       title: 'Nothing safe',
       objective: 'Idle with no suggestion',
       ownerAgentId: 'main',
       status: 'active',
     });
-    updateGoal(noStepMission.id, {
+    updateMission(noStepMission.id, {
       lastRunAt: oldTouch,
       nextRunAt: Date.now() + 60_000,
     });
-    const noStepResult = await runCuriosityMomentumForGoal(noStepMission.id, {
-      runGoalTurn: async () => ({
+    const noStepResult = await runCuriosityMomentumForMission(noStepMission.id, {
+      runMissionTurn: async () => ({
         textToSend: JSON.stringify({ hasSafeNextStep: false, suggestion: '' }),
         skillsCalled: [],
       }),
     });
-    assert(/Idle check:/.test(noStepResult.goal.lastActivity), 'no suggestion records idle check only');
+    assert(/Idle check:/.test(noStepResult.mission.lastActivity), 'no suggestion records idle check only');
 
     const cycle = await runCuriosityMomentumCycle({
       force: true,
       minIntervalMs: 0,
       idleMs: 2 * 60 * 60_000,
-      excludeGoalIds: [idleMission.id],
-      runGoalTurn: async () => ({
+      excludeMissionIds: [idleMission.id],
+      runMissionTurn: async () => ({
         textToSend: JSON.stringify({
           hasSafeNextStep: true,
           suggestion: 'Light read-only research pass.',
-          safeNextStep: 'Review open subgoals and pick the smallest next step.',
+          safeNextStep: 'Review open tasks and pick the smallest next step.',
         }),
         skillsCalled: [],
       }),
@@ -147,7 +147,7 @@ async function main() {
 
     const interval = await runCuriosityMomentumCycle({
       minIntervalMs: 60 * 60_000,
-      runGoalTurn: async () => ({ textToSend: '{}' }),
+      runMissionTurn: async () => ({ textToSend: '{}' }),
     });
     assert(interval.skipped === 'interval', 'cycle respects interval guard');
 

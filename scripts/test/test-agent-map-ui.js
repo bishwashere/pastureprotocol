@@ -110,10 +110,10 @@ const checks = [
     ok: html.includes('id="page-team"') && html.includes('id="team-map-canvas"'),
   },
   {
-    name: 'Team page has top-level Roster Goals Initiatives tabs',
+    name: 'Team page has top-level Roster and Missions tabs',
     ok: html.includes('id="team-top-tab-roster"') &&
-      html.includes('id="team-top-tab-goals"') &&
-      html.includes('id="team-top-tab-initiatives"') &&
+      html.includes('id="team-top-tab-missions"') &&
+      !html.includes('id="team-top-tab-suggestedTasks"') &&
       html.includes('setTeamTopTab'),
   },
   {
@@ -121,14 +121,14 @@ const checks = [
     ok: html.includes('id="team-top-tab-desc"') &&
       html.includes('TEAM_TOP_TAB_DESC') &&
       html.includes('Long-running missions your agents work on autonomously') &&
-      html.includes('Agent proposals from mission reflection and team activity'),
+      !html.includes('Agent proposals from mission reflection and team activity'),
   },
   {
-    name: 'Team page includes goals UI and API hooks',
-    ok: html.includes('id="team-goals-list"') &&
-      html.includes('id="team-goal-create"') &&
-      html.includes('/api/goals') &&
-      html.includes('fetchGoalsSnapshot'),
+    name: 'Team page includes missions UI and API hooks',
+    ok: html.includes('id="team-missions-list"') &&
+      html.includes('id="team-mission-create"') &&
+      html.includes('/api/missions') &&
+      html.includes('fetchMissionsSnapshot'),
   },
   {
     name: 'Team user input modal appears on team main view when mission needs input',
@@ -139,29 +139,33 @@ const checks = [
       html.includes('isTeamUserInputModalOpen') &&
       /if \(modalOpen\)[\s\S]{0,220}return;/.test(html) &&
       /function renderMissionControl\(\)[\s\S]{0,120}shouldPauseTeamDashboardRefresh/.test(html) &&
-      html.includes('/api/goals/') &&
+      html.includes('/api/missions/') &&
       html.includes('/respond') &&
       html.includes('team-user-input-modal-submit') &&
       html.includes('Implementation blocked') &&
       html.includes('Research continues'),
   },
   {
-    name: 'Goals tab includes detail pane with subgoal tree',
-    ok: html.includes('id="team-goal-detail"') &&
-      html.includes('renderGoalDetail') &&
-      html.includes('renderGoalSubgoalTree') &&
-      html.includes('depends_on'),
+    name: 'Missions tab includes detail pane with task tree',
+    ok: html.includes('id="team-mission-detail"') &&
+      html.includes('renderMissionDetail') &&
+      html.includes('renderMissionTaskTree') &&
+      html.includes('dependsOn'),
   },
   {
-    name: 'Initiatives tab includes list detail and API hooks',
-    ok: html.includes('id="team-initiatives-view"') &&
-      html.includes('id="team-initiatives-list"') &&
-      html.includes('id="team-initiative-detail"') &&
-      html.includes('/api/initiatives') &&
-      html.includes('fetchInitiativesSnapshot') &&
-      html.includes('renderInitiativesList') &&
-      html.includes('data-init-action="promote-goal"') &&
-      html.includes('undoInitiativePromotion'),
+    name: 'AI suggestions are handled as task-labeled work',
+    ok: !html.includes('id="team-suggestedTasks-view"') &&
+      html.includes('/api/suggestedTasks') &&
+      html.includes('fetchSuggestedTasksSnapshot') &&
+      html.includes('renderSuggestedTasksList') &&
+      html.includes('mc-task-card-label') &&
+      html.includes('AI suggested'),
+  },
+  {
+    name: 'Task UI filters chat-derived delegated status rows',
+    ok: html.includes('mc2IsChatDerivedDelegatedTask') &&
+      html.includes('mc2LooksLikeProjectMetaTaskText') &&
+      /if \(mc2IsChatDerivedDelegatedTask\(sg\)\) return;/.test(html),
   },
   {
     name: 'Team page includes live activity panel',
@@ -271,43 +275,40 @@ const checks = [
       html.includes('computeTeamTaskSummary') &&
       html.includes('getCurrentMission') &&
       html.includes('getLiveMissionFromTeamContext') &&
-      html.includes('missionSubgoalIcon') &&
+      html.includes('missionTaskIcon') &&
       html.includes('Blocked:') &&
       html.includes('Completed Today') &&
       /\.team-page-summary[\s\S]*\.team-current-mission/.test(html) &&
       /\.team-task-summary[\s\S]*\.team-task-badge/.test(html),
   },
   {
-    name: 'Team2 presents saved goals as missions',
+    name: 'Team2 presents saved missions as missions',
     ok: html.includes('id="mc2-mission-select"') &&
-      html.includes('data-mc-nav="initiatives"') &&
-      html.includes('id="mc2-view-initiatives"') &&
-      html.includes('id="mc2-initiatives-list"') &&
-      html.includes('id="mc2-initiative-detail"') &&
-      html.includes('data-init-action="approve-subgoal"') &&
+      !html.includes('data-mc-nav="suggestedTasks"') &&
+      html.includes('data-mc-nav="tasks"') &&
+      html.includes('id="mc2-view-tasks"') &&
+      html.includes('mc-task-card-label') &&
+      html.includes('AI suggested') &&
+      html.includes('data-init-action="approve-task"') &&
       html.includes('data-init-action="undo-promotion"') &&
-      html.includes('initiative_auto_promoted') &&
-      html.includes('Added initiative to mission') &&
+      html.includes('suggestedTask_auto_promoted') &&
+      html.includes('Added suggestedTask to mission') &&
       html.includes('data-mc-movement-nav') &&
       html.includes('buildMissionControlMovementGroups') &&
       html.includes('MC2_PINNED_MOVEMENT_TYPES') &&
       appJs.includes('return out.sort(function (a, b)') &&
       html.includes('missionTaskActionButtonsHtml') &&
       html.includes('wireMissionTaskActions') &&
-      html.includes('data-mc-goal-action') &&
-      html.includes('review-initiative') &&
+      html.includes('data-mc-mission-action') &&
+      html.includes('review-suggestedTask') &&
       html.includes('id="mc2-task-detail"') &&
       html.includes('mc2OpenTaskDetail') &&
       html.includes('buildMissionTaskTimeline') &&
       html.includes('mc-task-timeline') &&
-      html.includes('renderInitiativesPanels') &&
-      html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&
       html.includes('aria-label="Missions"') &&
       html.includes('MISSIONS') &&
-      html.includes('INITIATIVES') &&
       html.includes('Loading missions') &&
-      html.includes('Loading initiatives') &&
       html.includes('No missions yet') &&
       html.includes('Untitled mission') &&
       html.includes('Active mission'),
@@ -374,6 +375,7 @@ const checks = [
       html.includes('mc2MissionTaskCard') &&
       html.includes('mc2TaskDisplayTitle') &&
       html.includes('mc-task-card') &&
+      html.includes('No completed mission tasks for this range') &&
       html.includes('View completed tasks'),
   },
   {
@@ -387,15 +389,15 @@ const checks = [
       html.includes('mc-mission-task-card') &&
       html.includes('data-mc-task-action="respond"') &&
       html.includes('openMissionWorkInputModal') &&
-      html.includes('goalNeedsAttention') &&
-      html.includes('countBlockedSubgoalsForGoal') &&
+      html.includes('missionNeedsAttention') &&
+      html.includes('countBlockedTasksForMission') &&
       html.includes('View blocked tasks and subtasks'),
   },
   {
-    name: 'Team2 attention lists blocked subgoals needing input',
-    ok: html.includes('countBlockedSubgoalsForGoal') &&
-      html.includes('goalNeedsAttention') &&
-      html.includes('goalAttentionPrompt') &&
+    name: 'Team2 attention lists blocked tasks needing input',
+    ok: html.includes('countBlockedTasksForMission') &&
+      html.includes('missionNeedsAttention') &&
+      html.includes('missionAttentionPrompt') &&
       html.includes('data-mc-task-action="respond"'),
   },
   {
@@ -404,7 +406,7 @@ const checks = [
       html.includes('window.navigateToBlockedWork') &&
       html.includes('scheduleScrollToBlockedTarget') &&
       html.includes('navigateToBlockedWork') &&
-      html.includes('data-mission-subgoal-id') &&
+      html.includes('data-mission-task-id') &&
       html.includes('mission-blocked'),
   },
   {

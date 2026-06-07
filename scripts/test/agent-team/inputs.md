@@ -31,7 +31,7 @@ Run config contracts: `pnpm run test:agent-config` (see **agent-config** in Test
 | Two-turn marketing lane + ask | Turn1: Taglines, campaigns, and brand stuff should go through whoever owns marketing on the team. Turn2: What's our company tagline for marketing materials? |
 | Backend not linked | Can you investigate why our GitHub CI check is failing and propose a fix? |
 | Backend linked again | Can you investigate why our GitHub CI check is failing and propose a fix? |
-| Initiative-style risk + experiment prompt | Users drop off right after signup. What risk should we prioritize first, and what small experiment should we run this week? |
+| SuggestedTask-style risk + experiment prompt | Users drop off right after signup. What risk should we prioritize first, and what small experiment should we run this week? |
 | Proactive feasibility review | We have an onboarding improvement idea. Can you review technical feasibility and rollout risks before we proceed? |
 | Team count + recent movements | How many agents are there, and what are the recent movements? |
 | Named agent last five tasks | What did Alex do in his last five tasks? |

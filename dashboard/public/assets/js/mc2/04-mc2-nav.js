@@ -2,7 +2,7 @@
     function mc2SetView(view) {
       mc2ActiveView = view;
       var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
-      ['mission', 'agents', 'tasks', 'context', 'goals', 'initiatives', 'projects', 'activity', 'stats'].forEach(function (v) {
+      ['mission', 'agents', 'tasks', 'context', 'missions', 'projects', 'activity', 'stats'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
@@ -11,8 +11,7 @@
         btn.classList.toggle('active', nav === view);
       });
       if (visibleView === 'activity') mc2RenderActivity();
-      if (view === 'goals') mc2RenderGoals();
-      if (view === 'initiatives') mc2RenderInitiatives();
+      if (view === 'missions') mc2RenderMissions();
       if (view === 'projects') mc2RenderProjects();
       if (view === 'context') mc2RenderContext();
       if (view === 'stats') mc2RenderStats();

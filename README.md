@@ -119,7 +119,7 @@ pnpm install
 node setup.js      # interactive first-run setup
 ```
 
-<small>Upgrading from cowCode? Run `pasture update` (or `cowcode update` — the old command forwards to `pasture`). State migrates from `~/.cowcode` to `~/.pasture` automatically.</small>
+<small>Upgrading from Pasture? Run `pasture update` (or `pasture update` — the old command forwards to `pasture`). State migrates from `~/.pasture` to `~/.pasture` automatically.</small>
 
 ---
 
@@ -625,7 +625,7 @@ Pasture Protocol supports multiple **agent personas**. Each agent has its own id
 |---|---|
 | **Agent** | A named persona with its own skills, identity (WhoAmI, MyHuman), and optional LLM. |
 | **`main`** | The default agent. Always exists, cannot be deleted. |
-| **Agent space (Team)** | Central workspace for agent roster + goals. Includes cards, tree view, live context, inbox, stats, and activity feed. |
+| **Agent space (Team)** | Central workspace for agent roster + missions. Includes cards, tree view, live context, inbox, stats, and activity feed. |
 | **Agent messaging** | One agent can invoke another via the `agent-send` skill. Controlled by an allow-list. |
 | **Groups** | WhatsApp/Telegram groups are assigned to a specific agent. Group members chat with that agent only. |
 
@@ -637,7 +637,7 @@ Pasture Protocol supports multiple **agent personas**. Each agent has its own id
 2. Click **+ Agent** (top-right of the Agent team card, or in the chat toolbar).
 3. Type a **name** (e.g. "Backend Bot", "Writer"). The internal id is auto-generated (`backend-bot`, `writer`).
 4. Choose **Copy settings from** - defaults to the most recently used non-main agent. This copies the LLM config, skills (minus sensitive defaults), and identity files.
-5. Click **Create**. The new agent appears in the tree immediately.
+5. Click **Create**. The new agent appears in the tree immediately and is linked with every visible agent by default, including `main`.
 
 **From the CLI:**
 
@@ -651,13 +651,13 @@ Click the **✎** button on any agent card to edit:
 
 - **Title** - display name shown in the UI and chat toolbar
 - **Skills** - toggle which skills this agent has access to (independent of the main agent)
-- **Agent messaging** - enable the `agent-send` skill and add which other agents this one can invoke
+- **Agent messaging** - manage which other agents this one can invoke. New agents start linked to the whole visible team; remove links here when a pair should not delegate to each other.
 
 ### Agent Space (Team page)
 
 The **Team** page is the current agent space. It has:
 
-- **Top-level tabs:** `Roster` and `Goals`
+- **Top-level tabs:** `Roster` and `Missions`
 - **Roster views:** `Cards` (default) and `Tree`
 - **Filters:** `View Active Only` (shows only working/waiting/error agents)
 - **Per-agent panel:** `Active Context` (default), `Inbox`, `Stats`
@@ -688,21 +688,21 @@ Tree view shows team structure and link arrows:
 - **Dashed arrows** = message-passing permission (agent A can invoke agent B).
 - Click any node/card to inspect that agent in the lower panel.
 
-#### Goals (persistent autonomous work)
+#### Missions (persistent autonomous work)
 
-Goals are first-class entities with:
+Missions are first-class entities with:
 
 - title, owner agent, status (`active|paused|completed|blocked`)
 - objective, plan steps, progress/evidence
 - last run and next run timestamps
 - context snapshot + memory anchors
 
-From Team -> Goals you can:
+From Team -> Missions you can:
 
-- create a new goal (title/objective/owner)
-- view goal cards with status + progress
-- run a goal immediately (`Run now`)
-- pause/resume/activate goals
+- create a new mission (title/objective/owner)
+- view mission cards with status + progress
+- run a mission immediately (`Run now`)
+- pause/resume/activate missions
 
 ### Routing messages to agents
 
@@ -749,7 +749,7 @@ pasture dashboard
 | Page | What it's for |
 |---|---|
 | **Home** | Chat with any agent. Status overview and quick agent controls. |
-| **Team** | Agent space: roster cards/tree, Active Context, Inbox, Stats, activity feed, and Goals. |
+| **Team** | Agent space: roster cards/tree, Active Context, Inbox, Stats, activity feed, and Missions. |
 | **Memory** | Browse and edit all memory: Today, Yesterday, Long-term (MEMORY.md), History, Notes. |
 | **Crons** | View, add, and delete scheduled reminders. |
 | **Skills** | Enable/disable skills. View credential status badges. Edit SKILL.md files inline. |

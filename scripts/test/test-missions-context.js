@@ -8,18 +8,18 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-goals-ctx-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-missions-ctx-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { createProject } = await import('../../lib/projects-db.js');
-    const { createGoal } = await import('../../lib/goals.js');
+    const { createMission } = await import('../../lib/missions.js');
     const {
-      resolveGoalForUserTurn,
-      buildGoalsContextBlock,
-      getGoalsDiscoveryIntentHint,
+      resolveMissionForUserTurn,
+      buildMissionsContextBlock,
+      getMissionsDiscoveryIntentHint,
       isWorkOrDiscoveryRequest,
-      goalLabelForAgentContext,
-    } = await import('../../lib/goals-context.js');
+      missionLabelForAgentContext,
+    } = await import('../../lib/missions-context.js');
 
     assert(isWorkOrDiscoveryRequest('find out what this project is about'), 'work request');
 
@@ -28,41 +28,41 @@ async function main() {
       description: 'AI marketing',
       url: 'https://nextpostai.com',
     });
-    const goal = createGoal({
+    const mission = createMission({
       title: 'Research nextpostai',
       objective: 'Learn what nextpostai is and document findings',
       ownerAgentId: 'developer',
     });
 
-    const resolved = resolveGoalForUserTurn({
+    const resolved = resolveMissionForUserTurn({
       userText: 'what is this project all about find out',
       historyMessages: [],
       agentId: 'developer',
     });
-    assert(resolved && resolved.id === goal.id, 'goal resolved via project name');
+    assert(resolved && resolved.id === mission.id, 'mission resolved via project name');
 
-    const block = buildGoalsContextBlock({
+    const block = buildMissionsContextBlock({
       userText: 'what is this project all about find out',
       historyMessages: [],
       agentId: 'developer',
     });
-    assert(block.includes('Active goal'), 'goal block header');
+    assert(block.includes('Active mission'), 'mission block header');
     assert(block.includes('nextpostai'), 'related project in block');
     assert(block.includes('tools') && block.includes('confirm'), 'work instructions');
-    assert(block.includes('Research nextpostai'), 'goal title');
+    assert(block.includes('Research nextpostai'), 'mission title');
 
-    const hint = getGoalsDiscoveryIntentHint(
+    const hint = getMissionsDiscoveryIntentHint(
       'find out what this is about',
       [],
       ['browse', 'github', 'memory', 'search'],
       'developer',
     );
     assert(hint && hint.skills.includes('browse'), 'intent includes browse');
-    assert(hint.plan.includes('goal'), 'intent references goal');
+    assert(hint.plan.includes('mission'), 'intent references mission');
 
-    assert(goalLabelForAgentContext(goal).includes('Research'), 'goal label');
+    assert(missionLabelForAgentContext(mission).includes('Research'), 'mission label');
 
-    console.log('goals-context tests passed');
+    console.log('missions-context tests passed');
   } finally {
     try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}
   }

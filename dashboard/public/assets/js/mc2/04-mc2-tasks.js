@@ -46,45 +46,51 @@
       var agentHtml = assigneeId
         ? '<span class="mc-task-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></span>'
         : '';
-      var missionLine = item.missionTitle && item.kind !== 'goal'
+      var missionLine = item.missionTitle && item.kind !== 'mission'
         ? '<span class="mc-task-card-mission">' + escapeHtml(item.missionTitle) + '</span>'
         : '';
-      var initiativeLine = item.fromInitiative
-        ? '<span class="mc-task-card-initiative">From initiative</span>'
+      var suggestedTaskLine = item.fromSuggestedTask
+        ? '<span class="mc-task-card-suggestedTask">AI suggested</span>'
+        : '';
+      var labels = Array.isArray(item.labels) ? item.labels : [];
+      var labelLine = labels.length
+        ? labels.map(function (label) {
+          return '<span class="mc-task-card-label">' + escapeHtml(label) + '</span>';
+        }).join('')
         : '';
       var delegatedLine = item.delegatedFrom
         ? '<span class="mc-task-card-delegation">Assigned by ' + escapeHtml(agentNameById(item.delegatedFrom) || item.delegatedFrom) + '</span>'
         : '';
-      var pathLine = item.path && item.kind === 'subgoal'
+      var pathLine = item.path && item.kind === 'task'
         ? '<div class="mc-task-card-path">' + escapeHtml(item.path) + '</div>'
         : '';
       var desc = String(item.description || '').trim();
       var descHtml = desc ? '<p class="mc-task-card-desc">' + escapeHtml(desc.slice(0, 220)) + '</p>' : '';
       var progress = Number(item.progress);
       var progressLabel = isFinite(progress) && progress > 0 ? (progress + '%') : '';
-      var goalId = String(item.goalId || '');
-      var subgoalId = String(item.subgoalId || '');
+      var missionId = String(item.missionId || '');
+      var taskId = String(item.taskId || '');
       var selected = mc2SelectedTask && (
-        (goalId || subgoalId)
-          ? String(mc2SelectedTask.subgoalId || '') === subgoalId &&
-            String(mc2SelectedTask.goalId || '') === goalId
+        (missionId || taskId)
+          ? String(mc2SelectedTask.taskId || '') === taskId &&
+            String(mc2SelectedTask.missionId || '') === missionId
           : Number(mc2SelectedTask.turnTs || 0) === Number(item.turnTs || 0) &&
             String(mc2SelectedTask.agentId || mc2SelectedTask.assignee || '') === assigneeId
       );
       var actionsHtml = '';
-      if (item.kind === 'subgoal' && goalId && subgoalId && typeof missionTaskActionButtonsHtml === 'function') {
-        actionsHtml = missionTaskActionButtonsHtml(goalId, subgoalId, status, {
-          fromInitiative: !!item.fromInitiative,
+      if (item.kind === 'task' && missionId && taskId && typeof missionTaskActionButtonsHtml === 'function') {
+        actionsHtml = missionTaskActionButtonsHtml(missionId, taskId, status, {
+          fromSuggestedTask: !!item.fromSuggestedTask,
         });
-      } else if (status === 'blocked' && goalId && typeof goalNeedsAttention === 'function') {
+      } else if (status === 'blocked' && missionId && typeof missionNeedsAttention === 'function') {
         actionsHtml = '<div class="mc-task-card-actions">' +
           '<button type="button" class="mc-task-card-btn primary" data-mc-task-action="respond"' +
-            ' data-goal-id="' + escapeHtml(goalId) + '">Respond</button>' +
+            ' data-mission-id="' + escapeHtml(missionId) + '">Respond</button>' +
         '</div>';
       }
       return '<div class="mc-task-card mc-mission-task-card' + (selected ? ' mc-task-card-selected' : '') + '" data-mc-mission-task="1"' +
-        ' data-goal-id="' + escapeHtml(goalId) + '"' +
-        ' data-subgoal-id="' + escapeHtml(subgoalId) + '"' +
+        ' data-mission-id="' + escapeHtml(missionId) + '"' +
+        ' data-task-id="' + escapeHtml(taskId) + '"' +
         ' data-agent-id="' + escapeHtml(String(item.agentId || assigneeId || '')) + '"' +
         ' data-status="' + escapeHtml(status) + '"' +
         ' data-title="' + escapeHtml(String(item.title || '')) + '">' +
@@ -92,10 +98,11 @@
         pathLine +
         descHtml +
         '<div class="mc-task-card-meta">' +
-          '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(mc2MissionTaskStatusLabel(status)) + '</span>' +
+          '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(mc2MissionTaskStatusLabel(status)) + '</span>' +
           agentHtml +
           missionLine +
-          initiativeLine +
+          suggestedTaskLine +
+          labelLine +
           delegatedLine +
           (progressLabel ? '<span>' + escapeHtml(progressLabel) + '</span>' : '') +
         '</div>' +
@@ -127,9 +134,9 @@
     function mc2MissionTaskItemFromEl(el) {
       if (!el) return null;
       return {
-        kind: 'subgoal',
-        goalId: String(el.getAttribute('data-goal-id') || ''),
-        subgoalId: String(el.getAttribute('data-subgoal-id') || ''),
+        kind: 'task',
+        missionId: String(el.getAttribute('data-mission-id') || ''),
+        taskId: String(el.getAttribute('data-task-id') || ''),
         title: String(el.getAttribute('data-title') || '').trim(),
         agentId: String(el.getAttribute('data-agent-id') || ''),
         status: String(el.getAttribute('data-status') || 'blocked'),
@@ -141,10 +148,10 @@
       var item = typeof mc2ResolveTaskFromCard === 'function' ? mc2ResolveTaskFromCard(card) : null;
       if (!item) {
         item = typeof mc2MissionTaskItemFromEl === 'function' ? mc2MissionTaskItemFromEl(card) : null;
-        if (item && item.goalId && typeof findMissionTaskItem === 'function') {
+        if (item && item.missionId && typeof findMissionTaskItem === 'function') {
           item = findMissionTaskItem({
-            goalId: item.goalId,
-            subgoalId: item.subgoalId,
+            missionId: item.missionId,
+            taskId: item.taskId,
             title: item.title,
             agentId: item.agentId,
           }) || item;
@@ -154,9 +161,9 @@
         mc2OpenTaskDetail(item, { filter: item.status === 'blocked' ? 'blocked' : 'all' });
         return;
       }
-      var goalId = card.getAttribute('data-goal-id');
-      if (goalId) {
-        mc2OpenTaskDetail(null, { goalId: goalId, filter: 'all' });
+      var missionId = card.getAttribute('data-mission-id');
+      if (missionId) {
+        mc2OpenTaskDetail(null, { missionId: missionId, filter: 'all' });
       }
     }
 
@@ -169,8 +176,8 @@
         card.addEventListener('click', function (e) {
           if (e.target && e.target.closest && e.target.closest('[data-mc-task-action]')) return;
           var agentId = card.getAttribute('data-agent-id');
-          var goalId = card.getAttribute('data-goal-id');
-          if (goalId || (agentId && card.getAttribute('data-mc-mission-task'))) {
+          var missionId = card.getAttribute('data-mission-id');
+          if (missionId || (agentId && card.getAttribute('data-mc-mission-task'))) {
             mc2ShowMissionTaskDetails(card);
             return;
           }
@@ -231,7 +238,7 @@
           '</h4>' +
           '<div class="mc-tasks-section-body">';
         if (!tasks.length) {
-          html += '<p class="mc-kanban-empty">No completed agent turns for this range.</p>';
+          html += '<p class="mc-kanban-empty">No completed mission tasks for this range.</p>';
         } else {
           mc2TimelineSpyEnabled = filter === 'done';
           html += tasks.map(mc2RenderCanonicalTaskCard).join('');

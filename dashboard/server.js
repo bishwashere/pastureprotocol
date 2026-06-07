@@ -16,8 +16,8 @@ import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsTe
 import { readTeamActivity } from '../lib/team-activity.js';
 import { readAllAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
-import { listGoals, createGoal, updateGoal, getGoal, runGoalTick, respondToGoalUserInput } from '../lib/goals.js';
-import { listInitiatives, getInitiative, updateInitiative, promoteInitiativeToSubgoal } from '../lib/initiatives.js';
+import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput } from '../lib/missions.js';
+import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
@@ -241,7 +241,7 @@ if (API_KEY) {
 // ---- API ----
 
 function safeJsonParse(text) {
-  const s = String(text || '').replace(/^\[CowCode\]\s*/i, '').trim();
+  const s = String(text || '').replace(/^\[Pasture\]\s*/i, '').trim();
   if (!s) return null;
   try {
     return JSON.parse(s);
@@ -255,9 +255,9 @@ function safeJsonParse(text) {
   }
 }
 
-function buildGoalDraftPrompt({ title, objective, ownerAgentId, agentIds }) {
+function buildMissionDraftPrompt({ title, objective, ownerAgentId, agentIds }) {
   return [
-    'Create a persistent goal draft for an autonomous agent loop.',
+    'Create a persistent mission draft for an autonomous agent loop.',
     `Title: ${title || objective}`,
     `Objective: ${objective}`,
     `Preferred owner: ${ownerAgentId || 'main'}`,
@@ -274,9 +274,9 @@ function buildGoalDraftPrompt({ title, objective, ownerAgentId, agentIds }) {
   ].join('\n');
 }
 
-async function buildGoalDraftViaMainAgent({ title, objective, ownerAgentId }) {
+async function buildMissionDraftViaMainAgent({ title, objective, ownerAgentId }) {
   const agentIds = listVisibleAgentIds();
-  const prompt = buildGoalDraftPrompt({ title, objective, ownerAgentId, agentIds });
+  const prompt = buildMissionDraftPrompt({ title, objective, ownerAgentId, agentIds });
   const turn = await runInternalAgentTurn({
     targetAgentId: DEFAULT_AGENT_ID,
     userText: prompt,
@@ -489,25 +489,25 @@ app.get('/api/team/metrics', (req, res) => {
   }
 });
 
-app.get('/api/goals', (_req, res) => {
+app.get('/api/missions', (_req, res) => {
   try {
-    const snapshot = listGoals();
+    const snapshot = listMissions();
     res.json({ ...snapshot, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/initiatives', (_req, res) => {
+app.get('/api/suggestedTasks', (_req, res) => {
   try {
-    const snapshot = listInitiatives();
+    const snapshot = listSuggestedTasks();
     res.json({ ...snapshot, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/goals', async (req, res) => {
+app.post('/api/missions', async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
     const objective = String(req.body?.objective || '').trim();
@@ -524,14 +524,14 @@ app.post('/api/goals', async (req, res) => {
       memoryAnchors: [],
     };
     try {
-      draft = await buildGoalDraftViaMainAgent({ title, objective, ownerAgentId });
+      draft = await buildMissionDraftViaMainAgent({ title, objective, ownerAgentId });
     } catch (_) {
-      // Fallback is still a valid goal with a one-step plan.
+      // Fallback is still a valid mission with a one-step plan.
     }
     if (!Array.isArray(draft.currentPlan?.steps) || draft.currentPlan.steps.length === 0) {
       draft.currentPlan = { steps: [{ title: `Start: ${objective}`, status: 'todo' }] };
     }
-    const goal = createGoal({
+    const mission = createMission({
       title: draft.title || title || objective,
       objective,
       ownerAgentId: draft.ownerAgentId || ownerAgentId,
@@ -541,22 +541,22 @@ app.post('/api/goals', async (req, res) => {
       memoryAnchors: draft.memoryAnchors || [],
       intervalMs: req.body?.intervalMs,
     });
-    res.status(201).json({ goal });
+    res.status(201).json({ mission });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.patch('/api/goals/:id', (req, res) => {
+app.patch('/api/missions/:id', (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id) {
-      res.status(400).json({ error: 'goal id is required' });
+      res.status(400).json({ error: 'mission id is required' });
       return;
     }
     const patch = req.body || {};
-    const goal = updateGoal(id, patch);
-    res.json({ goal });
+    const mission = updateMission(id, patch);
+    res.json({ mission });
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {
       res.status(404).json({ error: err.message });
@@ -566,20 +566,20 @@ app.patch('/api/goals/:id', (req, res) => {
   }
 });
 
-app.post('/api/goals/:id/respond', (req, res) => {
+app.post('/api/missions/:id/respond', (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     const response = String(req.body?.response || req.body?.text || '').trim();
     if (!id) {
-      res.status(400).json({ error: 'goal id is required' });
+      res.status(400).json({ error: 'mission id is required' });
       return;
     }
     if (!response) {
       res.status(400).json({ error: 'response is required' });
       return;
     }
-    const goal = respondToGoalUserInput(id, response);
-    res.json({ goal });
+    const mission = respondToMissionUserInput(id, response);
+    res.json({ mission });
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {
       res.status(404).json({ error: err.message });
@@ -593,16 +593,16 @@ app.post('/api/goals/:id/respond', (req, res) => {
   }
 });
 
-app.patch('/api/initiatives/:id', (req, res) => {
+app.patch('/api/suggestedTasks/:id', (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id) {
-      res.status(400).json({ error: 'initiative id is required' });
+      res.status(400).json({ error: 'suggestedTask id is required' });
       return;
     }
     const patch = req.body || {};
-    const initiative = updateInitiative(id, patch);
-    res.json({ initiative });
+    const suggestedTask = updateSuggestedTask(id, patch);
+    res.json({ suggestedTask });
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {
       res.status(404).json({ error: err.message });
@@ -612,82 +612,82 @@ app.patch('/api/initiatives/:id', (req, res) => {
   }
 });
 
-app.post('/api/initiatives/:id/promote', async (req, res) => {
+app.post('/api/suggestedTasks/:id/promote', async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     const mode = String(req.body?.mode || '').trim().toLowerCase();
     if (!id) {
-      res.status(400).json({ error: 'initiative id is required' });
+      res.status(400).json({ error: 'suggestedTask id is required' });
       return;
     }
-    const initiative = getInitiative(id);
-    if (!initiative) {
-      res.status(404).json({ error: 'Initiative not found' });
+    const suggestedTask = getSuggestedTask(id);
+    if (!suggestedTask) {
+      res.status(404).json({ error: 'SuggestedTask not found' });
       return;
     }
-    const initiativeStatus = String(initiative.status || 'proposed').toLowerCase();
-    if (initiativeStatus === 'rejected') {
-      res.status(409).json({ error: 'Initiative was rejected' });
+    const suggestedTaskStatus = String(suggestedTask.status || 'proposed').toLowerCase();
+    if (suggestedTaskStatus === 'rejected') {
+      res.status(409).json({ error: 'SuggestedTask was rejected' });
       return;
     }
-    if (mode !== 'goal' && mode !== 'subgoal') {
-      res.status(400).json({ error: 'mode must be goal or subgoal' });
+    if (mode !== 'mission' && mode !== 'task') {
+      res.status(400).json({ error: 'mode must be mission or task' });
       return;
     }
-    if (mode === 'goal') {
-      const goal = createGoal({
-        title: initiative.title,
-        objective: initiative.description || initiative.title,
-        ownerAgentId: initiative.createdBy || DEFAULT_AGENT_ID,
+    if (mode === 'mission') {
+      const mission = createMission({
+        title: suggestedTask.title,
+        objective: suggestedTask.description || suggestedTask.title,
+        ownerAgentId: suggestedTask.createdBy || DEFAULT_AGENT_ID,
         status: 'active',
-        currentPlan: { steps: [{ title: `Start from initiative: ${initiative.title}`, status: 'todo' }] },
-        memoryAnchors: [`initiative=${initiative.id}`],
+        currentPlan: { steps: [{ title: `Start from suggestedTask: ${suggestedTask.title}`, status: 'todo' }] },
+        memoryAnchors: [`suggestedTask=${suggestedTask.id}`],
       });
-      const updated = updateInitiative(initiative.id, {
+      const updated = updateSuggestedTask(suggestedTask.id, {
         status: 'accepted',
-        relatedGoalIds: [goal.id],
-        activity: [`Approved as new mission ${goal.id}`],
+        relatedMissionIds: [mission.id],
+        activity: [`Approved as new mission ${mission.id}`],
       });
-      res.json({ initiative: updated, goal });
+      res.json({ suggestedTask: updated, mission });
       return;
     }
-    const targetGoalId = String(req.body?.goalId || '').trim();
-    if (!targetGoalId) {
-      res.status(400).json({ error: 'goalId is required for subgoal promotion' });
+    const targetMissionId = String(req.body?.missionId || '').trim();
+    if (!targetMissionId) {
+      res.status(400).json({ error: 'missionId is required for task promotion' });
       return;
     }
-    const goal = getGoal(targetGoalId);
-    if (!goal) {
-      res.status(404).json({ error: 'Goal not found' });
+    const mission = getMission(targetMissionId);
+    if (!mission) {
+      res.status(404).json({ error: 'Mission not found' });
       return;
     }
-    const result = await promoteInitiativeToSubgoal(initiative, targetGoalId);
+    const result = await promoteSuggestedTaskToTask(suggestedTask, targetMissionId);
     if (result.skipped) {
-      res.status(409).json({ error: 'Initiative already promoted to this goal', initiative: result.initiative, goal: result.goal });
+      res.status(409).json({ error: 'SuggestedTask already promoted to this mission', suggestedTask: result.suggestedTask, mission: result.mission });
       return;
     }
-    res.json({ initiative: result.initiative, goal: result.goal });
+    res.json({ suggestedTask: result.suggestedTask, mission: result.mission });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/goals/:id/run', async (req, res) => {
+app.post('/api/missions/:id/run', async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
-    const existing = getGoal(id);
+    const existing = getMission(id);
     if (!existing) {
-      res.status(404).json({ error: 'Goal not found' });
+      res.status(404).json({ error: 'Mission not found' });
       return;
     }
-    const result = await runGoalTick(id, {
-      runGoalTurn: (goal, prompt) =>
+    const result = await runMissionTick(id, {
+      runMissionTurn: (mission, prompt) =>
         runInternalAgentTurn({
-          targetAgentId: goal?.ownerAgentId || DEFAULT_AGENT_ID,
+          targetAgentId: mission?.ownerAgentId || DEFAULT_AGENT_ID,
           userText: prompt,
           callerAgentId: DEFAULT_AGENT_ID,
           depth: 1,
-          callChain: [DEFAULT_AGENT_ID, goal?.ownerAgentId || DEFAULT_AGENT_ID],
+          callChain: [DEFAULT_AGENT_ID, mission?.ownerAgentId || DEFAULT_AGENT_ID],
           persistHistory: true,
         }),
     });

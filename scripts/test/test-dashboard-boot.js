@@ -40,7 +40,7 @@ const html = fs.readFileSync(htmlPath, 'utf8');
 const pagesDir = path.join(publicDir, 'pages');
 const mc2PagesDir = path.join(pagesDir, 'mc2');
 const mc2ViewsHtml = fs.existsSync(mc2PagesDir)
-  ? ['view-home', 'view-tasks', 'view-agents', 'view-context', 'view-goals', 'view-initiatives', 'view-projects', 'view-activity', 'view-stats']
+  ? ['view-home', 'view-tasks', 'view-agents', 'view-context', 'view-missions', 'view-tasks', 'view-projects', 'view-activity', 'view-stats']
     .map((name) => fs.readFileSync(path.join(mc2PagesDir, name + '.html'), 'utf8'))
     .join('\n')
   : '';
@@ -97,7 +97,7 @@ const checks = [
   },
   {
     name: 'mc2PendingSnapshot initialized with team snapshots',
-    ok: /var teamGoalsSnapshot[\s\S]{0,200}var mc2PendingSnapshot = \{ pending: \[\]/.test(core),
+    ok: /var teamMissionsSnapshot[\s\S]{0,200}var mc2PendingSnapshot = \{ pending: \[\]/.test(core),
   },
   {
     name: 'dashboardBoot runs soon after fetchStatus in core bundle (home data load regression)',
@@ -156,15 +156,15 @@ const checks = [
       serverJs.includes('approvePendingProposal'),
   },
   {
-    name: 'initiative promote route is async (await promoteInitiativeToSubgoal)',
-    ok: /app\.post\('\/api\/initiatives\/:id\/promote',\s*async\s*\(req,\s*res\)\s*=>\s*\{[\s\S]*await promoteInitiativeToSubgoal\(/.test(serverJs),
+    name: 'suggestedTask promote route is async (await promoteSuggestedTaskToTask)',
+    ok: /app\.post\('\/api\/suggestedTasks\/:id\/promote',\s*async\s*\(req,\s*res\)\s*=>\s*\{[\s\S]*await promoteSuggestedTaskToTask\(/.test(serverJs),
   },
   {
     name: 'attention needed items are clickable buttons with actions',
     ok: missionControlJs.includes('data-attention-action') &&
       missionControlJs.includes('mc2HandleAttentionClick') &&
       missionControlJs.includes("return '<button'") &&
-      missionControlJs.includes('goal-input'),
+      missionControlJs.includes('mission-input'),
   },
   {
     name: 'mission kanban uses informative work-state column labels',
@@ -201,15 +201,16 @@ const checks = [
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
-    name: 'attention items use task titles and auto-promoted tags',
+    name: 'attention items use task titles and proposed task tags',
     ok: !fullHtml.includes('id="mc2-action-banner"') &&
       !fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectActionRequiredItems') &&
       !missionControlJs.includes('function mc2RenderActionBanner') &&
-      missionControlJs.includes("action: 'initiative-review'") &&
-      missionControlJs.includes("tag: 'Auto-promoted'") &&
-      missionControlJs.includes('function mc2TaskTitleForInitiative') &&
-      !missionControlJs.includes("'Review auto-promoted initiative'"),
+      missionControlJs.includes("action: 'suggestedTask-review'") &&
+      missionControlJs.includes("tag: 'Proposed'") &&
+      missionControlJs.includes('function mc2ProposedSuggestedTaskNeedsApproval') &&
+      missionControlJs.includes('function mc2TaskTitleForSuggestedTask') &&
+      !missionControlJs.includes("'Review auto-promoted suggestedTask'"),
   },
   {
     name: 'task detail drawer renders structured mission task fields',
@@ -225,7 +226,7 @@ const checks = [
       chat.includes('Auto archive in') &&
       missionControlJs.includes('If you do nothing') &&
       missionControlJs.includes('mc-task-inaction') &&
-      chat.includes('Initiative Auto Promotion') &&
+      chat.includes('SuggestedTask Auto Promotion') &&
       chat.includes('function buildStructuredMissionTaskTimeline'),
   },
   {
@@ -238,7 +239,7 @@ const checks = [
       fullHtml.includes('mc-nav-label">Home</span>') &&
       /data-mc-nav="mission"[\s\S]{0,220}data-mc-nav="tasks"/.test(fullHtml) &&
       missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
-      missionControlJs.includes('mc2OpenTaskForInitiative') &&
+      missionControlJs.includes('mc2OpenTaskForSuggestedTask') &&
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
   },
   {

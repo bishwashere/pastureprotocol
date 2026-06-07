@@ -23,9 +23,9 @@ const API = '';
     var teamViewActiveOnly = false;
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
-    var teamGoalsSnapshot = { goals: [], updatedAt: 0 };
+    var teamMissionsSnapshot = { missions: [], updatedAt: 0 };
     var mc2PendingSnapshot = { pending: [], updatedAt: 0 };
-    var teamInitiativesSnapshot = { initiatives: [], updatedAt: 0 };
+    var teamSuggestedTasksSnapshot = { suggestedTasks: [], updatedAt: 0 };
 
     function wireClick(id, handler) {
       var el = document.getElementById(id);
@@ -48,8 +48,8 @@ const API = '';
         setPage('home');
       }
     }
-    var selectedTeamGoalId = '';
-    var selectedTeamInitiativeId = '';
+    var selectedTeamMissionId = '';
+    var selectedTeamSuggestedTaskId = '';
     var teamPageFullscreen = false;
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';

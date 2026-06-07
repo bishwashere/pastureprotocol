@@ -236,7 +236,7 @@ function makeTests(servers, stateDir) {
     name: '[behavior] unreachable host — clear connection error is acceptable',
     expectMode: 'behavior',
     run: async () => {
-      const message = 'What log files do you see on cowcode-e2e-unreachable-host?';
+      const message = 'What log files do you see on pasture-e2e-unreachable-host?';
       const { reply, skillsCalled } = await runE2E(message, { stateDir });
       assertSshInspectCalled(skillsCalled);
       const { pass, reason } = await judgeUserGotWhatTheyWanted(message, reply, stateDir, {

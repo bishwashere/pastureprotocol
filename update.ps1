@@ -261,8 +261,8 @@ $BranchPath = Encode-GitHubBranchPath $Branch
 $Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
 
 $Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
-$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } elseif ($env:COWCODE_STATE_DIR) { $env:COWCODE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
-$LegacyState = Join-Path $env:USERPROFILE ".cowcode"
+$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } elseif ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
+$LegacyState = Join-Path $env:USERPROFILE ".pasture"
 
 if (-not (Test-Path (Join-Path $Root "package.json")) -or -not (Test-Path (Join-Path $Root "index.js"))) {
     Write-Host ""
@@ -306,7 +306,7 @@ try {
 
     New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 
-    if (-not $env:PASTURE_STATE_DIR -and -not $env:COWCODE_STATE_DIR) {
+    if (-not $env:PASTURE_STATE_DIR -and -not $env:PASTURE_STATE_DIR) {
         $legacyConfig = Join-Path $LegacyState "config.json"
         $stateConfig = Join-Path $StateDir "config.json"
         $stateAgents = Join-Path $StateDir "agents"

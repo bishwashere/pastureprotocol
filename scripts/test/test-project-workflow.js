@@ -9,7 +9,7 @@ async function main() {
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { createProject, getProjectGraph } = await import('../../lib/projects-db.js');
-    const { createGoal } = await import('../../lib/goals.js');
+    const { createMission } = await import('../../lib/missions.js');
     const {
       resolveProjectRef,
       lookupProjectRef,
@@ -191,7 +191,7 @@ async function main() {
             { userText: 'yes go ahead and create the mission' },
           );
           if (!applied.ok) throw new Error(applied.error || 'apply failed');
-          return applied.goal.title;
+          return applied.mission.title;
         },
       },
       {
@@ -218,30 +218,30 @@ async function main() {
             userApproved: true,
             ownerAgentId: 'main',
           }, { userText: 'yes create it' });
-          if (!applied.ok || !applied.goal?.id) throw new Error('apply failed');
-          if (Number(applied.goal.projectId) !== Number(project.id)) throw new Error('projectId not linked');
-          return applied.goal.title;
+          if (!applied.ok || !applied.mission?.id) throw new Error('apply failed');
+          if (Number(applied.mission.projectId) !== Number(project.id)) throw new Error('projectId not linked');
+          return applied.mission.title;
         },
       },
       {
         name: 'update task status',
         input: 'update_task doing → done',
         run: async () => {
-          const { createGoal } = await import('../../lib/goals.js');
-          const goal = createGoal({
+          const { createMission } = await import('../../lib/missions.js');
+          const mission = createMission({
             title: 'Temp task update',
             objective: 'x',
             ownerAgentId: 'main',
-            subgoals: [{ id: 't1', title: 'Ship feature', status: 'doing', progress: 10 }],
+            tasks: [{ id: 't1', title: 'Ship feature', status: 'doing', progress: 10 }],
           });
           const updated = updateProjectTaskStatus({
-            goalId: goal.id,
-            subgoalId: 't1',
+            missionId: mission.id,
+            taskId: 't1',
             status: 'done',
             note: 'Shipped',
           });
           if (!updated.ok) throw new Error('update failed');
-          const sg = (updated.goal.subgoals || []).find((s) => s.id === 't1');
+          const sg = (updated.mission.tasks || []).find((s) => s.id === 't1');
           if (!sg || sg.status !== 'done') throw new Error('status not done');
           return 'done';
         },
@@ -321,7 +321,7 @@ async function main() {
           const raw = await executeProjectWorkflow({ agentId: 'main' }, { action: 'health_check', project: 'NextPostAI' });
           const parsed = JSON.parse(raw);
           if (!parsed.project) throw new Error('no project in result');
-          return parsed.linkedGoalCount + ' linked goals';
+          return parsed.linkedMissionCount + ' linked missions';
         },
       },
       {
@@ -350,9 +350,9 @@ async function main() {
           const item = (store.pending || []).find((p) => p.kind === 'mission_plan' && p.projectName === 'NextPostAI');
           if (!item) throw new Error('no pending item');
           const result = await approvePendingProposal(item.id);
-          if (!result.ok || !result.goal?.id) throw new Error(result.error || 'approve failed');
+          if (!result.ok || !result.mission?.id) throw new Error(result.error || 'approve failed');
           if (getPendingProposal(item.id)) throw new Error('pending not cleared');
-          return result.goal.title;
+          return result.mission.title;
         },
       },
       {
@@ -393,7 +393,7 @@ async function main() {
             { approvedVia: 'dashboard' },
           );
           if (!applied.ok) throw new Error(applied.error || 'apply failed');
-          return applied.goal.title;
+          return applied.mission.title;
         },
       },
     ];

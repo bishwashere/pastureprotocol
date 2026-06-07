@@ -48,6 +48,13 @@ async function run() {
   });
   assert(greeting === null, 'Expected no delegation recommendation for greeting');
 
+  const taskCount = await buildDelegationContext({
+    agentId: 'main',
+    userText: 'How many tasks or todos are there with agents?',
+    availableSkillIds,
+  });
+  assert(taskCount === null, 'Expected no agent-send recommendation for tracker status questions');
+
   const marketingTypo = await buildDelegationContext({
     agentId: 'main',
     userText: 'what can be 3 blog ideas for marketting nextpostai.com',

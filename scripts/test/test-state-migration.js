@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * State dir migration: ~/.cowcode → ~/.pasture on first pasture run.
+ * State dir migration: legacy ~/.cowcode -> ~/.pasture on first pasture run.
  */
 
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs';
@@ -44,7 +44,7 @@ async function main() {
     writeFileSync(join(fakeHome, '.cowcode', 'config.json'), '{"bio":"old"}\n');
     assert(mod.migrateLegacyStateDirIfNeeded() === false, 'skip migration when pasture already exists');
 
-    console.log('[PASS] migrateLegacyStateDirIfNeeded copies ~/.cowcode to ~/.pasture once');
+    console.log('[PASS] migrateLegacyStateDirIfNeeded copies legacy ~/.cowcode to ~/.pasture once');
     console.log('[PASS] getStateDir uses ~/.pasture after migration');
     console.log('\nAll state migration checks passed.');
   } finally {

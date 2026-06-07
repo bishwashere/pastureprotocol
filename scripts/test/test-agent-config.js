@@ -86,6 +86,38 @@ async function main() {
       },
     },
     {
+      name: 'new agents default to full team links',
+      input: 'Setup: create Marketer, then Alex — expect main, Marketer, and Alex all linked to each other',
+      expectMode: 'behavior',
+      run: async () => {
+        createStateDir();
+        const ac = await loadAgentConfigModule();
+        ac.ensureMainAgentInitialized();
+        ac.createAgent('marketer', { fromAgentId: 'main', title: 'Marketer' });
+        ac.createAgent('alex', { fromAgentId: 'main', title: 'Alex' });
+        const mainPolicy = ac.getAgentMessagingPolicy('main');
+        const marketerPolicy = ac.getAgentMessagingPolicy('marketer');
+        const alexPolicy = ac.getAgentMessagingPolicy('alex');
+        const ok =
+          mainPolicy.allow.includes('marketer') &&
+          mainPolicy.allow.includes('alex') &&
+          marketerPolicy.allow.includes('main') &&
+          marketerPolicy.allow.includes('alex') &&
+          alexPolicy.allow.includes('main') &&
+          alexPolicy.allow.includes('marketer') &&
+          ac.agentSendEnabledForAgent('main') &&
+          ac.agentSendEnabledForAgent('marketer') &&
+          ac.agentSendEnabledForAgent('alex');
+        if (!ok) {
+          throw new Error(
+            `Expected full mesh links; main=[${mainPolicy.allow.join(', ')}], marketer=[${marketerPolicy.allow.join(', ')}], alex=[${alexPolicy.allow.join(', ')}]`,
+          );
+        }
+        const output = `main=[${mainPolicy.allow.join(', ')}], marketer=[${marketerPolicy.allow.join(', ')}], alex=[${alexPolicy.allow.join(', ')}]`;
+        return { reply: output };
+      },
+    },
+    {
       name: 'rename marketer → Chloe keeps id + aliases',
       input: 'Setup: PATCH marketer title to Chloe, then resolve Marketer / chloe / Chloe',
       expectMode: 'behavior',
@@ -164,7 +196,7 @@ async function main() {
           agentCallChain: ['main'],
           runInternalAgent: async ({ targetAgentId }) => {
             delegatedTo = targetAgentId;
-            return { textToSend: '[CowCode] stub reply', skillsCalled: [] };
+            return { textToSend: '[Pasture] stub reply', skillsCalled: [] };
           },
         }, {
           agent: 'auto',

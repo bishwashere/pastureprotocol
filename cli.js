@@ -180,13 +180,13 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'update') {
-  const branch = process.env.PASTURE_BRANCH || process.env.COWCODE_BRANCH || 'master';
+  const branch = process.env.PASTURE_BRANCH || process.env.PASTURE_BRANCH || 'master';
   const env = {
     ...process.env,
     PASTURE_ROOT: INSTALL_DIR,
     PASTURE_INSTALL_DIR: INSTALL_DIR,
-    COWCODE_ROOT: INSTALL_DIR,
-    COWCODE_INSTALL_DIR: INSTALL_DIR,
+    PASTURE_ROOT: INSTALL_DIR,
+    PASTURE_INSTALL_DIR: INSTALL_DIR,
   };
 
   if (IS_WIN) {

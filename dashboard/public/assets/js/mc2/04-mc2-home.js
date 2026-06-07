@@ -1,20 +1,20 @@
 /* MC2 Home page — mission progress, kanban, movement, attention (live refresh) */
     function mc2RenderMissionProgress() {
       var summary = computeTeamTaskSummary();
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
-      var activeGoal = getCurrentMissionGoal();
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+      var activeMission = getCurrentMissionMission();
       var pct = 0;
       var progressLabel = '— / — tasks completed';
       var etaLabel = '';
-      if (activeGoal) {
-        pct = Math.max(0, Math.min(100, Math.round(Number((activeGoal.progress && activeGoal.progress.pct) || 0))));
-        var label = String(activeGoal.title || activeGoal.objective || '').trim();
+      if (activeMission) {
+        pct = Math.max(0, Math.min(100, Math.round(Number((activeMission.progress && activeMission.progress.pct) || 0))));
+        var label = String(activeMission.title || activeMission.objective || '').trim();
         progressLabel = (label ? label : 'Active mission') + ' — ' + pct + '%';
         var totalSubs = 0, doneSubs = 0;
-        (activeGoal.subgoals || []).forEach(function sg(s) {
+        (activeMission.tasks || []).forEach(function sg(s) {
           totalSubs++;
           if (String(s.status || '').toLowerCase() === 'done') doneSubs++;
-          (s.subgoals || []).forEach(sg);
+          (s.tasks || []).forEach(sg);
         });
         if (totalSubs > 0) progressLabel = doneSubs + ' / ' + totalSubs + ' tasks completed';
       }
@@ -25,7 +25,7 @@
       var pp = mc2El('mc2-progress-percent');
       if (pp) pp.textContent = pct + '%';
       var eta = mc2El('mc2-eta-label');
-      if (eta) eta.textContent = etaLabel || (activeGoal ? 'ETA: tracking live work' : 'ETA: no active mission');
+      if (eta) eta.textContent = etaLabel || (activeMission ? 'ETA: tracking live work' : 'ETA: no active mission');
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;
       var statWaiting = mc2El('mc2-stat-waiting'); if (statWaiting) statWaiting.textContent = summary.waiting;
       var statBlocked = mc2El('mc2-stat-blocked'); if (statBlocked) statBlocked.textContent = summary.blocked;
@@ -39,11 +39,11 @@
       }
       var missionSel = mc2El('mc2-mission-select');
       if (missionSel) {
-        var goalList = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
-        var activeGoals = goalList.filter(function (g) { return String(g.status || 'active').toLowerCase() === 'active'; });
-        var currentMission = getCurrentMissionGoal();
-        missionSel.innerHTML = (activeGoals.length === 0 ? '<option value="">No active mission</option>' : '') +
-          activeGoals.map(function (g) {
+        var missionList = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+        var activeMissions = missionList.filter(function (g) { return String(g.status || 'active').toLowerCase() === 'active'; });
+        var currentMission = getCurrentMissionMission();
+        missionSel.innerHTML = (activeMissions.length === 0 ? '<option value="">No active mission</option>' : '') +
+          activeMissions.map(function (g) {
             var gid = String(g.id || '');
             var sel = currentMission && String(currentMission.id || '') === gid ? ' selected' : '';
             return '<option value="' + escapeHtml(gid) + '"' + sel + '>' + escapeHtml(String(g.title || g.objective || 'Untitled mission')) + '</option>';
@@ -51,32 +51,32 @@
       }
     }
 
-    function mc2InitiativeWasAutoPromoted(initiative) {
-      var raw = initiative && initiative.activity;
+    function mc2SuggestedTaskWasAutoPromoted(suggestedTask) {
+      var raw = suggestedTask && suggestedTask.activity;
       var lines = Array.isArray(raw) ? raw : (raw ? [String(raw)] : []);
       return lines.some(function (line) {
-        return String(line || '').indexOf('Auto-promoted to subgoal in ') >= 0;
+        return String(line || '').indexOf('Auto-promoted to task in ') >= 0;
       });
     }
 
-    function mc2ProposedInitiativeNeedsApproval(initiative) {
-      var status = String(initiative && initiative.status || 'proposed').toLowerCase();
+    function mc2ProposedSuggestedTaskNeedsApproval(suggestedTask) {
+      var status = String(suggestedTask && suggestedTask.status || 'proposed').toLowerCase();
       if (status === 'rejected' || status === 'completed' || status === 'accepted') return false;
-      if (typeof initiativeIsOnMission === 'function' && initiativeIsOnMission(initiative)) return false;
+      if (typeof suggestedTaskIsOnMission === 'function' && suggestedTaskIsOnMission(suggestedTask)) return false;
       return status === 'proposed' || status === 'open';
     }
 
-    function mc2ProposedInitiativeSubtitle(initiative) {
-      var confidence = Math.round((Number(initiative && initiative.confidence) || 0) * 100);
-      var ts = Number(initiative && initiative.updatedAt) || 0;
+    function mc2ProposedSuggestedTaskSubtitle(suggestedTask) {
+      var confidence = Math.round((Number(suggestedTask && suggestedTask.confidence) || 0) * 100);
+      var ts = Number(suggestedTask && suggestedTask.updatedAt) || 0;
       var parts = ['Awaiting approval'];
       if (confidence > 0) parts.unshift('Confidence ' + confidence + '%');
       if (ts) parts.push('proposed ' + mc2ShortWaitTime(ts));
       return parts.join(' · ');
     }
 
-    function mc2InitiativeDiscoveryIcon(initiative) {
-      var type = String(initiative && initiative.type || 'observation').toLowerCase();
+    function mc2SuggestedTaskDiscoveryIcon(suggestedTask) {
+      var type = String(suggestedTask && suggestedTask.type || 'observation').toLowerCase();
       if (type === 'risk' || type === 'gap' || type === 'warning') return '⚠';
       return '💡';
     }
@@ -90,18 +90,18 @@
       return mc2ProposedTagHtml(extraClass);
     }
 
-    function mc2TaskTitleForInitiative(initiative) {
-      var initiativeId = String(initiative && initiative.id || '');
-      var subgoalId = initiativeId ? 'init-' + initiativeId : '';
-      var fallback = String(initiative && initiative.title || 'Untitled task').trim();
-      if (!subgoalId || typeof findMissionTaskItem !== 'function') return fallback;
-      var taskItem = findMissionTaskItem({ subgoalId: subgoalId, title: initiative.title });
+    function mc2TaskTitleForSuggestedTask(suggestedTask) {
+      var suggestedTaskId = String(suggestedTask && suggestedTask.id || '');
+      var taskId = suggestedTaskId ? 'init-' + suggestedTaskId : '';
+      var fallback = String(suggestedTask && suggestedTask.title || 'Untitled task').trim();
+      if (!taskId || typeof findMissionTaskItem !== 'function') return fallback;
+      var taskItem = findMissionTaskItem({ taskId: taskId, title: suggestedTask.title });
       return String((taskItem && taskItem.title) || fallback).trim();
     }
 
-    function mc2AutoPromotedInitiativeSubtitle(initiative) {
-      var confidence = Math.round((Number(initiative && initiative.confidence) || 0) * 100);
-      var ts = Number(initiative && initiative.updatedAt) || 0;
+    function mc2AutoPromotedSuggestedTaskSubtitle(suggestedTask) {
+      var confidence = Math.round((Number(suggestedTask && suggestedTask.confidence) || 0) * 100);
+      var ts = Number(suggestedTask && suggestedTask.updatedAt) || 0;
       var parts = ['Needs review'];
       if (confidence > 0) parts.unshift('Confidence ' + confidence + '%');
       if (ts) parts.push('waiting ' + mc2ShortWaitTime(ts));
@@ -124,8 +124,8 @@
       var when = item.ts ? mc2RelTime(Number(item.ts)) : '';
       var attrs = ' class="mc-kanban-card mc-kanban-card-completed" role="button" tabindex="0"';
       attrs += ' data-title="' + escapeHtml(rawTitle) + '"';
-      if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(String(item.goalId)) + '"';
-      if (item.subgoalId) attrs += ' data-subgoal-id="' + escapeHtml(String(item.subgoalId)) + '"';
+      if (item.missionId) attrs += ' data-mission-id="' + escapeHtml(String(item.missionId)) + '"';
+      if (item.taskId) attrs += ' data-task-id="' + escapeHtml(String(item.taskId)) + '"';
       if (item.agentId) attrs += ' data-mc-agent="' + escapeHtml(String(item.agentId)) + '" data-agent-id="' + escapeHtml(String(item.agentId)) + '"';
       if (item.kind === 'turn' && item.ts) attrs += ' data-turn-ts="' + escapeHtml(String(item.ts)) + '" data-mc-kanban-kind="turn"';
       if (item.kind) attrs += ' data-mc-kanban-kind="' + escapeHtml(String(item.kind)) + '"';
@@ -140,11 +140,11 @@
       var icon = item.kind === 'error' ? '🔴' : '⚠';
       var attrs = ' class="mc-kanban-card mc-kanban-card-attention ' + escapeHtml(item.kind || 'warning') + '"';
       attrs += ' data-mc-kanban-kind="attention" data-attention-action="' + escapeHtml(item.action || '') + '"';
-      if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(item.goalId) + '"';
-      if (item.subgoalId) attrs += ' data-subgoal-id="' + escapeHtml(item.subgoalId) + '"';
+      if (item.missionId) attrs += ' data-mission-id="' + escapeHtml(item.missionId) + '"';
+      if (item.taskId) attrs += ' data-task-id="' + escapeHtml(item.taskId) + '"';
       if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
       if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
-      if (item.initiativeId) attrs += ' data-initiative-id="' + escapeHtml(item.initiativeId) + '"';
+      if (item.suggestedTaskId) attrs += ' data-suggestedTask-id="' + escapeHtml(item.suggestedTaskId) + '"';
       return '<div' + attrs + ' role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + escapeHtml(item.title) + '</div>' +
         (item.tag
@@ -157,24 +157,24 @@
       '</div>';
     }
 
-    function mc2KanbanDiscoveryCard(initiative) {
-      var id = String(initiative.id || '');
-      var icon = mc2InitiativeDiscoveryIcon(initiative);
-      var title = escapeHtml(String(initiative.title || 'Untitled discovery'));
-      var confidence = Math.round((Number(initiative.confidence) || 0) * 100);
-      return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-initiative-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
+    function mc2KanbanDiscoveryCard(suggestedTask) {
+      var id = String(suggestedTask.id || '');
+      var icon = mc2SuggestedTaskDiscoveryIcon(suggestedTask);
+      var title = escapeHtml(String(suggestedTask.title || 'Untitled discovery'));
+      var confidence = Math.round((Number(suggestedTask.confidence) || 0) * 100);
+      return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-suggestedTask-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + title + '</div>' +
         '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>' +
         '<div class="mc-kanban-card-meta">Confidence ' + escapeHtml(String(confidence)) + '%</div>' +
       '</div>';
     }
 
-    function mc2KanbanProgressSubgoalCard(item) {
+    function mc2KanbanProgressTaskCard(item) {
       var assigneeId = String(item.assignee || '').trim();
       var a = (agentMapData || []).find(function (x) { return String(x.id) === assigneeId; }) || { id: assigneeId || 'main' };
-      return '<div class="mc-kanban-card mc-kanban-card-progress" data-mc-kanban-kind="subgoal"' +
-        ' data-goal-id="' + escapeHtml(String(item.goalId || '')) + '"' +
-        ' data-subgoal-id="' + escapeHtml(String(item.subgoalId || '')) + '"' +
+      return '<div class="mc-kanban-card mc-kanban-card-progress" data-mc-kanban-kind="task"' +
+        ' data-mission-id="' + escapeHtml(String(item.missionId || '')) + '"' +
+        ' data-task-id="' + escapeHtml(String(item.taskId || '')) + '"' +
         ' data-title="' + escapeHtml(String(item.title || '')) + '"' +
         ' data-agent-id="' + escapeHtml(assigneeId) + '">' +
         '<div class="mc-kanban-card-title">' + escapeHtml(String(item.title || 'In progress')) + '</div>' +
@@ -185,9 +185,9 @@
       '</div>';
     }
 
-    function mc2MissionWaitSubtitle(goal, ts) {
-      var mission = String(goal && (goal.title || goal.objective) || 'Mission').trim();
-      var wait = mc2ShortWaitTime(ts || (goal && goal.updatedAt));
+    function mc2MissionWaitSubtitle(mission, ts) {
+      var mission = String(mission && (mission.title || mission.objective) || 'Mission').trim();
+      var wait = mc2ShortWaitTime(ts || (mission && mission.updatedAt));
       return mission + ' · waiting ' + wait;
     }
 
@@ -195,22 +195,22 @@
       if (!item || !item.title) return;
       var key = [
         item.action || '',
-        item.goalId || '',
-        item.subgoalId || '',
+        item.missionId || '',
+        item.taskId || '',
         item.agentId || '',
         item.pendingId || '',
-        item.initiativeId || '',
+        item.suggestedTaskId || '',
         item.title,
       ].join('|');
       for (var i = 0; i < items.length; i++) {
         var existing = items[i];
         var existingKey = [
           existing.action || '',
-          existing.goalId || '',
-          existing.subgoalId || '',
+          existing.missionId || '',
+          existing.taskId || '',
           existing.agentId || '',
           existing.pendingId || '',
-          existing.initiativeId || '',
+          existing.suggestedTaskId || '',
           existing.title,
         ].join('|');
         if (existingKey === key) return;
@@ -220,7 +220,7 @@
 
     function mc2CollectActionRequiredItems() {
       var items = [];
-      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var allWork = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
 
       allWork.forEach(function (it) {
@@ -228,9 +228,9 @@
         var ts = Number(it.updatedAt) || 0;
         mc2PushActionRequiredItem(items, {
           kind: 'error',
-          action: 'goal-input',
-          goalId: String(it.goalId || ''),
-          subgoalId: String(it.subgoalId || ''),
+          action: 'mission-input',
+          missionId: String(it.missionId || ''),
+          taskId: String(it.taskId || ''),
           title: String(it.title || 'Blocked task').trim(),
           subtitle: it.missionTitle
             ? (it.missionTitle + ' · waiting ' + mc2ShortWaitTime(ts))
@@ -239,18 +239,18 @@
         });
       });
 
-      goals.forEach(function (g) {
-        var goalId = String(g.id || '');
+      missions.forEach(function (g) {
+        var missionId = String(g.id || '');
         var ts = Number(g.updatedAt) || 0;
         var status = String(g.status || '').toLowerCase();
         var needsInput = String(g.needsUserInput || '').trim();
-        var blockedSubs = typeof countBlockedSubgoalsForGoal === 'function' ? countBlockedSubgoalsForGoal(g) : 0;
+        var blockedSubs = typeof countBlockedTasksForMission === 'function' ? countBlockedTasksForMission(g) : 0;
 
         if (needsInput) {
           mc2PushActionRequiredItem(items, {
             kind: 'warning',
-            action: 'goal-input',
-            goalId: goalId,
+            action: 'mission-input',
+            missionId: missionId,
             title: needsInput.slice(0, 96),
             subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
@@ -260,8 +260,8 @@
         if (status === 'blocked') {
           mc2PushActionRequiredItem(items, {
             kind: 'error',
-            action: 'goal-input',
-            goalId: goalId,
+            action: 'mission-input',
+            missionId: missionId,
             title: String(g.blockedReason || g.title || g.objective || 'Mission blocked').trim().slice(0, 96),
             subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
@@ -271,23 +271,23 @@
         if (blockedSubs > 0) {
           mc2PushActionRequiredItem(items, {
             kind: 'error',
-            action: 'goal-input',
-            goalId: goalId,
+            action: 'mission-input',
+            missionId: missionId,
             title: blockedSubs + ' blocked task' + (blockedSubs === 1 ? '' : 's') + ' need response',
             subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
           });
           return;
         }
-        if ((typeof isGoalPartialWait === 'function' && isGoalPartialWait(g)) ||
-          (typeof goalNeedsAttention === 'function' && goalNeedsAttention(g))) {
-          var reason = typeof goalImplementationBlockedLabel === 'function'
-            ? goalImplementationBlockedLabel(g)
+        if ((typeof isMissionPartialWait === 'function' && isMissionPartialWait(g)) ||
+          (typeof missionNeedsAttention === 'function' && missionNeedsAttention(g))) {
+          var reason = typeof missionImplementationBlockedLabel === 'function'
+            ? missionImplementationBlockedLabel(g)
             : '';
           mc2PushActionRequiredItem(items, {
             kind: 'warning',
-            action: 'goal-input',
-            goalId: goalId,
+            action: 'mission-input',
+            missionId: missionId,
             title: reason || String(g.title || g.objective || 'Mission needs input').trim().slice(0, 96),
             subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
@@ -295,18 +295,18 @@
         }
       });
 
-      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : [];
-      initiatives.forEach(function (it) {
-        var initiativeId = String(it.id || '');
+      var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : [];
+      suggestedTasks.forEach(function (it) {
+        var suggestedTaskId = String(it.id || '');
         var ts = Number(it.updatedAt) || 0;
-        if (!mc2ProposedInitiativeNeedsApproval(it)) return;
+        if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return;
         mc2PushActionRequiredItem(items, {
           kind: 'warning',
-          action: 'initiative-review',
-          initiativeId: initiativeId,
+          action: 'suggestedTask-review',
+          suggestedTaskId: suggestedTaskId,
           title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
           tag: 'Proposed',
-          subtitle: mc2ProposedInitiativeSubtitle(it),
+          subtitle: mc2ProposedSuggestedTaskSubtitle(it),
           ts: ts,
         });
       });
@@ -352,11 +352,11 @@
       return {
         kind: item.kind,
         action: item.action,
-        goalId: item.goalId,
-        subgoalId: item.subgoalId,
+        missionId: item.missionId,
+        taskId: item.taskId,
         agentId: item.agentId,
         pendingId: item.pendingId,
-        initiativeId: item.initiativeId,
+        suggestedTaskId: item.suggestedTaskId,
         title: item.title,
         subtitle: item.subtitle,
         tag: item.tag,
@@ -377,30 +377,20 @@
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'done') return;
         items.push({
-          kind: it.kind === 'turn' ? 'turn' : 'subgoal',
+          kind: it.kind === 'turn' ? 'turn' : 'task',
           title: it.title,
-          goalId: it.goalId,
-          subgoalId: it.subgoalId,
+          missionId: it.missionId,
+          taskId: it.taskId,
           assignee: it.assignee,
           agentId: it.agentId,
           delegatedFrom: it.delegatedFrom,
           ts: Number(it.updatedAt || it.completedAt || it.turnTs) || 0,
         });
       });
-      if (typeof listCanonicalWorkItems !== 'function' && typeof listCompletedTasks === 'function') {
-        listCompletedTasks({ range: 'today' }).forEach(function (task) {
-          items.push({
-            kind: 'turn',
-            title: typeof mc2TaskDisplayTitle === 'function' ? mc2TaskDisplayTitle(task) : String(task.prompt || task.summary || 'Completed task'),
-            agentId: task.agentId,
-            ts: Number(task.ts) || 0,
-          });
-        });
-      }
       items.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
       var seen = {};
       return items.filter(function (it) {
-        var key = String(it.kind || '') + '|' + String(it.subgoalId || it.title || '') + '|' + String(it.agentId || '');
+        var key = String(it.kind || '') + '|' + String(it.taskId || it.title || '') + '|' + String(it.agentId || '');
         if (seen[key]) return false;
         seen[key] = true;
         return true;
@@ -420,15 +410,15 @@
       });
       var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       allItems.forEach(function (it) {
-        if (String(it.status || '').toLowerCase() === 'doing') items.push({ kind: 'subgoal', item: it });
+        if (String(it.status || '').toLowerCase() === 'doing') items.push({ kind: 'task', item: it });
       });
       return items;
     }
 
     function mc2CollectKanbanDiscoveryItems() {
-      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
-      return initiatives.filter(function (it) {
-        return mc2ProposedInitiativeNeedsApproval(it);
+      var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks.slice() : [];
+      return suggestedTasks.filter(function (it) {
+        return mc2ProposedSuggestedTaskNeedsApproval(it);
       }).sort(function (a, b) {
         return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
       });
@@ -454,15 +444,15 @@
           mc2HandleAttentionClick(card);
         });
       });
-      col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="subgoal"]').forEach(function (card) {
+      col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="task"]').forEach(function (card) {
         card.addEventListener('click', function () {
           if (typeof mc2ShowMissionTaskDetails === 'function') mc2ShowMissionTaskDetails(card);
         });
       });
       col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="discovery"]').forEach(function (card) {
         card.addEventListener('click', function () {
-          var initiativeId = card.getAttribute('data-initiative-id') || '';
-          if (initiativeId) mc2OpenTaskForInitiative(initiativeId);
+          var suggestedTaskId = card.getAttribute('data-suggestedTask-id') || '';
+          if (suggestedTaskId) mc2OpenTaskForSuggestedTask(suggestedTaskId);
         });
       });
       col.querySelectorAll('.mc-kanban-card.mc-kanban-card-completed').forEach(function (card) {
@@ -566,7 +556,7 @@
         mc2CollectKanbanProgressItems(),
         function (entry) {
           if (entry.kind === 'agent') return mc2KanbanCard(entry.a, entry.ctx);
-          return mc2KanbanProgressSubgoalCard(entry.item);
+          return mc2KanbanProgressTaskCard(entry.item);
         },
         'No active work',
         'progress'

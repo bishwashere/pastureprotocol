@@ -122,7 +122,7 @@
       } catch (_) {}
       mc2UpdateApprovalsBadge();
       mc2RenderPendingApprovalsBanner();
-      mc2RenderPendingInline('mc2-goals-pending', 'mission_plan');
+      mc2RenderPendingInline('mc2-missions-pending', 'mission_plan');
       mc2RenderPendingInline('mc2-tasks-pending', 'mission_plan');
       if (mc2ActiveView === 'mission' && !(typeof shouldPauseTeamDashboardRefresh === 'function' && shouldPauseTeamDashboardRefresh())) {
         mc2RenderAttention();
@@ -145,15 +145,15 @@
           return;
         }
         await fetchMc2PendingApprovals();
-        await fetchGoalsSnapshot();
-        await fetchInitiativesSnapshot();
+        await fetchMissionsSnapshot();
+        await fetchSuggestedTasksSnapshot();
         if (window.pastureProjectsApi && typeof window.pastureProjectsApi.listProjects === 'function') {
           try {
             mc2ProjectsSnapshot = await window.pastureProjectsApi.listProjects();
           } catch (_) {}
         }
         if (mc2ActiveView === 'projects') mc2RenderProjects();
-        if (mc2ActiveView === 'goals') mc2RenderGoals();
+        if (mc2ActiveView === 'missions') mc2RenderMissions();
         if (mc2ActiveView === 'tasks') {
           mc2RenderTasks();
           mc2RenderTaskDetail();
@@ -161,7 +161,7 @@
         mc2RenderLiveChrome();
         if (mc2ActiveView === 'mission') mc2RenderHome();
         if (mc2ActiveView === 'projects') mc2RenderProjects();
-        if (mc2ActiveView === 'goals') mc2RenderGoals();
+        if (mc2ActiveView === 'missions') mc2RenderMissions();
         if (mc2ActiveView === 'tasks') {
           mc2RenderTasks();
           mc2RenderTaskDetail();

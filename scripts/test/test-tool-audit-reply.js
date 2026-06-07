@@ -29,7 +29,7 @@ async function main() {
     assert(r.status, r.input);
   }
 
-  const stripped = formatUserFacingReply('[CowCode] dev replied: ' + userSample);
+  const stripped = formatUserFacingReply('[Pasture] dev replied: ' + userSample);
   assert(looksLikeToolAuditReply(stripped), 'still audit after tag strip');
 
   console.log('\ntool-audit-reply tests passed');
