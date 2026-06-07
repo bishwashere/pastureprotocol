@@ -1,21 +1,25 @@
 /* MC2 navigation, view switching, projects sidebar, timeline scroll */
     function mc2SetView(view) {
+      if (view === 'context' || view === 'inbox' || view === 'outbox') {
+        mc2AgentsSubView = view;
+      } else if (view === 'agents' && (mc2AgentsSubView === 'context' || mc2AgentsSubView === 'inbox' || mc2AgentsSubView === 'outbox')) {
+        mc2AgentsSubView = 'overview';
+      }
       mc2ActiveView = view;
-      var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
+      var visibleView = (view === 'context' || view === 'inbox' || view === 'outbox') ? 'agents' : view;
       ['mission', 'agents', 'tasks', 'context', 'missions', 'projects', 'activity', 'stats'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
       document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
         var nav = btn.getAttribute('data-mc-nav');
-        btn.classList.toggle('active', nav === view);
+        btn.classList.toggle('active', nav === visibleView);
       });
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'missions') mc2RenderMissions();
       if (view === 'projects') mc2RenderProjects();
-      if (view === 'context') mc2RenderContext();
+      if (visibleView === 'agents') mc2RenderAgentsDetail();
       if (view === 'stats') mc2RenderStats();
-      if (view === 'agents') mc2RenderAgentsDetail();
       if (view === 'tasks') mc2RenderTasks();
       mc2SyncTimelineHighlightForScroll();
       if (typeof renderTeamUserInputModal === 'function') renderTeamUserInputModal();
@@ -129,7 +133,10 @@
 
     function mc2ScrollViewAndFeed() {
       if (mc2ActiveView === 'context') {
-        return { view: mc2El('mc2-view-context'), feed: mc2El('mc2-context-list') };
+        return { view: mc2El('mc2-view-agents'), feed: mc2El('mc2-agents-context-list') || mc2El('mc2-context-list') };
+      }
+      if (mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') {
+        return { view: mc2El('mc2-view-agents'), feed: mc2El('mc2-agents-mailbox-feed') || mc2El('mc2-activity-feed') };
       }
       if (mc2ActiveView === 'tasks') {
         return { view: mc2El('mc2-view-tasks'), feed: mc2El('mc2-tasks-list') };

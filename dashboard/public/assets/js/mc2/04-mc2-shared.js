@@ -13,6 +13,7 @@
     var mc2PendingActionBusy = false;
     var mc2TasksFilter = 'all';
     var mc2SelectedTask = null;
+    var mc2AgentsSubView = 'overview';
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -202,23 +203,8 @@
         });
       }
       if (panel) {
-        if (!item || !String(item.missionId || item.taskId || item.title || '').trim()) {
-          panel.hidden = true;
-          panel.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Select a task from the board, list, or recent movement.</p>';
-        } else {
-          panel.hidden = false;
-          panel.innerHTML = html;
-          if (typeof wireMissionTaskActions === 'function') wireMissionTaskActions(panel);
-          panel.querySelectorAll('[data-mc-task-agent-context]').forEach(function (btn) {
-            if (btn._wiredCtx) return;
-            btn._wiredCtx = true;
-            btn.addEventListener('click', function (e) {
-              e.preventDefault();
-              e.stopPropagation();
-              mc2OpenTaskDetailForAgent(btn.getAttribute('data-mc-task-agent-context') || '');
-            });
-          });
-        }
+        panel.hidden = true;
+        panel.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Select a task from the board, list, or recent movement.</p>';
       }
     }
 

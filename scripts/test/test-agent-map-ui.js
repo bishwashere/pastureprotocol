@@ -302,6 +302,10 @@ const checks = [
       html.includes('data-mc-mission-action') &&
       html.includes('review-suggestedTask') &&
       html.includes('id="mc2-task-detail"') &&
+      html.includes('class="mc-task-popup"') &&
+      html.includes('mc-task-popup-card') &&
+      html.includes('data-mc-task-drawer-close') &&
+      html.includes("closest('.mc-task-popup-card')") &&
       html.includes('mc2OpenTaskDetail') &&
       html.includes('buildMissionTaskTimeline') &&
       html.includes('mc-task-timeline') &&
@@ -314,12 +318,20 @@ const checks = [
       html.includes('Active mission'),
   },
   {
-    name: 'Team2 inbox outbox and activity render distinct content',
-    ok: html.includes('data-mc-nav="inbox"') &&
-      html.includes('data-mc-nav="outbox"') &&
-      html.includes('data-mc-nav="context"') &&
+    name: 'Team2 keeps context inbox and outbox inside Agents sub-app',
+    ok: !html.includes('class="mc-nav-item" data-mc-nav="inbox"') &&
+      !html.includes('class="mc-nav-item" data-mc-nav="outbox"') &&
+      !html.includes('class="mc-nav-item" data-mc-nav="context"') &&
+      html.includes('data-mc2-agents-tab="context"') &&
+      html.includes('data-mc2-agents-tab="inbox"') &&
+      html.includes('data-mc2-agents-tab="outbox"') &&
+      html.includes('id="mc2-agents-context-list"') &&
+      html.includes('id="mc2-agents-mailbox-feed"') &&
+      html.includes('mc2SetAgentsSubView') &&
       html.includes('data-mc-nav="stats"') &&
       html.includes('id="mc2-inbox-agent-filter"') &&
+      html.includes('id="mc2-agents-context-agent-filter"') &&
+      html.includes('id="mc2-agents-mailbox-agent-filter"') &&
       html.includes('id="mc2-context-agent-filter"') &&
       html.includes('id="mc2-stats-agent-filter"') &&
       html.includes('class="team-agent-panel-ranges mc2-range-controls"') &&
@@ -331,8 +343,8 @@ const checks = [
       html.includes('mc2InboxAgentFilter') &&
       html.includes('setTeamAgentPanelRange') &&
       html.includes('renderMissionControl();') &&
-      html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
-      html.includes("mc2RenderMailbox(mc2ActiveView)") &&
+      html.includes("var visibleView = (view === 'context' || view === 'inbox' || view === 'outbox') ? 'agents' : view") &&
+      html.includes("mc2RenderMailbox(subView)") &&
       html.includes('mc2MailboxFlows') &&
       html.includes('mc2MailboxFlows(direction, range)') &&
       html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId, activeRange), direction)') &&

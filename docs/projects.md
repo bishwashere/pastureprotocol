@@ -50,6 +50,12 @@ Mission Control includes a **Projects → Connectors** panel for project-specifi
 
 Agents can use these hints to understand which collection likely contains analytics, billing, events, users, or other project-specific data without guessing from opaque collection names.
 
+## Blocker templates
+
+Broad project questions often need user input before the team can act responsibly. The workflow keeps reusable blocker templates under `lib/templates/` and turns the missing inputs into mission tasks with `status: blocked` and the `blocker` label.
+
+Current templates cover digital product growth, ecommerce growth, physical/local businesses, B2B sales pipeline, and content/audience growth. The selected template depends on the request and project context. Already-known setup notes, connectors, or provided context suppress matching blockers, so a digital product with MongoDB and PostHog already configured will not ask for those again.
+
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.

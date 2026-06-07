@@ -38,6 +38,10 @@ async function main() {
       rejectPendingProposal,
       getPendingProposal,
     } = await import('../../lib/project-workflow-pending.js');
+    const {
+      BLOCKER_TEMPLATES,
+      inferBlockerTemplateTasks,
+    } = await import('../../lib/templates/blocker-templates.js');
 
     const project = createProject({
       name: 'NextPostAI',
@@ -131,6 +135,67 @@ async function main() {
         },
       },
       {
+        name: 'blocker template catalog has core product types',
+        input: 'template catalog',
+        run: async () => {
+          const ids = BLOCKER_TEMPLATES.map((t) => t.id);
+          for (const expected of ['digital-product-growth', 'ecommerce-growth', 'physical-local-business', 'b2b-sales-pipeline', 'content-audience-growth']) {
+            if (!ids.includes(expected)) throw new Error(`missing template ${expected}`);
+          }
+          return `${ids.length} templates`;
+        },
+      },
+      {
+        name: 'digital growth request creates user-input blockers',
+        input: 'How can I improve my customer base?',
+        run: async () => {
+          const inferred = inferBlockerTemplateTasks({
+            userText: 'How can I improve my customer base?',
+            project: { name: 'NextPostAI', description: 'AI marketing platform' },
+          });
+          if (inferred.template?.id !== 'digital-product-growth') throw new Error('wrong template');
+          if (!inferred.tasks.length) throw new Error('expected blocker tasks');
+          const task = inferred.tasks[0];
+          if (task.status !== 'blocked') throw new Error('blocker task must be blocked');
+          if (!task.labels.includes('blocker')) throw new Error('blocker label missing');
+          if (task.assignee !== 'user') throw new Error('blocker should be assigned to user');
+          return `${inferred.template.name}: ${inferred.tasks.length}`;
+        },
+      },
+      {
+        name: 'physical store request uses local-business blockers',
+        input: 'How do we grow this physical store?',
+        run: async () => {
+          const inferred = inferBlockerTemplateTasks({
+            userText: 'How do we grow this physical store and improve foot traffic?',
+            project: { name: 'Corner Cafe', description: 'A local restaurant' },
+          });
+          if (inferred.template?.id !== 'physical-local-business') throw new Error('wrong template');
+          const titles = inferred.tasks.map((t) => t.title).join(' | ');
+          if (!/POS|location|local/i.test(titles)) throw new Error(`unexpected blockers: ${titles}`);
+          if (/MongoDB/i.test(titles)) throw new Error('physical store should not ask for MongoDB by default');
+          return inferred.template.name;
+        },
+      },
+      {
+        name: 'known context suppresses already-provided blockers',
+        input: 'MongoDB and PostHog already configured',
+        run: async () => {
+          const inferred = inferBlockerTemplateTasks({
+            userText: 'Improve customer base',
+            project: {
+              name: 'NextPostAI',
+              description: 'AI app',
+              setup_notes: 'MongoDB Atlas read-only URI and PostHog analytics are configured',
+            },
+          });
+          const titles = inferred.tasks.map((t) => t.title).join(' | ');
+          if (/product\/customer data/i.test(titles)) throw new Error('MongoDB blocker should be suppressed');
+          if (/analytics\/funnel/i.test(titles)) throw new Error('analytics blocker should be suppressed');
+          return `${inferred.tasks.length} remaining blockers`;
+        },
+      },
+      {
         name: 'propose plan blocked for unconfigured project',
         input: 'propose_plan GhostApp',
         run: async () => {
@@ -152,6 +217,24 @@ async function main() {
           if (!preview.ok || !preview.preview) throw new Error('preview failed');
           if (preview.tasks.length !== 2) throw new Error('tasks not normalized');
           return preview.mission.title;
+        },
+      },
+      {
+        name: 'propose plan adds blocker template tasks for broad growth request',
+        input: 'propose_plan improve customer base',
+        run: async () => {
+          const preview = proposeProjectPlan({
+            project: 'NextPostAI',
+            title: 'Improve customer base',
+            userText: 'How can I improve my customer base?',
+            tasks: [{ title: 'Review current positioning', status: 'todo' }],
+          });
+          if (!preview.ok || preview.blockerTemplate?.id !== 'digital-product-growth') throw new Error('missing blocker template');
+          if (!preview.blockerTasksForDisplay.length) throw new Error('missing blocker display tasks');
+          const blocked = preview.tasksForDisplay.filter((t) => t.status === 'blocked');
+          if (!blocked.length) throw new Error('no blocked tasks in preview');
+          if (!blocked.every((t) => (t.labels || []).includes('blocker'))) throw new Error('blocked task missing blocker label');
+          return `${blocked.length} blocker tasks`;
         },
       },
       {
@@ -221,6 +304,25 @@ async function main() {
           if (!applied.ok || !applied.mission?.id) throw new Error('apply failed');
           if (Number(applied.mission.projectId) !== Number(project.id)) throw new Error('projectId not linked');
           return applied.mission.title;
+        },
+      },
+      {
+        name: 'apply plan persists blocker labels on mission tasks',
+        input: 'apply_plan broad growth with blockers',
+        run: async () => {
+          const applied = applyProjectPlan({
+            project: 'NextPostAI',
+            title: 'Customer growth blockers',
+            userText: 'Improve customer base',
+            tasks: [{ title: 'Draft growth hypothesis', status: 'todo' }],
+            userApproved: true,
+            ownerAgentId: 'main',
+          }, { userText: 'yes create it' });
+          if (!applied.ok) throw new Error(applied.error || 'apply failed');
+          const blockers = (applied.mission.tasks || []).filter((task) => task.status === 'blocked');
+          if (!blockers.length) throw new Error('no blocker tasks persisted');
+          if (!blockers.every((task) => (task.labels || []).includes('blocker'))) throw new Error('blocker label not persisted');
+          return `${blockers.length} persisted blockers`;
         },
       },
       {

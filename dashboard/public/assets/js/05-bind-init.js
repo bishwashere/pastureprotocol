@@ -10,6 +10,7 @@ function mc2BindTimelineScrollSpy(viewEl) {
     }
     mc2BindTimelineScrollSpy(document.getElementById('mc2-view-activity'));
     mc2BindTimelineScrollSpy(document.getElementById('mc2-view-context'));
+    mc2BindTimelineScrollSpy(document.getElementById('mc2-view-agents'));
     try {
       wireClick('agent-create-modal-cancel', closeAgentCreateModal);
       wireClick('agent-create-modal-submit', function () { submitAgentCreateModal(true); });

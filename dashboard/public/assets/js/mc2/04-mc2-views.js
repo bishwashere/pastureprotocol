@@ -126,10 +126,6 @@
     function mc2RenderActivity() {
       var el = mc2El('mc2-activity-feed');
       if (!el) return;
-      if (mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') {
-        mc2RenderMailbox(mc2ActiveView);
-        return;
-      }
       mc2TimelineSpyEnabled = false;
       var titleEl = mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = 'LIVE ACTIVITY';
@@ -186,9 +182,9 @@
     }
 
     function mc2RenderMailbox(direction) {
-      var el = mc2El('mc2-activity-feed');
+      var el = mc2El('mc2-agents-mailbox-feed') || mc2El('mc2-activity-feed');
       if (!el) return;
-      var titleEl = mc2El('mc2-activity-title');
+      var titleEl = mc2El('mc2-agents-mailbox-title') || mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = direction === 'outbox' ? 'OUTBOX' : 'INBOX';
       mc2SyncInboxAgentFilter();
       var flows = mc2MailboxFlows(direction, 'all').slice(0, 200);
@@ -301,7 +297,7 @@
     }
 
     function mc2RenderContext() {
-      var el = mc2El('mc2-context-list');
+      var el = mc2El('mc2-agents-context-list') || mc2El('mc2-context-list');
       if (!el) return;
       mc2SyncAgentFilterControls();
       var ids = mc2AgentIdsForFilter();
@@ -388,6 +384,31 @@
         if (selectEl.innerHTML !== html) selectEl.innerHTML = html;
         if (selectEl.value !== selected) selectEl.value = selected;
       });
+    }
+
+    function mc2SetAgentsSubView(subView) {
+      var next = String(subView || 'overview').trim();
+      if (['overview', 'context', 'inbox', 'outbox'].indexOf(next) < 0) next = 'overview';
+      mc2AgentsSubView = next;
+      mc2ActiveView = next === 'overview' ? 'agents' : next;
+      mc2RenderAgentsDetail();
+      mc2SyncTimelineHighlightForScroll();
+    }
+
+    function mc2RenderAgentsSubApp() {
+      var subView = ['overview', 'context', 'inbox', 'outbox'].indexOf(mc2AgentsSubView) >= 0 ? mc2AgentsSubView : 'overview';
+      var panelName = subView === 'inbox' || subView === 'outbox' ? 'mailbox' : subView;
+      document.querySelectorAll('#mc2-view-agents .mc-agents-subtab[data-mc2-agents-tab]').forEach(function (btn) {
+        var active = btn.getAttribute('data-mc2-agents-tab') === subView;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      ['overview', 'context', 'mailbox'].forEach(function (name) {
+        var panel = mc2El('mc2-agents-panel-' + name);
+        if (panel) panel.hidden = name !== panelName;
+      });
+      if (subView === 'context') mc2RenderContext();
+      if (subView === 'inbox' || subView === 'outbox') mc2RenderMailbox(subView);
     }
 
     function mc2ProjectNameById(projectId) {
@@ -493,4 +514,5 @@
 
     function mc2RenderAgentsDetail() {
       mc2RenderAgentsOverview();
+      mc2RenderAgentsSubApp();
     }

@@ -124,6 +124,12 @@
           mc2OpenTasksView(tasksFilterBtn.getAttribute('data-mc-tasks-filter') || 'all');
           return;
         }
+        var agentsTabBtn = e.target && e.target.closest ? e.target.closest('.mc-agents-subtab[data-mc2-agents-tab]') : null;
+        if (agentsTabBtn) {
+          e.preventDefault();
+          mc2SetAgentsSubView(agentsTabBtn.getAttribute('data-mc2-agents-tab') || 'overview');
+          return;
+        }
         var attentionBtn = e.target && e.target.closest ? e.target.closest('[data-attention-action]') : null;
         if (attentionBtn) {
           e.preventDefault();
@@ -199,6 +205,10 @@
           e.preventDefault();
           mc2CloseTaskDrawer();
         });
+      });
+      drawer.addEventListener('click', function (e) {
+        var card = e.target && e.target.closest ? e.target.closest('.mc-task-popup-card') : null;
+        if (!card && drawer.classList.contains('open')) mc2CloseTaskDrawer();
       });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && drawer.classList.contains('open')) mc2CloseTaskDrawer();
