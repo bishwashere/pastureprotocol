@@ -60,6 +60,8 @@
       if (!drawer) return;
       drawer.classList.add('open');
       drawer.setAttribute('aria-hidden', 'false');
+      var body = mc2El('mc2-task-drawer-body');
+      if (body) body.scrollTop = 0;
     }
 
     function mc2CloseTaskDrawer() {

@@ -814,15 +814,14 @@
 
     function walkMissionTasksForBlocked(tasks, missionId, mission, out) {
       var refs = out || [];
-      var waitCondition = mission && mission.waitCondition;
       (tasks || []).forEach(function (sg) {
         if (!sg || typeof sg !== 'object') return;
         var sgId = String(sg.id || '').trim();
         var title = String(sg.title || '').trim();
         var status = normalizeTaskStatus(sg.status);
-        var blocked = status === 'blocked' ||
-          (String(sg.status || '').toLowerCase() !== 'done' && dashboardTaskBlockedByWait(sg, waitCondition));
-        if (blocked) {
+        // Only surface tasks that are genuinely blocked (need user input or error).
+        // wait-dependency tasks are open work; they are not user-action required.
+        if (status === 'blocked') {
           refs.push({ kind: 'task', missionId: missionId, taskId: sgId, title: title });
         }
         walkMissionTasksForBlocked(sg.tasks, missionId, mission, refs);
@@ -868,7 +867,7 @@
       var status = normalizeTaskStatus(task && task.status);
       if (status === 'done') return 'done';
       if (status === 'blocked') return 'blocked';
-      if (mission && dashboardTaskBlockedByWait(task, mission.waitCondition)) return 'blocked';
+      // wait-conditioned tasks are dependencies, not user-input blockers — keep them as todo/open.
       return status;
     }
 
@@ -1448,6 +1447,9 @@
     function normalizeTaskStatus(status) {
       var s = String(status || '').toLowerCase();
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
+      // waiting_user means the task requires user action — surface as blocked.
+      if (s === 'waiting_user') return 'blocked';
+      // Everything else (open, in_progress, waiting_dependency, assigned, etc.) is open/todo work.
       return 'todo';
     }
 
@@ -3536,10 +3538,13 @@
 
     function missionNeedsAttention(mission) {
       if (!mission) return false;
+      // User was explicitly asked something.
       if (String(mission.needsUserInput || '').trim()) return true;
+      // There are tasks that need user input or have hard errors.
       if (countBlockedTasksForMission(mission) > 0) return true;
-      if (isMissionPartialWait(mission)) return true;
+      // Mission itself errored or is hard-blocked.
       if (String(mission.status || '').toLowerCase() === 'blocked') return true;
+      // A partial wait with no user-input ask is an internal dependency pause — no user action required.
       return false;
     }
 

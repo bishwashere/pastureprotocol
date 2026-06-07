@@ -1393,7 +1393,7 @@ button.mc-mission-task-card {
   position: relative;
   z-index: 1;
   width: min(58rem, calc(100vw - 2.5rem));
-  max-height: min(86dvh, 48rem);
+  height: min(86dvh, 48rem);
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(167, 139, 250, 0.24);
