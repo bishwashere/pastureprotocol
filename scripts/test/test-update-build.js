@@ -36,7 +36,7 @@ if (remote) {
   console.log('SKIP: fetchRemoteBuildSync (no network or git)');
 }
 
-const dashboardShell = readFileSync(join(projectRoot, 'dashboard/public/index.html'), 'utf8');
+const dashboardShell = readFileSync(join(projectRoot, 'dashboard/public/assets/js/00-loader.js'), 'utf8');
 assert(
   dashboardShell.includes('root.outerHTML = pages.map') && dashboardShell.includes("}).join('\\n');"),
   'dashboard fragment loader replaces install/update placeholder'

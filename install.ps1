@@ -567,10 +567,10 @@ if exist "%PASTURE_NODE_DIR%\node.exe" set PATH=%PASTURE_NODE_DIR%;%APPDATA%\npm
 node "$InstallDir\cli.js" %*
 "@
         Set-Content -Path $Launcher -Value $cmdContent -Encoding ASCII -ErrorAction Stop
-        $LegacyLauncher = Join-Path $BinDir "pasture.cmd"
+        $LegacyLauncher = Join-Path $BinDir "cowcode.cmd"
         $legacyContent = @"
 @echo off
-echo pasture is now pasture - update your scripts. 1>&2
+echo cowcode is now pasture - update your scripts. 1>&2
 call "$Launcher" %*
 "@
         Set-Content -Path $LegacyLauncher -Value $legacyContent -Encoding ASCII -ErrorAction SilentlyContinue

@@ -13,6 +13,7 @@ import { startReport, recordCase, endReport } from './e2e-report.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const INSTALL_SH = join(ROOT, 'install.sh');
+const UPDATE_SH = join(ROOT, 'update.sh');
 const SETUP_JS = join(ROOT, 'setup.js');
 
 function checkInstallScriptOrder() {
@@ -83,6 +84,30 @@ function checkUnixPathsUnchanged() {
   return { ok: true, detail: 'Linux/macOS still use install.sh + bash daemon/update/uninstall' };
 }
 
+function checkPastureLauncherNotLegacyShim() {
+  const install = readFileSync(INSTALL_SH, 'utf8');
+  const update = readFileSync(UPDATE_SH, 'utf8');
+  const checks = [];
+
+  for (const [label, src] of [['install.sh', install], ['update.sh', update]]) {
+    if (!src.includes('cat > "$BIN_DIR/pasture" <<LAUNCHER')) {
+      checks.push(`${label} must write the primary pasture launcher`);
+    }
+    if (!src.includes('exec node')) {
+      checks.push(`${label} pasture launcher must exec node cli.js`);
+    }
+    if (!src.includes('cat > "$BIN_DIR/cowcode"')) {
+      checks.push(`${label} must write legacy cowcode shim separately`);
+    }
+    if (src.includes("cat > \"$BIN_DIR/pasture\" <<'SHIM'") || src.includes('pasture is now pasture')) {
+      checks.push(`${label} must not replace pasture with the legacy shim`);
+    }
+  }
+
+  if (checks.length) return { ok: false, detail: checks.join('; ') };
+  return { ok: true, detail: 'pasture launcher remains real CLI; cowcode is the legacy shim' };
+}
+
 async function main() {
   startReport('test-install');
 
@@ -110,6 +135,14 @@ async function main() {
     status: unix.ok ? 'pass' : 'fail',
   });
 
+  const launcher = checkPastureLauncherNotLegacyShim();
+  recordCase({
+    name: 'pasture launcher',
+    input: 'install/update launcher scripts',
+    output: launcher.detail,
+    status: launcher.ok ? 'pass' : 'fail',
+  });
+
   const shellTest = spawnSync('bash', [join(ROOT, 'scripts/test/test-install.sh')], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -126,7 +159,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(order.ok && imports.ok && unix.ok && shellOk ? 0 : 1);
+  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && shellOk ? 0 : 1);
 }
 
 main();
