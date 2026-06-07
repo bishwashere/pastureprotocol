@@ -170,7 +170,7 @@
     document.querySelectorAll('#page-team2 .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var range = btn.getAttribute('data-range') || 'today';
-        if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox' || mc2ActiveView === 'context') {
+        if (mc2ActiveView === 'activity' || mc2ActiveView === 'agents' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox' || mc2ActiveView === 'context') {
           mc2ScrollToRange(range);
           return;
         }

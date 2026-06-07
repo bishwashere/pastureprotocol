@@ -4,14 +4,14 @@
     <div class="mc-agents-subapp-head">
       <div>
         <p class="mc-section-title">AGENTS</p>
-        <p class="mc-agents-subapp-hint">Open an agent workspace tab for live context, received work, or sent delegations.</p>
+        <p class="mc-agents-subapp-hint">Context, Inbox, and Outbox show all agents by default. Click an agent card to filter them.</p>
       </div>
-      <div class="mc-agents-subtabs" role="tablist" aria-label="Agent workspace">
-        <button type="button" class="mc-agents-subtab active" data-mc2-agents-tab="overview" role="tab" aria-selected="true">Overview</button>
-        <button type="button" class="mc-agents-subtab" data-mc2-agents-tab="context" role="tab" aria-selected="false">Context</button>
-        <button type="button" class="mc-agents-subtab" data-mc2-agents-tab="inbox" role="tab" aria-selected="false">Inbox</button>
-        <button type="button" class="mc-agents-subtab" data-mc2-agents-tab="outbox" role="tab" aria-selected="false">Outbox</button>
-      </div>
+      <label class="mc-agent-filter" for="mc2-agents-agent-filter">
+        <span>Agent</span>
+        <select id="mc2-agents-agent-filter" class="mc2-agent-filter-select" aria-label="Filter agent workspace by agent">
+          <option value="">All agents</option>
+        </select>
+      </label>
     </div>
 
     <section id="mc2-agents-panel-overview" class="mc-agents-subpanel">
@@ -20,45 +20,41 @@
       </div>
     </section>
 
-    <section id="mc2-agents-panel-context" class="mc-agents-subpanel" hidden>
-      <div class="mc-activity-toolbar">
-        <p class="mc-section-title" id="mc2-agents-context-title">ACTIVE CONTEXT</p>
-        <label class="mc-agent-filter" for="mc2-agents-context-agent-filter">
-          <span>Agent</span>
-          <select id="mc2-agents-context-agent-filter" class="mc2-agent-filter-select" aria-label="Filter agent context by agent">
-            <option value="">All agents</option>
-          </select>
-        </label>
-      </div>
+    <section class="mc-agents-workspace" aria-label="Agent workspace">
       <div class="team-agent-panel-ranges mc2-range-controls" aria-label="Agent context timeline">
         <button type="button" class="team-agent-panel-range active" data-range="today" aria-pressed="true">Today</button>
         <button type="button" class="team-agent-panel-range" data-range="yesterday" aria-pressed="false">Yesterday</button>
         <button type="button" class="team-agent-panel-range" data-range="last7" aria-pressed="false">Last week</button>
         <button type="button" class="team-agent-panel-range" data-range="last30" aria-pressed="false">Last 30 days</button>
       </div>
-      <div id="mc2-agents-context-list" style="display:flex;flex-direction:column;gap:0.6rem;">
-        <p style="color:var(--muted);font-size:0.66rem;">Loading context…</p>
-      </div>
-    </section>
 
-    <section id="mc2-agents-panel-mailbox" class="mc-agents-subpanel" hidden>
-      <div class="mc-activity-toolbar">
-        <p class="mc-section-title" id="mc2-agents-mailbox-title">INBOX</p>
-        <label class="mc-agent-filter" for="mc2-agents-mailbox-agent-filter">
-          <span>Agent</span>
-          <select id="mc2-agents-mailbox-agent-filter" class="mc2-agent-filter-select" aria-label="Filter agent mailbox by agent">
-            <option value="">All agents</option>
-          </select>
-        </label>
-      </div>
-      <div class="team-agent-panel-ranges mc2-range-controls" aria-label="Agent mailbox timeline">
-        <button type="button" class="team-agent-panel-range active" data-range="today" aria-pressed="true">Today</button>
-        <button type="button" class="team-agent-panel-range" data-range="yesterday" aria-pressed="false">Yesterday</button>
-        <button type="button" class="team-agent-panel-range" data-range="last7" aria-pressed="false">Last week</button>
-        <button type="button" class="team-agent-panel-range" data-range="last30" aria-pressed="false">Last 30 days</button>
-      </div>
-      <div id="mc2-agents-mailbox-feed" style="display:flex;flex-direction:column;gap:0.2rem;">
-        <p style="color:var(--muted);font-size:0.66rem;">No mailbox activity yet.</p>
+      <div class="mc-agents-workspace-grid">
+        <section id="mc2-agents-panel-context" class="mc-agents-workspace-card">
+          <div class="mc-agents-workspace-head">
+            <p class="mc-section-title" id="mc2-agents-context-title">ACTIVE CONTEXT</p>
+          </div>
+          <div id="mc2-agents-context-list" class="mc-agents-workspace-feed">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading context…</p>
+          </div>
+        </section>
+
+        <section id="mc2-agents-panel-inbox" class="mc-agents-workspace-card">
+          <div class="mc-agents-workspace-head">
+            <p class="mc-section-title">INBOX</p>
+          </div>
+          <div id="mc2-agents-inbox-feed" class="mc-agents-workspace-feed">
+            <p style="color:var(--muted);font-size:0.66rem;">No inbox activity yet.</p>
+          </div>
+        </section>
+
+        <section id="mc2-agents-panel-outbox" class="mc-agents-workspace-card">
+          <div class="mc-agents-workspace-head">
+            <p class="mc-section-title">OUTBOX</p>
+          </div>
+          <div id="mc2-agents-outbox-feed" class="mc-agents-workspace-feed">
+            <p style="color:var(--muted);font-size:0.66rem;">No outbox activity yet.</p>
+          </div>
+        </section>
       </div>
     </section>
   </div>

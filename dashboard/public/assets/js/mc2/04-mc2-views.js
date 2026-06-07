@@ -182,7 +182,7 @@
     }
 
     function mc2RenderMailbox(direction) {
-      var el = mc2El('mc2-agents-mailbox-feed') || mc2El('mc2-activity-feed');
+      var el = mc2El('mc2-agents-' + direction + '-feed') || mc2El('mc2-agents-mailbox-feed') || mc2El('mc2-activity-feed');
       if (!el) return;
       var titleEl = mc2El('mc2-agents-mailbox-title') || mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = direction === 'outbox' ? 'OUTBOX' : 'INBOX';
@@ -241,7 +241,13 @@
       mc2SyncAgentFilterControls();
       if (nextView) {
         if (nextView === 'context' || nextView === 'inbox' || nextView === 'outbox') {
-          mc2SetAgentsSubView(nextView);
+          mc2SetView('agents');
+          setTimeout(function () {
+            var panel = mc2El('mc2-agents-panel-' + nextView);
+            if (panel) {
+              try { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+            }
+          }, 0);
         } else {
           mc2SetView(nextView);
         }
@@ -249,6 +255,7 @@
       }
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'context') mc2RenderContext();
+      if (mc2ActiveView === 'agents') mc2RenderAgentsDetail();
     }
 
     function mc2AgentIdsForFilter() {
@@ -299,14 +306,17 @@
       var el = mc2El('mc2-agents-context-list') || mc2El('mc2-context-list');
       if (!el) return;
       mc2SyncAgentFilterControls();
+      var titleEl = mc2El('mc2-agents-context-title');
       var ids = mc2AgentIdsForFilter();
       if (!ids.length) {
         mc2TimelineSpyEnabled = false;
+        if (titleEl) titleEl.textContent = 'ACTIVE CONTEXT';
         el.innerHTML = '<p class="team-agent-inbox-empty">No agents available.</p>';
         return;
       }
       var sections = mc2ContextSections();
       var label = mc2InboxAgentFilter ? agentNameById(mc2InboxAgentFilter) : 'all agents';
+      if (titleEl) titleEl.textContent = mc2InboxAgentFilter ? ('ACTIVE CONTEXT — ' + label) : 'ACTIVE CONTEXT';
       if (!sections.length) {
         mc2TimelineSpyEnabled = false;
         el.innerHTML = '<p class="mc-kanban-empty">No context activity for ' + escapeHtml(label) + ' yet.</p>';
@@ -368,25 +378,22 @@
       var next = String(subView || 'overview').trim();
       if (['overview', 'context', 'inbox', 'outbox'].indexOf(next) < 0) next = 'overview';
       mc2AgentsSubView = next;
-      mc2ActiveView = next === 'overview' ? 'agents' : next;
+      mc2ActiveView = 'agents';
       mc2RenderAgentsDetail();
-      mc2SyncTimelineHighlightForScroll();
+      if (next !== 'overview') {
+        setTimeout(function () {
+          var panel = mc2El('mc2-agents-panel-' + next);
+          if (panel) {
+            try { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+          }
+        }, 0);
+      }
     }
 
     function mc2RenderAgentsSubApp() {
-      var subView = ['overview', 'context', 'inbox', 'outbox'].indexOf(mc2AgentsSubView) >= 0 ? mc2AgentsSubView : 'overview';
-      var panelName = subView === 'inbox' || subView === 'outbox' ? 'mailbox' : subView;
-      document.querySelectorAll('#mc2-view-agents .mc-agents-subtab[data-mc2-agents-tab]').forEach(function (btn) {
-        var active = btn.getAttribute('data-mc2-agents-tab') === subView;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
-      ['overview', 'context', 'mailbox'].forEach(function (name) {
-        var panel = mc2El('mc2-agents-panel-' + name);
-        if (panel) panel.hidden = name !== panelName;
-      });
-      if (subView === 'context') mc2RenderContext();
-      if (subView === 'inbox' || subView === 'outbox') mc2RenderMailbox(subView);
+      mc2RenderContext();
+      mc2RenderMailbox('inbox');
+      mc2RenderMailbox('outbox');
     }
 
     function mc2ProjectNameById(projectId) {

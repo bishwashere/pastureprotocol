@@ -593,7 +593,8 @@
           var active = agentCardActiveCount(ctx, metrics);
           var done = Number(metrics.totalHandled || 0);
           var waitingCount = s === 'waiting' ? 1 : 0;
-          return '<div class="mc-agent-overview-card" data-mc-agent="' + escapeHtml(id) + '">' +
+          var selected = mc2InboxAgentFilter && id === mc2InboxAgentFilter ? ' selected' : '';
+          return '<div class="mc-agent-overview-card' + selected + '" data-mc-agent="' + escapeHtml(id) + '">' +
             '<div class="mc-kanban-card-head">' +
               mc2AvatarHtml(a) +
               '<span class="mc-agent-role">' + name + '</span>' +
@@ -608,18 +609,17 @@
               '<span>' + done + ' Done</span>' +
               (waitingCount ? '<span class="waiting">' + waitingCount + ' Waiting</span>' : '') +
             '</div>' +
-            '<div class="mc-agent-overview-actions">' +
-              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="context" data-mc-agent="' + escapeHtml(id) + '">Context</button>' +
-              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="inbox" data-mc-agent="' + escapeHtml(id) + '">Inbox</button>' +
-              '<button type="button" class="mc-agent-overview-action" data-mc-agent-workspace="outbox" data-mc-agent="' + escapeHtml(id) + '">Outbox</button>' +
-            '</div>' +
           '</div>';
         }).join('');
         el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
-          card.addEventListener('click', function (e) {
-            if (e.target && e.target.closest && e.target.closest('[data-mc-agent-workspace]')) return;
+          card.addEventListener('click', function () {
             var aid = card.getAttribute('data-mc-agent');
-            if (aid) mc2OpenTaskDetailForAgent(aid);
+            if (!aid) return;
+            if (elId === 'mc2-agents-detail') {
+              mc2SetAgentFilter(aid);
+              return;
+            }
+            mc2OpenTaskDetailForAgent(aid);
           });
         });
       }

@@ -947,6 +947,59 @@ button.mc-stat-card-action:focus-visible {
   min-height: 0;
 }
 
+.mc-agents-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 0;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.16);
+}
+
+.mc-agents-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  min-height: 0;
+}
+
+.mc-agents-workspace-card {
+  min-width: 0;
+  min-height: 14rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-agents-workspace-head {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.14);
+}
+
+.mc-agents-workspace-head .mc-section-title {
+  margin: 0;
+}
+
+.mc-agents-workspace-feed {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+}
+
+@media (max-width: 1100px) {
+  .mc-agents-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .mc-agents-overview {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
@@ -1016,29 +1069,6 @@ button.mc-stat-card-action:focus-visible {
 .mc-agent-overview-stats .active  { color: #22c55e; }
 .mc-agent-overview-stats .waiting { color: #eab308; }
 .mc-agent-overview-stats .blocked { color: #ef4444; }
-.mc-agent-overview-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.1rem;
-}
-.mc-agent-overview-action {
-  margin: 0;
-  padding: 0.18rem 0.4rem;
-  border: 1px solid rgba(167, 139, 250, 0.28);
-  border-radius: 999px;
-  background: rgba(167, 139, 250, 0.08);
-  color: #ddd6fe;
-  font: inherit;
-  font-size: 0.56rem;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-.mc-agent-overview-action:hover {
-  border-color: rgba(167, 139, 250, 0.55);
-  background: rgba(167, 139, 250, 0.16);
-}
 
 .mc-task-card {
   border: 1px solid var(--border);
@@ -1139,9 +1169,9 @@ button.mc-stat-card-action:focus-visible {
   color: var(--muted);
 }
 .mc-tasks-section-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.55rem;
 }
 button.mc-mission-task-card {
   width: 100%;
@@ -1157,12 +1187,19 @@ button.mc-mission-task-card {
   font-size: 0.6rem;
   color: var(--muted);
   line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mc-task-card-desc {
   margin: 0 0 0.3rem;
   font-size: 0.62rem;
   color: var(--muted);
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .mc-task-card-mission {
   color: var(--muted);

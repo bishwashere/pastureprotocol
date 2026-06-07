@@ -28,6 +28,9 @@ const appJs = readDashboardJs(assetsJsDir)
 const dashboardCss = fs.existsSync(path.join(publicDir, 'assets/css/dashboard.css'))
   ? fs.readFileSync(path.join(publicDir, 'assets/css/dashboard.css'), 'utf8')
   : '';
+const team2Css = fs.existsSync(path.join(publicDir, 'assets/css/team2.css'))
+  ? fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8')
+  : '';
 const pagesDir = path.join(publicDir, 'pages');
 
 function readHtmlFragments(dir) {
@@ -56,6 +59,7 @@ const html = [
   readPartial('modals.html'),
   readPartial('project-edit-modal.html'),
   dashboardCss,
+  team2Css,
   appJs,
   pageFragments,
 ].join('\n');
@@ -318,27 +322,26 @@ const checks = [
       html.includes('Active mission'),
   },
   {
-    name: 'Team2 keeps context inbox and outbox inside Agents sub-app',
+    name: 'Team2 shows context inbox and outbox at bottom of Agents page',
     ok: !html.includes('class="mc-nav-item" data-mc-nav="inbox"') &&
       !html.includes('class="mc-nav-item" data-mc-nav="outbox"') &&
       !html.includes('class="mc-nav-item" data-mc-nav="context"') &&
       !html.includes('mc-nav-label">Settings</span>') &&
       html.includes('Agent workspace') &&
-      html.includes('data-mc2-agents-tab="context"') &&
-      html.includes('data-mc2-agents-tab="inbox"') &&
-      html.includes('data-mc2-agents-tab="outbox"') &&
-      html.includes('data-mc-agent-workspace="context"') &&
-      html.includes('data-mc-agent-workspace="inbox"') &&
-      html.includes('data-mc-agent-workspace="outbox"') &&
-      html.includes('mc-agent-overview-action') &&
+      html.includes('Context, Inbox, and Outbox show all agents by default') &&
+      html.includes('id="mc2-agents-agent-filter"') &&
+      html.includes('class="mc-agents-workspace"') &&
+      html.includes('class="mc-agents-workspace-grid"') &&
+      html.includes('id="mc2-agents-panel-context"') &&
+      html.includes('id="mc2-agents-panel-inbox"') &&
+      html.includes('id="mc2-agents-panel-outbox"') &&
       html.includes("mc2SetAgentFilter(contextLink.getAttribute('data-mc-agent') || '', 'context')") &&
       html.includes('id="mc2-agents-context-list"') &&
-      html.includes('id="mc2-agents-mailbox-feed"') &&
+      html.includes('id="mc2-agents-inbox-feed"') &&
+      html.includes('id="mc2-agents-outbox-feed"') &&
       html.includes('mc2SetAgentsSubView') &&
       !html.includes('data-mc-nav="stats"') &&
       html.includes('id="mc2-inbox-agent-filter"') &&
-      html.includes('id="mc2-agents-context-agent-filter"') &&
-      html.includes('id="mc2-agents-mailbox-agent-filter"') &&
       html.includes('id="mc2-context-agent-filter"') &&
       !html.includes('id="mc2-stats-agent-filter"') &&
       html.includes('class="team-agent-panel-ranges mc2-range-controls"') &&
@@ -351,7 +354,8 @@ const checks = [
       html.includes('setTeamAgentPanelRange') &&
       html.includes('renderMissionControl();') &&
       html.includes("var visibleView = (view === 'context' || view === 'inbox' || view === 'outbox') ? 'agents' : view") &&
-      html.includes("mc2RenderMailbox(subView)") &&
+      html.includes("mc2RenderMailbox('inbox')") &&
+      html.includes("mc2RenderMailbox('outbox')") &&
       html.includes('mc2MailboxFlows') &&
       html.includes('mc2MailboxFlows(direction, range)') &&
       html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId, activeRange), direction)') &&
@@ -371,7 +375,7 @@ const checks = [
       html.includes('mc2FirstVisibleTsInScrollView') &&
       html.includes('mc2ContextSections') &&
       html.includes('mc2BindTimelineScrollSpy') &&
-      html.includes("mc2ActiveView === 'context'") &&
+      html.includes("mc2ActiveView === 'agents'") &&
       html.includes('data-ts=') &&
       html.includes('mc2EventMatchesAgent'),
   },
@@ -379,6 +383,12 @@ const checks = [
     name: 'Team2 sidebar includes Tasks nav',
     ok: html.includes('class="mc-nav-item" data-mc-nav="tasks"') &&
       html.includes('mc-nav-label">Tasks</span>'),
+  },
+  {
+    name: 'Team2 task page uses compact tile grid',
+    ok: /\.mc-tasks-section-body\s*\{[\s\S]{0,180}display:\s*grid/.test(html) &&
+      /\.mc-tasks-section-body\s*\{[\s\S]{0,220}grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(10rem,\s*1fr\)\)/.test(html) &&
+      /\.mc-task-card-desc\s*\{[\s\S]{0,220}-webkit-line-clamp:\s*2/.test(html),
   },
   {
     name: 'Team2 Done Today opens completed tasks cards view',
