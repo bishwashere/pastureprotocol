@@ -1590,6 +1590,11 @@
               status: card ? card.getAttribute('data-status') : 'todo',
             };
           if (action === 'respond') {
+            var inDetailPopup = !!(btn.closest && btn.closest('#mc2-task-drawer-body'));
+            if (!inDetailPopup && card && typeof mc2ShowMissionTaskDetails === 'function') {
+              mc2ShowMissionTaskDetails(card);
+              return;
+            }
             if (typeof openMissionWorkInputModal === 'function') openMissionWorkInputModal(item);
             return;
           }
