@@ -1,0 +1,191 @@
+/* MC2 Activity view — #team/activity
+ * Covers: activity feed items, agent filter, range controls (timeline),
+ * movement/attention items, panel links.
+ */
+
+/* ── Movement & attention items ───────────────────────────────────────── */
+
+.mc-movement-time {
+  flex-shrink: 0;
+  width: 2.5rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.mc-activity-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mc-activity-agent {
+  font-size: 0.62rem;
+  font-weight: 600;
+  margin-bottom: 0.12rem;
+}
+
+.mc-activity-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mc-activity-line {
+  color: var(--text);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.mc-activity-group .mc-activity-line {
+  color: var(--muted);
+}
+
+.mc-activity-group .mc-activity-line:last-child {
+  color: var(--text);
+}
+
+/* ── Activity toolbar ─────────────────────────────────────────────────── */
+
+.mc-activity-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.mc-activity-toolbar .mc-section-title {
+  margin-bottom: 0;
+}
+
+/* ── Agent filter (select) ────────────────────────────────────────────── */
+
+.mc-agent-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.mc-agent-filter select {
+  min-width: 10rem;
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.66rem;
+}
+
+/* ── Timeline range controls ──────────────────────────────────────────── */
+
+.mc2-range-controls {
+  margin: 0 0 0.45rem 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+  padding: 0.35rem 0.45rem;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(7, 11, 23, 0.9);
+  backdrop-filter: blur(2px);
+}
+
+.mc2-range-controls .team-agent-panel-range {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ── Panel link ───────────────────────────────────────────────────────── */
+
+.mc-panel-link {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  font-size: 0.6rem;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+/* ── Visual polish overrides — activity view ──────────────────────────── */
+
+.mc-movement-time,
+.mc-movement-item:last-child {
+  color: #8795b1;
+}
+
+.mc-attention-item.error {
+  margin-bottom: 0.25rem;
+  padding: 0.38rem 0.45rem;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 0.42rem;
+  background: rgba(127, 29, 29, 0.22);
+}
+
+.mc-attention-item.warning {
+  margin-bottom: 0.25rem;
+  padding: 0.38rem 0.45rem;
+  border: 1px solid rgba(234, 179, 8, 0.18);
+  border-radius: 0.42rem;
+  background: rgba(113, 63, 18, 0.18);
+}
+
+.mc-panel-link {
+  align-self: flex-end;
+  color: #a78bfa;
+}
+
+.mc-movement-item,
+.mc-attention-item {
+  align-items: center;
+}
+
+.mc-attention-item .mc-attention-text {
+  flex: 1 1 auto;
+}
+
+/* ── Attention item structured ────────────────────────────────────────── */
+
+.mc-attention-tag {
+  font-size: 0.54rem !important;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
+.mc-attention-item-structured {
+  align-items: flex-start;
+}
+
+.mc-attention-item-structured .mc-attention-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mc-attention-item-structured .mc-attention-title {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #e5edf9;
+  line-height: 1.35;
+}
+
+.mc-attention-item-structured .mc-attention-sub {
+  font-size: 0.58rem;
+  color: var(--muted);
+  line-height: 1.35;
+}

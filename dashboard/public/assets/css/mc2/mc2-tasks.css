@@ -1,0 +1,500 @@
+/* MC2 Tasks view — #team/tasks
+ * Covers: task filters, task cards, task detail panel, task popup, task timeline.
+ */
+
+/* ── Task card ────────────────────────────────────────────────────────── */
+
+.mc-task-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0.5rem 0.55rem;
+  font-size: 0.64rem;
+  cursor: pointer;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.mc-task-card:hover { border-color: #60a5fa; }
+
+.mc-task-card-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mc-task-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.45rem;
+  font-size: 0.58rem;
+  color: var(--muted);
+}
+
+.mc-task-card-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+}
+.mc-task-card-agent .mc-agent-avatar {
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.48rem;
+}
+
+.mc-task-card-meta .done-tag { color: #60a5fa; }
+
+/* ── Task filters ─────────────────────────────────────────────────────── */
+
+.mc2-tasks-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.mc2-tasks-filter {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--muted);
+  font-size: 0.64rem;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.mc2-tasks-filter:hover { border-color: #60a5fa; color: var(--text); }
+.mc2-tasks-filter.active {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(30, 41, 92, 0.55);
+  color: #dbeafe;
+}
+.mc2-tasks-filter[data-mc-tasks-filter="blocked"].active {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(69, 10, 10, 0.45);
+  color: #fecaca;
+}
+
+/* ── Task list sections ───────────────────────────────────────────────── */
+
+.mc-tasks-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.mc-tasks-section-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mc-tasks-section-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.mc-tasks-section-sub {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.mc-tasks-section-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.55rem;
+}
+
+button.mc-mission-task-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ── Task card variants ───────────────────────────────────────────────── */
+
+.mc-task-card-path {
+  margin: 0.15rem 0 0.25rem;
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc-task-card-desc {
+  margin: 0 0 0.3rem;
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mc-task-card-mission {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.mc-task-card-suggestedTask {
+  color: #93c5fd;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.mc-task-card-label {
+  color: var(--text);
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  border-radius: 999px;
+  padding: 0.05rem 0.32rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+
+.mc2-suggestedTasks-main.team-suggestedTasks-main {
+  margin-top: 0;
+}
+
+.mc-movement-clickable {
+  cursor: pointer;
+}
+.mc-movement-clickable:hover {
+  background: rgba(167, 139, 250, 0.08);
+  border-radius: 6px;
+}
+
+.team-mission-task-actions,
+.team-mission-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.team-mission-task-node > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.team-mission-task-btn {
+  font-size: 0.62rem !important;
+  padding: 0.15rem 0.4rem !important;
+  margin: 0 !important;
+}
+
+.mc-mission-select-card.selected {
+  outline: 1px solid rgba(167, 139, 250, 0.55);
+  background: rgba(167, 139, 250, 0.06);
+}
+
+.mc-mission-card-btn {
+  font-size: 0.62rem !important;
+  padding: 0.2rem 0.45rem !important;
+  margin: 0 !important;
+}
+
+/* ── Task detail panel ────────────────────────────────────────────────── */
+
+.mc-task-detail-panel {
+  margin-bottom: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(26, 26, 31, 0.85);
+}
+.mc-task-detail-panel[hidden] {
+  display: none !important;
+}
+
+.mc-task-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.mc-task-detail-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.mc-task-detail-meta {
+  margin: 0.15rem 0;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.mc-task-detail-fields {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, auto) 1fr;
+  gap: 0.35rem 0.65rem;
+  margin: 0.55rem 0 0.65rem;
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+.mc-task-detail-fields dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.58rem;
+}
+.mc-task-detail-fields dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.mc-task-detail-reason {
+  margin: 0.45rem 0 0.65rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.mc-task-source-chain {
+  margin: 0.55rem 0 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  background: linear-gradient(135deg, rgba(76, 29, 149, 0.16), rgba(15, 23, 42, 0.35));
+}
+.mc-task-source-chain .mc-section-title {
+  margin-top: 0 !important;
+  color: #ddd6fe;
+}
+.mc-task-source-chain-fields dd {
+  color: #f4f4f5;
+  font-weight: 500;
+}
+
+.mc-task-inaction {
+  margin: 0.55rem 0 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: linear-gradient(135deg, rgba(69, 26, 3, 0.22), rgba(15, 23, 42, 0.35));
+}
+.mc-task-inaction-high {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.28), rgba(15, 23, 42, 0.35));
+}
+.mc-task-inaction-none {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.28);
+}
+.mc-task-inaction .mc-section-title {
+  margin-top: 0 !important;
+  color: #fde68a;
+}
+.mc-task-inaction-high .mc-section-title {
+  color: #fecaca;
+}
+.mc-task-inaction-fields dd {
+  color: #f4f4f5;
+  font-weight: 500;
+}
+.mc-task-inaction-required-yes {
+  color: #fca5a5 !important;
+  font-weight: 700 !important;
+}
+.mc-task-inaction-impact-high {
+  color: #fdba74 !important;
+  font-weight: 700 !important;
+}
+
+.mc-task-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+/* ── Task detail popup (drawer) ───────────────────────────────────────── */
+
+.mc-task-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: none;
+  pointer-events: none;
+}
+.mc-task-popup.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  padding: 1.25rem;
+}
+.mc-task-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+}
+.mc-task-popup-card {
+  position: relative;
+  z-index: 1;
+  width: min(58rem, calc(100vw - 2.5rem));
+  height: min(86dvh, 48rem);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #14141a 0%, #0f0f14 100%);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58);
+  overflow: hidden;
+}
+.mc-task-popup-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.mc-task-popup-kicker {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.mc-task-popup-close {
+  margin: 0;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.mc-task-popup-close:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.mc-task-popup-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.1rem 1.2rem;
+}
+.mc-task-popup-body .mc-task-detail-title {
+  font-size: 0.92rem;
+  line-height: 1.35;
+  margin-bottom: 0.35rem;
+}
+.mc-task-popup-body .mc-task-timeline {
+  max-height: none;
+}
+
+/* ── Task timeline ────────────────────────────────────────────────────── */
+
+.mc-kanban-card-completed,
+.mc-kanban-card[data-mc-kanban-kind="task"],
+.mc-task-card[data-mc-turn-task] {
+  cursor: pointer;
+}
+
+.mc-task-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.mc-task-timeline-item {
+  display: flex;
+  gap: 0.45rem;
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+.mc-task-timeline-time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  min-width: 3.2rem;
+}
+.mc-task-timeline-text {
+  flex: 1 1 auto;
+}
+
+.mc-task-card-selected {
+  outline: 1px solid rgba(167, 139, 250, 0.65);
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.mc-kanban-context-link {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.58rem !important;
+  text-align: left;
+  padding: 0 !important;
+}
+
+.mc-task-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.mc-task-card-btn {
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-size: 0.62rem;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.mc-task-card-btn:hover { border-color: #60a5fa; }
+.mc-task-card-btn.primary {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(69, 10, 10, 0.45);
+  color: #fecaca;
+}
+
+.mc-mission-task-card { cursor: pointer; }

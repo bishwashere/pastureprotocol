@@ -42,7 +42,7 @@ const API = '';
     function dashboardRouteFromHash() {
       try {
         var p = parseHash();
-        setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId);
+        setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId, p.mc2View);
       } catch (err) {
         console.error('[dashboard] route failed:', err);
         setPage('home');
@@ -67,7 +67,7 @@ const API = '';
       if (routeName === 'team') return 'team';
       return routeName;
     }
-    function setPage(name, memoryFileId, openIdentityFileId, teamAgentId) {
+    function setPage(name, memoryFileId, openIdentityFileId, teamAgentId, mc2View) {
       if (name === 'chat' || name === 'status') name = 'home';
       if (!name || !validPages.includes(name)) name = 'home';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -96,6 +96,9 @@ const API = '';
           }
           renderMissionControl();
           fetchMc2PendingApprovals();
+          if (mc2View && typeof mc2SetView === 'function') {
+            mc2SetView(mc2View, true);
+          }
         });
       } else {
         stopTeamActivityFeed();
@@ -112,6 +115,7 @@ const API = '';
       }
       if (openIdentityFileId) openIdentityEditor(openIdentityFileId);
     }
+    var MC2_VIEW_ROUTES = ['home', 'mission', 'tasks', 'agents', 'projects', 'activity', 'missions', 'context', 'inbox', 'outbox'];
     function parseHash() {
       var raw = (location.hash || '#home').slice(1) || 'home';
       var slash = raw.indexOf('/');
@@ -121,9 +125,14 @@ const API = '';
       if (name === 'agents') name = 'team';
       if (name === 'team' || name === 'team') {
         if (subFile) {
-          return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+          var decodedSub = decodeURIComponent(subFile);
+          if (MC2_VIEW_ROUTES.indexOf(decodedSub) >= 0) {
+            var mc2View = decodedSub === 'home' ? 'mission' : decodedSub;
+            return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null, mc2View: mc2View };
+          }
+          return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodedSub, mc2View: null };
         }
-        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
+        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null, mc2View: null };
       }
       if (name === 'team-agent') {
         return {

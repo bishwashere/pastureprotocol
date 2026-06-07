@@ -1,5 +1,5 @@
 /* MC2 navigation, view switching, projects sidebar, timeline scroll */
-    function mc2SetView(view) {
+    function mc2SetView(view, skipHistory) {
       if (view === 'context' || view === 'inbox' || view === 'outbox') {
         mc2AgentsSubView = view;
       } else if (view === 'agents' && (mc2AgentsSubView === 'context' || mc2AgentsSubView === 'inbox' || mc2AgentsSubView === 'outbox')) {
@@ -15,6 +15,10 @@
         var nav = btn.getAttribute('data-mc-nav');
         btn.classList.toggle('active', nav === visibleView);
       });
+      if (!skipHistory) {
+        var urlSeg = view === 'mission' ? 'home' : view;
+        try { history.replaceState(null, '', '#team/' + urlSeg); } catch (_) {}
+      }
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'missions') mc2RenderMissions();
       if (view === 'projects') mc2RenderProjects();

@@ -105,6 +105,32 @@ async function main() {
     assert(aiMission?.title === 'Launch TestProduct', 'AI projectName used in mission title');
     assert((aiMission?.tasks || []).length === 3, 'AI deliverables become tasks');
 
+    // Known-project early return: a message that mentions a registered project by name
+    // should become a new_mission_candidate WITHOUT calling the AI classifier.
+    process.env.PASTURE_STATE_DIR = stateDir; // already set, but be explicit
+    // Register a mock project so mentionsKnownProject fires.
+    const { createProject } = await import('../../lib/projects-db.js');
+    createProject({ name: 'testproject', url: 'https://example.com' });
+    let knownProjLlmCalls = 0;
+    const knownProjResult = await prepareWorkDurabilityWithAi({
+      userText: 'how can i improve testproject customer signups',
+      agentId: 'main',
+      llmChat: async (messages) => {
+        const system = String(messages?.[0]?.content || '');
+        if (system.includes('decompose persistent user work')) {
+          return JSON.stringify({ subtasks: [{ title: 'Improve signup funnel', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.85, reason: 'Signup improvements are marketing work.' }] });
+        }
+        knownProjLlmCalls += 1;
+        return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Generic advice' });
+      },
+    });
+    assert(knownProjLlmCalls === 0, 'known-project path skips AI durability classifier');
+    assert(knownProjResult.kind === 'new_mission_candidate', 'known-project message becomes new mission');
+    assert(knownProjResult.persistence === 'create_lightweight_mission', 'known-project creates mission');
+    assert(knownProjResult.projectName === 'testproject', 'known-project name captured');
+    assert(knownProjResult.missionId, 'known-project mission created before delegation');
+    assert(knownProjResult.decomposition === 'ai-constrained', 'known-project uses AI decomposition for tasks');
+
     const followup = await prepareWorkDurabilityWithAi({
       userText: 'Make the positioning less corporate',
       agentId: 'main',

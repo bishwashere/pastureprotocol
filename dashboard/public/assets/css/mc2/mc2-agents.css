@@ -1,0 +1,313 @@
+/* MC2 Agents view — #team/agents
+ * Covers: agents subapp, workspace grid, subtabs, overview cards, agent state dots.
+ */
+
+/* ── Shared agent avatar (used in multiple views) ─────────────────────── */
+
+.mc-agent-avatar {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: rgba(167,139,250,0.18);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Agents subapp ────────────────────────────────────────────────────── */
+
+.mc-agents-subapp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+}
+
+.mc-agents-subapp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mc-agents-subapp-head .mc-section-title {
+  margin-bottom: 0;
+}
+
+.mc-agents-subapp-hint {
+  margin: 0.18rem 0 0;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+/* ── Agents subtabs ───────────────────────────────────────────────────── */
+
+.mc-agents-subtabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(7, 11, 23, 0.72);
+}
+
+.mc-agents-subtab {
+  margin: 0;
+  padding: 0.3rem 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.mc-agents-subtab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mc-agents-subtab.active {
+  color: #fff;
+  background: rgba(167, 139, 250, 0.24);
+}
+
+.mc-agents-subpanel {
+  min-height: 0;
+}
+
+/* ── Agents workspace ─────────────────────────────────────────────────── */
+
+.mc-agents-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 0;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.16);
+}
+
+.mc-agents-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  min-height: 0;
+}
+
+.mc-agents-workspace-card {
+  min-width: 0;
+  min-height: 14rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-agents-workspace-head {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.14);
+}
+
+.mc-agents-workspace-head .mc-section-title {
+  margin: 0;
+}
+
+.mc-agents-workspace-feed {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+}
+
+@media (max-width: 1100px) {
+  .mc-agents-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Agents overview grid ─────────────────────────────────────────────── */
+
+.mc-agents-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.45rem;
+}
+
+.mc-agent-overview-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0.5rem 0.55rem;
+  font-size: 0.64rem;
+  cursor: pointer;
+}
+.mc-agent-overview-card:hover    { border-color: var(--muted);  }
+.mc-agent-overview-card.selected { border-color: var(--accent); }
+
+.mc-agent-overview-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.3rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mc-agent-overview-focus,
+.mc-agent-overview-last-task {
+  color: var(--muted);
+  margin: 0.25rem 0 0.35rem;
+}
+
+.mc-agent-overview-last-task-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.12rem;
+}
+
+.mc-agent-overview-last-task-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mc-agent-overview-last-task-line {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #c7d2e3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mc-agent-overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.45rem;
+  font-size: 0.58rem;
+  color: var(--muted);
+}
+.mc-agent-overview-stats .active  { color: #22c55e; }
+.mc-agent-overview-stats .waiting { color: #eab308; }
+.mc-agent-overview-stats .blocked { color: #ef4444; }
+
+/* ── Visual polish overrides — agents view ────────────────────────────── */
+
+.mc-agent-avatar {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(251, 191, 36, 0.4), transparent 0.5rem),
+    linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(30, 64, 175, 0.85));
+  color: #fff;
+}
+
+.mc-agents-overview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.mc-agent-overview-title {
+  color: #e5edf9;
+}
+
+.mc-agent-overview-last-task-label,
+.mc-agent-overview-last-task-line,
+.mc-agent-overview-focus {
+  color: #8795b1;
+}
+
+.mc-agent-overview-last-task-line {
+  color: #c7d2e3;
+}
+
+.mc-agent-overview-card {
+  min-height: 5.4rem;
+}
+
+.mc-agents-overview {
+  grid-template-columns: repeat(4, minmax(10rem, 1fr));
+}
+
+.mc-agent-overview-card {
+  position: relative;
+  min-height: 6.1rem;
+  padding: 0.6rem 0.65rem;
+  overflow: hidden;
+}
+
+.mc-agent-overview-card::after {
+  content: "⌁⌁⌁⌁⌁";
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.36rem;
+  color: #60a5fa;
+  opacity: 0.35;
+  letter-spacing: -0.12em;
+}
+
+/* ── Agent state dot ──────────────────────────────────────────────────── */
+
+.mc-agent-state-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.25);
+}
+
+.mc-agent-state-dot.working {
+  background: #22c55e;
+  border-color: rgba(34, 197, 94, 0.7);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.65);
+}
+
+.mc-agent-state-dot.waiting {
+  background: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.72);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.55);
+}
+
+.mc-agent-state-dot.error {
+  background: #fb4769;
+  border-color: rgba(251, 71, 105, 0.7);
+  box-shadow: 0 0 12px rgba(251, 71, 105, 0.58);
+}
+
+.mc-agent-overview-stats {
+  justify-content: space-between;
+  max-width: 8.5rem;
+}
+
+.mc-agent-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.82),
+    0 0 15px rgba(124, 58, 237, 0.28);
+}
+
+@media (max-width: 1180px) {
+  .mc-agents-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

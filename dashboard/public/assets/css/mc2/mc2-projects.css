@@ -1,0 +1,248 @@
+/* MC2 Projects view — #team/projects
+ * Covers: project workspace canvas, connector cards, MongoDB field maps.
+ */
+
+/* ── Project workspace ────────────────────────────────────────────────── */
+
+#mc2-proj-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+}
+
+.mc2-proj-canvas {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100dvh - 11rem);
+}
+
+.mc2-proj-toolbar {
+  flex-shrink: 0;
+}
+
+/* ── Connectors section ───────────────────────────────────────────────── */
+
+.mc2-proj-connectors {
+  flex-shrink: 0;
+  padding: 0.65rem 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.mc2-proj-connectors-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.mc2-proj-connectors-head .mc-section-title {
+  margin: 0;
+}
+
+.mc2-proj-connectors-hint {
+  margin: 0;
+  text-align: right;
+  max-width: 28rem;
+}
+
+.mc2-proj-connectors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.55rem;
+}
+
+/* ── Connector card ───────────────────────────────────────────────────── */
+
+.mc2-connector-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.7rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mc2-connector-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.mc2-connector-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mc2-connector-badge {
+  font-size: 0.62rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mc2-connector-badge.connected {
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.mc2-connector-badge.missing {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.mc2-connector-desc {
+  margin: 0;
+  font-size: 0.64rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.mc2-connector-field label {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.mc2-connector-field input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.35rem 0.45rem;
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+/* ── MongoDB field map ────────────────────────────────────────────────── */
+
+.mc2-mongo-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
+}
+
+.mc2-mongo-map-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.mc2-mongo-map-head span {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.mc2-mongo-map-head small {
+  color: var(--muted);
+  font-size: 0.54rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.mc2-mongo-map-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mc2-mongo-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.mc2-mongo-map-row input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.32rem 0.4rem;
+  font: inherit;
+  font-size: 0.66rem;
+}
+
+.mc2-mongo-map-add,
+.mc2-mongo-map-remove {
+  font: inherit;
+  font-size: 0.62rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc2-mongo-map-add {
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem;
+}
+
+.mc2-mongo-map-remove {
+  padding: 0.3rem 0.4rem;
+  color: var(--muted);
+}
+
+.mc2-mongo-map-add:hover,
+.mc2-mongo-map-remove:hover {
+  border-color: var(--muted);
+}
+
+/* ── Connector actions ────────────────────────────────────────────────── */
+
+.mc2-connector-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.mc2-connector-actions button {
+  font: inherit;
+  font-size: 0.68rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc2-connector-actions button:hover {
+  border-color: var(--muted);
+}
+
+.mc2-connector-saved {
+  font-size: 0.62rem;
+  color: var(--green);
+}
+
+.mc2-proj-connectors-empty {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 0.35rem 0;
+}
+
+.mc2-proj-login {
+  max-width: 340px;
+  margin: 2rem auto;
+}
