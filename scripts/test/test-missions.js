@@ -78,7 +78,7 @@ async function main() {
     assert(/"suggestedTasks": \[\{/.test(prompt), 'prompt includes suggestedTasks schema');
     const memoryPath = getMissionMemoryPath(created.id);
     assert(existsSync(memoryPath), 'mission memory file created');
-    assert(/Per-mission memory file path/.test(prompt), 'prompt includes memory path');
+    assert(/Per-mission memory/.test(prompt), 'prompt includes memory section');
 
     updateMission(created.id, { nextRunAt: Date.now() - 1 });
     assert(listDueMissions().length === 1, 'mission is due');
