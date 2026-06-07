@@ -352,9 +352,18 @@
       return d + 'd';
     }
 
-    function mc2AvatarHtml(a) {
+    function mc2AvatarHtml(a, opts) {
+      var large = opts && opts.large;
+      var cls = 'mc-agent-avatar' + (large ? ' mc-agent-avatar--large' : '');
+      if (a && a.avatarUrl) {
+        return (
+          '<div class="' + cls + ' mc-agent-avatar--img">' +
+            '<img src="' + escapeHtml(a.avatarUrl) + '" alt="' + escapeHtml(agentCardShortName(a)) + '" loading="lazy">' +
+          '</div>'
+        );
+      }
       var initials = mc2AgentInitials(a);
-      return '<div class="mc-agent-avatar">' + escapeHtml(initials) + '</div>';
+      return '<div class="' + cls + '">' + escapeHtml(initials) + '</div>';
     }
 
     function mc2NormalizeTaskPrompt(raw) {

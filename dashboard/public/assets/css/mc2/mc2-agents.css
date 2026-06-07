@@ -18,6 +18,28 @@
   flex-shrink: 0;
 }
 
+/* Image avatar — fills the circle when a real picture is available */
+.mc-agent-avatar--img {
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mc-agent-avatar--img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+/* Larger variant used on agent overview cards */
+.mc-agent-avatar--large {
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 0.75rem;
+}
+
 /* ── Agents subapp ────────────────────────────────────────────────────── */
 
 .mc-agents-subapp {

@@ -106,6 +106,19 @@ function runPostUpdateRestartAndDashboard() {
   } else {
     console.log('  (dashboard not found; run pasture dashboard if needed)');
   }
+
+  // Backfill agent avatars in the background — fire-and-forget, never blocks.
+  const backfillScript = join(INSTALL_DIR, 'scripts', 'backfill-agent-avatars.js');
+  if (existsSync(backfillScript)) {
+    const child = spawn(process.execPath, [backfillScript], {
+      stdio: 'ignore',
+      detached: true,
+      env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+      cwd: INSTALL_DIR,
+    });
+    child.unref();
+  }
+
   console.log('');
 }
 
@@ -254,11 +267,20 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       process.exit(code ?? 0);
     });
   }
-} else if (sub === 'uninstall') {
-  if (IS_WIN) {
-    runWindowsUninstall({ installDir: INSTALL_DIR });
-    process.exit(0);
+} else if (sub === 'avatars') {
+  // Generate (or re-generate) missing agent profile pictures.
+  const backfillScript = join(INSTALL_DIR, 'scripts', 'backfill-agent-avatars.js');
+  if (!existsSync(backfillScript)) {
+    console.error('pasture: backfill-agent-avatars.js not found. Re-run the installer.');
+    process.exit(1);
   }
+  const child = spawn(process.execPath, [backfillScript], {
+    stdio: 'inherit',
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
+} else if (sub === 'uninstall') {
   const script = join(INSTALL_DIR, 'uninstall.sh');
   if (!existsSync(script)) {
     console.error('pasture: uninstall.sh not found. Re-run the installer.');
@@ -500,6 +522,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('       pasture server list');
   console.log('       pasture server remove <name>');
   console.log('       pasture update [--force]');
+  console.log('       pasture avatars');
   console.log('       pasture uninstall');
   process.exit(sub ? 1 : 0);
 }

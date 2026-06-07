@@ -11,7 +11,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath } from '../lib/paths.js';
+import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent-avatar.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
 import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/team-activity.js';
 import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent-context-state.js';
@@ -442,6 +443,7 @@ app.get('/api/agents', (_req, res) => {
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
         hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
+        avatarUrl: hasAgentAvatar(id) ? `/agent-avatar/${encodeURIComponent(id)}` : null,
       };
     });
     res.json({ agents });
@@ -788,7 +790,41 @@ app.post('/api/agents', (req, res) => {
       else delete config.title;
       saveAgentConfig(created.id, config);
     }
+    // Kick off avatar generation asynchronously — never block the response.
+    if (created.created) {
+      const agentTitle = config.title || created.id;
+      generateAndSaveAgentAvatar(created.id, agentTitle).catch(() => {});
+    }
     res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Serve an agent's avatar PNG directly. */
+app.get('/agent-avatar/:id', (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || isInternalAgent(id)) { res.status(404).end(); return; }
+  const avatarPath = getAgentAvatarPath(id);
+  if (!existsSync(avatarPath)) { res.status(404).end(); return; }
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(avatarPath);
+});
+
+/** Regenerate (or generate for the first time) an agent's avatar. */
+app.post('/api/agents/:id/avatar', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (rejectInternalAgent(id, res)) return;
+    const config = loadAgentConfig(id);
+    const title = getAgentTitle(id) || id;
+    const avatarPath = await generateAndSaveAgentAvatar(id, title, { force: true });
+    if (!avatarPath) {
+      res.status(503).json({ error: 'Avatar generation failed — check OpenAI API key configuration' });
+      return;
+    }
+    res.json({ avatarUrl: `/agent-avatar/${encodeURIComponent(id)}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

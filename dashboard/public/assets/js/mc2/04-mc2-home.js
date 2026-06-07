@@ -598,7 +598,7 @@
           var selected = mc2InboxAgentFilter && id === mc2InboxAgentFilter ? ' selected' : '';
           return '<div class="mc-agent-overview-card' + selected + '" data-mc-agent="' + escapeHtml(id) + '">' +
             '<div class="mc-kanban-card-head">' +
-              mc2AvatarHtml(a) +
+              mc2AvatarHtml(a, { large: true }) +
               '<span class="mc-agent-role">' + name + '</span>' +
               '<span class="mc-agent-state-dot ' + escapeHtml(s) + '" aria-label="' + escapeHtml(s) + '"></span>' +
             '</div>' +
