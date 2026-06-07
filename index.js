@@ -402,6 +402,7 @@ async function main() {
           depth: 1,
           callChain: [DEFAULT_AGENT_ID, mission?.ownerAgentId || DEFAULT_AGENT_ID],
           persistHistory: true,
+          missionId: mission?.id || '',
         }),
       onLog: (event) => {
         const baseDetails = event?.details && typeof event.details === 'object' ? event.details : {};
