@@ -5,8 +5,8 @@
 /* ── Shared agent avatar (used in multiple views) ─────────────────────── */
 
 .mc-agent-avatar {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.68rem;
+  height: 1.68rem;
   border-radius: 50%;
   background: rgba(167,139,250,0.18);
   color: var(--accent);
@@ -35,9 +35,9 @@
 
 /* Larger variant used on agent overview cards */
 .mc-agent-avatar--large {
-  width: 2.4rem;
-  height: 2.4rem;
-  font-size: 0.75rem;
+  width: 2.88rem;
+  height: 2.88rem;
+  font-size: 0.9rem;
 }
 
 /* ── Agents subapp ────────────────────────────────────────────────────── */
