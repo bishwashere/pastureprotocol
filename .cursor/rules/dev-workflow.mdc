@@ -33,3 +33,19 @@ Whenever a feature is added or an existing one is modified:
 | `test-agent-team-e2e` | `new session` | `New session started.` | ✅ Pass |
 
 Never mark a feature done without showing this table.
+
+## 3. Editing Dashboard CSS — Always Bump the Cache Version
+
+The dashboard loads CSS with a cache-busting query string in `dashboard/public/index.html`:
+
+```html
+<link rel="stylesheet" href="assets/css/team.css?v=25">
+```
+
+**Whenever any file in `dashboard/public/assets/css/` is edited**, increment the `?v=N` number on that stylesheet's `<link>` tag in `index.html`. If you skip this, the browser serves the old cached file and the change appears to have no effect — even though the file on disk is correct.
+
+Steps:
+1. Edit the CSS file.
+2. Find the matching `<link>` in `dashboard/public/index.html`.
+3. Increment `?v=N` by 1.
+4. Verify in the browser that the new styles are active (use browser MCP or ask user to hard-refresh).
