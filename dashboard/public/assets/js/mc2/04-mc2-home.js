@@ -154,6 +154,7 @@
       if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
       if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
       if (item.suggestedTaskId) attrs += ' data-suggestedTask-id="' + escapeHtml(item.suggestedTaskId) + '"';
+      var timingItem = { status: item.status || 'blocked', createdAt: item.createdAt || item.ts || 0, startedAt: item.startedAt || 0, waitingSince: item.waitingSince || item.ts || 0 };
       return '<div' + attrs + ' role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + escapeHtml(item.title) + '</div>' +
         (item.tag
@@ -163,6 +164,7 @@
           ? '<div class="mc-kanban-card-meta">' + escapeHtml(item.subtitle || String(item.text || '').replace(/^[^—]+—\s*/, '')) + '</div>'
           : '') +
         (item.ts ? '<div class="mc-kanban-card-meta mc-kanban-card-when">' + mc2RelTime(item.ts) + '</div>' : '') +
+        (typeof mc2TaskTimingBarHtml === 'function' ? mc2TaskTimingBarHtml(timingItem) : '') +
       '</div>';
     }
 
@@ -171,10 +173,13 @@
       var icon = mc2SuggestedTaskDiscoveryIcon(suggestedTask);
       var title = escapeHtml(String(suggestedTask.title || 'Untitled discovery'));
       var confidence = Math.round((Number(suggestedTask.confidence) || 0) * 100);
+      var proposedTs = Number(suggestedTask.updatedAt || suggestedTask.proposedAt || suggestedTask.createdAt) || 0;
+      var timingItem = { status: 'todo', createdAt: proposedTs, waitingSince: proposedTs };
       return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-suggestedTask-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + title + '</div>' +
         '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>' +
         '<div class="mc-kanban-card-meta">Confidence ' + escapeHtml(String(confidence)) + '%</div>' +
+        (typeof mc2TaskTimingBarHtml === 'function' ? mc2TaskTimingBarHtml(timingItem) : '') +
       '</div>';
     }
 
@@ -265,6 +270,10 @@
             ? (it.missionTitle + ' · waiting ' + mc2ShortWaitTime(ts))
             : ('Mission · waiting ' + mc2ShortWaitTime(ts)),
           ts: ts,
+          status: 'blocked',
+          createdAt: Number(it.createdAt) || 0,
+          startedAt: Number(it.startedAt) || 0,
+          waitingSince: Number(it.waitingSince) || 0,
         });
       });
 
