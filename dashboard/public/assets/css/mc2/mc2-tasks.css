@@ -520,3 +520,51 @@ button.mc-mission-task-card {
 }
 
 .mc-mission-task-card { cursor: pointer; }
+
+/* ── Task timing bar ───────────────────────────────────────────────────────── */
+.mc-task-timing-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 14px;
+  margin: 6px 0 2px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  position: relative;
+}
+.mc-task-timing-wait {
+  display: block;
+  height: 100%;
+  background: #f97316;
+  opacity: 0.72;
+  border-radius: 4px 0 0 4px;
+  flex-shrink: 0;
+}
+.mc-task-timing-active {
+  display: block;
+  height: 100%;
+  background: #22c55e;
+  opacity: 0.8;
+  border-radius: 0 4px 4px 0;
+  flex-shrink: 0;
+}
+.mc-task-timing-label {
+  position: absolute;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 0.58rem;
+  color: #fff;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 14px;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+/* For waiting-only tasks (no active segment), use a single orange bar */
+.mc-task-timing-bar:not(:has(.mc-task-timing-active)) .mc-task-timing-wait {
+  border-radius: 4px;
+  width: 100% !important;
+}

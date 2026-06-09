@@ -44,6 +44,63 @@
       return 'open';
     }
 
+    function mc2FormatDuration(ms) {
+      if (!ms || ms < 0) return '';
+      var s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + 'm';
+      var h = Math.floor(m / 60);
+      var rm = m % 60;
+      if (h < 24) return h + 'h' + (rm ? ' ' + rm + 'm' : '');
+      var d = Math.floor(h / 24);
+      var rh = h % 24;
+      return d + 'd' + (rh ? ' ' + rh + 'h' : '');
+    }
+
+    function mc2TaskTimingBarHtml(item) {
+      var now = Date.now();
+      var createdAt = Number(item.createdAt) || 0;
+      var startedAt = Number(item.startedAt) || 0;
+      var completedAt = Number(item.completedAt) || 0;
+      var waitingSince = Number(item.waitingSince) || createdAt;
+      if (!createdAt && !waitingSince && !startedAt) return '';
+
+      var waitMs = 0, activeMs = 0, label = '';
+      var status = String(item.status || '').toLowerCase();
+
+      if (status === 'done') {
+        var refStart = createdAt || startedAt;
+        waitMs = startedAt && createdAt ? startedAt - createdAt : 0;
+        activeMs = startedAt && completedAt ? completedAt - startedAt
+          : (completedAt && refStart ? completedAt - refStart : 0);
+        var totalMs = completedAt && refStart ? completedAt - refStart : (waitMs + activeMs);
+        label = 'Done in ' + mc2FormatDuration(totalMs);
+      } else if (status === 'doing') {
+        waitMs = startedAt && createdAt ? startedAt - createdAt : 0;
+        activeMs = startedAt ? now - startedAt : 0;
+        label = (waitMs > 60000 ? 'Waited ' + mc2FormatDuration(waitMs) + ' · ' : '') +
+          'Active ' + mc2FormatDuration(activeMs);
+      } else {
+        var since = waitingSince || createdAt;
+        waitMs = since ? now - since : 0;
+        label = 'Waiting ' + mc2FormatDuration(waitMs);
+      }
+
+      var total = waitMs + activeMs;
+      if (!total || total <= 0) return '';
+      var waitPct = Math.round((waitMs / total) * 100);
+      var activePct = 100 - waitPct;
+
+      return '<div class="mc-task-timing-bar" title="' + escapeHtml(label) + '">' +
+        (waitPct > 0 ? '<span class="mc-task-timing-wait" style="width:' + waitPct + '%"></span>' : '') +
+        (activePct > 0 && (status === 'doing' || status === 'done')
+          ? '<span class="mc-task-timing-active" style="width:' + activePct + '%"></span>'
+          : '') +
+        '<span class="mc-task-timing-label">' + escapeHtml(label) + '</span>' +
+      '</div>';
+    }
+
     function mc2MissionTaskCard(item) {
       var status = String(item.status || 'todo').toLowerCase();
       var assigneeId = String(item.assignee || item.agentId || '').trim();
@@ -120,6 +177,7 @@
           (confidenceLabel ? '<span class="mc-task-card-confidence">' + escapeHtml(confidenceLabel) + '</span>' : '') +
         '</div>' +
         actionsHtml +
+        mc2TaskTimingBarHtml(item) +
       '</div>';
     }
 

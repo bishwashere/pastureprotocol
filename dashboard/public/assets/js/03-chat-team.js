@@ -955,6 +955,10 @@
               progress: normalizeTaskProgress(sg.progress),
               description: String(sg.description || '').trim(),
               updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
+              createdAt: Number(sg.createdAt) || 0,
+              startedAt: Number(sg.startedAt) || 0,
+              completedAt: Number(sg.completedAt) || 0,
+              waitingSince: Number(sg.waitingSince) || 0,
             });
             walk(sg.tasks, parts);
           });
