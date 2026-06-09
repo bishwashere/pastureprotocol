@@ -479,7 +479,7 @@
       }
 
       var mission = missionLabelForAgent(agentId, ctx);
-      if (mission && !mc2GenericTaskNoise(mission)) return mission;
+      if (mission && !mc2GenericTaskNoise(mission)) return 'Running mission tick';
 
       if (state === 'idle') {
         var queued = String(ctx.currentMission || ctx.currentStep || '').trim();
