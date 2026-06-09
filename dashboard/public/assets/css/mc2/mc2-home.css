@@ -597,3 +597,16 @@ button.mc-stat-card.mc-stat-card-action {
 
 /* ── Task timing bar inside kanban cards ───────────────────────────────────── */
 .mc-kanban-card .mc-task-timing-bar { margin: 5px 0 0; }
+
+/* Mission tag in attention cards */
+.mc-task-label-mission {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

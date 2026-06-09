@@ -157,6 +157,9 @@
       var timingItem = { status: item.status || 'blocked', createdAt: item.createdAt || item.ts || 0, startedAt: item.startedAt || 0, waitingSince: item.waitingSince || item.ts || 0 };
       return '<div' + attrs + ' role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + escapeHtml(item.title) + '</div>' +
+        (item.isMission
+          ? '<div class="mc-kanban-card-meta"><span class="mc-task-card-label mc-task-label-mission">Mission</span></div>'
+          : '') +
         (item.tag
           ? '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>'
           : '') +
@@ -289,6 +292,7 @@
             kind: 'warning',
             action: 'mission-input',
             missionId: missionId,
+            isMission: true,
             title: needsInput.slice(0, 96),
             subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
@@ -296,12 +300,15 @@
           return;
         }
         if (status === 'blocked') {
+          var blockedTitle = String(g.blockedReason || '').trim().slice(0, 96) || 'Mission blocked';
+          var missionLabel = String(g.title || g.objective || '').trim();
           mc2PushActionRequiredItem(items, {
             kind: 'error',
             action: 'mission-input',
             missionId: missionId,
-            title: String(g.blockedReason || g.title || g.objective || 'Mission blocked').trim().slice(0, 96),
-            subtitle: mc2MissionWaitSubtitle(g, ts),
+            isMission: true,
+            title: blockedTitle,
+            subtitle: missionLabel + ' · waiting ' + mc2ShortWaitTime(ts),
             ts: ts,
           });
           return;
