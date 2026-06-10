@@ -46,7 +46,7 @@ async function main() {
       historyMessages: [],
       agentId: 'developer',
     });
-    assert(block.includes('Active mission'), 'mission block header');
+    assert(block.includes('Mission:') && block.includes('Research nextpostai'), 'mission block header');
     assert(block.includes('nextpostai'), 'related project in block');
     assert(block.includes('tools') && block.includes('confirm'), 'work instructions');
     assert(block.includes('Research nextpostai'), 'mission title');
@@ -61,6 +61,32 @@ async function main() {
     assert(hint.plan.includes('mission'), 'intent references mission');
 
     assert(missionLabelForAgentContext(mission).includes('Research'), 'mission label');
+
+    // Any status (blocked, paused, completed) must resolve when user mentions
+    // the project by name — same data the dashboard UI shows.
+    const { updateMission } = await import('../../lib/missions.js');
+    for (const status of ['blocked', 'paused', 'completed']) {
+      updateMission(mission.id, { status });
+      const resolved2 = resolveMissionForUserTurn({
+        userText: 'what are the pending tasks for nextpostai',
+        historyMessages: [],
+        agentId: 'developer',
+      });
+      assert(
+        resolved2 && resolved2.id === mission.id,
+        `mission with status="${status}" must resolve when user asks about the project by name`,
+      );
+    }
+
+    // Completed missions must NOT surface for vague "continue work" requests
+    // where no project/mission name is mentioned.
+    updateMission(mission.id, { status: 'completed' });
+    const resolved3 = resolveMissionForUserTurn({
+      userText: 'continue working on the current task',
+      historyMessages: [],
+      agentId: 'developer',
+    });
+    assert(!resolved3, 'completed mission must NOT resolve for vague work requests');
 
     console.log('missions-context tests passed');
   } finally {

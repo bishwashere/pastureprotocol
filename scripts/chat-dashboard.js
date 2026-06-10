@@ -48,9 +48,7 @@ import {
   prepareWorkDurabilityWithAi,
 } from '../lib/work-durability.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
-import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
-import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from '../lib/user-facing-reply.js';
-import { buildToolAuditRewriteInstruction } from '../lib/user-reply-style.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/user-facing-reply.js';
 
 // Match Telegram/WhatsApp default. Override via PASTURE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.PASTURE_DASHBOARD_HISTORY);
@@ -269,7 +267,6 @@ async function main() {
     if (projectsBlock) systemPrompt += projectsBlock;
     const workflowBlock = buildProjectWorkflowContextBlock({ userText: message, historyMessages, agentId });
     if (workflowBlock) systemPrompt += workflowBlock;
-    systemPrompt = appendUserFacingPrompt(systemPrompt);
   }
 
   try {
@@ -313,35 +310,6 @@ async function main() {
     }
     if (skillsCalled.length) {
       process.stderr.write('[dashboard-skills] ' + skillsCalled.join(',') + '\n');
-    }
-    if (
-      !isNonTaskMessage(message) &&
-      textToSend &&
-      looksLikeToolAuditReply(formatUserFacingReply(textToSend))
-    ) {
-      process.stderr.write('[chat-dashboard] tool-audit reply detected, rewriting\n');
-      try {
-        const rewriteHistory = historyMessages.concat([
-          { role: 'user', content: message },
-          { role: 'assistant', content: formatUserFacingReply(textToSend) },
-        ]);
-        const rewrite = await runAgentTurn({
-          userText: buildToolAuditRewriteInstruction(message),
-          ctx,
-          systemPrompt,
-          tools: [],
-          historyMessages: rewriteHistory,
-          getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-          resolveToolName: skillContext?.resolveToolName ?? (() => null),
-        });
-        const candidate = formatUserFacingReply(rewrite?.textToSend || '');
-        if (candidate && !looksLikeToolAuditReply(candidate)) {
-          textToSend = rewrite.textToSend || textToSend;
-          skillsCalled = Array.isArray(rewrite?.skillsCalled) ? rewrite.skillsCalled : skillsCalled;
-        }
-      } catch (err) {
-        process.stderr.write(`[chat-dashboard] tool-audit rewrite failed: ${err?.message || err}\n`);
-      }
     }
     const reply = formatDashboardReply(textToSend);
     const exchange = {

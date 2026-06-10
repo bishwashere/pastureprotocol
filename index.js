@@ -80,9 +80,7 @@ import {
   prepareWorkDurabilityWithAi,
 } from './lib/work-durability.js';
 import { getGithubSourceIntentHint } from './lib/github-context.js';
-import { appendUserFacingPrompt } from './lib/user-reply-style.js';
-import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from './lib/user-facing-reply.js';
-import { buildToolAuditRewriteInstruction } from './lib/user-reply-style.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/user-facing-reply.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -92,9 +90,6 @@ import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
 import { startMissionEngine } from './lib/mission-engine.js';
-import {
-  buildAnswerCompletenessProbePrompt,
-} from './lib/conversation-context.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage, getErrorMessageForLog } from './lib/user-error.js';
@@ -1135,7 +1130,6 @@ async function main() {
         if (projectsBlock) systemPromptWithPlan += projectsBlock;
         const workflowBlock = buildProjectWorkflowContextBlock({ userText: text, historyMessages, agentId });
         if (workflowBlock) systemPromptWithPlan += workflowBlock;
-        systemPromptWithPlan = appendUserFacingPrompt(systemPromptWithPlan);
       }
     }
     const llmOptions = agentId ? { agentId } : {};
@@ -1199,106 +1193,10 @@ async function main() {
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
       });
     }
-    let resultToUse = turnResult;
-    let skillsCalledFromTurn = Array.isArray(turnResult?.skillsCalled) && turnResult.skillsCalled.length ? turnResult.skillsCalled : [];
-    const hasSearchOrBrowse = (arr) => Array.isArray(arr) && (arr.includes('search') || arr.includes('browse'));
-    const hasSearchOrBrowseTool = toolsForRequest.some(
-      (t) => t?.function?.name?.startsWith('search_') || t?.function?.name === 'browse_navigate',
-    );
-    const replyForProbe = sanitizeOutboundText((resultToUse?.textToSend || '').trim());
-    const textForSendProbe = isTelegramChatId(jid)
-      ? replyForProbe.replace(/^\[Pasture\]\s*/i, '').trim()
-      : replyForProbe;
-    if (
-      !isGroupJid &&
-      !isNonTaskMessage(text) &&
-      (hasSearchOrBrowseTool || plannerSaysNoTools) &&
-      !hasSearchOrBrowse(skillsCalledFromTurn) &&
-      skillsCalledFromTurn.length === 0 &&
-      textForSendProbe
-    ) {
-      // Ask the LLM whether the answer is actually complete before deciding to retry.
-      // This replaces the old structural check (no tools called = uncertain) which fired
-      // for greetings, jokes, and any direct answer that legitimately needed no tools.
-      let needsSearch = false;
-      try {
-        const probeReply = await llmChat([
-          { role: 'system', content: 'You are a quality checker. Answer only with valid JSON, no prose.' },
-          {
-            role: 'user',
-            content: buildAnswerCompletenessProbePrompt(text, textForSendProbe, historyMessages),
-          },
-        ], llmOptions);
-        const probe = JSON.parse(stripThinking(probeReply || '').trim());
-        needsSearch = probe?.complete === false;
-      } catch (_) {}
-
-      if (needsSearch) {
-        // For plannerSaysNoTools: lazily load the full skill context now so the retry has all tools.
-        // For normal path: reuse existing skillContext with the already-loaded tools.
-        const retrySkillContext = skillContext ?? getSkillContext({ groupJid: groupJidForSkills, agentId });
-        const retryTools = Array.isArray(retrySkillContext?.runSkillTool) ? retrySkillContext.runSkillTool : toolsForRequest;
-        const retryLabel = plannerSaysNoTools ? '[Retry with tools]' : '[Retry with search]';
-        const retryInstruction = plannerSaysNoTools
-          ? `${retryLabel} The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use available tools to look up the specific or current information needed, then reply with what you find.`
-          : `${retryLabel} The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
-        console.log('[agent] LLM probe: answer incomplete, retrying —', retryLabel);
-        try {
-          const retryResult = await runAgentTurn({
-            userText: retryInstruction,
-            ctx,
-            systemPrompt: systemPromptWithPlan,
-            tools: retryTools,
-            historyMessages,
-            getFullSkillDoc: retrySkillContext?.getFullSkillDoc ?? (() => ''),
-            resolveToolName: retrySkillContext?.resolveToolName ?? (() => null),
-          });
-          const retryUsedTools = Array.isArray(retryResult?.skillsCalled) && retryResult.skillsCalled.length > 0;
-          if (retryResult?.textToSend?.trim() && (hasSearchOrBrowse(retryResult.skillsCalled) || (plannerSaysNoTools && retryUsedTools))) {
-            resultToUse = retryResult;
-            skillsCalledFromTurn = retryResult.skillsCalled ?? skillsCalledFromTurn;
-          }
-        } catch (err) {
-          console.error('[agent] retry failed:', getErrorMessageForLog(err));
-        }
-      }
-    }
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = resultToUse || {};
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
+    let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
-    if (
-      !isGroupJid &&
-      !isNonTaskMessage(text) &&
-      rawTextToSend &&
-      looksLikeToolAuditReply(formatUserFacingReply(rawTextToSend))
-    ) {
-      console.log('[agent] tool-audit reply detected, rewriting for user');
-      try {
-        const rewriteHistory = historyMessages.concat([
-          { role: 'user', content: text },
-          { role: 'assistant', content: sanitizeOutboundText(rawTextToSend) },
-        ]);
-        const rewriteResult = await runAgentTurn({
-          userText: buildToolAuditRewriteInstruction(text),
-          ctx,
-          systemPrompt: systemPromptWithPlan,
-          tools: [],
-          historyMessages: rewriteHistory,
-          getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-          resolveToolName: skillContext?.resolveToolName ?? (() => null),
-        });
-        const rewriteRaw = (rewriteResult?.textToSend || '').trim();
-        const rewriteClean = sanitizeOutboundText(rewriteRaw);
-        if (rewriteClean && !looksLikeToolAuditReply(rewriteClean)) {
-          rawTextToSend = rewriteRaw;
-          if (Array.isArray(rewriteResult?.skillsCalled) && rewriteResult.skillsCalled.length) {
-            skillsCalledFromTurn = rewriteResult.skillsCalled;
-          }
-        }
-      } catch (err) {
-        console.error('[agent] tool-audit rewrite failed:', getErrorMessageForLog(err));
-      }
-    }
     const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
     logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');

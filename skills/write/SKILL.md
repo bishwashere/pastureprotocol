@@ -1,7 +1,7 @@
 ---
 id: write
 name: Write
-description: Create or replace a file with given content. Wholesale write; overwrites if exists. Use when the user asks to write, create, or save a file.
+description: Create or replace a file with given content. Use whenever producing source code, configs, scaffolded projects, documents, HTML/markdown pages, or any artifact longer than a few lines — files belong on disk, not pasted into the chat. Wholesale write; overwrites if exists.
 ---
 
 # Write
@@ -17,11 +17,14 @@ Call **run_skill** with **skill: "write"**. Set **command** or **arguments.actio
 
 ## When to use
 
-Use when the user says things like:
+Use this whenever your output would be a file-worthy artifact — source code, a multi-file project, a config, a document, an HTML or markdown page, or any block longer than a few lines. Save it to disk, then reply with the path(s) and one short sentence on what was created and how to run/open it. Do not paste the artifact into the chat.
+
+Also use when the user says things like:
 - "Write hello.txt with hi world"
 - "Create config.json with …"
 - "Save this to notes.md"
 - "Overwrite .env with …"
+- "Build me a Next.js app / a script / a page" → scaffold to disk; reply with the path.
 
 One path, one content. No partial updates - use the **edit** skill for find-and-replace.
 

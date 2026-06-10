@@ -5,7 +5,6 @@
 
 import {
   formatHistoryForClassifier,
-  buildAnswerCompletenessProbePrompt,
   resolveSharedTurnHistory,
   buildPairHistoryContextBlock,
 } from '../../lib/conversation-context.js';
@@ -36,13 +35,6 @@ function testFormatHistory() {
   if (!formatted.includes('Turn 1')) throw new Error('history missing turn labels');
 }
 
-function testProbeIncludesHistory() {
-  const prompt = buildAnswerCompletenessProbePrompt('Chloe', 'Which Chloe do you mean?', HISTORY);
-  if (!prompt.includes('Recent conversation')) throw new Error('probe missing history section');
-  if (!prompt.includes('rename marketer')) throw new Error('probe missing prior user turn');
-  if (!prompt.includes('complete')) throw new Error('probe missing JSON instruction');
-}
-
 function testResolveSharedTurnHistory() {
   const shared = resolveSharedTurnHistory(USER_CHANNEL_HISTORY, PAIR_HISTORY);
   if (shared !== USER_CHANNEL_HISTORY) throw new Error('expected user-channel history when shared is present');
@@ -67,7 +59,6 @@ async function main() {
 
   for (const [label, fn] of [
     ['formatHistoryForClassifier', testFormatHistory],
-    ['buildAnswerCompletenessProbePrompt', testProbeIncludesHistory],
     ['resolveSharedTurnHistory', testResolveSharedTurnHistory],
     ['buildPairHistoryContextBlock', testPairHistoryIsAdditive],
   ]) {

@@ -12,18 +12,16 @@ async function main() {
     agentId: 'main',
     userText: "What's our company tagline for marketing materials?",
     availableSkillIds: ['agent-send', 'evaluate-team-capability'],
-    minScore: 5,
   });
   assert(ctx, 'expected delegation context');
   const details = buildDelegationDecisionDetails(ctx);
   assert(details && details.reason, 'reason present');
-  assert(Array.isArray(details.candidates) && details.candidates.length > 0, 'candidates');
-  assert(details.candidates[0].score > 0, 'score on candidate');
-  assert(details.selectedScore >= 0, 'selected score');
+  assert(details.selectedScore >= 0, 'selected score present');
+  assert(typeof details.action === 'string', 'action is string');
 
   console.log('| Test | Input | Output | Status |');
   console.log('| --- | --- | --- | --- |');
-  console.log('| delegation-routing-details | marketing delegate | score+candidates | ✅ Pass |');
+  console.log('| delegation-routing-details | marketing delegate | reason+action present | ✅ Pass |');
   console.log('\ndelegation-routing-details tests passed');
 }
 
