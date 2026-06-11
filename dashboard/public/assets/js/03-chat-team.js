@@ -946,6 +946,7 @@
               title: title,
               missionTitle: missionTitle,
               missionId: missionId,
+              missionObjective: String(g.objective || '').trim(),
               taskId: taskId,
               fromSuggestedTask: /^init-/.test(taskId),
               labels: Array.isArray(sg.labels) ? sg.labels.slice() : [],
@@ -957,6 +958,15 @@
               dueAt: Number(sg.dueAt) || 0,
               progress: normalizeTaskProgress(sg.progress),
               description: String(sg.description || '').trim(),
+              expectedOutput: String(sg.expectedOutput || '').trim(),
+              type: String(sg.type || '').trim(),
+              priority: Number(sg.priority) || 0,
+              routeReason: String(sg.routeReason || '').trim(),
+              reviewNotes: String(sg.reviewNotes || '').trim(),
+              dependsOn: Array.isArray(sg.dependsOn) ? sg.dependsOn.slice() : [],
+              missionHistory: Array.isArray(g.history) ? g.history.slice(-5) : [],
+              missionProgress: g.progress || null,
+              missionContextSnapshot: String(g.contextSnapshot || '').trim(),
               updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
               createdAt: Number(sg.createdAt) || 0,
               startedAt: Number(sg.startedAt) || 0,
@@ -4225,6 +4235,30 @@
         }
         if (!out.reason && out.prompt) out.reason = String(out.prompt).trim();
         if (!out.reason && out.summary) out.reason = String(out.summary).trim();
+      }
+      if (!out.mainAsk) {
+        var turnStartEv = null;
+        events.forEach(function (ev) {
+          if (String(ev && ev.type || '') === 'turn_start') turnStartEv = ev;
+        });
+        if (turnStartEv && String(turnStartEv.message || '').trim()) {
+          out.mainAsk = String(turnStartEv.message).trim();
+        } else if (out.prompt) {
+          out.mainAsk = String(out.prompt).trim();
+        } else if (mission && String(mission.needsUserInput || '').trim()) {
+          out.mainAsk = String(mission.needsUserInput).trim();
+        } else if (mission && String(mission.objective || '').trim()) {
+          out.mainAsk = String(mission.objective).trim();
+        }
+      }
+      if (!out.missionObjective && mission) {
+        out.missionObjective = String(mission.objective || '').trim();
+      }
+      if (!out.missionHistory && mission && Array.isArray(mission.history) && mission.history.length) {
+        out.missionHistory = mission.history.slice(-5);
+      }
+      if (!out.missionProgress && mission && mission.progress) {
+        out.missionProgress = mission.progress;
       }
       if (!out.skillsUsed || !out.skillsUsed.length) {
         var skills = [];

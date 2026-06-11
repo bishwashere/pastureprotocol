@@ -338,6 +338,43 @@ async function main() {
     try { deleteMission(toDelete.id); } catch (e) { notFoundErr = e; }
     assert(notFoundErr && /not found/i.test(notFoundErr.message), 'deleting non-existent mission throws');
 
+    // recoverStaleMissions: unstick missions left running after a crash.
+    const { recoverStaleMissions } = await import('../../lib/missions.js');
+    const staleMission = createMission({
+      title: 'Stuck mission',
+      objective: 'Test stale recovery',
+      ownerAgentId: 'main',
+      intervalMs: 60_000,
+    });
+    updateMission(staleMission.id, {
+      running: true,
+      runningSince: Date.now() - 15 * 60_000,
+      runningAgentId: 'main',
+    });
+    assert(getMission(staleMission.id).running === true, 'mission is stuck running');
+    assert(processDueMissionsInStore({ maxPerCycle: 10 }).every((g) => g.id !== staleMission.id), 'stuck mission filtered out of due list');
+    recoverStaleMissions();
+    const recovered = getMission(staleMission.id);
+    assert(recovered.running === false, 'stale mission recovered: running=false');
+    assert(recovered.runningSince === 0, 'stale mission recovered: runningSince=0');
+    assert(Number(recovered.nextRunAt) <= Date.now(), 'stale mission scheduled immediately after recovery');
+    const dueAfterRecovery = processDueMissionsInStore({ maxPerCycle: 10 }).map((g) => g.id);
+    assert(dueAfterRecovery.includes(staleMission.id), 'recovered mission appears in due list');
+
+    // Recent running missions should NOT be recovered.
+    const recentMission = createMission({
+      title: 'Currently running',
+      objective: 'Still active',
+      ownerAgentId: 'main',
+    });
+    updateMission(recentMission.id, {
+      running: true,
+      runningSince: Date.now() - 60_000,
+      runningAgentId: 'main',
+    });
+    recoverStaleMissions();
+    assert(getMission(recentMission.id).running === true, 'recently started mission NOT recovered');
+
     console.log('missions tests passed');
   } finally {
     try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}

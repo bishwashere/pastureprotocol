@@ -23,6 +23,8 @@
       try {
         mc2RenderLiveChrome();
         if (mc2ActiveView === 'mission') mc2RenderHome();
+        else if (mc2ActiveView === 'tasks') { mc2RenderTasks(); mc2RenderTaskDetail(); }
+        else if (mc2ActiveView === 'missions') mc2RenderMissions();
       } catch (err) {
         console.error('[mission-control] render failed:', err);
       }

@@ -164,31 +164,120 @@
         ? '<button type="button" class="mc-panel-link" data-mc-task-agent-context="' + escapeHtml(assignee) + '">Assignee tasks (' + escapeHtml(agentNameById(assignee)) + ') →</button>'
         : '';
       var expectedOutput = String(item.expectedOutput || '').trim();
+      var description = String(item.description || '').trim();
+      var mainAsk = String(item.mainAsk || item.prompt || '').trim();
+      var missionObjective = String(item.missionObjective || '').trim();
+      var taskType = String(item.type || '').trim();
+      var priority = Number(item.priority) || 0;
+      var routeReason = String(item.routeReason || '').trim();
+      var reviewNotes = String(item.reviewNotes || '').trim();
+      var dependsOn = Array.isArray(item.dependsOn) ? item.dependsOn.filter(Boolean) : [];
+      var missionHistory = Array.isArray(item.missionHistory) ? item.missionHistory : [];
+      var missionProgress = item.missionProgress || null;
       var fields = [
         { label: 'Status', value: statusLabel },
         mission ? { label: 'Mission', value: mission } : null,
+        missionObjective && missionObjective !== mission ? { label: 'Objective', value: missionObjective } : null,
         assignee ? { label: 'Assigned To', value: agentNameById(assignee) } : null,
-        expectedOutput ? { label: 'Output', value: expectedOutput } : null,
+        taskType ? { label: 'Type', value: taskType } : null,
+        priority ? { label: 'Priority', value: 'P' + priority } : null,
+        expectedOutput ? { label: 'Expected Output', value: expectedOutput } : null,
+        item.dueAt ? { label: 'Due', value: mc2FormatTaskTimestamp(item.dueAt) } : null,
+        dependsOn.length ? { label: 'Depends On', value: dependsOn.join(', ') } : null,
         item.createdAt ? { label: 'Created', value: mc2FormatTaskTimestamp(item.createdAt) } : null,
+        item.startedAt ? { label: 'Started', value: mc2FormatTaskTimestamp(item.startedAt) } : null,
         item.completedAt && status === 'done' ? { label: 'Completed', value: mc2FormatTaskTimestamp(item.completedAt) } : null,
         { label: 'Skills Used', value: skillsLabel },
+        routeReason ? { label: 'Route Reason', value: routeReason } : null,
       ].filter(Boolean);
       var fieldsHtml = '<dl class="mc-task-detail-fields">' + fields.map(function (row) {
         return '<dt>' + escapeHtml(row.label) + '</dt><dd>' + escapeHtml(row.value) + '</dd>';
       }).join('') + '</dl>';
       var sourceChainHtml = mc2RenderMissionTaskSourceChainHtml(sourceChain);
       var inactionHtml = mc2RenderMissionTaskInactionHtml(inactionImpact);
+
+      var mainAskHtml = '';
+      if (mainAsk) {
+        mainAskHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Main Ask / Prompt</p>' +
+          '<div class="mc-task-detail-block">' + escapeHtml(mainAsk) + '</div>' +
+        '</div>';
+      }
+
+      var descriptionHtml = '';
+      if (description && description !== mainAsk && description !== reason) {
+        descriptionHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Description</p>' +
+          '<div class="mc-task-detail-block">' + escapeHtml(description) + '</div>' +
+        '</div>';
+      }
+
+      var reviewNotesHtml = '';
+      if (reviewNotes) {
+        reviewNotesHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Review Notes</p>' +
+          '<div class="mc-task-detail-block">' + escapeHtml(reviewNotes) + '</div>' +
+        '</div>';
+      }
+
+      var missionProgressHtml = '';
+      if (missionProgress && (missionProgress.pct || (missionProgress.evidence && missionProgress.evidence.length))) {
+        var progressParts = [];
+        if (missionProgress.pct) progressParts.push('Progress: ' + missionProgress.pct + '%');
+        if (missionProgress.metrics && Object.keys(missionProgress.metrics).length) {
+          Object.keys(missionProgress.metrics).forEach(function (k) {
+            progressParts.push(k + ': ' + missionProgress.metrics[k]);
+          });
+        }
+        if (missionProgress.evidence && missionProgress.evidence.length) {
+          progressParts.push('Evidence: ' + missionProgress.evidence.join(' · '));
+        }
+        missionProgressHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Mission Progress</p>' +
+          '<div class="mc-task-detail-block">' + escapeHtml(progressParts.join('\n')) + '</div>' +
+        '</div>';
+      }
+
+      var historyHtml = '';
+      if (missionHistory.length) {
+        historyHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Recent Mission History</p>' +
+          '<ul class="mc-task-history-list">' +
+          missionHistory.map(function (entry) {
+            var ts = entry.ts ? mc2FormatTaskTimestamp(entry.ts) : '';
+            var summary = String(entry.summary || '').trim();
+            var evidence = Array.isArray(entry.evidence) && entry.evidence.length
+              ? ' — ' + entry.evidence.join(', ')
+              : '';
+            var skillsCalled = Array.isArray(entry.skillsCalled) && entry.skillsCalled.length
+              ? ' [' + entry.skillsCalled.join(', ') + ']'
+              : '';
+            var statusBit = entry.status ? ' (' + entry.status + ')' : '';
+            return '<li>' +
+              (ts ? '<span class="mc-task-history-ts">' + escapeHtml(ts) + '</span> ' : '') +
+              '<span class="mc-task-history-summary">' + escapeHtml(summary + evidence + skillsCalled + statusBit) + '</span>' +
+            '</li>';
+          }).join('') +
+          '</ul>' +
+        '</div>';
+      }
+
       return '' +
         '<div class="mc-task-detail-head">' +
           '<h3 class="mc-task-detail-title" id="mc2-task-drawer-title">' + escapeHtml(title) + '</h3>' +
           '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(statusLabel) + '</span>' +
         '</div>' +
+        mainAskHtml +
+        descriptionHtml +
         fieldsHtml +
         sourceChainHtml +
         inactionHtml +
-        (reason
+        (reason && reason !== mainAsk && reason !== description
           ? '<div class="mc-task-detail-reason"><strong>Reason:</strong> ' + escapeHtml(reason) + '</div>'
           : '') +
+        reviewNotesHtml +
+        missionProgressHtml +
+        historyHtml +
         actionsHtml +
         '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">Timeline</p>' +
         timelineHtml +

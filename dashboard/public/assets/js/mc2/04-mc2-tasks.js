@@ -198,11 +198,19 @@
     }
 
     function mc2FilterMissionItems(items) {
-      if (!mc2TasksAgentFilter) return items;
-      return items.filter(function (it) {
-        var aid = String(it.assignee || it.agentId || '').trim();
-        return aid === mc2TasksAgentFilter;
-      });
+      var filtered = items;
+      if (selectedTeamMissionId) {
+        filtered = filtered.filter(function (it) {
+          return String(it.missionId || '') === selectedTeamMissionId;
+        });
+      }
+      if (mc2TasksAgentFilter) {
+        filtered = filtered.filter(function (it) {
+          var aid = String(it.assignee || it.agentId || '').trim();
+          return aid === mc2TasksAgentFilter;
+        });
+      }
+      return filtered;
     }
 
     function mc2RenderCanonicalTaskCard(item) {
