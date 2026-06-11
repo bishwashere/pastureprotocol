@@ -3545,13 +3545,44 @@
       return count;
     }
 
+    function collectBlockedTasksForMission(mission) {
+      var result = [];
+      if (!mission) return result;
+      function walk(tasks) {
+        (tasks || []).forEach(function (sg) {
+          if (!sg || typeof sg !== 'object') return;
+          if (effectiveTaskStatus(sg, mission) === 'blocked') result.push(sg);
+          walk(sg.tasks);
+        });
+      }
+      walk(mission.tasks);
+      return result;
+    }
+
     function missionAttentionPrompt(mission) {
       if (!mission) return '';
       var ask = String(mission.needsUserInput || '').trim();
       if (ask) return ask;
-      var blockedN = countBlockedTasksForMission(mission);
-      if (blockedN > 0) {
-        return 'This mission has ' + blockedN + ' blocked task(s). Tell the team what to do next — e.g. your analytics choice, "use default", or step-by-step instructions to unblock.';
+      var blockedTasks = collectBlockedTasksForMission(mission);
+      if (blockedTasks.length > 0) {
+        var first = blockedTasks[0];
+        var taskTitle = String(first.title || '').trim();
+        var taskDesc = String(first.description || first.expectedOutput || '').trim();
+        if (taskTitle && taskDesc) {
+          var prompt = 'Blocked task: "' + taskTitle + '"\n' + taskDesc;
+          if (blockedTasks.length > 1) {
+            prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
+          }
+          return prompt;
+        }
+        if (taskTitle) {
+          var prompt = 'Blocked task: "' + taskTitle + '"\nPlease provide what\'s needed to unblock this task.';
+          if (blockedTasks.length > 1) {
+            prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
+          }
+          return prompt;
+        }
+        return 'This mission has ' + blockedTasks.length + ' blocked task(s). Tell the team what to do next.';
       }
       if (isMissionPartialWait(mission)) {
         return missionImplementationBlockedLabel(mission) || 'Implementation is paused until you confirm the next step. Reply with your choice or "use default".';
@@ -3629,6 +3660,7 @@
     function openTeamUserInputModal(mission, opts) {
       opts = opts || {};
       var modal = document.getElementById('team-user-input-modal');
+      var titleEl = document.getElementById('team-user-input-modal-title');
       var missionEl = document.getElementById('team-user-input-modal-mission');
       var questionEl = document.getElementById('team-user-input-modal-question');
       var quickEl = document.getElementById('team-user-input-modal-quick');
@@ -3639,14 +3671,25 @@
       if (!ask) ask = missionAttentionPrompt(mission);
       if (!id || !ask) return;
       teamUserInputMissionId = id;
-      if (missionEl) missionEl.textContent = String(mission.title || 'Untitled mission');
+
+      var blockedTasks = collectBlockedTasksForMission(mission);
+      var firstBlockedTitle = blockedTasks.length > 0 ? String(blockedTasks[0].title || '').trim() : '';
+
+      if (titleEl) {
+        titleEl.textContent = firstBlockedTitle
+          ? 'Task blocked — needs your input'
+          : 'Mission needs your input';
+      }
+      if (missionEl) missionEl.textContent = 'Mission: ' + String(mission.title || 'Untitled mission');
       if (questionEl) questionEl.textContent = ask;
       if (textEl) textEl.value = '';
       showTeamUserInputModalError('');
       if (quickEl) {
         var askLower = ask.toLowerCase();
+        var firstBlockedDesc = blockedTasks.length > 0 ? String(blockedTasks[0].description || blockedTasks[0].expectedOutput || '').toLowerCase() : '';
+        var matchText = askLower + ' ' + firstBlockedDesc;
         var options = [];
-        if (/posthog|analytics|ga4|mixpanel|tracking|measurement/.test(askLower)) {
+        if (/posthog|analytics|ga4|mixpanel|tracking|measurement/.test(matchText)) {
           options = ['PostHog', 'Google Analytics (GA4)', 'Mixpanel', 'No analytics yet — use defaults'];
         }
         quickEl.innerHTML = options.map(function (label) {
