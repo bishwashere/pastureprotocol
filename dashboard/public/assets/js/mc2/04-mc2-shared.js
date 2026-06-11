@@ -17,6 +17,11 @@
 
     function mc2El(id) { return document.getElementById(id); }
 
+    function mc2MatchesSelectedMission(missionId) {
+      if (!selectedTeamMissionId) return true;
+      return String(missionId || '') === selectedTeamMissionId;
+    }
+
     function mc2SetTasksFilter(filter) {
       var next = String(filter || 'all').trim();
       if (['all', 'blocked', 'open', 'done'].indexOf(next) < 0) next = 'all';
@@ -278,6 +283,7 @@
         reviewNotesHtml +
         missionProgressHtml +
         historyHtml +
+        '<div id="mc2-task-retro-slot" class="mc-task-detail-section"></div>' +
         actionsHtml +
         '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">Timeline</p>' +
         timelineHtml +
@@ -306,11 +312,55 @@
             mc2OpenTaskDetailForAgent(btn.getAttribute('data-mc-task-agent-context') || '');
           });
         });
+        mc2LoadRetrospectiveSlot(drawerBody);
       }
       if (panel) {
         panel.hidden = true;
         panel.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Select a task from the board, list, or recent movement.</p>';
       }
+    }
+
+    var mc2RetroCache = null;
+    var mc2RetroFetching = false;
+    function mc2LoadRetrospectiveSlot(drawerBody) {
+      var slot = drawerBody.querySelector('#mc2-task-retro-slot');
+      if (!slot) return;
+      if (mc2RetroCache) {
+        slot.innerHTML = mc2BuildRetroHtml(mc2RetroCache);
+        return;
+      }
+      if (mc2RetroFetching) return;
+      mc2RetroFetching = true;
+      fetch((typeof API !== 'undefined' ? API : '') + '/api/team/retrospective')
+        .then(function (r) { return r.ok ? r.json() : { cases: [] }; })
+        .then(function (data) {
+          mc2RetroCache = data;
+          mc2RetroFetching = false;
+          var el = document.getElementById('mc2-task-retro-slot');
+          if (el) el.innerHTML = mc2BuildRetroHtml(data);
+        })
+        .catch(function () { mc2RetroFetching = false; });
+    }
+
+    function mc2BuildRetroHtml(data) {
+      if (!data || !data.cases || !data.cases.length) return '';
+      var cases = data.cases.slice(0, 5);
+      var html = '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Retrospective — Recent Cases (' + data.count + ' total)</p>';
+      html += '<ul class="mc-task-history-list">';
+      cases.forEach(function (c) {
+        var scoreBit = c.score != null ? 'Score: ' + c.score + '/10' : '';
+        var feedback = c.feedbackType || '';
+        var userMsg = String(c.userMessage || '').slice(0, 150);
+        var reason = String(c.selfReason || c.implicitFeedback || '').trim();
+        html += '<li>';
+        if (scoreBit) html += '<strong>' + escapeHtml(scoreBit) + '</strong> ';
+        if (feedback) html += '<em>(' + escapeHtml(feedback) + ')</em> ';
+        if (userMsg) html += '<br><span style="color:#94a3b8;">User: </span>' + escapeHtml(userMsg);
+        if (reason) html += '<br><span style="color:#fbbf24;">Reason: </span>' + escapeHtml(reason);
+        html += '</li>';
+      });
+      html += '</ul>';
+      return html;
     }
 
     function mc2ResolveTaskFromCard(card) {

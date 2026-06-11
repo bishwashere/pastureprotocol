@@ -5,6 +5,11 @@
       var groups = typeof buildMissionControlMovementGroups === 'function'
         ? buildMissionControlMovementGroups(10)
         : groupTeamActivityEvents((teamActivityEvents || []).slice(-80)).slice(0, 8);
+      if (selectedTeamMissionId) {
+        groups = groups.filter(function (g) {
+          return g.nav && String(g.nav.missionId || '') === selectedTeamMissionId;
+        });
+      }
       if (!groups.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
       el.innerHTML = groups.map(function (group) {
         return renderTeamActivityGroupRow(group, { timeHtml: mc2RelTime(group.ts) });

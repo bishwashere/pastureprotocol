@@ -262,6 +262,7 @@
 
       allWork.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'blocked') return;
+        if (!mc2MatchesSelectedMission(it.missionId)) return;
         var ts = Number(it.updatedAt) || 0;
         mc2PushActionRequiredItem(items, {
           kind: 'error',
@@ -282,6 +283,7 @@
 
       missions.forEach(function (g) {
         var missionId = String(g.id || '');
+        if (!mc2MatchesSelectedMission(missionId)) return;
         var ts = Number(g.updatedAt) || 0;
         var status = String(g.status || '').toLowerCase();
         var needsInput = String(g.needsUserInput || '').trim();
@@ -344,6 +346,10 @@
 
       var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : [];
       suggestedTasks.forEach(function (it) {
+        if (selectedTeamMissionId) {
+          var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
+          if (ids.indexOf(selectedTeamMissionId) < 0) return;
+        }
         var suggestedTaskId = String(it.id || '');
         var ts = Number(it.updatedAt) || 0;
         if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return;
@@ -425,6 +431,7 @@
         : (typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : []);
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'done') return;
+        if (!mc2MatchesSelectedMission(it.missionId)) return;
         items.push({
           kind: it.kind === 'turn' ? 'turn' : 'task',
           status: 'done',
@@ -454,16 +461,27 @@
       var agents = agentMapData || [];
       var ctxMap = teamAgentContextSnapshot.agents || {};
       var items = [];
+      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var missionAgentIds = {};
+      if (selectedTeamMissionId) {
+        allItems.forEach(function (it) {
+          if (String(it.missionId || '') === selectedTeamMissionId) {
+            var aid = String(it.assignee || it.agentId || '');
+            if (aid) missionAgentIds[aid] = true;
+          }
+        });
+      }
       agents.forEach(function (a) {
         var id = String(a.id || '');
         var ctx = ctxMap[id] || { state: 'idle' };
-        if (String(ctx.state || 'idle').toLowerCase() === 'working') {
-          items.push({ kind: 'agent', a: a, ctx: ctx });
-        }
+        if (String(ctx.state || 'idle').toLowerCase() !== 'working') return;
+        if (selectedTeamMissionId && !missionAgentIds[id]) return;
+        items.push({ kind: 'agent', a: a, ctx: ctx });
       });
-      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       allItems.forEach(function (it) {
-        if (String(it.status || '').toLowerCase() === 'doing') items.push({ kind: 'task', item: it });
+        if (String(it.status || '').toLowerCase() !== 'doing') return;
+        if (!mc2MatchesSelectedMission(it.missionId)) return;
+        items.push({ kind: 'task', item: it });
       });
       return items;
     }
@@ -474,6 +492,7 @@
       allItems.forEach(function (it) {
         var s = String(it.status || 'todo').toLowerCase();
         if (s === 'doing' || s === 'done' || s === 'blocked' || s === 'waiting') return;
+        if (!mc2MatchesSelectedMission(it.missionId)) return;
         items.push(it);
       });
       items.sort(function (a, b) { return (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0); });
@@ -483,7 +502,12 @@
     function mc2CollectKanbanDiscoveryItems() {
       var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks.slice() : [];
       return suggestedTasks.filter(function (it) {
-        return mc2ProposedSuggestedTaskNeedsApproval(it);
+        if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return false;
+        if (selectedTeamMissionId) {
+          var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
+          if (ids.indexOf(selectedTeamMissionId) < 0) return false;
+        }
+        return true;
       }).sort(function (a, b) {
         return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
       });

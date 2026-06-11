@@ -363,6 +363,48 @@ button.mc-mission-task-card {
   margin-top: 0.55rem;
 }
 
+/* ── Task detail expanded sections ─────────────────────────────────────── */
+
+.mc-task-detail-section {
+  margin: 0.55rem 0;
+}
+.mc-task-detail-block {
+  padding: 0.5rem 0.6rem;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.65rem;
+  line-height: 1.55;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.mc-task-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.mc-task-history-list li {
+  padding: 0.3rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.14);
+  margin-bottom: 0.3rem;
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+.mc-task-history-ts {
+  color: #94a3b8;
+  font-size: 0.58rem;
+  margin-right: 0.3rem;
+}
+.mc-task-history-summary {
+  color: #e2e8f0;
+}
+
 /* ── Task detail popup (drawer) ───────────────────────────────────────── */
 
 .mc-task-popup {

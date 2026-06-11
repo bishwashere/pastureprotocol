@@ -20,6 +20,7 @@ import { readAgentMetrics } from '../lib/agent-metrics.js';
 import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/missions.js';
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
+import { collectBadExchanges, readQualityMetrics } from '../lib/retrospective.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -495,6 +496,29 @@ app.get('/api/team/metrics', (req, res) => {
     res.json({ ...snapshot, now: Date.now() });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/team/retrospective', (_req, res) => {
+  try {
+    const workspaceDir = getWorkspaceDir();
+    const cases = collectBadExchanges(workspaceDir, 7, 6);
+    const metrics = readQualityMetrics();
+    const summary = cases.map(c => {
+      const r = c.retrospective || {};
+      return {
+        score: r.selfScore ?? null,
+        feedbackType: r.feedbackType || (typeof r.selfScore === 'number' && r.selfScore <= 6 ? 'low-score' : 'correction'),
+        userMessage: String(c.row.user || '').slice(0, 300),
+        assistantMessage: String(c.row.assistant || '').slice(0, 400),
+        selfReason: String(r.selfReason || '').trim(),
+        implicitFeedback: String(r.implicitFeedback || '').trim(),
+        ts: c.row.ts || 0,
+      };
+    });
+    res.json({ cases: summary, metrics: metrics || {}, count: cases.length, now: Date.now() });
+  } catch (err) {
+    res.json({ cases: [], metrics: {}, count: 0, error: err.message, now: Date.now() });
   }
 });
 
