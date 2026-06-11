@@ -63,7 +63,7 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
-import { startSystemPulse, getPendingHealthFlags } from './lib/system-pulse.js';
+import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/system-pulse.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, resolveChatHistoryExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
@@ -365,6 +365,7 @@ async function main() {
   migrateSkillsConfigToIncludeDefaults();
   migrateTideConfig();
   migrateRetrospectiveConfig();
+  migrateSystemPulseConfig();
   if (authOnly && existsSync(getAuthDir())) {
     rmSync(getAuthDir(), { recursive: true });
     mkdirSync(getAuthDir(), { recursive: true });
