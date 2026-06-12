@@ -2852,12 +2852,27 @@
     }
 
     function humanizeTeamActivityMessage(msg) {
-      return String(msg || '')
+      var s = String(msg || '');
+      // Strip the internal mission-tick system prompt prefix so it never surfaces in the UI.
+      s = s.replace(/^You are executing a persistent background mission tick\.\s*/i, '');
+      // If the remaining text starts with "Mission ID: ..." it's still internal; drop it.
+      s = s.replace(/^Mission ID:\s*\S+\s*/i, '');
+      // Unwrap a raw JSON blob that starts with { "status": ... } — show the summary field if present.
+      if (/^\s*\{/.test(s)) {
+        try {
+          var parsed = JSON.parse(s);
+          if (parsed && typeof parsed === 'object') {
+            s = String(parsed.summary || parsed.message || parsed.status || s).trim();
+          }
+        } catch (_) {}
+      }
+      return s
         .replace(/Auto-promoted suggestedTask to task:/gi, 'Added suggestedTask to mission:')
         .replace(/Auto-promoted to task in/gi, 'Added to mission')
         .replace(/Promoted to task in/gi, 'Added to mission')
         .replace(/\btask\b/gi, 'task')
-        .replace(/\btasks\b/gi, 'tasks');
+        .replace(/\btasks\b/gi, 'tasks')
+        .trim();
     }
 
     function activityNavFromEvent(ev) {
@@ -3010,10 +3025,10 @@
         return 'Failed <span class="accent">' + escapeHtml(skill || 'task') + '</span>: ' + escapeHtml(msg || 'Error');
       }
       if (type === 'turn_start') {
-        return 'New task: ' + escapeHtml(msg || 'request');
+        return 'New task: ' + escapeHtml(humanizeTeamActivityMessage(msg) || 'request');
       }
       if (type === 'turn_done') {
-        return 'Finished the task. ' + escapeHtml(msg || '');
+        return 'Finished the task. ' + escapeHtml(humanizeTeamActivityMessage(msg) || '');
       }
       if (type === 'delegation_decision') {
         return 'Delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.';
@@ -3285,7 +3300,39 @@
         return g;
       }).filter(function (g) { return g.lines && g.lines.length; });
       pinnedGroups.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
-      var rest = all.filter(function (ev) { return !ev || !pinnedIds[String(ev.id || '')]; });
+
+      // For mission_tick_done events: keep only the LATEST one per mission so they appear
+      // as a single "what this mission did last" row instead of one row per 60s tick.
+      // mission_tick_start events are pure noise (no summary yet) — suppress them entirely.
+      // All other event types pass through unchanged.
+      var latestTickByMission = {};
+      all.forEach(function (ev) {
+        if (!ev) return;
+        var type = String(ev.type || '');
+        if (type !== 'mission_tick_done' && type !== 'mission_tick_error') return;
+        var missionId = String((ev.details && ev.details.missionId) || ev.missionId || ev.agentId || '');
+        var key = type + '|' + missionId;
+        var ts = Number(ev.ts) || 0;
+        if (!latestTickByMission[key] || ts > (Number(latestTickByMission[key].ts) || 0)) {
+          latestTickByMission[key] = ev;
+        }
+      });
+      var latestTickIds = {};
+      Object.keys(latestTickByMission).forEach(function (k) {
+        var ev = latestTickByMission[k];
+        if (ev && ev.id) latestTickIds[String(ev.id)] = true;
+      });
+
+      var rest = all.filter(function (ev) {
+        if (!ev || pinnedIds[String(ev.id || '')]) return false;
+        var type = String(ev.type || '');
+        if (type === 'mission_tick_start') return false; // no summary yet, pure noise
+        if (type === 'mission_tick_done' || type === 'mission_tick_error') {
+          // Only keep the latest tick per mission
+          return !!latestTickIds[String(ev.id || '')];
+        }
+        return true;
+      });
       var regular = groupTeamActivityEvents(rest.slice(-100));
       var seen = {};
       var out = [];
