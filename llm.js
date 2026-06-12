@@ -6,10 +6,59 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getConfigPath, getUploadsDir, getAgentConfigPath } from './lib/paths.js';
+import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/paths.js';
 import { DEFAULT_AGENT_ID } from './lib/agent-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ---------------------------------------------------------------------------
+// Daily cloud LLM rate limiter
+// Only cloud (non-local) calls count. Local models (ollama/lmstudio on 127.x)
+// are free and never blocked. Counter resets at midnight UTC.
+// Override the cap via config.json: { "llm": { "dailyLimit": 200 } }
+// ---------------------------------------------------------------------------
+
+const DEFAULT_DAILY_LIMIT = 100;
+
+function todayUTC() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readUsage() {
+  try {
+    const raw = readFileSync(getLlmUsagePath(), 'utf8');
+    const data = JSON.parse(raw);
+    if (data && data.date === todayUTC()) return { date: data.date, count: Number(data.count) || 0 };
+  } catch (_) {}
+  return { date: todayUTC(), count: 0 };
+}
+
+function writeUsage(usage) {
+  try {
+    writeFileSync(getLlmUsagePath(), JSON.stringify(usage), 'utf8');
+  } catch (_) {}
+}
+
+/**
+ * Check and increment the daily cloud LLM counter.
+ * Throws a non-retryable error with code 'LLM_DAILY_LIMIT' if the cap is reached.
+ */
+function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
+  const limit = Number(dailyLimit) > 0 ? Number(dailyLimit) : DEFAULT_DAILY_LIMIT;
+  const usage = readUsage();
+  if (usage.count >= limit) {
+    const err = new Error(
+      `Daily cloud LLM limit reached (${usage.count}/${limit} calls today). Resets at midnight UTC. Local models are unaffected.`,
+    );
+    err.code = 'LLM_DAILY_LIMIT';
+    throw err;
+  }
+  usage.count += 1;
+  writeUsage(usage);
+  console.log(`[LLM] daily usage: ${usage.count}/${limit}`);
+}
+
+// ---------------------------------------------------------------------------
 
 /** If config value is an env var name (e.g. "LLM_API_KEY"), return process.env[value]; else return value. */
 function fromEnv(val) {
@@ -141,7 +190,8 @@ function loadConfig(options = {}) {
     }
     models = models.map(({ priority: _p, ...m }) => m);
     const visionFallback = parseVisionFallback(config);
-    return { models, maxTokens: defaultMaxTokens, visionFallback };
+    const dailyLimit = Number(fromEnv(llm.dailyLimit)) || DEFAULT_DAILY_LIMIT;
+    return { models, maxTokens: defaultMaxTokens, visionFallback, dailyLimit };
   }
 
   const baseUrl = fromEnv('LLM_BASE_URL') || fromEnv(llm.baseUrl);
@@ -149,6 +199,7 @@ function loadConfig(options = {}) {
   const model = fromEnv('LLM_MODEL') || fromEnv(llm.model);
   const maxTokens = Number(fromEnv(llm.maxTokens)) || 2048;
   const visionFallback = parseVisionFallback(config);
+  const dailyLimit = Number(fromEnv(llm.dailyLimit)) || DEFAULT_DAILY_LIMIT;
   return {
     models: [
       {
@@ -160,6 +211,7 @@ function loadConfig(options = {}) {
     ],
     maxTokens,
     visionFallback,
+    dailyLimit,
   };
 }
 
@@ -213,7 +265,10 @@ function openaiUsesMaxCompletionTokens(model) {
   return typeof model === 'string' && /^gpt-5/.test(model);
 }
 
-function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null) {
+function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT) {
+  const isLocal = /127\.0\.0\.1|localhost/i.test(baseUrl || '');
+  if (!isLocal) checkAndTrackCloudLimit(dailyLimit);
+
   const isAnthropic = (baseUrl || '').includes('anthropic.com');
   if (isAnthropic) {
     return callAnthropic(messages, { apiKey, model, maxTokens }, tools);
@@ -240,12 +295,12 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null) 
  * @returns {Promise<string>}
  */
 export async function chat(messages, options = {}) {
-  const { models } = loadConfig(options);
+  const { models, dailyLimit } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     try {
-      const res = await callOne(messages, opts);
+      const res = await callOne(messages, opts, null, dailyLimit);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -256,6 +311,7 @@ export async function chat(messages, options = {}) {
       console.log('[LLM] used:', label);
       return content.trim();
     } catch (err) {
+      if (err.code === 'LLM_DAILY_LIMIT') throw err;
       console.log('[LLM] try failed:', label, err.message);
       lastError = err;
     }
@@ -272,12 +328,12 @@ export async function chat(messages, options = {}) {
  * @returns {Promise<{ content: string, toolCalls: Array<{ id: string, name: string, arguments: string }> }>}
  */
 export async function chatWithTools(messages, tools, options = {}) {
-  const { models } = loadConfig(options);
+  const { models, dailyLimit } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     try {
-      const res = await callOne(messages, opts, tools);
+      const res = await callOne(messages, opts, tools, dailyLimit);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -295,6 +351,7 @@ export async function chatWithTools(messages, tools, options = {}) {
       console.log('[LLM] used:', label, toolCalls.length ? '(with tools)' : '');
       return { content, toolCalls };
     } catch (err) {
+      if (err.code === 'LLM_DAILY_LIMIT') throw err;
       console.log('[LLM] try failed:', label, err.message);
       lastError = err;
     }
@@ -326,13 +383,13 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     },
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
-  const { models } = loadConfig(options);
+  const { models, dailyLimit } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     try {
       const res = await Promise.race([
-        callOne(messages, { ...opts, maxTokens: 25 }, null),
+        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit),
         new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
       ]);
       if (!res.ok) {
@@ -353,6 +410,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       }
       return intent;
     } catch (err) {
+      if (err.code === 'LLM_DAILY_LIMIT') throw err;
       console.log('[LLM] intent try failed:', label, err.message);
       lastError = err;
     }
@@ -400,16 +458,18 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
   }
 
   const messages = [{ role: 'user', content: userContentOpenAI }];
-  const { models, visionFallback } = loadConfig(options);
+  const { models, visionFallback, dailyLimit } = loadConfig(options);
   const candidates = visionFallback ? [...models, visionFallback] : [...models];
   let lastError;
   for (const opts of candidates) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     const isAnthropic = (opts.baseUrl || '').includes('anthropic.com');
     if (isAnthropic && (!opts.apiKey || opts.apiKey === 'not-needed' || String(opts.apiKey || '').trim() === '')) continue;
+    const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     try {
       let res;
       if (isAnthropic && userContentAnthropic) {
+        if (!isLocal) checkAndTrackCloudLimit(dailyLimit);
         const body = {
           model: opts.model,
           max_tokens: opts.maxTokens || 1024,
@@ -427,7 +487,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
         });
       } else if (!isAnthropic) {
         const fullMessages = systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages;
-        res = await callOne(fullMessages, opts, null);
+        res = await callOne(fullMessages, opts, null, dailyLimit);
       } else {
         continue;
       }
@@ -443,6 +503,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
       }
       throw new Error('No content in vision response');
     } catch (err) {
+      if (err.code === 'LLM_DAILY_LIMIT') throw err;
       const msg = (err && err.message) || '';
       const looksLikeTextOnly = /invalid.*content|does not support|400|image|vision|multimodal/i.test(msg);
       console.log('[LLM] vision try failed:', label, err.message);
@@ -526,6 +587,13 @@ export async function generateImage(prompt, opts = {}) {
 
   const caption = (revised && String(revised).trim()) ? String(revised).trim().slice(0, 500) : p.slice(0, 500);
   return { path, caption };
+}
+
+/** Return today's cloud LLM usage: { date, count, limit }. */
+export function getLlmUsageToday(options = {}) {
+  const { dailyLimit } = loadConfig(options);
+  const usage = readUsage();
+  return { date: usage.date, count: usage.count, limit: dailyLimit };
 }
 
 export { loadConfig, PRESETS };
