@@ -9,13 +9,31 @@
       if (activeMission) {
         var label = String(activeMission.title || activeMission.objective || '').trim();
         var totalSubs = 0, doneSubs = 0, progressSum = 0;
-        (activeMission.tasks || []).forEach(function sg(s) {
-          totalSubs++;
-          var st = String(s.status || '').toLowerCase();
-          if (st === 'done') { doneSubs++; progressSum += 100; }
-          else { progressSum += Math.max(0, Math.min(100, Number(s.progress) || 0)); }
-          (s.tasks || []).forEach(sg);
+        // Use the same deduplicated task list as the kanban (flattenMissionWorkItems) so the
+        // progress bar and the Work Completed lane always show consistent numbers.
+        // Direct recursive walks on activeMission.tasks double-count delegated originals.
+        var _flatItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+        var _missionId = String(activeMission.id || '');
+        var _missionTasks = _flatItems.filter(function (it) {
+          return it.kind === 'task' && String(it.missionId || '') === _missionId;
         });
+        if (_missionTasks.length > 0) {
+          totalSubs = _missionTasks.length;
+          _missionTasks.forEach(function (it) {
+            var st = String(it.status || '').toLowerCase();
+            if (st === 'done') { doneSubs++; progressSum += 100; }
+            else { progressSum += Math.max(0, Math.min(100, Number(it.progress) || 0)); }
+          });
+        } else {
+          // Fallback: raw walk when flattenMissionWorkItems returns nothing for this mission.
+          (activeMission.tasks || []).forEach(function sg(s) {
+            totalSubs++;
+            var st = String(s.status || '').toLowerCase();
+            if (st === 'done') { doneSubs++; progressSum += 100; }
+            else { progressSum += Math.max(0, Math.min(100, Number(s.progress) || 0)); }
+            (s.tasks || []).forEach(sg);
+          });
+        }
         // Derive pct from actual task progress values — not the agent's self-reported estimate.
         pct = totalSubs > 0 ? Math.max(0, Math.min(100, Math.round(progressSum / totalSubs))) : 0;
         progressLabel = totalSubs > 0
@@ -426,12 +444,19 @@
 
     function mc2CollectKanbanCompletedItems() {
       var items = [];
+      // When no mission is explicitly selected, scope to the current active mission so the
+      // count matches the progress bar. Without this, the lane would show done items from
+      // ALL missions while the progress bar shows only the active one.
+      var _activeMission = !selectedTeamMissionId ? getCurrentMissionMission() : null;
+      var _activeMissionId = _activeMission ? String(_activeMission.id || '') : '';
       var allItems = typeof listCanonicalWorkItems === 'function'
-        ? listCanonicalWorkItems({ range: 'today', status: 'done' })
+        ? listCanonicalWorkItems({ status: 'done' })
         : (typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : []);
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'done') return;
         if (!mc2MatchesSelectedMission(it.missionId)) return;
+        // Scope to active mission when no explicit selection
+        if (_activeMissionId && String(it.missionId || '') !== _activeMissionId) return;
         items.push({
           kind: it.kind === 'turn' ? 'turn' : 'task',
           status: 'done',
