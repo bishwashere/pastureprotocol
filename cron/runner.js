@@ -12,6 +12,7 @@ import { isTelegramChatId } from '../lib/telegram.js';
 import { addPending as addPendingTelegram } from '../lib/pending-telegram.js';
 import { getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
 import { toUserMessage, getErrorMessageForLog } from '../lib/user-error.js';
+import { isDailyLimitError } from '../llm.js';
 import { appendExchange } from '../lib/chat-log.js';
 import { toLogJid } from '../lib/owner-config.js';
 import { ensureChatSession, getCurrentSession } from '../lib/chat-session.js';
@@ -164,6 +165,10 @@ export async function runJob({ job, sock, selfJid }) {
     } catch (err) {
       lastErr = err;
       console.error('[cron] Job failed' + (attempt < MAX_RETRIES ? ` (attempt ${attempt + 1}/${MAX_RETRIES + 1})` : ''), job.name, err.message);
+      if (isDailyLimitError(lastErr)) {
+        console.log('[cron] Daily LLM limit reached — skipping retries for job:', job.name);
+        break;
+      }
       if (attempt < MAX_RETRIES) {
         const delayMs = RETRY_DELAYS_MS[attempt];
         console.log('[cron] Retrying in', Math.round(delayMs / 1000), 's');

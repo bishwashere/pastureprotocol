@@ -24,7 +24,7 @@ const {
   areJidsSameUser,
   downloadMediaMessage,
 } = Baileys;
-import { loadConfig, chat as llmChat } from './llm.js';
+import { loadConfig, chat as llmChat, isDailyLimitReached, msUntilLimitResets } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent-context-state.js';
@@ -735,15 +735,20 @@ async function main() {
         );
       }
       // 2. Fire conversation follow-ups for any JID whose cooldown has elapsed.
-      const now = Date.now();
-      for (const [jid, entry] of tideTimerByJid) {
-        if (now >= entry.dueMs && !tideRunningJids.has(jid)) {
-          const jidShort = String(jid).slice(0, 20) + (String(jid).length > 20 ? '…' : '');
-          console.log('[tide] Follow-up due for', jidShort);
-          tideRunningJids.add(jid);
-          runTideForJid(jid)
-            .catch((e) => console.error('[tide]', getErrorMessageForLog(e)))
-            .finally(() => tideRunningJids.delete(jid));
+      if (isDailyLimitReached()) {
+        const hoursLeft = Math.ceil(msUntilLimitResets() / 3_600_000);
+        console.log(`[tide] Daily LLM limit reached — skipping follow-ups. Resets in ~${hoursLeft}h.`);
+      } else {
+        const now = Date.now();
+        for (const [jid, entry] of tideTimerByJid) {
+          if (now >= entry.dueMs && !tideRunningJids.has(jid)) {
+            const jidShort = String(jid).slice(0, 20) + (String(jid).length > 20 ? '…' : '');
+            console.log('[tide] Follow-up due for', jidShort);
+            tideRunningJids.add(jid);
+            runTideForJid(jid)
+              .catch((e) => console.error('[tide]', getErrorMessageForLog(e)))
+              .finally(() => tideRunningJids.delete(jid));
+          }
         }
       }
     }, healthCheckMinutes * 60 * 1000);

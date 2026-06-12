@@ -40,6 +40,12 @@ function writeUsage(usage) {
 }
 
 /**
+ * Module-level flag: the UTC date string ('YYYY-MM-DD') on which the daily limit was first hit,
+ * or null when not yet hit today. Automatically stale the moment the date rolls over.
+ */
+let _dailyLimitReachedDate = null;
+
+/**
  * Check and increment the daily cloud LLM counter.
  * Throws a non-retryable error with code 'LLM_DAILY_LIMIT' if the cap is reached.
  */
@@ -47,6 +53,7 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   const limit = Number(dailyLimit) > 0 ? Number(dailyLimit) : DEFAULT_DAILY_LIMIT;
   const usage = readUsage();
   if (usage.count >= limit) {
+    _dailyLimitReachedDate = todayUTC();
     const err = new Error(
       `Daily cloud LLM limit reached (${usage.count}/${limit} calls today). Resets at midnight UTC. Local models are unaffected.`,
     );
@@ -56,6 +63,47 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   usage.count += 1;
   writeUsage(usage);
   console.log(`[LLM] daily usage: ${usage.count}/${limit}`);
+}
+
+/**
+ * Returns true if the daily cloud LLM limit has been hit today (UTC).
+ * Uses the in-process flag (fast path) and falls back to reading the usage file
+ * (handles daemon restarts, multi-process, and cases where the limit was hit before
+ * the current process started).
+ * Local models are never limited and this always returns false for them.
+ */
+export function isDailyLimitReached() {
+  if (_dailyLimitReachedDate === todayUTC()) return true;
+  try {
+    const usage = readUsage();
+    if (usage.count >= DEFAULT_DAILY_LIMIT) {
+      _dailyLimitReachedDate = todayUTC();
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/**
+ * Milliseconds until the daily limit resets (midnight UTC).
+ * Useful for logging "try again in X hours".
+ */
+export function msUntilLimitResets() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setUTCHours(24, 0, 0, 0);
+  return midnight.getTime() - now.getTime();
+}
+
+/**
+ * True when the error is a daily-limit hit — works across process boundaries
+ * (child processes lose err.code; check the message text too).
+ */
+export function isDailyLimitError(err) {
+  return (
+    (err?.code === 'LLM_DAILY_LIMIT') ||
+    /Daily cloud LLM limit reached/i.test(err?.message || '')
+  );
 }
 
 // ---------------------------------------------------------------------------
