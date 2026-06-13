@@ -571,6 +571,19 @@ async function main() {
     return {};
   }
   async function runTideForJid(tideJid) {
+    const trace = startRequestTrace({ source: 'tide_followup', jid: String(tideJid), agentId: 'main' });
+    logRequestStart(trace);
+    let tideStatus = 'ok';
+    try {
+      await _runTideForJid(tideJid, trace);
+    } catch (err) {
+      tideStatus = 'error';
+    } finally {
+      logRequestEnd(trace, tideStatus);
+    }
+  }
+
+  async function _runTideForJid(tideJid) {
     const tideJidShort = String(tideJid).slice(0, 20) + (String(tideJid).length > 20 ? '…' : '');
     let config = getTideConfig();
     const tide = config.tide || {};
