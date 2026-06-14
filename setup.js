@@ -100,14 +100,14 @@ function askParagraph(prompt) {
 
 function checkQuit(answer) {
   if (answer && answer.toLowerCase() === 'q') {
-    if (typeof onboardingEnvFlush === 'function') onboardingEnvFlush();
+    if (activeSetupSession) activeSetupSession.flushOnQuit();
     console.log('Quit.');
     process.exit(0);
   }
 }
 
-/** When set during onboarding(), writes pending .env changes before early quit. */
-let onboardingEnvFlush = null;
+/** Active setup session — set during onboarding/messaging prompts for save-on-quit. */
+let activeSetupSession = null;
 
 /** Prompt with full default value shown (e.g. for base URL). Press q to quit. */
 async function promptWithDefault(prompt, defaultVal) {
@@ -344,6 +344,123 @@ function saveConfig(config) {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
+function valuesDiffer(before, after) {
+  return String(before ?? '').trim() !== String(after ?? '').trim();
+}
+
+/** Incremental save during pasture setup — writes ~/.pasture only when a value changes. */
+function createSetupSession(initialEnv) {
+  const envPath = getEnvPath();
+  const pendingEnv = { ...initialEnv };
+  let envDirty = false;
+  let savedThisRun = false;
+
+  function flushEnv() {
+    if (!envDirty) return false;
+    ensureStateDir();
+    writeFileSync(envPath, stringifyEnv(pendingEnv), 'utf8');
+    envDirty = false;
+    savedThisRun = true;
+    return true;
+  }
+
+  function setEnv(key, value) {
+    const prev = pendingEnv[key] ?? '';
+    const next = value ?? '';
+    if (!valuesDiffer(prev, next)) return false;
+    pendingEnv[key] = next;
+    envDirty = true;
+    return flushEnv();
+  }
+
+  function saveConfigIfChanged(updateFn) {
+    let config = loadConfig() || ensureConfig();
+    const before = JSON.stringify(config);
+    updateFn(config);
+    if (before === JSON.stringify(config)) return false;
+    saveConfig(config);
+    savedThisRun = true;
+    return true;
+  }
+
+  function flushOnQuit() {
+    flushEnv();
+    if ((pendingEnv.LLM_1_API_KEY || '').trim()) {
+      wireWhisperToOpenAiKey({ pendingEnv, saveConfigIfChanged });
+    }
+    if (savedThisRun) {
+      console.log(C.dim + '  ✓ Saved changes to ~/.pasture' + C.reset);
+    }
+  }
+
+  return { pendingEnv, setEnv, saveConfigIfChanged, flushOnQuit };
+}
+
+async function setupPromptSecret(session, envKey, prompt, existingVal) {
+  const display = existingVal ? maskSecret(existingVal) : '';
+  const def = display ? ` [${display}]` : '';
+  const answer = await ask(`${prompt}${def} (q to quit): `);
+  checkQuit(answer);
+  const next = answer || existingVal || '';
+  session.setEnv(envKey, next);
+  return next;
+}
+
+async function setupPromptDefault(prompt, defaultVal) {
+  const def = defaultVal ? ` [${defaultVal}]` : '';
+  const answer = await ask(`${prompt}${def} (q to quit): `);
+  checkQuit(answer);
+  return answer || defaultVal || '';
+}
+
+function wireWhisperToOpenAiKey(session) {
+  if (!(session.pendingEnv.LLM_1_API_KEY || '').trim()) return;
+  session.saveConfigIfChanged((cfg) => {
+    if (!cfg.skills) cfg.skills = {};
+    if (!cfg.skills.speech) cfg.skills.speech = {};
+    cfg.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
+  });
+}
+
+function saveCloudLlmSelection(session, provider, selectedModel) {
+  if (provider === 'skip' || !selectedModel) return;
+  session.saveConfigIfChanged((cfg) => {
+    if (!Array.isArray(cfg?.llm?.models)) return;
+    const models = cfg.llm.models;
+    const hasPriorityAlready = models.some(
+      (m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'
+    );
+    if (!hasPriorityAlready) {
+      for (let i = 0; i < models.length; i++) {
+        const p = (models[i].provider || '').toLowerCase();
+        const isChosen = p === provider;
+        models[i].priority = isChosen;
+        if (isChosen) models[i].model = selectedModel;
+      }
+    } else {
+      for (let i = 0; i < models.length; i++) {
+        if ((models[i].provider || '').toLowerCase() === provider) {
+          models[i].model = selectedModel;
+          break;
+        }
+      }
+    }
+  });
+}
+
+function saveSpeechConfig(session, whisperChoice) {
+  session.saveConfigIfChanged((cfg) => {
+    if (!cfg.skills) cfg.skills = {};
+    if (!cfg.skills.speech) cfg.skills.speech = {};
+    if (whisperChoice === 'openai') {
+      cfg.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
+    } else if (whisperChoice === 'separate' && (session.pendingEnv.SPEECH_WHISPER_API_KEY || '').trim()) {
+      cfg.skills.speech.whisper = { apiKey: 'SPEECH_WHISPER_API_KEY' };
+    }
+    cfg.skills.speech.elevenLabs = { apiKey: 'ELEVEN_LABS_API_KEY' };
+  });
+}
+
 /** Detect host timezone (IANA) and 12/24 format; set in config so install sets them, not "auto". */
 function ensureAgentsDefaultsFromHost() {
   const config = loadConfig();
@@ -455,45 +572,23 @@ async function onboarding() {
   const hasEnv = existsSync(envPath);
   const envContent = hasEnv ? readFileSync(envPath, 'utf8') : '';
   const env = parseEnv(envContent);
-  const pendingEnv = { ...env };
-  let envDirty = false;
-
-  function markEnvDirty() {
-    envDirty = true;
-  }
-
-  function flushEnv(force) {
-    if (!force && !envDirty) return;
-    ensureStateDir();
-    writeFileSync(envPath, stringifyEnv(pendingEnv), 'utf8');
-    envDirty = false;
-  }
-
-  function wireWhisperToOpenAiKey() {
-    if (!(pendingEnv.LLM_1_API_KEY || '').trim()) return;
-    config = loadConfig() || config;
-    if (!config.skills) config.skills = {};
-    if (!config.skills.speech) config.skills.speech = {};
-    config.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
-    saveConfig(config);
-  }
-
-  onboardingEnvFlush = () => {
-    if (!envDirty) return;
-    flushEnv(true);
-    if ((pendingEnv.LLM_1_API_KEY || '').trim()) wireWhisperToOpenAiKey();
-    console.log(C.dim + '  ✓ Saved changes to ~/.pasture' + C.reset);
-  };
+  const session = createSetupSession(env);
+  activeSetupSession = session;
 
   try {
   section('Configuration (optional — press Enter to keep defaults or skip)');
 
-  const baseUrl = await promptWithDefault(q('Local LLM base URL (e.g. LM Studio)'), defaultBaseUrl || '');
+  const baseUrl = await setupPromptDefault(q('Local LLM base URL (e.g. LM Studio)'), defaultBaseUrl || '');
+  if (valuesDiffer(defaultBaseUrl || '', baseUrl)) {
+    session.saveConfigIfChanged((cfg) => {
+      if (cfg?.llm?.models?.[0]) cfg.llm.models[0].baseUrl = baseUrl;
+    });
+  }
 
   // Cloud LLM: ask provider directly, with skip
-  let llm1Key = pendingEnv.LLM_1_API_KEY || '';
-  let llm2Key = pendingEnv.LLM_2_API_KEY || '';
-  let llm3Key = pendingEnv.LLM_3_API_KEY || '';
+  let llm1Key = session.pendingEnv.LLM_1_API_KEY || '';
+  let llm2Key = session.pendingEnv.LLM_2_API_KEY || '';
+  let llm3Key = session.pendingEnv.LLM_3_API_KEY || '';
 
   let provider;
   try {
@@ -526,48 +621,40 @@ async function onboarding() {
   if (provider === 'openai') {
     const models = CLOUD_LLM_MODELS.openai;
     selectedModel = await selectModel(q('OpenAI model version'), models);
-    llm1Key = await promptSecret(q('OpenAI API key'), pendingEnv.LLM_1_API_KEY || '');
-    pendingEnv.LLM_1_API_KEY = llm1Key ?? '';
-    markEnvDirty();
-    flushEnv(true);
-    wireWhisperToOpenAiKey();
+    saveCloudLlmSelection(session, provider, selectedModel);
+    llm1Key = await setupPromptSecret(session, 'LLM_1_API_KEY', q('OpenAI API key'), session.pendingEnv.LLM_1_API_KEY || '');
+    wireWhisperToOpenAiKey(session);
   } else if (provider === 'grok') {
     const models = CLOUD_LLM_MODELS.grok;
     selectedModel = await selectModel(q('Grok model version'), models);
-    llm2Key = await promptSecret(q('Grok API key'), pendingEnv.LLM_2_API_KEY || '');
-    pendingEnv.LLM_2_API_KEY = llm2Key ?? '';
-    markEnvDirty();
-    flushEnv(true);
+    saveCloudLlmSelection(session, provider, selectedModel);
+    llm2Key = await setupPromptSecret(session, 'LLM_2_API_KEY', q('Grok API key'), session.pendingEnv.LLM_2_API_KEY || '');
   } else if (provider === 'anthropic') {
     const models = CLOUD_LLM_MODELS.anthropic;
     selectedModel = await selectModel(q('Anthropic (Claude) model version'), models);
-    llm3Key = await promptSecret(q('Anthropic API key'), pendingEnv.LLM_3_API_KEY || '');
-    pendingEnv.LLM_3_API_KEY = llm3Key ?? '';
-    markEnvDirty();
-    flushEnv(true);
+    saveCloudLlmSelection(session, provider, selectedModel);
+    llm3Key = await setupPromptSecret(session, 'LLM_3_API_KEY', q('Anthropic API key'), session.pendingEnv.LLM_3_API_KEY || '');
   }
 
-  const braveKey = await promptSecret(q('Brave Search API key – optional'), pendingEnv.BRAVE_API_KEY || '');
-  pendingEnv.BRAVE_API_KEY = braveKey ?? '';
-  markEnvDirty();
-  flushEnv(true);
+  await setupPromptSecret(session, 'BRAVE_API_KEY', q('Brave Search API key – optional'), session.pendingEnv.BRAVE_API_KEY || '');
 
   // Google Workspace (gog) skill
   const enableGogAnswer = await ask(q('Enable Google Workspace (gog) skill? (y/n)') + ' ');
   const enableGog = (enableGogAnswer || '').trim().toLowerCase().startsWith('y');
   if (enableGog) {
     config = loadConfig() || config;
-    if (!config.skills) config.skills = {};
-    const skills = config.skills;
-    const enabled = Array.isArray(skills.enabled) ? skills.enabled : [];
-    if (!enabled.includes('gog')) enabled.push('gog');
-    skills.enabled = enabled;
-    if (!skills.gog) skills.gog = {};
-    const existingAccount = skills.gog.account ? String(skills.gog.account) : '';
-    const gogAccount = await promptWithDefault(q('Default Google account email for gog (optional)'), existingAccount || '');
-    if (gogAccount && gogAccount.trim()) skills.gog.account = gogAccount.trim();
-    config.skills = skills;
-    saveConfig(config);
+    const existingAccount = config?.skills?.gog?.account ? String(config.skills.gog.account) : '';
+    const gogAccount = await setupPromptDefault(q('Default Google account email for gog (optional)'), existingAccount || '');
+    session.saveConfigIfChanged((cfg) => {
+      if (!cfg.skills) cfg.skills = {};
+      const skills = cfg.skills;
+      const enabled = Array.isArray(skills.enabled) ? skills.enabled : [];
+      if (!enabled.includes('gog')) enabled.push('gog');
+      skills.enabled = enabled;
+      if (!skills.gog) skills.gog = {};
+      if (gogAccount && gogAccount.trim()) skills.gog.account = gogAccount.trim();
+      cfg.skills = skills;
+    });
     if (!hasBinary('gog')) {
       console.log(C.dim + '  ! gog CLI not found in PATH. Install from https://gogcli.sh and run setup again.' + C.reset);
     }
@@ -608,25 +695,23 @@ async function onboarding() {
     }
   }
   if (visionFallbackProvider === 'openai' || visionFallbackProvider === 'anthropic') {
-    config = loadConfig() || config;
-    if (!config.skills) config.skills = {};
-    if (!config.skills.vision) config.skills.vision = {};
     const visionModel = visionFallbackProvider === 'openai'
       ? await selectModel(q('OpenAI vision model'), CLOUD_LLM_MODELS.openai)
       : await selectModel(q('Anthropic vision model'), CLOUD_LLM_MODELS.anthropic);
-    config.skills.vision.fallback = {
-      provider: visionFallbackProvider,
-      model: visionModel || (visionFallbackProvider === 'openai' ? 'gpt-5.2' : 'claude-sonnet-4-5-20250929'),
-      apiKey: visionFallbackProvider === 'openai' ? 'LLM_1_API_KEY' : 'LLM_3_API_KEY',
-    };
-    saveConfig(config);
+    session.saveConfigIfChanged((cfg) => {
+      if (!cfg.skills) cfg.skills = {};
+      if (!cfg.skills.vision) cfg.skills.vision = {};
+      cfg.skills.vision.fallback = {
+        provider: visionFallbackProvider,
+        model: visionModel || (visionFallbackProvider === 'openai' ? 'gpt-5.2' : 'claude-sonnet-4-5-20250929'),
+        apiKey: visionFallbackProvider === 'openai' ? 'LLM_1_API_KEY' : 'LLM_3_API_KEY',
+      };
+    });
   }
 
   // Speech (voice): Whisper = voice-to-text, 11Labs = text-to-voice. Separate from LLM setup.
   section('Speech (voice)');
-  let speechWhisperKey = '';
-  let elevenLabsKey = pendingEnv.ELEVEN_LABS_API_KEY || '';
-  const hasOpenAIKey = (pendingEnv.LLM_1_API_KEY || '').trim().length > 0;
+  const hasOpenAIKey = (session.pendingEnv.LLM_1_API_KEY || '').trim().length > 0;
   let whisperChoice = 'skip';
   try {
     const select = (await import('@inquirer/select')).default;
@@ -649,69 +734,18 @@ async function onboarding() {
       throw err;
     }
   }
-  if (whisperChoice === 'separate') {
-    speechWhisperKey = await promptSecret(q('Whisper/OpenAI API key'), pendingEnv.SPEECH_WHISPER_API_KEY || '');
-    pendingEnv.SPEECH_WHISPER_API_KEY = speechWhisperKey ?? '';
-    markEnvDirty();
-    flushEnv(true);
-  }
-  elevenLabsKey = await promptSecret(q('11Labs API key (text to voice) – optional'), elevenLabsKey || '');
-  pendingEnv.ELEVEN_LABS_API_KEY = elevenLabsKey ?? '';
-  markEnvDirty();
-  flushEnv(true);
-  config = loadConfig() || config;
-  if (!config.skills) config.skills = {};
-  if (!config.skills.speech) config.skills.speech = {};
   if (whisperChoice === 'openai') {
-    config.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
-  } else if (whisperChoice === 'separate' && (pendingEnv.SPEECH_WHISPER_API_KEY || '').trim()) {
-    config.skills.speech.whisper = { apiKey: 'SPEECH_WHISPER_API_KEY' };
+    saveSpeechConfig(session, whisperChoice);
+  } else if (whisperChoice === 'separate') {
+    await setupPromptSecret(session, 'SPEECH_WHISPER_API_KEY', q('Whisper/OpenAI API key'), session.pendingEnv.SPEECH_WHISPER_API_KEY || '');
+    saveSpeechConfig(session, whisperChoice);
   }
-  config.skills.speech.elevenLabs = { apiKey: 'ELEVEN_LABS_API_KEY' };
-  saveConfig(config);
-
-  if (baseUrl && config?.llm?.models?.[0]) {
-    config.llm.models[0].baseUrl = baseUrl;
-    saveConfig(config);
-  }
-
-  flushEnv(true);
-
-  // When user adds a cloud LLM key during setup, set that model as priority and chosen version.
-  const cloudKeyAdded = provider !== 'skip' && (
-    (provider === 'openai' && (llm1Key ?? '').trim()) ||
-    (provider === 'grok' && (llm2Key ?? '').trim()) ||
-    (provider === 'anthropic' && (llm3Key ?? '').trim())
-  );
-  if (cloudKeyAdded && Array.isArray(config?.llm?.models)) {
-    const models = config.llm.models;
-    const hasPriorityAlready = models.some(
-      (m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'
-    );
-    if (!hasPriorityAlready) {
-      for (let i = 0; i < models.length; i++) {
-        const p = (models[i].provider || '').toLowerCase();
-        const isChosen = p === provider;
-        models[i].priority = isChosen;
-        if (isChosen && selectedModel) models[i].model = selectedModel;
-      }
-      saveConfig(config);
-    } else if (selectedModel) {
-      // Re-run setup: still update the chosen provider's model version.
-      for (let i = 0; i < models.length; i++) {
-        if ((models[i].provider || '').toLowerCase() === provider) {
-          models[i].model = selectedModel;
-          saveConfig(config);
-          break;
-        }
-      }
-    }
-  }
+  await setupPromptSecret(session, 'ELEVEN_LABS_API_KEY', q('11Labs API key (text to voice) – optional'), session.pendingEnv.ELEVEN_LABS_API_KEY || '');
 
   console.log('');
   console.log(C.dim + '  ✓ Config and .env saved to ~/.pasture' + C.reset);
   } finally {
-    onboardingEnvFlush = null;
+    activeSetupSession = null;
   }
 }
 
@@ -781,15 +815,20 @@ async function main() {
 
   if (!bothAlreadySetUp && messagingFirst === 'telegram') {
     console.log('');
-    const telegramToken = await promptSecret(q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
-    if (telegramToken) {
-      env.TELEGRAM_BOT_TOKEN = telegramToken;
-      writeFileSync(envPath, stringifyEnv(env), 'utf8');
-      console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
-      const config = loadConfig() || {};
-      config.channels = config.channels || {};
-      config.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
-      saveConfig(config);
+    const msgSession = createSetupSession(env);
+    activeSetupSession = msgSession;
+    try {
+      const telegramToken = await setupPromptSecret(msgSession, 'TELEGRAM_BOT_TOKEN', q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
+      if (telegramToken) {
+        env.TELEGRAM_BOT_TOKEN = telegramToken;
+        msgSession.saveConfigIfChanged((cfg) => {
+          cfg.channels = cfg.channels || {};
+          cfg.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
+        });
+        console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
+      }
+    } finally {
+      activeSetupSession = null;
     }
     const addWa = await ask(q('Add WhatsApp too? (y/n)') + ' ');
     if ((addWa || '').toLowerCase().startsWith('y')) {
@@ -856,15 +895,20 @@ async function main() {
       console.log('');
       const addTg = await ask(q('Add Telegram too? (y/n)') + ' ');
       if ((addTg || '').toLowerCase().startsWith('y')) {
-        const telegramToken = await promptSecret(q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
-        if (telegramToken) {
-          env.TELEGRAM_BOT_TOKEN = telegramToken;
-          writeFileSync(envPath, stringifyEnv(env), 'utf8');
-          console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
-          const config = loadConfig() || {};
-          config.channels = config.channels || {};
-          config.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
-          saveConfig(config);
+        const msgSession = createSetupSession(env);
+        activeSetupSession = msgSession;
+        try {
+          const telegramToken = await setupPromptSecret(msgSession, 'TELEGRAM_BOT_TOKEN', q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
+          if (telegramToken) {
+            env.TELEGRAM_BOT_TOKEN = telegramToken;
+            msgSession.saveConfigIfChanged((cfg) => {
+              cfg.channels = cfg.channels || {};
+              cfg.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
+            });
+            console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
+          }
+        } finally {
+          activeSetupSession = null;
         }
       }
     }
