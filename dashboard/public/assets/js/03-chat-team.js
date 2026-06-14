@@ -5042,7 +5042,7 @@
           if (!res.ok) {
             var errMsg = data.error || data.message || ('Transcription failed (' + res.status + ')');
             if (/invalid_api_key|401|Whisper API key not configured/i.test(String(errMsg))) {
-              errMsg = 'Transcription unavailable — check your OpenAI API key in LLM settings or OPENAI_API_KEY in .env.';
+              errMsg = 'Transcription unavailable — update LLM_1_API_KEY in ~/.pasture/.env (run pasture setup) or restart the dashboard after saving.';
             }
             throw new Error(errMsg);
           }

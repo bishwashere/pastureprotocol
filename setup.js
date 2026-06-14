@@ -100,10 +100,14 @@ function askParagraph(prompt) {
 
 function checkQuit(answer) {
   if (answer && answer.toLowerCase() === 'q') {
+    if (typeof onboardingEnvFlush === 'function') onboardingEnvFlush();
     console.log('Quit.');
     process.exit(0);
   }
 }
+
+/** When set during onboarding(), writes pending .env changes before early quit. */
+let onboardingEnvFlush = null;
 
 /** Prompt with full default value shown (e.g. for base URL). Press q to quit. */
 async function promptWithDefault(prompt, defaultVal) {
@@ -451,15 +455,45 @@ async function onboarding() {
   const hasEnv = existsSync(envPath);
   const envContent = hasEnv ? readFileSync(envPath, 'utf8') : '';
   const env = parseEnv(envContent);
+  const pendingEnv = { ...env };
+  let envDirty = false;
 
+  function markEnvDirty() {
+    envDirty = true;
+  }
+
+  function flushEnv(force) {
+    if (!force && !envDirty) return;
+    ensureStateDir();
+    writeFileSync(envPath, stringifyEnv(pendingEnv), 'utf8');
+    envDirty = false;
+  }
+
+  function wireWhisperToOpenAiKey() {
+    if (!(pendingEnv.LLM_1_API_KEY || '').trim()) return;
+    config = loadConfig() || config;
+    if (!config.skills) config.skills = {};
+    if (!config.skills.speech) config.skills.speech = {};
+    config.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
+    saveConfig(config);
+  }
+
+  onboardingEnvFlush = () => {
+    if (!envDirty) return;
+    flushEnv(true);
+    if ((pendingEnv.LLM_1_API_KEY || '').trim()) wireWhisperToOpenAiKey();
+    console.log(C.dim + '  ✓ Saved changes to ~/.pasture' + C.reset);
+  };
+
+  try {
   section('Configuration (optional — press Enter to keep defaults or skip)');
 
   const baseUrl = await promptWithDefault(q('Local LLM base URL (e.g. LM Studio)'), defaultBaseUrl || '');
 
   // Cloud LLM: ask provider directly, with skip
-  let llm1Key = env.LLM_1_API_KEY || '';
-  let llm2Key = env.LLM_2_API_KEY || '';
-  let llm3Key = env.LLM_3_API_KEY || '';
+  let llm1Key = pendingEnv.LLM_1_API_KEY || '';
+  let llm2Key = pendingEnv.LLM_2_API_KEY || '';
+  let llm3Key = pendingEnv.LLM_3_API_KEY || '';
 
   let provider;
   try {
@@ -492,18 +526,31 @@ async function onboarding() {
   if (provider === 'openai') {
     const models = CLOUD_LLM_MODELS.openai;
     selectedModel = await selectModel(q('OpenAI model version'), models);
-    llm1Key = await promptSecret(q('OpenAI API key'), env.LLM_1_API_KEY || '');
+    llm1Key = await promptSecret(q('OpenAI API key'), pendingEnv.LLM_1_API_KEY || '');
+    pendingEnv.LLM_1_API_KEY = llm1Key ?? '';
+    markEnvDirty();
+    flushEnv(true);
+    wireWhisperToOpenAiKey();
   } else if (provider === 'grok') {
     const models = CLOUD_LLM_MODELS.grok;
     selectedModel = await selectModel(q('Grok model version'), models);
-    llm2Key = await promptSecret(q('Grok API key'), env.LLM_2_API_KEY || '');
+    llm2Key = await promptSecret(q('Grok API key'), pendingEnv.LLM_2_API_KEY || '');
+    pendingEnv.LLM_2_API_KEY = llm2Key ?? '';
+    markEnvDirty();
+    flushEnv(true);
   } else if (provider === 'anthropic') {
     const models = CLOUD_LLM_MODELS.anthropic;
     selectedModel = await selectModel(q('Anthropic (Claude) model version'), models);
-    llm3Key = await promptSecret(q('Anthropic API key'), env.LLM_3_API_KEY || '');
+    llm3Key = await promptSecret(q('Anthropic API key'), pendingEnv.LLM_3_API_KEY || '');
+    pendingEnv.LLM_3_API_KEY = llm3Key ?? '';
+    markEnvDirty();
+    flushEnv(true);
   }
 
-  const braveKey = await promptSecret(q('Brave Search API key – optional'), env.BRAVE_API_KEY || '');
+  const braveKey = await promptSecret(q('Brave Search API key – optional'), pendingEnv.BRAVE_API_KEY || '');
+  pendingEnv.BRAVE_API_KEY = braveKey ?? '';
+  markEnvDirty();
+  flushEnv(true);
 
   // Google Workspace (gog) skill
   const enableGogAnswer = await ask(q('Enable Google Workspace (gog) skill? (y/n)') + ' ');
@@ -578,8 +625,8 @@ async function onboarding() {
   // Speech (voice): Whisper = voice-to-text, 11Labs = text-to-voice. Separate from LLM setup.
   section('Speech (voice)');
   let speechWhisperKey = '';
-  let elevenLabsKey = env.ELEVEN_LABS_API_KEY || '';
-  const hasOpenAIKey = (env.LLM_1_API_KEY || '').trim().length > 0;
+  let elevenLabsKey = pendingEnv.ELEVEN_LABS_API_KEY || '';
+  const hasOpenAIKey = (pendingEnv.LLM_1_API_KEY || '').trim().length > 0;
   let whisperChoice = 'skip';
   try {
     const select = (await import('@inquirer/select')).default;
@@ -603,15 +650,21 @@ async function onboarding() {
     }
   }
   if (whisperChoice === 'separate') {
-    speechWhisperKey = await promptSecret(q('Whisper/OpenAI API key'), env.SPEECH_WHISPER_API_KEY || '');
+    speechWhisperKey = await promptSecret(q('Whisper/OpenAI API key'), pendingEnv.SPEECH_WHISPER_API_KEY || '');
+    pendingEnv.SPEECH_WHISPER_API_KEY = speechWhisperKey ?? '';
+    markEnvDirty();
+    flushEnv(true);
   }
   elevenLabsKey = await promptSecret(q('11Labs API key (text to voice) – optional'), elevenLabsKey || '');
+  pendingEnv.ELEVEN_LABS_API_KEY = elevenLabsKey ?? '';
+  markEnvDirty();
+  flushEnv(true);
   config = loadConfig() || config;
   if (!config.skills) config.skills = {};
   if (!config.skills.speech) config.skills.speech = {};
   if (whisperChoice === 'openai') {
     config.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
-  } else if (whisperChoice === 'separate' && (speechWhisperKey || env.SPEECH_WHISPER_API_KEY)) {
+  } else if (whisperChoice === 'separate' && (pendingEnv.SPEECH_WHISPER_API_KEY || '').trim()) {
     config.skills.speech.whisper = { apiKey: 'SPEECH_WHISPER_API_KEY' };
   }
   config.skills.speech.elevenLabs = { apiKey: 'ELEVEN_LABS_API_KEY' };
@@ -622,15 +675,7 @@ async function onboarding() {
     saveConfig(config);
   }
 
-  const newEnv = { ...env };
-  newEnv.LLM_1_API_KEY = llm1Key ?? '';
-  newEnv.LLM_2_API_KEY = llm2Key ?? '';
-  newEnv.LLM_3_API_KEY = llm3Key ?? '';
-  newEnv.BRAVE_API_KEY = braveKey ?? '';
-  newEnv.SPEECH_WHISPER_API_KEY = speechWhisperKey ?? '';
-  newEnv.ELEVEN_LABS_API_KEY = elevenLabsKey ?? '';
-
-  writeFileSync(getEnvPath(), stringifyEnv(newEnv), 'utf8');
+  flushEnv(true);
 
   // When user adds a cloud LLM key during setup, set that model as priority and chosen version.
   const cloudKeyAdded = provider !== 'skip' && (
@@ -665,6 +710,9 @@ async function onboarding() {
 
   console.log('');
   console.log(C.dim + '  ✓ Config and .env saved to ~/.pasture' + C.reset);
+  } finally {
+    onboardingEnvFlush = null;
+  }
 }
 
 async function main() {
