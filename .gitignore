@@ -13,9 +13,7 @@ package-lock.json
 pnpm-lock.yaml
 cron/jobs.e2e.json
 scripts/test/.tmp-cron-e2e-*
-.cowcode-test
 
-# --- If someone sets COWCODE_STATE_DIR inside this clone (default state is ~/.cowcode) ---
 /agents/
 /groups/
 /group/

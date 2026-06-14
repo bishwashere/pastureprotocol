@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "job-mp6xul2u-o7hwge",
+      "name": "Reminder",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-05-16T21:30:00.000Z"
+      },
+      "message": "Call Bishwas",
+      "jid": "test@s.whatsapp.net",
+      "createdAtMs": 1778850819894,
+      "updatedAtMs": 1778850819894
+    },
+    {
+      "id": "job-mpr5y1qi-inh9pg",
+      "name": "Reminder",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-05-30T21:30:00.000Z"
+      },
+      "message": "Call Bishwas",
+      "jid": "test@s.whatsapp.net",
+      "createdAtMs": 1780073741898,
+      "updatedAtMs": 1780073741898
+    },
+    {
+      "id": "job-mpr5ydot-6mb6ua",
+      "name": "Reminder",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-05-31T21:30:00.000Z"
+      },
+      "message": "Blue Moon reminder (next week)",
+      "jid": "test@s.whatsapp.net",
+      "createdAtMs": 1780073757389,
+      "updatedAtMs": 1780073757389
+    }
+  ]
+}

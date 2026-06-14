@@ -12,8 +12,8 @@ Read this before changing **Windows-specific** install, update, uninstall, or da
 |---------|---------------|--------------------------------------------|
 | One-line install | `install.sh` | `install.ps1` |
 | Code dir | `~/.local/share/pastureprotocol` | `%USERPROFILE%\.local\share\pastureprotocol` |
-| State dir | `~/.pasture` (legacy `~/.cowcode`) | `%USERPROFILE%\.pasture` (legacy `%USERPROFILE%\.cowcode`) |
-| CLI launcher | `~/.local/bin/pasture` (bash) + legacy `cowcode` shim | `%USERPROFILE%\.local\bin\pasture.cmd` + legacy `cowcode.cmd` shim |
+| State dir | `~/.pasture` | `%USERPROFILE%\.pasture` |
+| CLI launcher | `~/.local/bin/pasture` (bash) | `%USERPROFILE%\.local\bin\pasture.cmd` |
 | Daemon | `bash scripts/daemon.sh` → launchd/systemd | `lib/daemon-pm2.js` → pm2 |
 | Update / uninstall | `update.sh` / `uninstall.sh` | `update.ps1` / `lib/uninstall-win.js` |
 
@@ -77,7 +77,7 @@ pnpm run test:daemon-pm2   # install.ps1 order, cli win32 routing, daemon-pm2 ex
 
 Check logs in order:
 
-- `%USERPROFILE%\.pasture\daemon.log` (legacy `%USERPROFILE%\.cowcode\daemon.log`)
+- `%USERPROFILE%\.pasture\daemon.log`
 - `%USERPROFILE%\.pasture\daemon.err`
 - `pm2 logs pasture`
 

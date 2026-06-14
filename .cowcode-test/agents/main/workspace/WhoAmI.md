@@ -1,0 +1,1 @@
+Edit this file to describe who you are: your name, how you want the assistant to address you, and anything else that helps it respond in a personal way. You can also set this during setup when asked "Who am I?".

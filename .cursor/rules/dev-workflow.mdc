@@ -9,7 +9,7 @@ alwaysApply: true
 
 When the user reports a bug, error, or unexpected behavior, **before responding**, inspect the following log paths:
 
-- `~/.pasture/daemon.log` — main runtime output (`$PASTURE_STATE_DIR/daemon.log` if the env var is set; legacy `$COWCODE_STATE_DIR` / `~/.cowcode` still work)
+- `~/.pasture/daemon.log` — main runtime output (`$PASTURE_STATE_DIR/daemon.log` if the env var is set)
 - `~/.pasture/daemon.err` — daemon stderr / crash output (`$PASTURE_STATE_DIR/daemon.err` if the env var is set)
 - `pm2 logs pasture` — Windows / pm2-managed process logs
 
