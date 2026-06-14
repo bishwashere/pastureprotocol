@@ -119,11 +119,17 @@
             </svg>
           </button>
         </div>
-        <div id="team-user-input-mic-status" class="team-mic-status" aria-live="polite" style="display:none;">
-          <span class="team-mic-dot"></span>
-          <span class="team-mic-status-text">Listening…</span>
+        <div id="team-user-input-composer" class="team-user-input-composer">
+          <div id="team-user-input-waveform-wrap" class="team-user-input-waveform-wrap" aria-hidden="true">
+            <div id="team-user-input-waveform-bars" class="team-user-input-waveform-bars"></div>
+          </div>
+          <div id="team-user-input-listening" class="team-user-input-listening" aria-hidden="true">Listening…</div>
+          <div id="team-user-input-transcribing" class="team-user-input-transcribing" aria-hidden="true">
+            <span class="team-user-input-transcribing-spinner" aria-hidden="true"></span>
+            <span>Transcribing…</span>
+          </div>
+          <textarea id="team-user-input-modal-text" class="team-user-input-textarea" rows="3" placeholder="Type your answer…"></textarea>
         </div>
-        <textarea id="team-user-input-modal-text" class="team-user-input-textarea" rows="3" placeholder="Type your answer…"></textarea>
       </div>
       <p id="team-user-input-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">

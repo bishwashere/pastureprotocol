@@ -89,7 +89,7 @@ const API = '';
         if (typeof renderHomeIdentityTiles === 'function') renderHomeIdentityTiles();
       }
       if (pageId === 'team') {
-        startTeamActivityFeed();
+        if (typeof startTeamActivityFeed === 'function') startTeamActivityFeed();
         fetchAgentMapData().then(function () {
           if (teamAgentId) {
             selectTeamInboxAgent(teamAgentId);
@@ -102,8 +102,8 @@ const API = '';
           }
         });
       } else {
-        stopTeamActivityFeed();
-        setTeamPageFullscreen(false);
+        if (typeof stopTeamActivityFeed === 'function') stopTeamActivityFeed();
+        if (typeof setTeamPageFullscreen === 'function') setTeamPageFullscreen(false);
       }
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();

@@ -4948,33 +4948,78 @@
       var analyser = null;
       var animFrame = null;
       var isRecording = false;
+      var isRecordingRef = false;
 
-      var statusEl = document.getElementById('team-user-input-mic-status');
-      var statusTextEl = statusEl && statusEl.querySelector('.team-mic-status-text');
+      var composerEl = document.getElementById('team-user-input-composer');
+      var waveformBarsEl = document.getElementById('team-user-input-waveform-bars');
+      var waveformWrapEl = document.getElementById('team-user-input-waveform-wrap');
       var micIcon = micBtn.querySelector('.team-mic-icon');
       var stopIcon = micBtn.querySelector('.team-mic-stop-icon');
 
+      var waveformBuffer = [];
+      var nextBarId = 0;
+      var lastBarTime = 0;
+      var lastFrameTime = 0;
+      var scrollSpeedPixelsPerSecond = 96;
+      var barsPerSecond = 15;
+      var barInterval = 1000 / barsPerSecond;
+      var barWidth = 3;
+
+      function getComposerWidth() {
+        if (!waveformWrapEl) return 600;
+        return Math.max(waveformWrapEl.clientWidth - 32, 200);
+      }
+
+      function renderWaveformBars() {
+        if (!waveformBarsEl) return;
+        waveformBarsEl.innerHTML = waveformBuffer.map(function (bar) {
+          var barHeight = Math.max(bar.amplitude * 324, 2);
+          var halfHeight = barHeight / 2;
+          return '<div class="team-voice-bar" style="height:' + barHeight + 'px;left:' + bar.x + 'px;top:calc(50% - ' + halfHeight + 'px);"></div>';
+        }).join('');
+      }
+
+      function clearWaveform() {
+        waveformBuffer = [];
+        nextBarId = 0;
+        lastBarTime = 0;
+        if (waveformBarsEl) waveformBarsEl.innerHTML = '';
+      }
+
       function setRecordingState(active) {
         isRecording = active;
+        isRecordingRef = active;
         micBtn.classList.toggle('team-mic-btn--recording', active);
+        if (composerEl) composerEl.classList.toggle('team-user-input-composer--recording', active);
         if (micIcon) micIcon.style.display = active ? 'none' : '';
         if (stopIcon) stopIcon.style.display = active ? '' : 'none';
-        if (statusEl) statusEl.style.display = active ? 'flex' : 'none';
-        if (statusTextEl) statusTextEl.textContent = active ? 'Listening…' : '';
+        if (!active) clearWaveform();
       }
 
       function setTranscribingState(active) {
         micBtn.disabled = active;
         micBtn.classList.toggle('team-mic-btn--transcribing', active);
-        if (statusEl) statusEl.style.display = active ? 'flex' : 'none';
-        if (statusTextEl) statusTextEl.textContent = active ? 'Transcribing…' : '';
+        if (composerEl) composerEl.classList.toggle('team-user-input-composer--transcribing', active);
       }
 
       function stopStream() {
+        isRecordingRef = false;
         if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
         if (audioCtx) { audioCtx.close().catch(function () {}); audioCtx = null; }
         analyser = null;
         if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      }
+
+      function fillTranscribedText(text) {
+        var textEl = document.getElementById('team-user-input-modal-text');
+        if (!textEl || !text) return;
+        var trimmed = String(text).trim();
+        if (!trimmed) return;
+        textEl.value = textEl.value ? textEl.value.trimEnd() + ' ' + trimmed : trimmed;
+        textEl.dispatchEvent(new Event('input', { bubbles: true }));
+        textEl.focus();
+        var len = textEl.value.length;
+        if (typeof textEl.setSelectionRange === 'function') textEl.setSelectionRange(len, len);
       }
 
       async function transcribeBlob(blob) {
@@ -4985,18 +5030,73 @@
             headers: { 'Content-Type': 'audio/webm' },
             body: blob,
           });
+          var data = await res.json().catch(function () { return {}; });
           if (!res.ok) {
-            var errData = await res.json().catch(function () { return {}; });
-            throw new Error(errData.error || ('Transcription failed (' + res.status + ')'));
+            throw new Error(data.error || data.message || ('Transcription failed (' + res.status + ')'));
           }
-          var data = await res.json();
-          return data.text || '';
+          return (data.data && data.data.text) || data.text || '';
         } finally {
           setTranscribingState(false);
         }
       }
 
+      function updateWaveform() {
+        if (!analyser || !isRecordingRef) return;
+
+        var currentTime = performance.now();
+        var deltaTime = lastFrameTime ? (currentTime - lastFrameTime) / 1000 : 0;
+        lastFrameTime = currentTime;
+        var scrollDelta = scrollSpeedPixelsPerSecond * deltaTime;
+
+        var bufferLength = analyser.fftSize;
+        var dataArray = new Uint8Array(bufferLength);
+        analyser.getByteTimeDomainData(dataArray);
+
+        var startSample = Math.floor(bufferLength * 0.3);
+        var endSample = Math.floor(bufferLength * 0.7);
+        var sumSquares = 0;
+        var count = 0;
+        for (var i = startSample; i < endSample; i += 5) {
+          var normalized = (dataArray[i] - 128) / 128;
+          sumSquares += normalized * normalized;
+          count++;
+        }
+        var rms = Math.sqrt(sumSquares / Math.max(count, 1));
+        var amplitude = rms;
+        var noiseGateThreshold = 0.04;
+        var voiceThreshold = 0.03;
+        if (amplitude < noiseGateThreshold) {
+          amplitude = 0;
+        } else if (amplitude >= voiceThreshold) {
+          amplitude = amplitude * 0.6;
+        } else {
+          amplitude = (amplitude - noiseGateThreshold) * 0.5;
+        }
+        var normalizedAmplitude = Math.abs(amplitude);
+        var now = Date.now();
+        var containerWidth = getComposerWidth();
+
+        waveformBuffer = waveformBuffer
+          .map(function (bar) { return { id: bar.id, amplitude: bar.amplitude, x: bar.x - scrollDelta }; })
+          .filter(function (bar) { return bar.x > -barWidth; });
+
+        if (now - lastBarTime >= barInterval) {
+          waveformBuffer.push({
+            id: nextBarId++,
+            amplitude: normalizedAmplitude,
+            x: containerWidth,
+          });
+          lastBarTime = now;
+        }
+
+        renderWaveformBars();
+        animFrame = requestAnimationFrame(updateWaveform);
+      }
+
       async function startRecording() {
+        var errEl = document.getElementById('team-user-input-modal-error');
+        if (errEl) errEl.textContent = '';
+
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch (e) {
@@ -5007,25 +5107,14 @@
         try {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
           analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 1024;
+          analyser.fftSize = 2048;
+          analyser.smoothingTimeConstant = 0.3;
           var src = audioCtx.createMediaStreamSource(stream);
           src.connect(analyser);
-
-          var dotEl = statusEl && statusEl.querySelector('.team-mic-dot');
-          var dataArr = new Uint8Array(analyser.fftSize);
-          function animateDot() {
-            if (!isRecording) return;
-            analyser.getByteTimeDomainData(dataArr);
-            var rms = 0;
-            for (var i = 0; i < dataArr.length; i++) {
-              var v = (dataArr[i] - 128) / 128;
-              rms += v * v;
-            }
-            rms = Math.sqrt(rms / dataArr.length);
-            if (dotEl) dotEl.style.transform = 'scale(' + (1 + Math.min(rms * 6, 1.2)) + ')';
-            animFrame = requestAnimationFrame(animateDot);
-          }
-          animateDot();
+          clearWaveform();
+          lastFrameTime = 0;
+          isRecordingRef = true;
+          updateWaveform();
         } catch (_) {}
 
         var mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
@@ -5041,38 +5130,30 @@
           stopStream();
           var blob = new Blob(chunks, { type: 'audio/webm' });
           chunks = [];
-          if (blob.size < 1000) return; // too short / empty
+          if (!blob.size) return;
           try {
             var text = await transcribeBlob(blob);
-            if (text) {
-              var textEl = document.getElementById('team-user-input-modal-text');
-              if (textEl) {
-                textEl.value = (textEl.value ? textEl.value.trimEnd() + ' ' : '') + text;
-                textEl.focus();
-              }
-            }
+            fillTranscribedText(text);
           } catch (err) {
-            var errEl = document.getElementById('team-user-input-modal-error');
             if (errEl) errEl.textContent = 'Voice input: ' + (err.message || 'Failed to transcribe.');
           }
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(250);
         setRecordingState(true);
       }
 
       function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-        }
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+        try {
+          if (typeof mediaRecorder.requestData === 'function') mediaRecorder.requestData();
+        } catch (_) {}
+        mediaRecorder.stop();
       }
 
       micBtn.addEventListener('click', function () {
-        if (isRecording) {
-          stopRecording();
-        } else {
-          startRecording();
-        }
+        if (isRecording) stopRecording();
+        else startRecording();
       });
     })();
     // ── End voice input ────────────────────────────────────────────────────

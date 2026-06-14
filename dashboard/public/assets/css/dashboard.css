@@ -2137,17 +2137,104 @@
       gap: 0.4rem;
       margin: 0.65rem 0 0.35rem;
     }
+    .team-user-input-composer {
+      position: relative;
+      min-height: 4.5rem;
+      border-radius: 0.45rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .team-user-input-composer--recording {
+      border-color: rgba(109, 77, 242, 0.5);
+      background: rgba(109, 77, 242, 0.05);
+    }
+    .team-user-input-composer--transcribing {
+      border-color: rgba(109, 77, 242, 0.35);
+    }
     .team-user-input-textarea {
       width: 100%;
       min-height: 4.5rem;
       resize: vertical;
       box-sizing: border-box;
       padding: 0.55rem 0.65rem;
-      border-radius: 0.45rem;
-      border: 1px solid var(--border);
-      background: var(--surface);
+      border: none;
+      border-radius: 0;
+      background: transparent;
       color: var(--text);
       font: inherit;
+    }
+    .team-user-input-composer--recording .team-user-input-textarea,
+    .team-user-input-composer--transcribing .team-user-input-textarea {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .team-user-input-waveform-wrap {
+      display: none;
+      position: absolute;
+      inset: 0;
+      padding: 0 1rem;
+      align-items: center;
+      pointer-events: none;
+    }
+    .team-user-input-composer--recording .team-user-input-waveform-wrap {
+      display: flex;
+    }
+    .team-user-input-waveform-bars {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    .team-voice-bar {
+      position: absolute;
+      width: 3px;
+      min-width: 3px;
+      max-width: 3px;
+      min-height: 2px;
+      border-radius: 999px;
+      background: var(--accent, #6d4df2);
+    }
+    .team-user-input-listening {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--accent, #6d4df2);
+      opacity: 0.6;
+    }
+    .team-user-input-composer--recording .team-user-input-listening {
+      display: flex;
+    }
+    .team-user-input-transcribing {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      pointer-events: none;
+      font-size: 0.82rem;
+      color: var(--muted-text, #888);
+    }
+    .team-user-input-composer--transcribing .team-user-input-transcribing {
+      display: flex;
+    }
+    .team-user-input-transcribing-spinner {
+      width: 0.95rem;
+      height: 0.95rem;
+      border: 2px solid rgba(109, 77, 242, 0.2);
+      border-top-color: var(--accent, #6d4df2);
+      border-radius: 50%;
+      animation: team-voice-spin 0.8s linear infinite;
+    }
+    @keyframes team-voice-spin {
+      to { transform: rotate(360deg); }
     }
     .team-input-label-row {
       display: flex;
@@ -2173,38 +2260,12 @@
     }
     .team-mic-btn:hover { background: #5a3fd4; box-shadow: 0 0 0 3px rgba(109,77,242,0.25); }
     .team-mic-btn--recording {
-      background: #e53e3e;
-      box-shadow: 0 0 0 4px rgba(229,62,62,0.25);
-      animation: team-mic-pulse 1.2s ease-in-out infinite;
+      background: var(--accent, #6d4df2);
+      box-shadow: 0 4px 14px rgba(109, 77, 242, 0.3);
     }
-    .team-mic-btn--recording:hover { background: #c53030; }
+    .team-mic-btn--recording:hover { background: #5a3fd4; }
     .team-mic-btn--transcribing { opacity: 0.6; cursor: not-allowed; }
     .team-mic-btn svg { width: 1rem; height: 1rem; display: block; }
-    @keyframes team-mic-pulse {
-      0%, 100% { box-shadow: 0 0 0 4px rgba(229,62,62,0.25); }
-      50% { box-shadow: 0 0 0 7px rgba(229,62,62,0.1); }
-    }
-    .team-mic-status {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      margin-bottom: 0.4rem;
-      font-size: 0.78rem;
-      color: var(--muted-text, #888);
-    }
-    .team-mic-dot {
-      width: 0.55rem;
-      height: 0.55rem;
-      border-radius: 50%;
-      background: #e53e3e;
-      flex-shrink: 0;
-      transition: transform 0.08s ease-out;
-      animation: team-mic-dot-blink 1s ease-in-out infinite;
-    }
-    @keyframes team-mic-dot-blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.35; }
-    }
     .agent-edit-basics {
       display: grid;
       grid-template-columns: 1fr 1.4fr;
