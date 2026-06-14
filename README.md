@@ -923,12 +923,27 @@ Tide sends a single AI-composed follow-up message when a conversation goes quiet
     "healthCheckMinutes": 2,       // polling watchdog + follow-up scheduler interval (default 2)
     "inactiveStart": "23:00",      // quiet hours start - no Tide during this window
     "inactiveEnd": "06:00",        // quiet hours end
-    "jid": ""                      // leave empty for auto-detection
+    "jid": "",                     // leave empty for auto-detection
+    "nudge": {
+      "enabled": true,             // set false to disable history nudge independently of silence follow-up
+      "intervalMinutes": 120,      // how often to send a history nudge (default 2 h, minimum 30 min)
+      "lookbackDays": 7,           // how many days back to scan for topics (default 7)
+      "maxHistoryItems": 20        // max exchanges sampled from that window (evenly spread, default 20)
+    }
   }
 }
 ```
 
 Tide never sends more than one follow-up per silence period, and never during the configured quiet hours. Each cycle also runs the Telegram polling watchdog (self-healing heartbeat), independent of whether a follow-up is sent.
+
+### Tide history nudge
+
+Completely separate from the silence-based follow-up. Every **2 hours** (configurable) Tide scans the past **7 days** of conversation, picks **one interesting topic**, and sends a casual proactive message:
+
+> "Hey, last week you were looking at [X]. Want to pick that back up, or take a different angle?"  
+> "We never finished [Y]. Still relevant, or off the table?"
+
+The nudge is evenly sampled across the lookback window so it surfaces threads from earlier in the week, not just the most recent exchanges. It respects quiet hours and the daily LLM limit. `tide.nudge.enabled` can be set to `false` to disable it independently of the silence follow-up.
 
 ### Tide checklist (maintenance)
 
