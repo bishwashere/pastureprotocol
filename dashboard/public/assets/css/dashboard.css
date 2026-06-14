@@ -2269,7 +2269,11 @@
     }
     .team-mic-btn--recording:hover { background: #5a3fd4; }
     .team-mic-btn--transcribing { opacity: 0.6; cursor: not-allowed; }
-    .team-mic-btn svg { width: 1.15rem; height: 1.15rem; display: block; }
+    .team-mic-btn svg { width: 1.15rem; height: 1.15rem; display: block; pointer-events: none; }
+    .team-mic-btn .team-mic-icon { display: block; }
+    .team-mic-btn .team-mic-stop-icon { display: none; }
+    .team-mic-btn--recording .team-mic-icon { display: none !important; }
+    .team-mic-btn--recording .team-mic-stop-icon { display: block !important; }
     .agent-edit-basics {
       display: grid;
       grid-template-columns: 1fr 1.4fr;
