@@ -5,7 +5,7 @@
 set -e
 ACTION="${1:?Usage: pasture start|stop|status|restart}"
 INSTALL_DIR="${PASTURE_INSTALL_DIR:-.}"
-STATE_DIR="${PASTURE_STATE_DIR:-${COWCODE_STATE_DIR:-$HOME/.pasture}}"
+STATE_DIR="${PASTURE_STATE_DIR:-$HOME/.pasture}"
 # Resolve INSTALL_DIR to absolute path
 if [ -d "$INSTALL_DIR" ]; then
   INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd)"

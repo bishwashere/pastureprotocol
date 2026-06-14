@@ -96,16 +96,13 @@ function checkPastureLauncherNotLegacyShim() {
     if (!src.includes('exec node')) {
       checks.push(`${label} pasture launcher must exec node cli.js`);
     }
-    if (!src.includes('cat > "$BIN_DIR/cowcode"')) {
-      checks.push(`${label} must write legacy cowcode shim separately`);
-    }
-    if (src.includes("cat > \"$BIN_DIR/pasture\" <<'SHIM'") || src.includes('pasture is now pasture')) {
-      checks.push(`${label} must not replace pasture with the legacy shim`);
+    if (src.includes('cowcode')) {
+      checks.push(`${label} must not reference cowcode (legacy name removed)`);
     }
   }
 
   if (checks.length) return { ok: false, detail: checks.join('; ') };
-  return { ok: true, detail: 'pasture launcher remains real CLI; cowcode is the legacy shim' };
+  return { ok: true, detail: 'pasture launcher is the sole CLI entry point; no cowcode references' };
 }
 
 async function main() {

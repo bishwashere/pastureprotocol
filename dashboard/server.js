@@ -49,8 +49,8 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR || ROOT;
-const PORT = Number(process.env.PASTURE_DASHBOARD_PORT || process.env.COWCODE_DASHBOARD_PORT) || 3847;
-const HOST = process.env.PASTURE_DASHBOARD_HOST || process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
+const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || 3847;
+const HOST = process.env.PASTURE_DASHBOARD_HOST || '127.0.0.1';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -221,7 +221,7 @@ function getDaemonUptimeSeconds() {
 // ---- API key auth (optional) ----
 // Set PASTURE_API_KEY in ~/.pasture/.env to require Bearer token on all /api/* routes.
 // Auth is enforced for remote access (e.g. Tailscale *.ts.net) but skipped for local dashboard use.
-const API_KEY = process.env.PASTURE_API_KEY || process.env.COWCODE_API_KEY || '';
+const API_KEY = process.env.PASTURE_API_KEY || '';
 if (API_KEY) {
   app.use('/api', (req, res, next) => {
     const host = req.headers.host || '';
@@ -1343,8 +1343,8 @@ const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
 
 /** Where test scripts run from (install dir, or repo override for dev). */
 function getTestRoot() {
-  if (process.env.PASTURE_TEST_ROOT || process.env.COWCODE_TEST_ROOT) {
-    return resolve(process.env.PASTURE_TEST_ROOT || process.env.COWCODE_TEST_ROOT);
+  if (process.env.PASTURE_TEST_ROOT) {
+    return resolve(process.env.PASTURE_TEST_ROOT);
   }
   const installMarker = join(INSTALL_DIR, 'scripts', 'test', 'e2e-report.js');
   if (existsSync(installMarker)) return INSTALL_DIR;

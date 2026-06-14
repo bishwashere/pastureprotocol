@@ -88,13 +88,6 @@ add_path_to() {
   ADDED_PATH=1
 }
 
-cat > "$BIN_DIR/cowcode" <<'SHIM'
-#!/usr/bin/env bash
-echo "cowcode is now pasture — update your scripts." >&2
-exec pasture "$@"
-SHIM
-chmod +x "$BIN_DIR/cowcode" 2>/dev/null || true
-
 if ! command -v pasture >/dev/null 2>&1; then
   add_path_to "${ZDOTDIR:-$HOME}/.zshrc"
   add_path_to "${ZDOTDIR:-$HOME}/.zprofile"

@@ -150,8 +150,8 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       console.error('pasture: dashboard not found. Re-run the installer or run from repo.');
       process.exit(1);
     }
-    const port = process.env.PASTURE_DASHBOARD_PORT || process.env.COWCODE_DASHBOARD_PORT || '3847';
-    const host = process.env.PASTURE_DASHBOARD_HOST || process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
+    const port = process.env.PASTURE_DASHBOARD_PORT || '3847';
+    const host = process.env.PASTURE_DASHBOARD_HOST || '127.0.0.1';
     const url = `http://${host}:${port}`;
     try {
       const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
@@ -193,13 +193,11 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'update') {
-  const branch = process.env.PASTURE_BRANCH || process.env.COWCODE_BRANCH || 'master';
+  const branch = process.env.PASTURE_BRANCH || 'master';
   const env = {
     ...process.env,
     PASTURE_ROOT: INSTALL_DIR,
     PASTURE_INSTALL_DIR: INSTALL_DIR,
-    COWCODE_ROOT: INSTALL_DIR,
-    COWCODE_INSTALL_DIR: INSTALL_DIR,
   };
 
   if (IS_WIN) {

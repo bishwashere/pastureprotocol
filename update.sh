@@ -117,24 +117,9 @@ fi
 echo "  ------------------------------------------------"
 echo ""
 
-# State dir: config/auth/cron live here (new installs and after migration)
-STATE_DIR="${PASTURE_STATE_DIR:-${COWCODE_STATE_DIR:-$HOME/.pasture}}"
-LEGACY_STATE="$HOME/.cowcode"
+# State dir: config/auth/cron live here
+STATE_DIR="${PASTURE_STATE_DIR:-$HOME/.pasture}"
 mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
-
-# Migrate legacy ~/.cowcode -> ~/.pasture when upgrading from CowCode (full state, not install-dir config only).
-if [ -z "${PASTURE_STATE_DIR:-}" ] && [ -z "${COWCODE_STATE_DIR:-}" ] \
-  && [ -d "$LEGACY_STATE" ] && [ -f "$LEGACY_STATE/config.json" ]; then
-  if [ ! -f "$STATE_DIR/config.json" ] || [ ! -d "$STATE_DIR/agents" ]; then
-    echo "  ► Migrating state from $LEGACY_STATE to $STATE_DIR"
-    if command -v rsync >/dev/null 2>&1; then
-      rsync -a "$LEGACY_STATE/" "$STATE_DIR/"
-    else
-      mkdir -p "$STATE_DIR"
-      cp -R "$LEGACY_STATE/." "$STATE_DIR/"
-    fi
-  fi
-fi
 
 # Fallback: ancient installs kept config inside the install dir.
 if [ ! -f "$STATE_DIR/config.json" ] && [ -f "$ROOT/config.json" ]; then
@@ -174,7 +159,7 @@ fi
 NOW_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
 NOW_BUILD=$(read_build)
 
-# Refresh CLI launchers (pasture primary plus legacy cowcode shim; in-place update keeps same ROOT).
+# Refresh CLI launcher (in-place update keeps same ROOT).
 BIN_DIR="${HOME}/.local/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/pasture" <<LAUNCHER
@@ -183,12 +168,6 @@ export PASTURE_INSTALL_DIR="$ROOT"
 exec node "$ROOT/cli.js" "\$@"
 LAUNCHER
 chmod +x "$BIN_DIR/pasture"
-cat > "$BIN_DIR/cowcode" <<'SHIM'
-#!/usr/bin/env bash
-echo "cowcode is now pasture — update your scripts." >&2
-exec pasture "$@"
-SHIM
-chmod +x "$BIN_DIR/cowcode" 2>/dev/null || true
 
 echo ""
 if [ -n "$NOW_VER" ]; then
