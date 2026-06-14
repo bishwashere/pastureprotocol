@@ -5042,7 +5042,7 @@
           if (!res.ok) {
             var errMsg = data.error || data.message || ('Transcription failed (' + res.status + ')');
             if (/invalid_api_key|401|Whisper API key not configured/i.test(String(errMsg))) {
-              errMsg = 'Transcription unavailable — update LLM_1_API_KEY in ~/.pasture/.env (run pasture setup) or restart the dashboard after saving.';
+              errMsg = 'Transcription unavailable — run pasture setup to update LLM_1_API_KEY in ~/.pasture/.env, then retry (restart dashboard if it was already running during setup).';
             }
             throw new Error(errMsg);
           }
