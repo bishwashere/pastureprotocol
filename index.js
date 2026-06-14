@@ -1714,6 +1714,7 @@ async function main() {
       whatsappSockRef.current = null;
       stopCron();
       stopTide();
+      stopTideNudge();
       const reason = u.lastDisconnect?.error;
       const code = reason?.output?.statusCode ?? reason?.statusCode;
       const msg = reason?.message || reason?.output?.payload?.message;
