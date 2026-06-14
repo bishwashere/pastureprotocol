@@ -46,7 +46,14 @@
             <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission">
               <option value="">No active mission</option>
             </select>
-            <button type="button" id="mc2-mission-delete-btn" class="secondary" style="margin:0;padding:0.25rem 0.6rem;font-size:0.78rem;color:var(--color-danger,#d63031);white-space:nowrap;" title="Delete selected mission">Delete</button>
+            <div style="position:relative;">
+              <button type="button" id="mc2-mission-menu-btn" class="secondary" style="margin:0;padding:0.2rem 0.55rem;font-size:1.1rem;line-height:1.2;letter-spacing:0.04em;font-weight:700;" title="Mission options" aria-haspopup="true" aria-expanded="false">⋯</button>
+              <div id="mc2-mission-menu-dropdown" style="display:none;position:absolute;top:calc(100% + 5px);right:0;z-index:300;background:#1a2535;border:1px solid rgba(255,255,255,0.1);border-radius:0.45rem;min-width:178px;box-shadow:0 6px 22px rgba(0,0,0,0.45);overflow:hidden;">
+                <button type="button" id="mc2-mission-assign-btn" class="mc2-mission-menu-item" style="display:block;width:100%;text-align:left;padding:0.6rem 0.9rem;background:none;border:none;color:inherit;cursor:pointer;font-size:0.83rem;white-space:nowrap;">Assign to agent…</button>
+                <div style="height:1px;background:rgba(255,255,255,0.08);margin:0 0.6rem;"></div>
+                <button type="button" id="mc2-mission-delete-btn" class="mc2-mission-menu-item" style="display:block;width:100%;text-align:left;padding:0.6rem 0.9rem;background:none;border:none;color:var(--color-danger,#d63031);cursor:pointer;font-size:0.83rem;white-space:nowrap;">Delete mission…</button>
+              </div>
+            </div>
           </div>
 
           <!-- Mission delete confirmation modal -->
@@ -58,6 +65,21 @@
               <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
                 <button type="button" id="mc2-mission-delete-cancel" class="secondary" style="margin:0;color:#1a1a1a;background:#f0f0f0;border:1px solid #ccc;">Cancel</button>
                 <button type="button" id="mc2-mission-delete-confirm" style="margin:0;background:var(--color-danger,#d63031);color:#fff;border:none;border-radius:0.4rem;padding:0.4rem 1rem;cursor:pointer;">Delete permanently</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mission assign-to-agent modal -->
+          <div id="mc2-mission-assign-modal" role="dialog" aria-modal="true" aria-labelledby="mc2-mission-assign-title" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+            <div style="background:#fff;color:#1a1a1a;border-radius:0.75rem;padding:1.5rem 1.75rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+              <h4 id="mc2-mission-assign-title" style="margin:0 0 0.35rem;color:#1a1a1a;">Assign mission to agent</h4>
+              <p id="mc2-mission-assign-desc" style="margin:0 0 1rem;font-size:0.88rem;color:#444;line-height:1.4;"></p>
+              <label for="mc2-mission-assign-select" style="display:block;font-size:0.82rem;font-weight:600;color:#1a1a1a;margin-bottom:0.35rem;">Agent</label>
+              <select id="mc2-mission-assign-select" style="width:100%;padding:0.45rem 0.6rem;border:1px solid #ccc;border-radius:0.4rem;font-size:0.88rem;color:#1a1a1a;background:#fafafa;margin-bottom:1.1rem;"></select>
+              <div id="mc2-mission-assign-error" style="display:none;color:var(--color-danger,#d63031);font-size:0.82rem;margin-bottom:0.7rem;"></div>
+              <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button type="button" id="mc2-mission-assign-cancel" class="secondary" style="margin:0;color:#1a1a1a;background:#f0f0f0;border:1px solid #ccc;">Cancel</button>
+                <button type="button" id="mc2-mission-assign-confirm" style="margin:0;background:#2d6cf6;color:#fff;border:none;border-radius:0.4rem;padding:0.4rem 1rem;cursor:pointer;">Assign</button>
               </div>
             </div>
           </div>

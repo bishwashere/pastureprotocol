@@ -789,6 +789,23 @@
       return 'mission-todo';
     }
 
+    var BLOCKER_TYPE_PREFIX_MAP = {
+      need_direction: 'Need direction',
+      need_access: 'Need access',
+      need_content: 'Need content',
+      need_approval: 'Need approval',
+      system_error: 'System error',
+    };
+
+    function blockerTypeLabel(task) {
+      var bt = String(task && task.blockerType || '').toLowerCase().trim();
+      return BLOCKER_TYPE_PREFIX_MAP[bt] || 'Need direction';
+    }
+
+    function isSystemErrorTask(task) {
+      return !!(task && String(task.blockerType || '').toLowerCase() === 'system_error');
+    }
+
     function dashboardTaskBlockedByWait(task, waitCondition) {
       if (!task || !isMissionPartialWait({ waitCondition: waitCondition })) return false;
       var w = waitCondition || {};
@@ -1220,8 +1237,8 @@
           var icon = missionTaskIcon(status);
           var cls = missionTaskClass(status);
           var sgId = String(sg.id || '').trim();
-          var statusTag = status === 'blocked'
-            ? ' <span class="team-mission-task-status blocked">blocked</span>'
+          var statusTag = (status === 'blocked' && !isSystemErrorTask(sg))
+            ? ' <span class="team-mission-task-status blocked">' + escapeHtml(blockerTypeLabel(sg)) + '</span>'
             : '';
           return '<li class="' + cls + '" data-mission-task-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
             escapeHtml(icon + ' ' + title) + statusTag + '</li>';
@@ -1753,8 +1770,11 @@
         var actionsHtml = gid && sgKey
           ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromSuggestedTask: /^init-/.test(sgKey) })
           : '';
+        var blockerBadge = (status === 'blocked' && !isSystemErrorTask(sg))
+          ? '<span class="team-mission-blocker-type-badge ' + escapeHtml(String(sg.blockerType || 'need_direction')) + '">' + escapeHtml(blockerTypeLabel(sg) + ':') + '</span> '
+          : '';
         var summary = '<span class="team-mission-task-row" data-task-id="' + escapeHtml(sgKey) + '">' +
-          initBadge +
+          initBadge + blockerBadge +
           '<span class="team-mission-task-title">' + escapeHtml(title) + '</span>' +
           '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '<span class="team-mission-task-meta">' + escapeHtml(String(progress)) + '%</span>' +
@@ -3665,7 +3685,8 @@
       function walk(tasks) {
         (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          if (effectiveTaskStatus(sg, mission) === 'blocked') result.push(sg);
+          // system_error tasks auto-retry and are never user-actionable — hide from user.
+          if (effectiveTaskStatus(sg, mission) === 'blocked' && !isSystemErrorTask(sg)) result.push(sg);
           walk(sg.tasks);
         });
       }
@@ -3682,15 +3703,16 @@
         var first = blockedTasks[0];
         var taskTitle = String(first.title || '').trim();
         var taskDesc = String(first.description || first.expectedOutput || '').trim();
+        var typeLabel = blockerTypeLabel(first);
         if (taskTitle && taskDesc) {
-          var prompt = 'Blocked task: "' + taskTitle + '"\n' + taskDesc;
+          var prompt = typeLabel + ': "' + taskTitle + '"\n' + taskDesc;
           if (blockedTasks.length > 1) {
             prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
           }
           return prompt;
         }
         if (taskTitle) {
-          var prompt = 'Blocked task: "' + taskTitle + '"\nPlease provide what\'s needed to unblock this task.';
+          var prompt = typeLabel + ': "' + taskTitle + '"\nPlease provide what\'s needed to unblock this task.';
           if (blockedTasks.length > 1) {
             prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
           }

@@ -13,7 +13,6 @@
     function mc2RenderHome() {
       mc2RenderMissionProgress();
       mc2RenderKanban();
-      mc2RenderAgentsOverview();
       mc2RenderMovement();
       mc2RenderAttention();
     }
@@ -218,14 +217,17 @@
       });
     })();
 
-    (function wireMc2MissionDeleteButton() {
+    (function wireMc2MissionMenu() {
+      var menuBtn = mc2El('mc2-mission-menu-btn');
+      var dropdown = mc2El('mc2-mission-menu-dropdown');
       var deleteBtn = mc2El('mc2-mission-delete-btn');
-      var modal = mc2El('mc2-mission-delete-modal');
+      var assignBtn = mc2El('mc2-mission-assign-btn');
+      var deleteModal = mc2El('mc2-mission-delete-modal');
       var cancelBtn = mc2El('mc2-mission-delete-cancel');
       var confirmBtn = mc2El('mc2-mission-delete-confirm');
       var descEl = mc2El('mc2-mission-delete-desc');
       var itemsEl = mc2El('mc2-mission-delete-items');
-      if (!deleteBtn || !modal) return;
+      if (!menuBtn || !dropdown) return;
 
       function getMc2SelectedMission() {
         var sel = mc2El('mc2-mission-select');
@@ -236,7 +238,34 @@
         return missions.find(function (g) { return String(g.id || '') === id; }) || null;
       }
 
-      deleteBtn.addEventListener('click', function () {
+      function closeMenu() {
+        dropdown.style.display = 'none';
+        menuBtn.setAttribute('aria-expanded', 'false');
+      }
+
+      function openMenu() {
+        dropdown.style.display = 'block';
+        menuBtn.setAttribute('aria-expanded', 'true');
+      }
+
+      menuBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = dropdown.style.display !== 'none';
+        isOpen ? closeMenu() : openMenu();
+      });
+
+      document.addEventListener('click', function (e) {
+        if (dropdown.style.display === 'none') return;
+        if (!dropdown.contains(e.target) && e.target !== menuBtn) closeMenu();
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMenu();
+      });
+
+      // ── Delete mission ────────────────────────────────────────────────────
+      deleteBtn && deleteBtn.addEventListener('click', function () {
+        closeMenu();
         var mission = getMc2SelectedMission();
         if (!mission) { alert('Select a mission first.'); return; }
         var taskCount = typeof countMissionTasks === 'function' ? countMissionTasks(mission.tasks || []) : 0;
@@ -245,7 +274,7 @@
             var ids = Array.isArray(t.relatedMissionIds) ? t.relatedMissionIds : [];
             return ids.indexOf(String(mission.id || '')) >= 0;
           }).length;
-        descEl.textContent = 'You are about to permanently delete "' + escapeHtml(mission.title || 'Untitled mission') + '". This cannot be undone.';
+        descEl.textContent = 'You are about to permanently delete "' + (mission.title || 'Untitled mission') + '". This cannot be undone.';
         itemsEl.innerHTML = [
           '<li><strong>Mission record</strong> — all objectives, progress, plan steps, and history</li>',
           taskCount > 0 ? '<li><strong>' + taskCount + ' task' + (taskCount === 1 ? '' : 's') + '</strong> embedded in this mission (including delegated tasks)</li>' : '',
@@ -253,34 +282,34 @@
           suggestedCount > 0 ? '<li><strong>' + suggestedCount + ' AI suggested task' + (suggestedCount === 1 ? '' : 's') + '</strong> linked exclusively to this mission</li>' : '',
           '<li><strong>Activity log entries older than today</strong> — pruned if this mission pre-dates the per-ID storage migration</li>',
         ].filter(Boolean).join('');
-        modal.dataset.pendingMissionId = String(mission.id || '');
-        modal.style.display = 'flex';
+        deleteModal.dataset.pendingMissionId = String(mission.id || '');
+        deleteModal.style.display = 'flex';
         confirmBtn.disabled = false;
         confirmBtn.textContent = 'Delete permanently';
       });
 
       cancelBtn && cancelBtn.addEventListener('click', function () {
-        modal.style.display = 'none';
-        delete modal.dataset.pendingMissionId;
+        deleteModal.style.display = 'none';
+        delete deleteModal.dataset.pendingMissionId;
       });
 
-      modal.addEventListener('click', function (e) {
-        if (e.target === modal) {
-          modal.style.display = 'none';
-          delete modal.dataset.pendingMissionId;
+      deleteModal && deleteModal.addEventListener('click', function (e) {
+        if (e.target === deleteModal) {
+          deleteModal.style.display = 'none';
+          delete deleteModal.dataset.pendingMissionId;
         }
       });
 
       confirmBtn && confirmBtn.addEventListener('click', async function () {
-        var id = modal.dataset.pendingMissionId;
+        var id = deleteModal.dataset.pendingMissionId;
         if (!id) return;
         confirmBtn.disabled = true;
         confirmBtn.textContent = 'Deleting…';
         try {
           var resp = await fetch(API + '/api/missions/' + encodeURIComponent(id), { method: 'DELETE' });
           if (resp.ok) {
-            modal.style.display = 'none';
-            delete modal.dataset.pendingMissionId;
+            deleteModal.style.display = 'none';
+            delete deleteModal.dataset.pendingMissionId;
             selectedTeamMissionId = '';
             await fetchMissionsSnapshot();
             if (typeof fetchSuggestedTasksSnapshot === 'function') await fetchSuggestedTasksSnapshot();
@@ -294,6 +323,82 @@
         }
         confirmBtn.disabled = false;
         confirmBtn.textContent = 'Delete permanently';
+      });
+
+      // ── Assign mission to agent ───────────────────────────────────────────
+      assignBtn && assignBtn.addEventListener('click', function () {
+        closeMenu();
+        var mission = getMc2SelectedMission();
+        if (!mission) { alert('Select a mission first.'); return; }
+        var assignModal = mc2El('mc2-mission-assign-modal');
+        var assignDesc = mc2El('mc2-mission-assign-desc');
+        var assignSel = mc2El('mc2-mission-assign-select');
+        var assignErr = mc2El('mc2-mission-assign-error');
+        if (!assignModal || !assignSel) return;
+        var agents = Array.isArray(agentMapData) ? agentMapData : [];
+        assignDesc.textContent = 'Reassign "' + (mission.title || 'Untitled mission') + '" to a different agent. The selected agent will own and run this mission.';
+        assignSel.innerHTML = agents.length
+          ? agents.map(function (a) {
+              var id = String(a.id || '');
+              var name = typeof agentNameById === 'function' ? agentNameById(id) : (String(a.name || a.role || id));
+              var selected = id === String(mission.ownerAgentId || '') ? ' selected' : '';
+              return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(name || id) + '</option>';
+            }).join('')
+          : '<option value="main">main</option>';
+        if (assignErr) { assignErr.style.display = 'none'; assignErr.textContent = ''; }
+        assignModal.dataset.pendingMissionId = String(mission.id || '');
+        assignModal.style.display = 'flex';
+      });
+    })();
+
+    (function wireMc2MissionAssignModal() {
+      var assignModal = mc2El('mc2-mission-assign-modal');
+      var cancelBtn = mc2El('mc2-mission-assign-cancel');
+      var confirmBtn = mc2El('mc2-mission-assign-confirm');
+      var assignSel = mc2El('mc2-mission-assign-select');
+      var assignErr = mc2El('mc2-mission-assign-error');
+      if (!assignModal) return;
+
+      function closeAssignModal() {
+        assignModal.style.display = 'none';
+        delete assignModal.dataset.pendingMissionId;
+      }
+
+      cancelBtn && cancelBtn.addEventListener('click', closeAssignModal);
+      assignModal.addEventListener('click', function (e) {
+        if (e.target === assignModal) closeAssignModal();
+      });
+
+      confirmBtn && confirmBtn.addEventListener('click', async function () {
+        var id = assignModal.dataset.pendingMissionId;
+        var agentId = assignSel ? assignSel.value.trim() : '';
+        if (!id) return;
+        if (!agentId) {
+          if (assignErr) { assignErr.textContent = 'Please select an agent.'; assignErr.style.display = 'block'; }
+          return;
+        }
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Assigning…';
+        if (assignErr) { assignErr.style.display = 'none'; assignErr.textContent = ''; }
+        try {
+          var resp = await fetch(API + '/api/missions/' + encodeURIComponent(id), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ownerAgentId: agentId }),
+          });
+          if (resp.ok) {
+            closeAssignModal();
+            await fetchMissionsSnapshot();
+            if (typeof renderMissionControl === 'function') renderMissionControl();
+          } else {
+            var body = await resp.json().catch(function () { return {}; });
+            if (assignErr) { assignErr.textContent = 'Assign failed: ' + (body.error || resp.status); assignErr.style.display = 'block'; }
+          }
+        } catch (err) {
+          if (assignErr) { assignErr.textContent = 'Assign failed: ' + String(err && err.message || err); assignErr.style.display = 'block'; }
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Assign';
       });
     })();
 

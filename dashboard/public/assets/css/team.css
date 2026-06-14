@@ -263,6 +263,12 @@ body.dashboard-team-active > nav {
   font-size: 0.72rem;
 }
 
+.mc2-mission-menu-item:hover,
+.mc2-mission-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.07) !important;
+  outline: none;
+}
+
 .mc-header-actions {
   display: flex;
   align-items: center;
