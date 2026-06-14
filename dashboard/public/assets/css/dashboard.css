@@ -1699,19 +1699,6 @@
       font-family: inherit;
       font-size: 0.9rem;
     }
-    .llm-models-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-    .llm-model {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
-    }
-    .llm-model .field input { max-width: none; }
-    .llm-model h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--accent); }
     .form-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; }
     .form-row label { margin-bottom: 0; }
     .read-only-note { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }

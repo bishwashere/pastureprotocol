@@ -253,7 +253,8 @@ const checks = [
       script.includes('id="config-tide-checklist-items"') &&
       script.includes('config-tide-checklist-run') &&
       script.includes('fetchTideChecklistForConfig') &&
-      !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="tide"'),
+      !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="tide"') &&
+      !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="llm"'),
   },
   {
     name: 'chat bundle guards mission-control forward refs before script 04 loads (click handler regression)',

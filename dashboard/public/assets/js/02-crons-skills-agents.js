@@ -2160,8 +2160,6 @@ async function fetchCrons() {
       if (tile === 'history') renderMemoryHistoryList();
       if (tile === 'notes') renderMemoryNotesList();
       history.pushState(null, '', '/memory');
-      if (typeof dashboardRouteFromPath === 'function') dashboardRouteFromPath();
-      else if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();
     }
 
     async function loadMemoryLog(id, textareaId, onLoad) {
@@ -2303,8 +2301,14 @@ async function fetchCrons() {
         // Re-render active tile if it's one of the list-based ones
         if (activeTile === 'history') renderMemoryHistoryList();
         if (activeTile === 'notes') renderMemoryNotesList();
-        // Auto-load today content
-        if (activeTile === 'today') setMemoryTile('today');
+        // Auto-load today content without re-routing (setMemoryTile would loop via setPage → fetchMemoryFiles)
+        if (activeTile === 'today') {
+          loadMemoryLog(MEM_TODAY_ID, 'mem-today-textarea', function (content) {
+            var stat = document.getElementById('mtile-today-stat');
+            var lines = content ? content.split('\n').filter(function (l) { return l.trim(); }).length : 0;
+            if (stat) stat.textContent = lines ? lines + ' lines' : 'No chats yet';
+          });
+        }
       } catch(e) {
         console.error('[memory]', e);
       }
@@ -2431,47 +2435,3 @@ async function fetchCrons() {
       identityEditorCard.addEventListener('click', function (e) { e.stopPropagation(); });
     }
 
-    async function renderLlmForm() {
-      const r = await fetch(API + '/api/config');
-      const d = await r.json();
-      const llm = d.llm || {};
-      const maxTokens = Number(llm.maxTokens) || 2048;
-      const models = Array.isArray(llm.models) ? llm.models : [];
-      document.getElementById('llm-max-tokens').value = maxTokens;
-      const container = document.getElementById('llm-models');
-      container.innerHTML = models.map((m, i) => {
-        const baseUrl = (m.baseUrl || '').trim();
-        const apiKey = (m.apiKey || '').trim();
-        const priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
-        return '<div class="llm-model" data-i="' + i + '">' +
-          '<h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3>' +
-          '<div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '" placeholder="openai, lmstudio, anthropic, grok"></div></div>' +
-          '<div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div></div>' +
-          '<div class="form-row"><div class="field"><label>Base URL (optional, for local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '" placeholder="http://127.0.0.1:1234/v1"></div></div>' +
-          '<div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '" placeholder="LLM_1_API_KEY"></div></div>' +
-          '<div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority (use first)</label></div>' +
-          '</div>';
-      }).join('');
-      if (models.length === 0) { container.className = ''; container.innerHTML = '<p class="empty">No models in config. Add entries in Config (read-only) or via setup.</p>'; } else { container.className = 'llm-models-grid'; }
-    }
-
-    wireEl('llm-save', 'click', async () => {
-      const maxTokens = Number(document.getElementById('llm-max-tokens').value) || 2048;
-      const modelCards = document.querySelectorAll('#llm-models .llm-model');
-      const models = Array.from(modelCards).map(card => {
-        const provider = (card.querySelector('[data-f="provider"]').value || '').trim();
-        const model = (card.querySelector('[data-f="model"]').value || '').trim();
-        const baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
-        const apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
-        const priority = card.querySelector('[data-f="priority"]').checked;
-        const o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
-        if (baseUrl) o.baseUrl = baseUrl;
-        if (priority) o.priority = true;
-        return o;
-      });
-      const r = await fetch(API + '/api/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens, models } }) });
-      if (r.ok) {
-        document.getElementById('llm-saved-msg').style.display = 'inline';
-        setTimeout(() => { document.getElementById('llm-saved-msg').style.display = 'none'; }, 2000);
-      }
-    });
