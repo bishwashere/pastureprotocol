@@ -186,6 +186,10 @@ const _consoleLog = console.log;
 const _consoleInfo = console.info;
 const _consoleDebug = console.debug;
 const _consoleWarn = console.warn;
+const _consoleError = console.error;
+function tsPrefix() {
+  return `[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}]`;
+}
 function redactConsoleArgs(args) {
   return args.map((a) => {
     if (a !== null && typeof a === 'object') return redactForLog(a);
@@ -196,10 +200,11 @@ function redactConsoleArgs(args) {
     return a;
   });
 }
-console.log = (...args) => _consoleLog(...redactConsoleArgs(args));
-console.info = (...args) => _consoleInfo(...redactConsoleArgs(args));
-console.debug = (...args) => _consoleDebug(...redactConsoleArgs(args));
-console.warn = (...args) => _consoleWarn(...redactConsoleArgs(args));
+console.log = (...args) => _consoleLog(tsPrefix(), ...redactConsoleArgs(args));
+console.info = (...args) => _consoleInfo(tsPrefix(), ...redactConsoleArgs(args));
+console.debug = (...args) => _consoleDebug(tsPrefix(), ...redactConsoleArgs(args));
+console.warn = (...args) => _consoleWarn(tsPrefix(), ...redactConsoleArgs(args));
+console.error = (...args) => _consoleError(tsPrefix(), ...redactConsoleArgs(args));
 
 const DISCONNECT_REASONS = {
   401: 'Logged out',
