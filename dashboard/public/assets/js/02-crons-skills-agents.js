@@ -381,7 +381,7 @@ async function fetchCrons() {
       if (!models.length) {
         dom.llmModelsWrap.hidden = true;
         if (dom.llmPriorityHint) {
-          dom.llmPriorityHint.textContent = 'No models configured. Set up project LLM models first (#llm).';
+          dom.llmPriorityHint.textContent = 'No models configured. Set up project LLM models first in Config.';
         }
         return;
       }
