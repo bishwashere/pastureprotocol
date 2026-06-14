@@ -1,9 +1,20 @@
 <div id="page-config" class="page">
     <div class="card">
-      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Config</h2>
-      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Edit the full config below and save to write config.json. Invalid JSON will show an error on save.</p>
-      <textarea id="full-config" class="config-json-editable" spellcheck="false"></textarea>
-      <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+      <div class="config-page-header">
+        <h2 style="margin:0; font-size:1rem;">Config</h2>
+        <div class="config-view-toggle group-sub-nav" role="tablist" aria-label="Config editor mode">
+          <button type="button" class="active" data-config-view="ui" role="tab" aria-selected="true">UI</button>
+          <button type="button" data-config-view="json" role="tab" aria-selected="false">JSON</button>
+        </div>
+      </div>
+      <p class="skill-meta" style="margin:0.75rem 0;">Edit settings below and save to write <code>config.json</code>. Use JSON mode for keys not shown in the UI.</p>
+      <div id="config-ui-panel">
+        <div id="config-ui-sections"></div>
+      </div>
+      <div id="config-json-panel" hidden>
+        <textarea id="full-config" class="config-json-editable" spellcheck="false"></textarea>
+      </div>
+      <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
         <button type="button" id="config-save">Save</button>
         <span id="config-saved" style="color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
         <span id="config-error" class="error" style="display:none;"></span>

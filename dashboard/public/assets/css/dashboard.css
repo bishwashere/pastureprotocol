@@ -1556,6 +1556,93 @@
       resize: vertical;
     }
     .config-json-editable:focus { outline: none; border-color: var(--accent); }
+    .config-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .config-view-toggle { margin: 0; border-bottom: none; padding-bottom: 0; }
+    .config-section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      background: var(--bg);
+    }
+    .config-section > summary {
+      cursor: pointer;
+      padding: 0.65rem 0.85rem;
+      font-weight: 500;
+      font-size: 0.92rem;
+      color: var(--accent);
+      list-style: none;
+    }
+    .config-section > summary::-webkit-details-marker { display: none; }
+    .config-section > summary::before {
+      content: '▸ ';
+      display: inline-block;
+      transition: transform 0.15s ease;
+    }
+    .config-section[open] > summary::before { transform: rotate(90deg); }
+    .config-section-body { padding: 0 0.85rem 0.85rem; }
+    .config-section-body .field textarea,
+    .config-section-body .field select {
+      width: 100%;
+      max-width: 24rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    .config-section-body .field textarea { max-width: none; min-height: 4rem; resize: vertical; }
+    .config-models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .config-model-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      background: var(--card);
+    }
+    .config-model-card h4 { margin: 0 0 0.5rem 0; font-size: 0.9rem; }
+    .config-model-card .field input,
+    .config-model-card .field select { max-width: none; width: 100%; }
+    .config-priority-row label { font-size: 0.88rem; }
+    .config-skills-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .config-skill-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.82rem;
+      background: var(--card);
+    }
+    .config-check-row { margin-bottom: 0.5rem; }
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0;
+      margin-top: 0.25rem;
+    }
+    .link-btn:hover { text-decoration: underline; }
     .error { color: var(--red); font-size: 0.9rem; }
     .empty { color: var(--muted); font-style: italic; }
     .field { margin-bottom: 1rem; }
@@ -1984,6 +2071,13 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
     }
     .modal-card.modal-card-wide { max-width: 34rem; }
+    .modal-card.team-user-input-modal-card {
+      max-width: 34rem;
+      transition: max-width 0.18s ease;
+    }
+    .modal-card.team-user-input-modal-card--rich {
+      max-width: min(92vw, 50rem);
+    }
     .modal-card.modal-card-editor { max-width: 42rem; }
     .modal-card.modal-card-agent-edit {
       max-width: min(92vw, 52rem);

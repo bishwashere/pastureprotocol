@@ -3806,6 +3806,19 @@
       return options;
     }
 
+    function userInputModalIsRich(ask, quickOptions, blockedTasks) {
+      var parsed = parseUserInputAsk(ask);
+      if (parsed.kind === 'decision' && parsed.options.length) return true;
+      if (parsed.kind === 'multiline' && parsed.lines.length >= 3) return true;
+      if (quickOptions && quickOptions.length) return true;
+      if (String(ask || '').length > 140) return true;
+      if (blockedTasks && blockedTasks.length > 0) {
+        var desc = String(blockedTasks[0].description || blockedTasks[0].expectedOutput || '').trim();
+        if (desc.length > 80) return true;
+      }
+      return false;
+    }
+
     function isOrphanedLetterPrompt(text) {
       var raw = String(text || '').replace(/\s+/g, ' ').trim();
       if (!raw) return false;
@@ -3912,6 +3925,8 @@
     function closeTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');
       if (!modal) return;
+      var cardEl = modal.querySelector('.team-user-input-modal-card');
+      if (cardEl) cardEl.classList.remove('team-user-input-modal-card--rich');
       modal.classList.remove('open');
       modal.setAttribute('aria-hidden', 'true');
       teamUserInputMissionId = '';
@@ -3926,6 +3941,7 @@
       var questionEl = document.getElementById('team-user-input-modal-question');
       var quickEl = document.getElementById('team-user-input-modal-quick');
       var textEl = document.getElementById('team-user-input-modal-text');
+      var cardEl = modal ? modal.querySelector('.team-user-input-modal-card') : null;
       if (!modal || !mission) return;
       var id = String(mission.id || '');
       var ask = String(opts.ask || mission.needsUserInput || '').trim();
@@ -3945,24 +3961,27 @@
       if (questionEl) questionEl.innerHTML = formatUserInputQuestionHtml(ask);
       if (textEl) textEl.value = '';
       showTeamUserInputModalError('');
+      var askLower = ask.toLowerCase();
+      var firstBlockedDesc = blockedTasks.length > 0 ? String(blockedTasks[0].description || blockedTasks[0].expectedOutput || '').toLowerCase() : '';
+      var matchText = askLower + ' ' + firstBlockedDesc;
+      var options = extractUserInputQuickOptions(ask);
+      if (!options.length && /posthog|analytics|ga4|mixpanel|tracking|measurement/.test(matchText)) {
+        options = [
+          { label: 'PostHog', value: 'PostHog' },
+          { label: 'Google Analytics (GA4)', value: 'Google Analytics (GA4)' },
+          { label: 'Mixpanel', value: 'Mixpanel' },
+          { label: 'No analytics yet — use defaults', value: 'use default' },
+        ];
+      }
       if (quickEl) {
-        var askLower = ask.toLowerCase();
-        var firstBlockedDesc = blockedTasks.length > 0 ? String(blockedTasks[0].description || blockedTasks[0].expectedOutput || '').toLowerCase() : '';
-        var matchText = askLower + ' ' + firstBlockedDesc;
-        var options = extractUserInputQuickOptions(ask);
-        if (!options.length && /posthog|analytics|ga4|mixpanel|tracking|measurement/.test(matchText)) {
-          options = [
-            { label: 'PostHog', value: 'PostHog' },
-            { label: 'Google Analytics (GA4)', value: 'Google Analytics (GA4)' },
-            { label: 'Mixpanel', value: 'Mixpanel' },
-            { label: 'No analytics yet — use defaults', value: 'use default' },
-          ];
-        }
         quickEl.innerHTML = options.map(function (opt) {
           var label = typeof opt === 'string' ? opt : opt.label;
           var value = typeof opt === 'string' ? opt : opt.value;
           return '<button type="button" class="secondary team-user-input-quick-btn" data-quick-response="' + escapeHtml(value) + '">' + escapeHtml(label) + '</button>';
         }).join('');
+      }
+      if (cardEl) {
+        cardEl.classList.toggle('team-user-input-modal-card--rich', userInputModalIsRich(ask, options, blockedTasks));
       }
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');

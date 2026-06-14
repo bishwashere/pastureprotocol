@@ -245,10 +245,15 @@ const checks = [
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
   },
   {
-    name: 'home page has status overview element ids',
-    ok: fullHtml.includes('id="chat-status-text"') &&
-      fullHtml.includes('id="chat-overview-uptime"') &&
-      fullHtml.includes('id="home-identity-tiles"'),
+    name: 'config page has UI/JSON toggle and sectioned editor',
+    ok: fullHtml.includes('data-config-view="ui"') &&
+      fullHtml.includes('data-config-view="json"') &&
+      fullHtml.includes('id="config-ui-sections"') &&
+      fullHtml.includes('id="config-json-panel"') &&
+      script.includes('function renderConfigUi(') &&
+      script.includes('function collectConfigFromUi(') &&
+      script.includes('name="config-llm-priority"') &&
+      script.includes("localStorage.setItem('pasture-config-view'"),
   },
   {
     name: 'chat bundle guards mission-control forward refs before script 04 loads (click handler regression)',

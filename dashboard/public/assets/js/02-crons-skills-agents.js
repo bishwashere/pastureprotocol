@@ -1247,16 +1247,425 @@ async function fetchCrons() {
       }
     });
 
+    var configCache = null;
+    var configSkillsList = [];
+    var configViewMode = (function () {
+      try { return localStorage.getItem('pasture-config-view') || 'ui'; } catch (_) { return 'ui'; }
+    })();
+    var configToggleWired = false;
+    var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
+
+    function configNum(val, fallback) {
+      var n = Number(val);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function configBoolInput(id, checked, label) {
+      return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '> ' + escapeHtml(label) + '</label>';
+    }
+
+    function configTextField(id, label, value, placeholder, type) {
+      type = type || 'text';
+      return '<div class="field"><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+        '<input type="' + type + '" id="' + id + '" value="' + escapeHtml(value == null ? '' : String(value)) + '"' +
+        (placeholder ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></div>';
+    }
+
+    function renderConfigUi(config) {
+      var agents = config.agents || {};
+      var defaults = agents.defaults || {};
+      var llm = config.llm || {};
+      var models = Array.isArray(llm.models) ? llm.models : [];
+      var skills = config.skills || {};
+      var enabled = Array.isArray(skills.enabled) ? skills.enabled : [];
+      var search = skills.search || {};
+      var github = skills.github || {};
+      var gog = skills.gog || {};
+      var channels = config.channels || {};
+      var whatsapp = channels.whatsapp || {};
+      var telegram = channels.telegram || {};
+      var tide = config.tide || {};
+      var owner = config.owner || {};
+      var agentMessaging = config.agentMessaging || {};
+      var retrospective = config.retrospective || {};
+      var systemPulse = config.systemPulse || {};
+      var priorityIdx = models.findIndex(function (m) {
+        return m && (m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true');
+      });
+      var skillsHtml = configSkillsList.length
+        ? configSkillsList.map(function (s) {
+          var on = enabled.indexOf(s.id) >= 0;
+          return '<label class="config-skill-chip"><input type="checkbox" data-config-skill="' + escapeHtml(s.id) + '"' + (on ? ' checked' : '') + '> ' + escapeHtml(s.id) + '</label>';
+        }).join('')
+        : enabled.map(function (id) {
+          return '<label class="config-skill-chip"><input type="checkbox" data-config-skill="' + escapeHtml(id) + '" checked> ' + escapeHtml(id) + '</label>';
+        }).join('') || '<p class="empty">No skills found.</p>';
+      var modelsHtml = models.map(function (m, i) {
+        var provider = (m && m.provider) || '';
+        var priorityChecked = i === priorityIdx ? ' checked' : '';
+        return '<div class="config-model-card" data-config-model="' + i + '">' +
+          '<h4>Model ' + (i + 1) + '</h4>' +
+          '<div class="form-row"><div class="field"><label>Provider</label><select data-f="provider">' +
+          CONFIG_LLM_PROVIDERS.map(function (p) {
+            return '<option value="' + p + '"' + (p === provider ? ' selected' : '') + '>' + p + '</option>';
+          }).join('') +
+          '</select></div></div>' +
+          '<div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div>' +
+          '<div class="field"><label>Base URL (local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(m.baseUrl || '') + '" placeholder="http://127.0.0.1:1234/v1"></div>' +
+          '<div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(m.apiKey || '') + '" placeholder="LLM_1_API_KEY"></div>' +
+          '<div class="form-row config-priority-row"><label><input type="radio" name="config-llm-priority" value="' + i + '"' + priorityChecked + '> Priority (use first)</label></div>' +
+          '<button type="button" class="config-model-remove link-btn" data-remove-model="' + i + '">Remove model</button>' +
+          '</div>';
+      }).join('');
+      var allowLines = Array.isArray(agentMessaging.allow) ? agentMessaging.allow.join('\n') : '';
+      var tideCooldown = tide.silenceCooldownMinutes != null ? tide.silenceCooldownMinutes : tide.intervalMinutes;
+      var html = '' +
+        '<details class="config-section" open><summary>General</summary><div class="config-section-body">' +
+        '<div class="field"><label for="config-bio">Bio / personality</label><textarea id="config-bio" rows="3">' + escapeHtml(config.bio || '') + '</textarea></div>' +
+        configTextField('config-title', 'Title', config.title || '', 'CEO') +
+        configTextField('config-color', 'Accent color', config.color || '', '#ef4444', 'color') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Agents defaults</summary><div class="config-section-body">' +
+        configTextField('config-user-timezone', 'User timezone', defaults.userTimezone || '', 'auto or America/New_York') +
+        '<div class="field"><label for="config-time-format">Time format</label><select id="config-time-format">' +
+        ['auto', '12h', '24h', '12', '24'].map(function (v) {
+          var sel = String(defaults.timeFormat || 'auto') === v ? ' selected' : '';
+          var label = v === '12' ? '12h (legacy)' : v === '24' ? '24h (legacy)' : v;
+          return '<option value="' + v + '"' + sel + '>' + label + '</option>';
+        }).join('') +
+        '</select></div></div></details>' +
+        '<details class="config-section" open><summary>LLM</summary><div class="config-section-body">' +
+        configTextField('config-llm-max-tokens', 'Max tokens', llm.maxTokens != null ? llm.maxTokens : 2048, '', 'number') +
+        '<p class="skill-meta">Select one priority model. Local models are used as fallback when cloud is unavailable.</p>' +
+        '<div id="config-llm-models" class="config-models-grid">' + modelsHtml + '</div>' +
+        '<button type="button" id="config-llm-add-model" class="link-btn">+ Add model</button>' +
+        '</div></details>' +
+        '<details class="config-section"><summary>Skills</summary><div class="config-section-body">' +
+        '<p class="skill-meta">Toggle enabled skills. Skill-specific settings below are optional.</p>' +
+        '<div class="config-skills-grid">' + skillsHtml + '</div>' +
+        configTextField('config-search-provider', 'Search provider', search.provider || 'brave', 'brave') +
+        configTextField('config-search-count', 'Search result count', search.count != null ? search.count : 8, '', 'number') +
+        configTextField('config-github-token', 'GitHub token env var', github.token || '', 'GITHUB_TOKEN') +
+        configTextField('config-github-repo', 'GitHub default repo', github.defaultRepo || '', 'owner/repo') +
+        configTextField('config-gog-account', 'Google (gog) account', gog.account || '', 'you@gmail.com') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Channels</summary><div class="config-section-body">' +
+        '<div class="config-check-row">' + configBoolInput('config-whatsapp-enabled', !!whatsapp.enabled, 'WhatsApp enabled') + '</div>' +
+        '<div class="config-check-row">' + configBoolInput('config-telegram-enabled', !!telegram.enabled, 'Telegram enabled') + '</div>' +
+        configTextField('config-telegram-token', 'Telegram bot token env var', telegram.botToken || '', 'TELEGRAM_BOT_TOKEN') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Owner</summary><div class="config-section-body">' +
+        configTextField('config-owner-whatsapp', 'WhatsApp JID', owner.whatsappJid || '', '1234567890@s.whatsapp.net') +
+        configTextField('config-owner-telegram', 'Telegram user ID', owner.telegramUserId != null ? owner.telegramUserId : '', '123456789', 'number') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Tide</summary><div class="config-section-body">' +
+        '<div class="config-check-row">' + configBoolInput('config-tide-enabled', !!tide.enabled, 'Tide enabled') + '</div>' +
+        configTextField('config-tide-cooldown', 'Silence cooldown (minutes)', tideCooldown != null ? tideCooldown : 30, '', 'number') +
+        configTextField('config-tide-inactive-start', 'Quiet hours start', tide.inactiveStart || '23:00', '23:00') +
+        configTextField('config-tide-inactive-end', 'Quiet hours end', tide.inactiveEnd || '06:00', '06:00') +
+        configTextField('config-tide-jid', 'Target JID (optional)', tide.jid || '', '') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Agent messaging</summary><div class="config-section-body">' +
+        '<div class="field"><label for="config-agent-allow">Allowed agents (one per line)</label><textarea id="config-agent-allow" rows="3">' + escapeHtml(allowLines) + '</textarea></div>' +
+        configTextField('config-agent-max-depth', 'Max delegation depth', agentMessaging.maxDepth != null ? agentMessaging.maxDepth : 2, '', 'number') +
+        configTextField('config-agent-max-calls', 'Max calls per turn', agentMessaging.maxCallsPerTurn != null ? agentMessaging.maxCallsPerTurn : 5, '', 'number') +
+        '</div></details>' +
+        '<details class="config-section"><summary>Retrospective</summary><div class="config-section-body">' +
+        '<div class="config-check-row">' + configBoolInput('config-retro-enabled', !!retrospective.enabled, 'Retrospective enabled') + '</div>' +
+        configTextField('config-retro-agent', 'Reflector agent ID', retrospective.reflectorAgentId || 'reflector', 'reflector') +
+        configTextField('config-retro-threshold', 'Low score threshold', retrospective.lowScoreThreshold != null ? retrospective.lowScoreThreshold : 6, '', 'number') +
+        configTextField('config-retro-lookback', 'Lookback days', retrospective.lookbackDays != null ? retrospective.lookbackDays : 7, '', 'number') +
+        configTextField('config-retro-nightly-hour', 'Nightly hour (0–23)', retrospective.nightlyHour != null ? retrospective.nightlyHour : 2, '', 'number') +
+        configTextField('config-retro-weekly-day', 'Weekly day (0=Sun)', retrospective.weeklyDay != null ? retrospective.weeklyDay : 0, '', 'number') +
+        configTextField('config-retro-weekly-hour', 'Weekly hour (0–23)', retrospective.weeklyHour != null ? retrospective.weeklyHour : 3, '', 'number') +
+        '</div></details>' +
+        '<details class="config-section"><summary>System pulse</summary><div class="config-section-body">' +
+        '<div class="config-check-row">' + configBoolInput('config-pulse-enabled', !!systemPulse.enabled, 'System pulse enabled') + '</div>' +
+        '<div class="config-check-row">' + configBoolInput('config-pulse-notify', systemPulse.healthNotify !== false, 'Health notify') + '</div>' +
+        '<div class="config-check-row">' + configBoolInput('config-pulse-dry-run', !!systemPulse.dryRun, 'Dry run') + '</div>' +
+        configTextField('config-pulse-health-interval', 'Health interval (minutes)', systemPulse.healthIntervalMinutes != null ? systemPulse.healthIntervalMinutes : 45, '', 'number') +
+        configTextField('config-pulse-pattern-interval', 'Pattern interval (hours)', systemPulse.patternIntervalHours != null ? systemPulse.patternIntervalHours : 8, '', 'number') +
+        configTextField('config-pulse-max-patterns', 'Max patterns per run', systemPulse.maxPatternsPerRun != null ? systemPulse.maxPatternsPerRun : 2, '', 'number') +
+        configTextField('config-pulse-confidence', 'Self-edit confidence threshold', systemPulse.selfEditConfidenceThreshold != null ? systemPulse.selfEditConfidenceThreshold : 0.7, '', 'number') +
+        '</div></details>';
+      var container = document.getElementById('config-ui-sections');
+      if (!container) return;
+      container.innerHTML = html;
+      wireConfigUiActions();
+    }
+
+    function wireConfigUiActions() {
+      var addBtn = document.getElementById('config-llm-add-model');
+      if (addBtn && !addBtn.dataset.wired) {
+        addBtn.dataset.wired = '1';
+        addBtn.addEventListener('click', function () {
+          var base = configCache || {};
+          var merged = collectConfigFromUi(base);
+          merged.llm = merged.llm || {};
+          var models = Array.isArray(merged.llm.models) ? merged.llm.models.slice() : [];
+          models.push({ provider: 'openai', model: 'gpt-4o', apiKey: 'LLM_1_API_KEY' });
+          merged.llm.models = models;
+          configCache = merged;
+          renderConfigUi(merged);
+        });
+      }
+      document.querySelectorAll('.config-model-remove').forEach(function (btn) {
+        if (btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', function () {
+          var idx = Number(btn.getAttribute('data-remove-model'));
+          var base = configCache || {};
+          var merged = collectConfigFromUi(base);
+          var models = Array.isArray(merged.llm && merged.llm.models) ? merged.llm.models.slice() : [];
+          if (idx >= 0 && idx < models.length) models.splice(idx, 1);
+          merged.llm = merged.llm || {};
+          merged.llm.models = models;
+          configCache = merged;
+          renderConfigUi(merged);
+        });
+      });
+    }
+
+    function collectConfigFromUi(base) {
+      var config = JSON.parse(JSON.stringify(base || {}));
+      var bioEl = document.getElementById('config-bio');
+      if (bioEl) {
+        var bio = bioEl.value.trim();
+        if (bio) config.bio = bio; else delete config.bio;
+      }
+      var titleEl = document.getElementById('config-title');
+      if (titleEl) {
+        var title = titleEl.value.trim();
+        if (title) config.title = title; else delete config.title;
+      }
+      var colorEl = document.getElementById('config-color');
+      if (colorEl) {
+        var color = colorEl.value.trim();
+        if (color) config.color = color; else delete config.color;
+      }
+      config.agents = config.agents || {};
+      config.agents.defaults = config.agents.defaults || {};
+      var tzEl = document.getElementById('config-user-timezone');
+      if (tzEl) config.agents.defaults.userTimezone = tzEl.value.trim() || 'auto';
+      var tfEl = document.getElementById('config-time-format');
+      if (tfEl) config.agents.defaults.timeFormat = tfEl.value || 'auto';
+
+      var maxTokEl = document.getElementById('config-llm-max-tokens');
+      var modelCards = document.querySelectorAll('#config-llm-models .config-model-card');
+      var priorityRadio = document.querySelector('input[name="config-llm-priority"]:checked');
+      var priorityIdx = priorityRadio ? Number(priorityRadio.value) : -1;
+      var models = Array.from(modelCards).map(function (card, i) {
+        var providerEl = card.querySelector('[data-f="provider"]');
+        var modelEl = card.querySelector('[data-f="model"]');
+        var baseUrlEl = card.querySelector('[data-f="baseUrl"]');
+        var apiKeyEl = card.querySelector('[data-f="apiKey"]');
+        var o = {
+          provider: providerEl ? providerEl.value.trim() || 'openai' : 'openai',
+          model: modelEl ? modelEl.value.trim() || 'gpt-4o' : 'gpt-4o',
+          apiKey: apiKeyEl ? apiKeyEl.value.trim() || 'LLM_1_API_KEY' : 'LLM_1_API_KEY',
+        };
+        var baseUrl = baseUrlEl ? baseUrlEl.value.trim() : '';
+        if (baseUrl) o.baseUrl = baseUrl;
+        if (i === priorityIdx) o.priority = true;
+        return o;
+      });
+      config.llm = config.llm || {};
+      config.llm.maxTokens = maxTokEl ? configNum(maxTokEl.value, 2048) : (config.llm.maxTokens || 2048);
+      config.llm.models = models;
+
+      config.skills = config.skills || {};
+      var enabled = [];
+      document.querySelectorAll('[data-config-skill]').forEach(function (cb) {
+        if (cb.checked) enabled.push(cb.getAttribute('data-config-skill'));
+      });
+      config.skills.enabled = enabled;
+      var searchProvider = document.getElementById('config-search-provider');
+      var searchCount = document.getElementById('config-search-count');
+      if (searchProvider || searchCount) {
+        config.skills.search = config.skills.search || {};
+        if (searchProvider) config.skills.search.provider = searchProvider.value.trim() || 'brave';
+        if (searchCount) config.skills.search.count = configNum(searchCount.value, 8);
+      }
+      var ghToken = document.getElementById('config-github-token');
+      var ghRepo = document.getElementById('config-github-repo');
+      if (ghToken && ghToken.value.trim()) {
+        config.skills.github = config.skills.github || {};
+        config.skills.github.token = ghToken.value.trim();
+      }
+      if (ghRepo && ghRepo.value.trim()) {
+        config.skills.github = config.skills.github || {};
+        config.skills.github.defaultRepo = ghRepo.value.trim();
+      }
+      var gogAccount = document.getElementById('config-gog-account');
+      if (gogAccount && gogAccount.value.trim()) {
+        config.skills.gog = config.skills.gog || {};
+        config.skills.gog.account = gogAccount.value.trim();
+      }
+
+      config.channels = config.channels || {};
+      config.channels.whatsapp = { enabled: !!(document.getElementById('config-whatsapp-enabled') && document.getElementById('config-whatsapp-enabled').checked) };
+      var tgEnabled = document.getElementById('config-telegram-enabled');
+      var tgToken = document.getElementById('config-telegram-token');
+      config.channels.telegram = {
+        enabled: !!(tgEnabled && tgEnabled.checked),
+        botToken: tgToken ? tgToken.value.trim() || 'TELEGRAM_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN',
+      };
+
+      var ownerWa = document.getElementById('config-owner-whatsapp');
+      var ownerTg = document.getElementById('config-owner-telegram');
+      if ((ownerWa && ownerWa.value.trim()) || (ownerTg && ownerTg.value.trim())) {
+        config.owner = config.owner || {};
+        if (ownerWa && ownerWa.value.trim()) config.owner.whatsappJid = ownerWa.value.trim();
+        if (ownerTg && ownerTg.value.trim()) config.owner.telegramUserId = configNum(ownerTg.value, 0);
+      }
+
+      var tideEnabled = document.getElementById('config-tide-enabled');
+      var tideCooldown = document.getElementById('config-tide-cooldown');
+      config.tide = config.tide || {};
+      if (tideEnabled) config.tide.enabled = !!tideEnabled.checked;
+      if (tideCooldown) {
+        var mins = configNum(tideCooldown.value, 30);
+        config.tide.silenceCooldownMinutes = mins;
+        if ('intervalMinutes' in config.tide) config.tide.intervalMinutes = mins;
+      }
+      var tideStart = document.getElementById('config-tide-inactive-start');
+      var tideEnd = document.getElementById('config-tide-inactive-end');
+      var tideJid = document.getElementById('config-tide-jid');
+      if (tideStart) config.tide.inactiveStart = tideStart.value.trim() || '23:00';
+      if (tideEnd) config.tide.inactiveEnd = tideEnd.value.trim() || '06:00';
+      if (tideJid) config.tide.jid = tideJid.value.trim();
+
+      var allowEl = document.getElementById('config-agent-allow');
+      config.agentMessaging = config.agentMessaging || {};
+      if (allowEl) {
+        config.agentMessaging.allow = allowEl.value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      var maxDepthEl = document.getElementById('config-agent-max-depth');
+      var maxCallsEl = document.getElementById('config-agent-max-calls');
+      if (maxDepthEl) config.agentMessaging.maxDepth = configNum(maxDepthEl.value, 2);
+      if (maxCallsEl) config.agentMessaging.maxCallsPerTurn = configNum(maxCallsEl.value, 5);
+
+      config.retrospective = config.retrospective || {};
+      var retroEnabled = document.getElementById('config-retro-enabled');
+      if (retroEnabled) config.retrospective.enabled = !!retroEnabled.checked;
+      var retroAgent = document.getElementById('config-retro-agent');
+      if (retroAgent) config.retrospective.reflectorAgentId = retroAgent.value.trim() || 'reflector';
+      var retroThreshold = document.getElementById('config-retro-threshold');
+      if (retroThreshold) config.retrospective.lowScoreThreshold = configNum(retroThreshold.value, 6);
+      var retroLookback = document.getElementById('config-retro-lookback');
+      if (retroLookback) config.retrospective.lookbackDays = configNum(retroLookback.value, 7);
+      var retroNightly = document.getElementById('config-retro-nightly-hour');
+      if (retroNightly) config.retrospective.nightlyHour = configNum(retroNightly.value, 2);
+      var retroWeeklyDay = document.getElementById('config-retro-weekly-day');
+      if (retroWeeklyDay) config.retrospective.weeklyDay = configNum(retroWeeklyDay.value, 0);
+      var retroWeeklyHour = document.getElementById('config-retro-weekly-hour');
+      if (retroWeeklyHour) config.retrospective.weeklyHour = configNum(retroWeeklyHour.value, 3);
+
+      config.systemPulse = config.systemPulse || {};
+      var pulseEnabled = document.getElementById('config-pulse-enabled');
+      var pulseNotify = document.getElementById('config-pulse-notify');
+      var pulseDry = document.getElementById('config-pulse-dry-run');
+      if (pulseEnabled) config.systemPulse.enabled = !!pulseEnabled.checked;
+      if (pulseNotify) config.systemPulse.healthNotify = !!pulseNotify.checked;
+      if (pulseDry) config.systemPulse.dryRun = !!pulseDry.checked;
+      var pulseHealth = document.getElementById('config-pulse-health-interval');
+      if (pulseHealth) config.systemPulse.healthIntervalMinutes = configNum(pulseHealth.value, 45);
+      var pulsePattern = document.getElementById('config-pulse-pattern-interval');
+      if (pulsePattern) config.systemPulse.patternIntervalHours = configNum(pulsePattern.value, 8);
+      var pulseMax = document.getElementById('config-pulse-max-patterns');
+      if (pulseMax) config.systemPulse.maxPatternsPerRun = configNum(pulseMax.value, 2);
+      var pulseConf = document.getElementById('config-pulse-confidence');
+      if (pulseConf) config.systemPulse.selfEditConfidenceThreshold = configNum(pulseConf.value, 0.7);
+
+      return config;
+    }
+
+    function applyConfigViewMode() {
+      var uiPanel = document.getElementById('config-ui-panel');
+      var jsonPanel = document.getElementById('config-json-panel');
+      var uiBtn = document.querySelector('[data-config-view="ui"]');
+      var jsonBtn = document.querySelector('[data-config-view="json"]');
+      if (!uiPanel || !jsonPanel) return;
+      var isJson = configViewMode === 'json';
+      uiPanel.hidden = isJson;
+      jsonPanel.hidden = !isJson;
+      if (uiBtn) {
+        uiBtn.classList.toggle('active', !isJson);
+        uiBtn.setAttribute('aria-selected', !isJson ? 'true' : 'false');
+      }
+      if (jsonBtn) {
+        jsonBtn.classList.toggle('active', isJson);
+        jsonBtn.setAttribute('aria-selected', isJson ? 'true' : 'false');
+      }
+    }
+
+    function syncConfigJsonFromUi() {
+      if (!configCache) return;
+      var merged = collectConfigFromUi(configCache);
+      configCache = merged;
+      document.getElementById('full-config').value = JSON.stringify(merged, null, 2);
+    }
+
+    function setConfigViewMode(mode) {
+      var errEl = document.getElementById('config-error');
+      var next = mode === 'json' ? 'json' : 'ui';
+      if (next === configViewMode) return;
+      errEl.style.display = 'none';
+      errEl.textContent = '';
+      if (next === 'json') {
+        try {
+          syncConfigJsonFromUi();
+        } catch (e) {
+          errEl.textContent = 'Could not sync UI to JSON: ' + (e.message || 'error');
+          errEl.style.display = 'inline';
+          return;
+        }
+      } else {
+        var raw = document.getElementById('full-config').value.trim();
+        try {
+          var parsed = raw ? JSON.parse(raw) : {};
+          if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('Config must be a JSON object.');
+          configCache = parsed;
+          renderConfigUi(parsed);
+        } catch (e) {
+          errEl.textContent = 'Invalid JSON — fix before switching to UI: ' + (e.message || 'parse error');
+          errEl.style.display = 'inline';
+          return;
+        }
+      }
+      configViewMode = next;
+      try { localStorage.setItem('pasture-config-view', configViewMode); } catch (_) {}
+      applyConfigViewMode();
+    }
+
+    function wireConfigViewToggle() {
+      if (configToggleWired) return;
+      configToggleWired = true;
+      document.querySelectorAll('[data-config-view]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setConfigViewMode(btn.getAttribute('data-config-view'));
+        });
+      });
+    }
+
     async function fetchConfig() {
+      var errEl = document.getElementById('config-error');
+      wireConfigViewToggle();
       try {
-        const r = await fetch(API + '/api/config');
-        const d = await r.json();
-        document.getElementById('full-config').value = JSON.stringify(d, null, 2);
-        document.getElementById('config-error').style.display = 'none';
-        document.getElementById('config-error').textContent = '';
+        var results = await Promise.all([
+          fetch(API + '/api/config').then(function (r) { return r.json(); }),
+          fetch(API + '/api/skills').then(function (r) { return r.json(); }).catch(function () { return { skills: [] }; }),
+        ]);
+        configCache = results[0];
+        configSkillsList = results[1].skills || [];
+        document.getElementById('full-config').value = JSON.stringify(configCache, null, 2);
+        renderConfigUi(configCache);
+        applyConfigViewMode();
+        errEl.style.display = 'none';
+        errEl.textContent = '';
       } catch (e) {
-        document.getElementById('config-error').textContent = 'Failed to load config.';
-        document.getElementById('config-error').style.display = 'inline';
+        errEl.textContent = 'Failed to load config.';
+        errEl.style.display = 'inline';
       }
     }
 
@@ -1267,17 +1676,19 @@ async function fetchCrons() {
       savedEl.style.display = 'none';
       errEl.style.display = 'none';
       errEl.textContent = '';
-      var raw = textarea.value.trim();
       var config;
       try {
-        config = raw ? JSON.parse(raw) : {};
+        if (configViewMode === 'ui') {
+          config = collectConfigFromUi(configCache || {});
+        } else {
+          var raw = textarea.value.trim();
+          config = raw ? JSON.parse(raw) : {};
+          if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+            throw new Error('Config must be a JSON object.');
+          }
+        }
       } catch (e) {
-        errEl.textContent = 'Invalid JSON: ' + (e.message || 'parse error');
-        errEl.style.display = 'inline';
-        return;
-      }
-      if (typeof config !== 'object' || config === null || Array.isArray(config)) {
-        errEl.textContent = 'Config must be a JSON object.';
+        errEl.textContent = e.message || 'Invalid config.';
         errEl.style.display = 'inline';
         return;
       }
@@ -1288,7 +1699,9 @@ async function fetchCrons() {
           throw new Error(d.error || 'Save failed');
         }
         var d = await r.json();
+        configCache = d;
         textarea.value = JSON.stringify(d, null, 2);
+        renderConfigUi(d);
         savedEl.style.display = 'inline';
         setTimeout(function () { savedEl.style.display = 'none'; }, 2500);
       } catch (e) {
