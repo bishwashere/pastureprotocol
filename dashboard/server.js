@@ -651,6 +651,35 @@ app.post('/api/missions/:id/respond', (req, res) => {
   }
 });
 
+// Voice transcription endpoint — accepts raw audio/webm and returns { text }
+app.post('/api/transcribe', express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
+  try {
+    const { getSpeechConfig, transcribe } = await import('../lib/speech-client.js');
+    const config = getSpeechConfig();
+    if (!config?.whisperApiKey) {
+      res.status(503).json({ error: 'Whisper API key not configured. Add openai.apiKey in settings.' });
+      return;
+    }
+    if (!req.body || !req.body.length) {
+      res.status(400).json({ error: 'No audio body received' });
+      return;
+    }
+    const tmpDir = join(getStateDir(), 'tmp');
+    if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = join(tmpDir, `transcribe-${Date.now()}.webm`);
+    writeFileSync(tmpPath, req.body);
+    let text = '';
+    try {
+      text = await transcribe(config.whisperApiKey, tmpPath);
+    } finally {
+      try { (await import('fs')).unlinkSync(tmpPath); } catch (_) {}
+    }
+    res.json({ text });
+  } catch (err) {
+    res.status(500).json({ error: String(err?.message || err) });
+  }
+});
+
 app.patch('/api/suggestedTasks/:id', (req, res) => {
   try {
     const id = String(req.params.id || '').trim();

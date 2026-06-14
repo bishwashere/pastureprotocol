@@ -1241,7 +1241,7 @@
             ? ' <span class="team-mission-task-status blocked">' + escapeHtml(blockerTypeLabel(sg)) + '</span>'
             : '';
           return '<li class="' + cls + '" data-mission-task-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
-            escapeHtml(icon + ' ' + title) + statusTag + '</li>';
+            '<span class="team-current-mission-task-text">' + escapeHtml(icon + ' ' + title) + '</span>' + statusTag + '</li>';
         }).join('') + '</ul>'
         : '<p class="team-current-mission-empty" style="margin:0;">No tasks yet.</p>';
       var missionHeading = liveOnly ? 'Activity' : 'Mission';
@@ -4927,7 +4927,146 @@
     }
     wireTeamUserInputModal();
 
-    async function fetchSuggestedTasksSnapshot() {
+    // ── Voice input for team user-input modal ──────────────────────────────
+    (function wireTeamMicInput() {
+      var micBtn = document.getElementById('team-user-input-mic-btn');
+      if (!micBtn) return;
+
+      var mediaRecorder = null;
+      var chunks = [];
+      var stream = null;
+      var audioCtx = null;
+      var analyser = null;
+      var animFrame = null;
+      var isRecording = false;
+
+      var statusEl = document.getElementById('team-user-input-mic-status');
+      var statusTextEl = statusEl && statusEl.querySelector('.team-mic-status-text');
+      var micIcon = micBtn.querySelector('.team-mic-icon');
+      var stopIcon = micBtn.querySelector('.team-mic-stop-icon');
+
+      function setRecordingState(active) {
+        isRecording = active;
+        micBtn.classList.toggle('team-mic-btn--recording', active);
+        if (micIcon) micIcon.style.display = active ? 'none' : '';
+        if (stopIcon) stopIcon.style.display = active ? '' : 'none';
+        if (statusEl) statusEl.style.display = active ? 'flex' : 'none';
+        if (statusTextEl) statusTextEl.textContent = active ? 'Listening…' : '';
+      }
+
+      function setTranscribingState(active) {
+        micBtn.disabled = active;
+        micBtn.classList.toggle('team-mic-btn--transcribing', active);
+        if (statusEl) statusEl.style.display = active ? 'flex' : 'none';
+        if (statusTextEl) statusTextEl.textContent = active ? 'Transcribing…' : '';
+      }
+
+      function stopStream() {
+        if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+        if (audioCtx) { audioCtx.close().catch(function () {}); audioCtx = null; }
+        analyser = null;
+        if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      }
+
+      async function transcribeBlob(blob) {
+        setTranscribingState(true);
+        try {
+          var res = await fetch(API + '/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/webm' },
+            body: blob,
+          });
+          if (!res.ok) {
+            var errData = await res.json().catch(function () { return {}; });
+            throw new Error(errData.error || ('Transcription failed (' + res.status + ')'));
+          }
+          var data = await res.json();
+          return data.text || '';
+        } finally {
+          setTranscribingState(false);
+        }
+      }
+
+      async function startRecording() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          alert('Could not access microphone. Please check your browser permissions.');
+          return;
+        }
+
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 1024;
+          var src = audioCtx.createMediaStreamSource(stream);
+          src.connect(analyser);
+
+          var dotEl = statusEl && statusEl.querySelector('.team-mic-dot');
+          var dataArr = new Uint8Array(analyser.fftSize);
+          function animateDot() {
+            if (!isRecording) return;
+            analyser.getByteTimeDomainData(dataArr);
+            var rms = 0;
+            for (var i = 0; i < dataArr.length; i++) {
+              var v = (dataArr[i] - 128) / 128;
+              rms += v * v;
+            }
+            rms = Math.sqrt(rms / dataArr.length);
+            if (dotEl) dotEl.style.transform = 'scale(' + (1 + Math.min(rms * 6, 1.2)) + ')';
+            animFrame = requestAnimationFrame(animateDot);
+          }
+          animateDot();
+        } catch (_) {}
+
+        var mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+        chunks = [];
+
+        mediaRecorder.ondataavailable = function (e) {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async function () {
+          setRecordingState(false);
+          stopStream();
+          var blob = new Blob(chunks, { type: 'audio/webm' });
+          chunks = [];
+          if (blob.size < 1000) return; // too short / empty
+          try {
+            var text = await transcribeBlob(blob);
+            if (text) {
+              var textEl = document.getElementById('team-user-input-modal-text');
+              if (textEl) {
+                textEl.value = (textEl.value ? textEl.value.trimEnd() + ' ' : '') + text;
+                textEl.focus();
+              }
+            }
+          } catch (err) {
+            var errEl = document.getElementById('team-user-input-modal-error');
+            if (errEl) errEl.textContent = 'Voice input: ' + (err.message || 'Failed to transcribe.');
+          }
+        };
+
+        mediaRecorder.start();
+        setRecordingState(true);
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+      }
+
+      micBtn.addEventListener('click', function () {
+        if (isRecording) {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      });
+    })();
+    // ── End voice input ────────────────────────────────────────────────────
       try {
         var r = await fetch(API + '/api/suggestedTasks');
         if (!r.ok) return;

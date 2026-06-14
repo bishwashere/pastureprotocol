@@ -339,11 +339,21 @@
       list-style: none;
     }
     .team-current-mission-task-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
       margin: 0 0 0.18rem 0;
       color: var(--muted);
-      white-space: nowrap;
+    }
+    .team-current-mission-task-text {
+      flex: 1;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .team-current-mission-task-list li .team-mission-task-status {
+      flex-shrink: 0;
     }
     .team-current-mission-task-list li.mission-doing {
       color: var(--text);
@@ -2138,6 +2148,62 @@
       background: var(--surface);
       color: var(--text);
       font: inherit;
+    }
+    .team-input-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.35rem;
+    }
+    .team-input-label-row label { margin-bottom: 0; }
+    .team-mic-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      background: var(--accent, #6d4df2);
+      color: #fff;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      flex-shrink: 0;
+    }
+    .team-mic-btn:hover { background: #5a3fd4; box-shadow: 0 0 0 3px rgba(109,77,242,0.25); }
+    .team-mic-btn--recording {
+      background: #e53e3e;
+      box-shadow: 0 0 0 4px rgba(229,62,62,0.25);
+      animation: team-mic-pulse 1.2s ease-in-out infinite;
+    }
+    .team-mic-btn--recording:hover { background: #c53030; }
+    .team-mic-btn--transcribing { opacity: 0.6; cursor: not-allowed; }
+    .team-mic-btn svg { width: 1rem; height: 1rem; display: block; }
+    @keyframes team-mic-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(229,62,62,0.25); }
+      50% { box-shadow: 0 0 0 7px rgba(229,62,62,0.1); }
+    }
+    .team-mic-status {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--muted-text, #888);
+    }
+    .team-mic-dot {
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 50%;
+      background: #e53e3e;
+      flex-shrink: 0;
+      transition: transform 0.08s ease-out;
+      animation: team-mic-dot-blink 1s ease-in-out infinite;
+    }
+    @keyframes team-mic-dot-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
     }
     .agent-edit-basics {
       display: grid;

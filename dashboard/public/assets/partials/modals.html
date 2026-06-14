@@ -105,7 +105,24 @@
       <p id="team-user-input-modal-question" class="team-user-input-question"></p>
       <div id="team-user-input-modal-quick" class="team-user-input-quick"></div>
       <div class="field">
-        <label for="team-user-input-modal-text">Your response</label>
+        <div class="team-input-label-row">
+          <label for="team-user-input-modal-text">Your response</label>
+          <button type="button" id="team-user-input-mic-btn" class="team-mic-btn" title="Use microphone" aria-label="Start voice input">
+            <svg class="team-mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="11" rx="3"/>
+              <path d="M5 10a7 7 0 0 0 14 0"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            <svg class="team-mic-stop-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none;">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+        </div>
+        <div id="team-user-input-mic-status" class="team-mic-status" aria-live="polite" style="display:none;">
+          <span class="team-mic-dot"></span>
+          <span class="team-mic-status-text">Listening…</span>
+        </div>
         <textarea id="team-user-input-modal-text" class="team-user-input-textarea" rows="3" placeholder="Type your answer…"></textarea>
       </div>
       <p id="team-user-input-modal-error" class="modal-error" role="alert"></p>
