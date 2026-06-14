@@ -394,7 +394,7 @@ async function main() {
   // Persistent autonomous missions loop (agent background work above single turns).
   try {
     const cfg = loadConfig();
-    const loopMs = Number(cfg?.missions?.loopMs) || 60_000;
+    const loopMs = Number(cfg?.missions?.loopMs) || 15 * 60_000;
     startMissionEngine({
       loopMs,
       runMissionTurn: async (mission, prompt) =>
@@ -738,7 +738,7 @@ async function main() {
     // healthCheckMinutes controls how often Tide wakes up to run the polling watchdog and check
     // for due follow-ups. It must be <= silenceCooldownMinutes to catch due JIDs on time.
     const healthCheckMinutes = Math.min(
-      Math.max(1, Number(tide.healthCheckMinutes) || 2),
+      Math.max(1, Number(tide.healthCheckMinutes) || 7),
       cooldownMinutes
     );
     console.log('[tide] Enabled. Follow-up cooldown:', cooldownMinutes, 'min. Health-check interval:', healthCheckMinutes, 'min.');
