@@ -3703,6 +3703,109 @@
       return result;
     }
 
+    function parseUserInputNumberedOptions(optionsText) {
+      var raw = String(optionsText || '').trim();
+      if (!raw) return [];
+      var chunks = raw.split(/\s*(?:·|\|)\s*|\s+(?=\d+\)\s)/).map(function (s) { return s.trim(); }).filter(Boolean);
+      if (chunks.length <= 1 && /\d+\)/.test(raw)) {
+        chunks = raw.match(/\d+\)\s*[\s\S]*?(?=\s+\d+\)|$)/g) || [raw];
+      }
+      return chunks.map(function (part) {
+        return part.replace(/^\d+\)\s*/, '').replace(/\*\*/g, '').trim();
+      }).filter(Boolean);
+    }
+
+    function parseUserInputAsk(ask) {
+      var raw = String(ask || '').replace(/\*\*/g, '').trim();
+      if (!raw) return { kind: 'empty' };
+      if (raw.indexOf('\n') >= 0) {
+        var lines = raw.split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
+        var recIdx = -1;
+        var optIdx = -1;
+        var replyIdx = -1;
+        lines.forEach(function (line, idx) {
+          if (recIdx < 0 && /^Recommend(?::|\s)/i.test(line)) recIdx = idx;
+          if (optIdx < 0 && /^Options:?$/i.test(line)) optIdx = idx;
+          if (replyIdx < 0 && /^Reply\b/i.test(line)) replyIdx = idx;
+        });
+        if (recIdx >= 0 && optIdx >= 0) {
+          var optionLines = lines.slice(optIdx + 1, replyIdx >= 0 ? replyIdx : lines.length);
+          return {
+            kind: 'decision',
+            question: lines.slice(0, recIdx).join(' ').replace(/\.$/, '').trim(),
+            recommend: lines[recIdx].replace(/^Recommend(?::|\s)/i, '').replace(/\.$/, '').trim(),
+            options: optionLines.map(function (line) {
+              return line.replace(/^\d+\)\s*/, '').trim();
+            }).filter(Boolean),
+            reply: replyIdx >= 0 ? lines[replyIdx] : '',
+          };
+        }
+        return { kind: 'multiline', lines: lines };
+      }
+      var decisionMatch = raw.match(/^(.+?)\.\s*Recommend(?::|\s)\s*(.+?)\.\s*Options:\s*(.+?)\.\s*(Reply.+)$/i);
+      if (decisionMatch) {
+        return {
+          kind: 'decision',
+          question: decisionMatch[1].trim(),
+          recommend: decisionMatch[2].trim(),
+          options: parseUserInputNumberedOptions(decisionMatch[3]),
+          reply: decisionMatch[4].trim(),
+        };
+      }
+      var softened = raw
+        .replace(/\.\s*(Recommend(?::|\s))/gi, '.\n$1')
+        .replace(/\.\s*(Options:)/gi, '.\n$1')
+        .replace(/(Options:)\s*/i, '$1\n')
+        .replace(/\s+(?=\d+\)\s)/g, '\n')
+        .replace(/\.\s*(Reply\b)/i, '.\n$1');
+      if (softened.indexOf('\n') >= 0) {
+        return parseUserInputAsk(softened);
+      }
+      return { kind: 'plain', text: raw };
+    }
+
+    function formatUserInputQuestionHtml(ask) {
+      var parsed = parseUserInputAsk(ask);
+      if (parsed.kind === 'decision') {
+        var html = '<div class="team-user-input-question-body">';
+        html += '<p class="team-user-input-question-lead">' + escapeHtml(parsed.question) + '</p>';
+        html += '<p class="team-user-input-question-recommend"><span class="team-user-input-question-kicker">Recommended</span> ' + escapeHtml(parsed.recommend) + '</p>';
+        if (parsed.options.length) {
+          html += '<div class="team-user-input-question-options"><span class="team-user-input-question-kicker">Options</span><ol>';
+          parsed.options.forEach(function (opt) {
+            html += '<li>' + escapeHtml(opt) + '</li>';
+          });
+          html += '</ol></div>';
+        }
+        html += '<p class="team-user-input-question-reply">' + escapeHtml(parsed.reply) + '</p>';
+        html += '</div>';
+        return html;
+      }
+      if (parsed.kind === 'multiline') {
+        var lines = parsed.lines || [];
+        var body = '<div class="team-user-input-question-body">';
+        if (lines.length) {
+          body += '<p class="team-user-input-question-lead">' + escapeHtml(lines[0]) + '</p>';
+          lines.slice(1).forEach(function (line) {
+            body += '<p class="team-user-input-question-detail">' + escapeHtml(line) + '</p>';
+          });
+        }
+        body += '</div>';
+        return body;
+      }
+      return '<div class="team-user-input-question-body team-user-input-question-plain">' + escapeHtml(parsed.text || ask) + '</div>';
+    }
+
+    function extractUserInputQuickOptions(ask) {
+      var parsed = parseUserInputAsk(ask);
+      if (parsed.kind !== 'decision' || !parsed.options.length) return [];
+      var options = [{ label: 'Use default', value: 'use default' }];
+      parsed.options.forEach(function (label, index) {
+        options.push({ label: label, value: String(index + 1) });
+      });
+      return options;
+    }
+
     function isOrphanedLetterPrompt(text) {
       var raw = String(text || '').replace(/\s+/g, ' ').trim();
       if (!raw) return false;
@@ -3839,19 +3942,26 @@
           : 'Mission needs your input';
       }
       if (missionEl) missionEl.textContent = 'Mission: ' + String(mission.title || 'Untitled mission');
-      if (questionEl) questionEl.textContent = ask;
+      if (questionEl) questionEl.innerHTML = formatUserInputQuestionHtml(ask);
       if (textEl) textEl.value = '';
       showTeamUserInputModalError('');
       if (quickEl) {
         var askLower = ask.toLowerCase();
         var firstBlockedDesc = blockedTasks.length > 0 ? String(blockedTasks[0].description || blockedTasks[0].expectedOutput || '').toLowerCase() : '';
         var matchText = askLower + ' ' + firstBlockedDesc;
-        var options = [];
-        if (/posthog|analytics|ga4|mixpanel|tracking|measurement/.test(matchText)) {
-          options = ['PostHog', 'Google Analytics (GA4)', 'Mixpanel', 'No analytics yet — use defaults'];
+        var options = extractUserInputQuickOptions(ask);
+        if (!options.length && /posthog|analytics|ga4|mixpanel|tracking|measurement/.test(matchText)) {
+          options = [
+            { label: 'PostHog', value: 'PostHog' },
+            { label: 'Google Analytics (GA4)', value: 'Google Analytics (GA4)' },
+            { label: 'Mixpanel', value: 'Mixpanel' },
+            { label: 'No analytics yet — use defaults', value: 'use default' },
+          ];
         }
-        quickEl.innerHTML = options.map(function (label) {
-          return '<button type="button" class="secondary team-user-input-quick-btn" data-quick-response="' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
+        quickEl.innerHTML = options.map(function (opt) {
+          var label = typeof opt === 'string' ? opt : opt.label;
+          var value = typeof opt === 'string' ? opt : opt.value;
+          return '<button type="button" class="secondary team-user-input-quick-btn" data-quick-response="' + escapeHtml(value) + '">' + escapeHtml(label) + '</button>';
         }).join('');
       }
       modal.classList.add('open');

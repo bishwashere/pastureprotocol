@@ -2128,7 +2128,36 @@
     .modal-card button.secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
     .team-user-input-question {
       margin: 0.75rem 0 0;
-      line-height: 1.45;
+      line-height: 1.5;
+    }
+    .team-user-input-question-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .team-user-input-question-lead,
+    .team-user-input-question-detail,
+    .team-user-input-question-recommend,
+    .team-user-input-question-reply {
+      margin: 0;
+    }
+    .team-user-input-question-kicker {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+    .team-user-input-question-options ol {
+      margin: 0.15rem 0 0;
+      padding-left: 1.2rem;
+    }
+    .team-user-input-question-options li + li {
+      margin-top: 0.25rem;
+    }
+    .team-user-input-question-plain {
       white-space: pre-wrap;
     }
     .team-user-input-quick {
