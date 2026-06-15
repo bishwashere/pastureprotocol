@@ -42,9 +42,12 @@
       var pp = mc2El('mc2-progress-percent');
       if (pp) pp.textContent = pct + '%';
       var eta = mc2El('mc2-eta-label');
-      var runningMissions = missions.filter(function (g) { return !!g.running; });
-      var runningLabel = runningMissions.length > 0
-        ? '⏳ Agent working… (' + runningMissions.length + ' mission' + (runningMissions.length === 1 ? '' : 's') + ')'
+      var allWorkItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var runningTasks = allWorkItems.filter(function (it) {
+        return it.kind === 'task' && String(it.status || '').toLowerCase() === 'doing';
+      });
+      var runningLabel = runningTasks.length > 0
+        ? '⏳ Agent working… (' + runningTasks.length + ' task' + (runningTasks.length === 1 ? '' : 's') + ')'
         : (etaLabel || (activeMission ? 'ETA: tracking live work' : 'ETA: no active mission'));
       if (eta) eta.textContent = runningLabel;
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;

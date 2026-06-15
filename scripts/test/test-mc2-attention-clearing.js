@@ -14,6 +14,8 @@ assert(source.includes('function mc2ProposedSuggestedTaskNeedsApproval'), 'atten
 assert(source.includes("status === 'rejected' || status === 'completed' || status === 'accepted'"), 'finished suggestedTasks clear attention');
 assert(source.includes('suggestedTaskIsOnMission(suggestedTask)'), 'tasks already on missions clear proposal attention');
 assert(source.includes("return status === 'proposed' || status === 'open'"), 'only open proposals need attention');
-assert(source.includes('return mc2ProposedSuggestedTaskNeedsApproval(it);'), 'collector uses attention helper');
+assert(source.includes('mc2ProposedSuggestedTaskNeedsApproval(it)'), 'collector uses attention helper');
+assert(source.includes("it.kind === 'task' && String(it.status || '').toLowerCase() === 'doing'"), 'ETA counts in-progress tasks only');
+assert(source.includes("' task' + (runningTasks.length === 1 ? '' : 's')"), 'ETA label uses task count not missions');
 
 console.log('mc2 attention clearing tests passed');
