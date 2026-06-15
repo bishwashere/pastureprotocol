@@ -353,7 +353,7 @@
               action: 'mission-input',
               missionId: missionId,
               taskId: String(sg.id || ''),
-              title: '\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d',
+              title: taskTitle.slice(0, 96) + (taskTitle.length > 96 ? '\u2026' : ''),
               subtitle: String(g.title || g.objective || 'Mission').trim()
                 + ' · waiting ' + mc2ShortWaitTime(taskTs),
               ts: taskTs,
