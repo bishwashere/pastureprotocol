@@ -1564,53 +1564,39 @@
       flex-wrap: wrap;
     }
     .config-view-toggle { margin: 0; border-bottom: none; padding-bottom: 0; }
-    .config-section-tiles-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    .config-section-tile {
-      display: block;
-      width: 100%;
-      text-align: left;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.65rem 0.75rem;
-      cursor: pointer;
-      font: inherit;
-      color: var(--text);
-      transition: border-color 0.15s ease, background 0.15s ease;
-    }
-    .config-section-tile:hover { border-color: var(--muted); }
-    .config-section-tile.active {
-      border-color: var(--accent);
-      background: var(--bg);
-    }
-    .config-section-tile-title {
-      display: block;
-      font-weight: 500;
-      font-size: 0.9rem;
-      line-height: 1.3;
-      color: var(--text);
-    }
-    .config-section-tile-desc {
-      display: block;
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-top: 0.2rem;
-      line-height: 1.35;
+    .config-section-nav {
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
     }
     .config-section-panel { display: none; }
     .config-section-panel.active { display: block; }
     .config-section-body { padding: 0; }
-    .config-section-heading {
-      margin: 0 0 0.75rem 0;
-      font-size: 0.95rem;
+    .config-tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .config-tile-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      background: var(--card);
+    }
+    .config-tile-card-wide { grid-column: 1 / -1; }
+    .config-tile-card-title,
+    .config-model-card h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.9rem;
       font-weight: 500;
       color: var(--accent);
     }
+    .config-tile-card .field input,
+    .config-tile-card .field select,
+    .config-tile-card .field textarea,
+    .config-model-card .field input,
+    .config-model-card .field select { max-width: none; width: 100%; }
+    .config-tile-card .skill-meta { margin-top: 0; }
     .config-agents-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1666,9 +1652,10 @@
       font-size: 0.9rem;
     }
     .config-section-body .field textarea { max-width: none; min-height: 4rem; resize: vertical; }
-    .config-models-grid {
+    .config-models-grid,
+    .config-tiles-grid.config-models-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.75rem;
       margin-bottom: 0.75rem;
     }
@@ -1678,9 +1665,6 @@
       padding: 0.75rem;
       background: var(--card);
     }
-    .config-model-card h4 { margin: 0 0 0.5rem 0; font-size: 0.9rem; }
-    .config-model-card .field input,
-    .config-model-card .field select { max-width: none; width: 100%; }
     .config-priority-row label { font-size: 0.88rem; }
     .config-skills-grid {
       display: flex;
