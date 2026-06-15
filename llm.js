@@ -204,6 +204,94 @@ function isDailyLimitFallbackError(err) {
   return err?.code === 'LLM_DAILY_LIMIT';
 }
 
+/** Cloud retries before falling back to the next model (local). */
+export const CLOUD_MAX_ATTEMPTS = 3;
+const CLOUD_RETRY_DELAYS_MS = [600, 1800];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function summarizeLlmError(message = '', max = 160) {
+  const s = String(message || '').replace(/\s+/g, ' ').trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+/** True for transient provider/network failures worth retrying on the same model. */
+export function isTransientCloudError(err) {
+  if (!err || isDailyLimitError(err) || isLocalRateLimitError(err)) return false;
+  const msg = String(err?.message || err || '');
+  if (/LLM request failed 401\b/i.test(msg)) return false;
+  if (/invalid api key|incorrect api key|authentication header/i.test(msg)) return false;
+  if (/LLM request failed 400\b/i.test(msg)) return false;
+  if (/LLM request failed 404\b/i.test(msg)) return false;
+  if (/LLM request failed 431\b/i.test(msg)) return false;
+  if (/model not found|invalid argument/i.test(msg)) return false;
+  if (/LLM request failed 429\b/i.test(msg)) return true;
+  if (/LLM request failed 5\d\d\b/i.test(msg)) return true;
+  if (/520|503|502|504|529|upstream connect|connection termination|fetch failed|ECONNRESET|ETIMEDOUT|network error|socket hang up/i.test(msg)) {
+    return true;
+  }
+  return false;
+}
+
+async function runModelWithRetries({
+  label,
+  isLocal,
+  llmCtx,
+  toolCount = 0,
+  callFactory,
+  parseOkResponse,
+}) {
+  const maxAttempts = isLocal ? 1 : CLOUD_MAX_ATTEMPTS;
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await callFactory({ countUsage: attempt === 1 });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`LLM request failed ${res.status}: ${text}`);
+      }
+      const parsed = await parseOkResponse(res);
+      if (attempt > 1) {
+        console.log(`[LLM] used: ${label} (after ${attempt} attempts${toolCount ? ', with tools' : ''})`);
+      } else {
+        console.log(`[LLM] used: ${label}${toolCount ? ' (with tools)' : ''}`);
+      }
+      endLlmCall(llmCtx, {
+        model: label,
+        status: 'ok',
+        toolCount,
+        detail: { attempts: attempt, ...(parsed.detail || {}) },
+      });
+      return parsed.result;
+    } catch (err) {
+      lastError = err;
+      if (isLocalRateLimitError(err)) throw err;
+      if (isDailyLimitFallbackError(err)) throw err;
+      const canRetry = !isLocal && attempt < maxAttempts && isTransientCloudError(err);
+      if (canRetry) {
+        const delay = CLOUD_RETRY_DELAYS_MS[attempt - 1] || 2000;
+        console.log(
+          `[LLM] transient error on ${label} (attempt ${attempt}/${maxAttempts}), retry in ${delay}ms:`,
+          summarizeLlmError(err?.message),
+        );
+        await sleep(delay);
+        continue;
+      }
+      endLlmCall(llmCtx, {
+        model: label,
+        status: 'error',
+        message: err?.message || String(err),
+        toolCount,
+        detail: { attempts: attempt },
+      });
+      throw err;
+    }
+  }
+  throw lastError || new Error('LLM call failed');
+}
+
 // ---------------------------------------------------------------------------
 
 /** If config value is an env var name (e.g. "LLM_API_KEY"), return process.env[value]; else return value. */
@@ -480,10 +568,11 @@ function openaiUsesMaxCompletionTokens(model) {
   return typeof model === 'string' && /^gpt-5/.test(model);
 }
 
-function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '', localRpm = DEFAULT_LOCAL_RPM) {
+function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '', localRpm = DEFAULT_LOCAL_RPM, callOpts = {}) {
   const isLocal = /127\.0\.0\.1|localhost/i.test(baseUrl || '');
+  const countUsage = callOpts.countUsage !== false;
   if (!isLocal) {
-    checkAndTrackCloudLimit(dailyLimit);
+    if (countUsage) checkAndTrackCloudLimit(dailyLimit);
   } else {
     checkLocalRateLimit(baseUrl, localRpm, getActiveTrace()?.id ?? null);
   }
@@ -527,19 +616,20 @@ export async function chat(messages, options = {}) {
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
-      const res = await callOne(messages, opts, null, dailyLimit, purpose, localRpm);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`LLM request failed ${res.status}: ${text}`);
-      }
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (content == null) throw new Error('No content in LLM response');
-      console.log('[LLM] used:', label);
-      endLlmCall(llmCtx, { model: label, status: 'ok' });
-      return content.trim();
+      const content = await runModelWithRetries({
+        label,
+        isLocal,
+        llmCtx,
+        callFactory: ({ countUsage }) => callOne(messages, opts, null, dailyLimit, purpose, localRpm, { countUsage }),
+        parseOkResponse: async (res) => {
+          const data = await res.json();
+          const text = data.choices?.[0]?.message?.content;
+          if (text == null) throw new Error('No content in LLM response');
+          return { result: text.trim() };
+        },
+      });
+      return content;
     } catch (err) {
-      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isLocalRateLimitError(err)) {
         console.log('[LLM] local rate limit reached, rejecting request:', err.message);
         throw err;
@@ -553,12 +643,11 @@ export async function chat(messages, options = {}) {
         console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
         localError = err;
       } else {
-        console.log('[LLM] try failed:', label, err.message);
+        console.log('[LLM] try failed:', label, summarizeLlmError(err?.message));
       }
       lastError = err;
     }
   }
-  // Surface the root cause: when local went down and cloud also failed, report the local failure
   throw localError || lastError || new Error('No LLM configured');
 }
 
@@ -581,31 +670,32 @@ export async function chatWithTools(messages, tools, options = {}) {
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId, toolCount });
     try {
-      const res = await callOne(messages, opts, tools, dailyLimit, purpose, localRpm);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`LLM request failed ${res.status}: ${text}`);
-      }
-      const data = await res.json();
-      const msg = data.choices?.[0]?.message;
-      if (!msg) throw new Error('No message in LLM response');
-      const content = (msg.content && String(msg.content).trim()) || '';
-      const rawCalls = msg.tool_calls || [];
-      const toolCalls = rawCalls.map((tc) => ({
-        id: tc.id || '',
-        name: tc.function?.name || '',
-        arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
-      }));
-      console.log('[LLM] used:', label, toolCalls.length ? '(with tools)' : '');
-      endLlmCall(llmCtx, {
-        model: label,
-        status: 'ok',
+      return await runModelWithRetries({
+        label,
+        isLocal,
+        llmCtx,
         toolCount,
-        detail: { returnedToolCalls: toolCalls.length },
+        callFactory: ({ countUsage }) => callOne(messages, opts, tools, dailyLimit, purpose, localRpm, { countUsage }),
+        parseOkResponse: async (res) => {
+          const data = await res.json();
+          const msg = data.choices?.[0]?.message;
+          if (!msg) throw new Error('No message in LLM response');
+          const content = (msg.content && String(msg.content).trim()) || '';
+          const rawCalls = msg.tool_calls || [];
+          const toolCalls = rawCalls.map((tc) => ({
+            id: tc.id || '',
+            name: tc.function?.name || '',
+            arguments: typeof tc.function?.arguments === 'string'
+              ? tc.function.arguments
+              : JSON.stringify(tc.function?.arguments || {}),
+          }));
+          return {
+            result: { content, toolCalls },
+            detail: { returnedToolCalls: toolCalls.length },
+          };
+        },
       });
-      return { content, toolCalls };
     } catch (err) {
-      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err), toolCount });
       if (isLocalRateLimitError(err)) {
         console.log('[LLM] local rate limit reached, rejecting request:', err.message);
         throw err;
@@ -619,12 +709,11 @@ export async function chatWithTools(messages, tools, options = {}) {
         console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
         localError = err;
       } else {
-        console.log('[LLM] try failed:', label, err.message);
+        console.log('[LLM] try failed:', label, summarizeLlmError(err?.message));
       }
       lastError = err;
     }
   }
-  // Surface the root cause: when local went down and cloud also failed, report the local failure
   throw localError || lastError || new Error('No LLM configured');
 }
 
@@ -657,32 +746,34 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
-      const res = await Promise.race([
-        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit, purpose, localRpm),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
-      ]);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`LLM request failed ${res.status}: ${text}`);
-      }
-      const data = await res.json();
-      const content = (data.choices?.[0]?.message?.content || '').trim().toUpperCase();
-      let intent = 'CHAT';
-      if (content.includes('SCHEDULE_LIST')) intent = 'SCHEDULE_LIST';
-      else if (content.includes('SCHEDULE_CREATE')) intent = 'SCHEDULE_CREATE';
-      else if (content.includes('SCHEDULE')) intent = 'SCHEDULE_CREATE';
-      else if (content.includes('SEARCH')) intent = 'SEARCH';
-      // Fallback: if user clearly asked about weather/time/news and model said CHAT, force SEARCH
-      const lower = (userMessage || '').trim().toLowerCase();
-      if (intent === 'CHAT' && (/\bweather\b/.test(lower) || /\b(current )?time\b/.test(lower) || /\b(latest|recent|today'?s?) (news|headlines)\b/.test(lower))) {
-        intent = 'SEARCH';
-      }
-      endLlmCall(llmCtx, { model: label, status: 'ok', detail: { intent } });
+      const intent = await runModelWithRetries({
+        label,
+        isLocal,
+        llmCtx,
+        callFactory: ({ countUsage }) => Promise.race([
+          callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit, purpose, localRpm, { countUsage }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
+        ]),
+        parseOkResponse: async (res) => {
+          const data = await res.json();
+          const content = (data.choices?.[0]?.message?.content || '').trim().toUpperCase();
+          let intent = 'CHAT';
+          if (content.includes('SCHEDULE_LIST')) intent = 'SCHEDULE_LIST';
+          else if (content.includes('SCHEDULE_CREATE')) intent = 'SCHEDULE_CREATE';
+          else if (content.includes('SCHEDULE')) intent = 'SCHEDULE_CREATE';
+          else if (content.includes('SEARCH')) intent = 'SEARCH';
+          const lower = (userMessage || '').trim().toLowerCase();
+          if (intent === 'CHAT' && (/\bweather\b/.test(lower) || /\b(current )?time\b/.test(lower) || /\b(latest|recent|today'?s?) (news|headlines)\b/.test(lower))) {
+            intent = 'SEARCH';
+          }
+          return { result: intent, detail: { intent } };
+        },
+      });
       return intent;
     } catch (err) {
-      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isLocalRateLimitError(err)) {
         console.log('[LLM] local rate limit reached, rejecting intent request:', err.message);
         throw err;
@@ -692,7 +783,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
         lastError = err;
         continue;
       }
-      console.log('[LLM] intent try failed:', label, err.message);
+      console.log('[LLM] intent try failed:', label, summarizeLlmError(err?.message));
       lastError = err;
     }
   }
