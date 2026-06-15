@@ -135,6 +135,10 @@ const checks = [
       html.includes('/api/missions/') &&
       html.includes('/respond') &&
       html.includes('team-user-input-modal-submit') &&
+      html.includes('teamUserInputDismissKey') &&
+      html.includes('isTeamUserInputDismissed') &&
+      html.includes('markTeamUserInputDismissed') &&
+      !/teamUserInputDismissKey\(mission\)[\s\S]{0,80}missionAttentionPrompt/.test(html) &&
       html.includes('Implementation blocked') &&
       html.includes('Research continues'),
   },

@@ -4034,7 +4034,41 @@
     }
 
     function teamUserInputDismissKey(mission) {
-      return String(mission.id || '') + '::' + missionAttentionPrompt(mission).slice(0, 240);
+      if (!mission) return '';
+      var id = String(mission.id || '').trim();
+      if (!id) return '';
+      var ask = String(mission.needsUserInput || '').trim();
+      if (ask && !isOrphanedLetterPrompt(ask)) {
+        return id + '::ask::' + ask.replace(/\s+/g, ' ').trim().slice(0, 160);
+      }
+      var blocked = collectBlockedTasksForMission(mission);
+      if (blocked.length) {
+        var ids = blocked.map(function (t) {
+          return String(t.id || stripBlockerTitlePrefix(String(t.title || '')).toLowerCase()).trim();
+        }).filter(Boolean).sort().join('|');
+        return id + '::blockers::' + ids.slice(0, 240);
+      }
+      if (String(mission.status || '').toLowerCase() === 'blocked') {
+        return id + '::mission-blocked';
+      }
+      return id;
+    }
+
+    function isTeamUserInputDismissed(mission) {
+      if (!mission) return false;
+      var key = teamUserInputDismissKey(mission);
+      if (key && teamUserInputDismissed[key]) return true;
+      var id = String(mission.id || '').trim();
+      return !!(id && teamUserInputDismissed[id + '::snooze']);
+    }
+
+    function markTeamUserInputDismissed(mission) {
+      if (!mission) return;
+      var key = teamUserInputDismissKey(mission);
+      if (key) teamUserInputDismissed[key] = true;
+      var id = String(mission.id || '').trim();
+      if (id) teamUserInputDismissed[id + '::snooze'] = true;
+      saveTeamUserInputDismissed();
     }
 
     function isTeamUserInputModalOpen() {
@@ -4097,6 +4131,7 @@
       var textEl = document.getElementById('team-user-input-modal-text');
       var cardEl = modal ? modal.querySelector('.team-user-input-modal-card') : null;
       if (!modal || !mission) return;
+      wireTeamUserInputModal();
       var id = String(mission.id || '');
       var ask = String(opts.ask || mission.needsUserInput || '').trim();
       if (!ask) ask = missionAttentionPrompt(mission);
@@ -5179,7 +5214,7 @@
       }
       if (!modal) return;
       var missions = getMissionsNeedingUserInput().filter(function (g) {
-        return !teamUserInputDismissed[teamUserInputDismissKey(g)];
+        return !isTeamUserInputDismissed(g);
       });
       if (modalOpen) {
         if (teamUserInputMissionId) {
@@ -5234,13 +5269,21 @@
 
     function wireTeamUserInputModal() {
       if (teamUserInputModalWired) return;
+      if (!document.getElementById('team-user-input-modal-dismiss')) return;
       teamUserInputModalWired = true;
       loadTeamUserInputDismissed();
       wireClick('team-user-input-modal-dismiss', function () {
-        var missions = getMissionsNeedingUserInput();
-        var mission = missions.find(function (g) { return String(g.id || '') === teamUserInputMissionId; }) || missions[0];
-        if (mission) teamUserInputDismissed[teamUserInputDismissKey(mission)] = true;
-        saveTeamUserInputDismissed();
+        var id = String(teamUserInputMissionId || '').trim();
+        var mission = id
+          ? (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
+            return String(g.id || '') === id;
+          })
+          : null;
+        if (!mission) {
+          var missions = getMissionsNeedingUserInput();
+          mission = missions.find(function (g) { return String(g.id || '') === id; }) || missions[0] || null;
+        }
+        markTeamUserInputDismissed(mission);
         closeTeamUserInputModal();
       });
       wireClick('team-user-input-modal-submit', function () {
@@ -5255,10 +5298,17 @@
       });
       wireEl('team-user-input-modal', 'click', function (ev) {
         if (ev.target === ev.currentTarget) {
-          var missions = getMissionsNeedingUserInput();
-          var mission = missions.find(function (g) { return String(g.id || '') === teamUserInputMissionId; }) || missions[0];
-          if (mission) teamUserInputDismissed[teamUserInputDismissKey(mission)] = true;
-          saveTeamUserInputDismissed();
+          var id = String(teamUserInputMissionId || '').trim();
+          var mission = id
+            ? (Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : []).find(function (g) {
+              return String(g.id || '') === id;
+            })
+            : null;
+          if (!mission) {
+            var missions = getMissionsNeedingUserInput();
+            mission = missions.find(function (g) { return String(g.id || '') === id; }) || missions[0] || null;
+          }
+          markTeamUserInputDismissed(mission);
           closeTeamUserInputModal();
         }
       });
