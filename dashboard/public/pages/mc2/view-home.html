@@ -23,9 +23,13 @@
           <div class="mc-stat-label">Open</div>
           <div class="mc-stat-value waiting" id="mc2-stat-open">0</div>
         </button>
-        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="attention" aria-label="Scroll to items needing attention">
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="attention" aria-label="Scroll to blocked items needing your input">
           <div class="mc-stat-label">Needs Attention</div>
           <div class="mc-stat-value blocked" id="mc2-stat-attention">0</div>
+        </button>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="proposed" aria-label="Scroll to proposed items awaiting approval">
+          <div class="mc-stat-label">Proposed</div>
+          <div class="mc-stat-value proposed" id="mc2-stat-proposed">0</div>
         </button>
         <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="completed" aria-label="Scroll to completed work">
           <div class="mc-stat-label">Completed</div>
@@ -57,6 +61,10 @@
       <div class="mc-kanban-col-head">NEEDS ATTENTION <span class="mc-kanban-col-count" id="mc2-col-count-attention">0</span></div>
       <div class="mc-kanban-col-body" id="mc2-col-attention"><p class="mc-kanban-empty">All clear</p></div>
     </div>
+    <div class="mc-kanban-col">
+      <div class="mc-kanban-col-head">PROPOSED <span class="mc-kanban-col-count" id="mc2-col-count-proposed">0</span></div>
+      <div class="mc-kanban-col-body" id="mc2-col-proposed"><p class="mc-kanban-empty">Nothing to review</p></div>
+    </div>
   </div>
 
   <!-- Bottom row -->
@@ -73,7 +81,7 @@
       <div class="mc-panel-body" id="mc2-attention">
         <p class="mc-kanban-empty">All clear.</p>
       </div>
-      <button type="button" class="mc-panel-link" data-mc-action="kanban-focus" data-kanban-col="attention">View action queue →</button>
+      <button type="button" class="mc-panel-link" data-mc-action="kanban-focus" data-kanban-col="proposed">View proposed items →</button>
     </div>
   </div>
 </div>

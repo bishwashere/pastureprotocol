@@ -69,7 +69,7 @@
 
 .mc-stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.45rem;
   align-items: stretch;
 }
@@ -128,6 +128,7 @@ button.mc-stat-card-action:focus-visible {
 .mc-stat-value.active  { color: #22c55e; }
 .mc-stat-value.waiting { color: #eab308; }
 .mc-stat-value.blocked { color: #ef4444; }
+.mc-stat-value.proposed { color: #a78bfa; }
 .mc-stat-value.done    { color: #60a5fa; }
 .mc-stat-value.pace    { color: var(--accent); }
 
@@ -135,7 +136,7 @@ button.mc-stat-card-action:focus-visible {
 
 .mc-kanban {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.55rem;
 }
 
@@ -343,7 +344,7 @@ button.mc-stat-card-action:focus-visible {
 }
 
 .mc-stat-grid {
-  grid-template-columns: repeat(5, minmax(6.2rem, 1fr));
+  grid-template-columns: repeat(6, minmax(6.2rem, 1fr));
   margin-top: 0.35rem;
   align-items: stretch;
 }
@@ -545,7 +546,7 @@ button.mc-stat-card.mc-stat-card-action {
 }
 
 .mc-stat-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.6rem;
   margin-top: 0;
 }
@@ -584,7 +585,7 @@ button.mc-stat-card.mc-stat-card-action {
     grid-template-columns: 1fr;
   }
   .mc-stat-grid {
-    grid-template-columns: repeat(5, minmax(6.4rem, 1fr));
+    grid-template-columns: repeat(6, minmax(6.4rem, 1fr));
     overflow-x: auto;
   }
 }
@@ -593,6 +594,19 @@ button.mc-stat-card.mc-stat-card-action {
 #mc2-view-mission .mc-bottom-row .mc-panel-body {
   flex: none;
   overflow: visible;
+}
+
+.mc-action-queue-label {
+  margin: 0.55rem 0 0.35rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mc-action-queue-label:first-child {
+  margin-top: 0;
 }
 
 /* ── Task timing bar inside kanban cards ───────────────────────────────────── */

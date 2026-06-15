@@ -337,11 +337,16 @@ const checks = [
       html.includes('mc2CollectKanbanProgressItems().length') &&
       html.includes('mc2CollectKanbanOpenItems().length') &&
       html.includes('mc2CollectKanbanAttentionItems().length') &&
+      html.includes('mc2CollectKanbanProposedItems().length') &&
+      html.includes('function mc2CollectBlockersNeedingAttention') &&
+      html.includes('function mc2CollectApprovalQueueItems') &&
       html.includes('id="mc2-stat-open"') &&
       html.includes('id="mc2-stat-attention"') &&
+      html.includes('id="mc2-stat-proposed"') &&
+      html.includes('id="mc2-col-proposed"') &&
+      html.includes('PROPOSED') &&
       html.includes('data-mc-action="kanban-focus"') &&
-      html.includes('data-kanban-col="attention"') &&
-      html.includes('View action queue'),
+      html.includes('View proposed items'),
   },
   {
     name: 'Team2 attention lists blocked tasks needing input',

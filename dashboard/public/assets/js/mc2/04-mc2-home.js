@@ -7,6 +7,7 @@
         open: mc2CollectKanbanOpenItems().length,
         completed: mc2CollectKanbanCompletedItems().length,
         needsAttention: mc2CollectKanbanAttentionItems().length,
+        proposed: mc2CollectKanbanProposedItems().length,
       };
     }
 
@@ -16,6 +17,7 @@
         open: 'mc2-col-open',
         completed: 'mc2-col-completed',
         attention: 'mc2-col-attention',
+        proposed: 'mc2-col-proposed',
       }[String(col || '').trim()];
       if (!colId) return;
       var body = mc2El(colId);
@@ -74,6 +76,7 @@
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = counts.inProgress;
       var statOpen = mc2El('mc2-stat-open'); if (statOpen) statOpen.textContent = counts.open;
       var statAttention = mc2El('mc2-stat-attention'); if (statAttention) statAttention.textContent = counts.needsAttention;
+      var statProposed = mc2El('mc2-stat-proposed'); if (statProposed) statProposed.textContent = counts.proposed;
       var statDone = mc2El('mc2-stat-done'); if (statDone) statDone.textContent = counts.completed;
       var statPace = mc2El('mc2-stat-pace');
       if (statPace) {
@@ -296,7 +299,7 @@
       items.push(item);
     }
 
-    function mc2CollectActionRequiredItems() {
+    function mc2CollectBlockersNeedingAttention() {
       var items = [];
       var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var allWork = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
@@ -378,11 +381,53 @@
         });
       });
 
-      // Proposed suggested tasks and pending mission plans are not blockers — they live in
-      // the approvals badge, pending banners, and mission/task views instead.
+      items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+      return items;
+    }
+
+    function mc2CollectApprovalQueueItems() {
+      var items = [];
+      var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : [];
+      suggestedTasks.forEach(function (it) {
+        if (selectedTeamMissionId) {
+          var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
+          if (ids.indexOf(selectedTeamMissionId) < 0) return;
+        }
+        var suggestedTaskId = String(it.id || '');
+        var ts = Number(it.updatedAt) || 0;
+        if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return;
+        mc2PushActionRequiredItem(items, {
+          kind: 'warning',
+          action: 'suggestedTask-review',
+          suggestedTaskId: suggestedTaskId,
+          title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
+          tag: 'Proposed',
+          discoveryType: String(it.type || 'observation').toLowerCase(),
+          subtitle: mc2ProposedSuggestedTaskSubtitle(it),
+          ts: ts,
+        });
+      });
+
+      mc2PendingItems().forEach(function (p) {
+        var pendingId = String(p.id || '');
+        var ts = Number(p.createdAt) || 0;
+        mc2PushActionRequiredItem(items, {
+          kind: 'warning',
+          action: 'pending',
+          pendingId: pendingId,
+          title: String(mc2PendingTitle(p) || 'Pending approval').trim().slice(0, 96),
+          subtitle: 'Awaiting your approval · ' + mc2ShortWaitTime(ts),
+          ts: ts,
+        });
+      });
 
       items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
       return items;
+    }
+
+    function mc2CollectActionRequiredItems() {
+      return mc2CollectBlockersNeedingAttention().concat(mc2CollectApprovalQueueItems())
+        .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
     }
 
     function mc2MapKanbanAttentionItem(item) {
@@ -404,7 +449,11 @@
     }
 
     function mc2CollectKanbanAttentionItems() {
-      return mc2CollectActionRequiredItems().map(mc2MapKanbanAttentionItem);
+      return mc2CollectBlockersNeedingAttention().map(mc2MapKanbanAttentionItem);
+    }
+
+    function mc2CollectKanbanProposedItems() {
+      return mc2CollectApprovalQueueItems().map(mc2MapKanbanAttentionItem);
     }
 
     function mc2CollectKanbanCompletedItems() {
@@ -560,6 +609,7 @@
     var MC2_KANBAN_DISPLAY_LIMIT = 3;
     var mc2KanbanColExpanded = {
       attention: false,
+      proposed: false,
       completed: false,
       progress: false,
       discoveries: false,
@@ -659,6 +709,14 @@
         'All clear',
         'attention'
       );
+      mc2RenderKanbanCol(
+        'mc2-col-proposed',
+        'mc2-col-count-proposed',
+        mc2CollectKanbanProposedItems(),
+        mc2KanbanAttentionCard,
+        'Nothing to review',
+        'proposed'
+      );
     }
 
     function mc2RenderAgentsOverview() {
@@ -721,3 +779,5 @@
 
     window.computeMc2HomeCounts = computeMc2HomeCounts;
     window.mc2FocusKanbanColumn = mc2FocusKanbanColumn;
+    window.mc2CollectBlockersNeedingAttention = mc2CollectBlockersNeedingAttention;
+    window.mc2CollectApprovalQueueItems = mc2CollectApprovalQueueItems;

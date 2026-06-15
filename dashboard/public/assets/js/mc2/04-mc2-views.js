@@ -17,29 +17,48 @@
       mc2SyncTimelineHighlightForScroll();
     }
 
+    function mc2RenderAttentionItemButton(item) {
+      var icon = item.kind === 'error' ? '🔴' : (item.tag ? '💡' : '→');
+      var attrs = ' type="button" class="mc-attention-item mc-attention-item-structured ' + item.kind + '" data-attention-action="' + escapeHtml(item.action || '') + '"';
+      if (item.missionId) attrs += ' data-mission-id="' + escapeHtml(item.missionId) + '"';
+      if (item.taskId) attrs += ' data-task-id="' + escapeHtml(item.taskId) + '"';
+      if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
+      if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
+      if (item.suggestedTaskId) attrs += ' data-suggestedTask-id="' + escapeHtml(item.suggestedTaskId) + '"';
+      return '<button' + attrs + '>' +
+        '<span class="mc-attention-icon">' + icon + '</span>' +
+        '<span class="mc-attention-copy">' +
+          '<span class="mc-attention-title">' + escapeHtml(item.title) +
+            (item.tag ? ' ' + mc2AutoPromotedTagHtml('mc-attention-tag') : '') +
+          '</span>' +
+          (item.subtitle ? '<span class="mc-attention-sub">' + escapeHtml(item.subtitle) + '</span>' : '') +
+        '</span>' +
+      '</button>';
+    }
+
     function mc2RenderAttention() {
       var el = mc2El('mc2-attention');
       if (!el) return;
-      var items = mc2CollectActionRequiredItems();
-      if (!items.length) { el.innerHTML = '<p class="mc-kanban-empty">All clear.</p>'; return; }
-      el.innerHTML = items.slice(0, 6).map(function (item) {
-        var icon = item.kind === 'error' ? '🔴' : '→';
-        var attrs = ' type="button" class="mc-attention-item mc-attention-item-structured ' + item.kind + '" data-attention-action="' + escapeHtml(item.action || '') + '"';
-        if (item.missionId) attrs += ' data-mission-id="' + escapeHtml(item.missionId) + '"';
-        if (item.taskId) attrs += ' data-task-id="' + escapeHtml(item.taskId) + '"';
-        if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
-        if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
-        if (item.suggestedTaskId) attrs += ' data-suggestedTask-id="' + escapeHtml(item.suggestedTaskId) + '"';
-        return '<button' + attrs + '>' +
-          '<span class="mc-attention-icon">' + icon + '</span>' +
-          '<span class="mc-attention-copy">' +
-            '<span class="mc-attention-title">' + escapeHtml(item.title) +
-              (item.tag ? ' ' + mc2AutoPromotedTagHtml('mc-attention-tag') : '') +
-            '</span>' +
-            (item.subtitle ? '<span class="mc-attention-sub">' + escapeHtml(item.subtitle) + '</span>' : '') +
-          '</span>' +
-        '</button>';
-      }).join('');
+      var blockers = typeof mc2CollectBlockersNeedingAttention === 'function'
+        ? mc2CollectBlockersNeedingAttention()
+        : [];
+      var approvals = typeof mc2CollectApprovalQueueItems === 'function'
+        ? mc2CollectApprovalQueueItems()
+        : [];
+      if (!blockers.length && !approvals.length) {
+        el.innerHTML = '<p class="mc-kanban-empty">All clear.</p>';
+        return;
+      }
+      var html = '';
+      if (blockers.length) {
+        html += '<p class="mc-action-queue-label">Blocked — needs your input</p>';
+        html += blockers.slice(0, 4).map(mc2RenderAttentionItemButton).join('');
+      }
+      if (approvals.length) {
+        html += '<p class="mc-action-queue-label">Proposed — awaiting approval</p>';
+        html += approvals.slice(0, 4).map(mc2RenderAttentionItemButton).join('');
+      }
+      el.innerHTML = html;
     }
 
     function mc2MissionById(missionId) {
