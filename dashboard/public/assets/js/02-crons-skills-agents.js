@@ -1373,8 +1373,16 @@ async function fetchCrons() {
       ul.innerHTML = list.map(function (a) {
         var selected = a.id === configSelectedAgentId ? 'selected' : '';
         var title = (a.title && String(a.title).trim()) ? String(a.title).trim() : '';
-        var label = title ? escapeHtml(title) + ' <span class="skill-meta">(' + escapeHtml(a.id) + ')</span>' : escapeHtml(a.id);
-        return '<li class="' + selected + '"><button type="button" class="link" data-config-agent-id="' + escapeHtml(a.id) + '">' + label + '</button></li>';
+        var titleHtml = title
+          ? '<span class="config-agent-card-title">' + escapeHtml(title) + '</span>'
+          : '<span class="config-agent-card-title">' + escapeHtml(a.id) + '</span>';
+        var idHtml = title
+          ? '<span class="config-agent-card-id">' + escapeHtml(a.id) + '</span>'
+          : '';
+        return '<li class="config-agent-card ' + selected + '">' +
+          '<button type="button" class="config-agent-card-btn" data-config-agent-id="' + escapeHtml(a.id) + '">' +
+          titleHtml + idHtml +
+          '</button></li>';
       }).join('');
       ul.querySelectorAll('button[data-config-agent-id]').forEach(function (btn) {
         btn.addEventListener('click', function () { selectConfigAgent(btn.getAttribute('data-config-agent-id')); });
