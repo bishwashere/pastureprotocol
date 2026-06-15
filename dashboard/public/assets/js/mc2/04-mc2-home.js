@@ -303,85 +303,110 @@
       var items = [];
       var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var allWork = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
-      var missionsWithInput = {};
-      missions.forEach(function (g) {
-        var missionId = String(g.id || '');
-        var ask = String(g.needsUserInput || '').trim();
-        if (!missionId || !ask) return;
-        if (typeof isOrphanedLetterPrompt === 'function' && isOrphanedLetterPrompt(ask)) return;
-        missionsWithInput[missionId] = true;
+
+      // Agent errors are team-wide — show even when a single mission is selected.
+      allWork.forEach(function (it) {
+        if (it.kind !== 'agent') return;
+        if (String(it.status || '').toLowerCase() !== 'blocked') return;
+        var agentId = String(it.agentId || it.assignee || '').trim();
+        var ts = Number(it.updatedAt) || 0;
+        mc2PushActionRequiredItem(items, {
+          kind: 'error',
+          action: 'agent',
+          agentId: agentId,
+          title: String(it.title || 'Agent blocked').trim().slice(0, 96),
+          subtitle: agentNameById(agentId) + ' · waiting ' + mc2ShortWaitTime(ts),
+          ts: ts,
+        });
       });
 
-      allWork.forEach(function (it) {
-        if (String(it.status || '').toLowerCase() !== 'blocked') return;
-        if (!mc2MatchesSelectedMission(it.missionId)) return;
-        var ts = Number(it.updatedAt) || 0;
-        if (it.kind === 'agent') {
-          var agentId = String(it.agentId || it.assignee || '').trim();
+      // Use the same rules as the team input modal (missionNeedsAttention), not raw status===blocked.
+      missions.forEach(function (g) {
+        var missionId = String(g.id || '');
+        if (!missionId || !mc2MatchesSelectedMission(missionId)) return;
+        if (typeof missionNeedsAttention === 'function' && !missionNeedsAttention(g)) return;
+
+        var ts = Number(g.updatedAt) || 0;
+        var missionTitle = String(g.title || g.objective || 'Mission').trim();
+        var needsInput = String(g.needsUserInput || '').trim();
+        var hasValidAsk = needsInput &&
+          !(typeof isOrphanedLetterPrompt === 'function' && isOrphanedLetterPrompt(needsInput));
+
+        if (hasValidAsk) {
           mc2PushActionRequiredItem(items, {
-            kind: 'error',
-            action: 'agent',
-            agentId: agentId,
-            title: String(it.title || 'Agent blocked').trim().slice(0, 96),
-            subtitle: agentNameById(agentId) + ' · waiting ' + mc2ShortWaitTime(ts),
+            kind: 'warning',
+            action: 'mission-input',
+            missionId: missionId,
+            isMission: true,
+            title: needsInput.slice(0, 96),
+            subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
           });
           return;
         }
-        if (it.kind === 'mission') {
-          var blockedMissionId = String(it.missionId || '');
-          var blockedTitle = String(it.description || it.title || 'Mission blocked').trim().slice(0, 96) || 'Mission blocked';
+
+        if (String(g.status || '').toLowerCase() === 'blocked') {
           mc2PushActionRequiredItem(items, {
             kind: 'error',
             action: 'mission-input',
-            missionId: blockedMissionId,
+            missionId: missionId,
             isMission: true,
-            title: blockedTitle,
-            subtitle: mc2MissionWaitSubtitle(
-              missions.find(function (g) { return String(g.id || '') === blockedMissionId; }) || { title: it.title },
-              ts
-            ),
+            title: String(g.blockedReason || missionTitle || 'Mission blocked').trim().slice(0, 96),
+            subtitle: mc2MissionWaitSubtitle(g, ts),
             ts: ts,
           });
           return;
         }
-        if (missionsWithInput[String(it.missionId || '')]) return;
-        var taskTitle = String(it.title || 'Blocked task').trim();
-        mc2PushActionRequiredItem(items, {
-          kind: 'error',
-          action: 'mission-input',
-          missionId: String(it.missionId || ''),
-          taskId: String(it.taskId || ''),
-          title: '\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d',
-          subtitle: it.missionTitle
-            ? (it.missionTitle + ' · waiting ' + mc2ShortWaitTime(ts))
-            : ('Mission · waiting ' + mc2ShortWaitTime(ts)),
-          ts: ts,
-          status: 'blocked',
-          createdAt: Number(it.createdAt) || 0,
-          startedAt: Number(it.startedAt) || 0,
-          waitingSince: Number(it.waitingSince) || 0,
-        });
+
+        var blockedTasks = typeof collectBlockedTasksForMission === 'function'
+          ? collectBlockedTasksForMission(g)
+          : [];
+        if (blockedTasks.length) {
+          blockedTasks.forEach(function (sg) {
+            var taskTitle = String(sg.title || 'Blocked task').trim();
+            var taskTs = Number(sg.updatedAt || g.updatedAt) || 0;
+            var taskDesc = String(sg.description || sg.expectedOutput || '').trim();
+            mc2PushActionRequiredItem(items, {
+              kind: 'error',
+              action: 'mission-input',
+              missionId: missionId,
+              taskId: String(sg.id || ''),
+              title: taskDesc
+                ? ('\u201c' + taskTitle.slice(0, 64) + (taskTitle.length > 64 ? '\u2026' : '') + '\u201d')
+                : ('\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d'),
+              subtitle: taskDesc
+                ? (taskDesc.slice(0, 96) + ' · ' + missionTitle)
+                : (missionTitle + ' · waiting ' + mc2ShortWaitTime(taskTs)),
+              ts: taskTs,
+              status: 'blocked',
+              createdAt: Number(sg.createdAt) || 0,
+              startedAt: Number(sg.startedAt) || 0,
+              waitingSince: Number(sg.waitingSince) || 0,
+            });
+          });
+          return;
+        }
+
+        var prompt = typeof missionAttentionPrompt === 'function' ? missionAttentionPrompt(g) : '';
+        if (prompt) {
+          mc2PushActionRequiredItem(items, {
+            kind: 'warning',
+            action: 'mission-input',
+            missionId: missionId,
+            isMission: true,
+            title: prompt.split('\n')[0].slice(0, 96),
+            subtitle: mc2MissionWaitSubtitle(g, ts),
+            ts: ts,
+          });
+        }
       });
 
-      missions.forEach(function (g) {
-        var missionId = String(g.id || '');
-        if (!mc2MatchesSelectedMission(missionId)) return;
-        if (!missionsWithInput[missionId]) return;
-        var ts = Number(g.updatedAt) || 0;
-        var needsInput = String(g.needsUserInput || '').trim();
-        mc2PushActionRequiredItem(items, {
-          kind: 'warning',
-          action: 'mission-input',
-          missionId: missionId,
-          isMission: true,
-          title: needsInput.slice(0, 96),
-          subtitle: mc2MissionWaitSubtitle(g, ts),
-          ts: ts,
-        });
+      items.sort(function (a, b) {
+        var ak = a.kind === 'error' ? 1 : 0;
+        var bk = b.kind === 'error' ? 1 : 0;
+        if (ak !== bk) return bk - ak;
+        return (Number(b.ts) || 0) - (Number(a.ts) || 0);
       });
-
-      items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
       return items;
     }
 
