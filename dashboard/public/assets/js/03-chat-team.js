@@ -914,6 +914,7 @@
 
     function isUserActionableBlockerTask(task, mission) {
       if (!task || typeof task !== 'object') return false;
+      if (hasAppliedTaskAssumption(task)) return false;
       if (normalizeTaskStatus(task.status) === 'done') return false;
       if (isSystemErrorTask(task)) return false;
       var status = normalizeTaskStatus(task.status);
@@ -1013,6 +1014,9 @@
 
     function effectiveTaskStatus(task, mission) {
       var status = normalizeTaskStatus(task && task.status);
+      if (hasAppliedTaskAssumption(task)) {
+        if (status === 'blocked' || status === 'doing') return 'todo';
+      }
       if (status === 'done') return 'done';
       if (status === 'blocked') return 'blocked';
       // Paused / dependency / assigned work belongs in Open, not Work in Progress.
@@ -1113,6 +1117,9 @@
               description: String(sg.description || '').trim(),
               expectedOutput: String(sg.expectedOutput || '').trim(),
               blockerType: String(sg.blockerType || '').trim(),
+              assumptionRecord: sg.assumptionRecord && typeof sg.assumptionRecord === 'object' ? sg.assumptionRecord : null,
+              blockerHistory: sg.blockerHistory && typeof sg.blockerHistory === 'object' ? sg.blockerHistory : null,
+              taskHistory: Array.isArray(sg.taskHistory) ? sg.taskHistory.slice() : [],
               type: String(sg.type || '').trim(),
               priority: Number(sg.priority) || 0,
               routeReason: String(sg.routeReason || '').trim(),
@@ -4713,10 +4720,38 @@
       return out;
     }
 
+    function formatTaskHistoryLabel(entry) {
+      if (!entry || typeof entry !== 'object') return '';
+      var kind = String(entry.kind || entry.type || 'note').toLowerCase();
+      var parts = [];
+      if (kind === 'delegated') {
+        parts.push(entry.actor && entry.target ? (entry.actor + ' → ' + entry.target) : 'Delegated');
+      } else if (kind === 'assigned') {
+        parts.push(entry.target ? ('Assigned to ' + entry.target) : 'Assigned');
+      } else if (kind === 'status_changed') {
+        parts.push(entry.fromStatus && entry.toStatus
+          ? (entry.fromStatus + ' → ' + entry.toStatus)
+          : (entry.toStatus ? ('Status: ' + entry.toStatus) : 'Status updated'));
+      } else if (kind === 'assumption_applied') {
+        parts.push('Assumption applied');
+      } else if (kind === 'blocker_converted') {
+        parts.push('Blocker converted to open work');
+      } else if (kind === 'reply_received') {
+        parts.push(entry.actor ? ('Reply from ' + entry.actor) : 'Reply received');
+      } else if (kind === 'created') {
+        parts.push('Created');
+      } else {
+        parts.push(String(entry.outcome || kind.replace(/_/g, ' ')));
+      }
+      if (entry.outcome && parts.indexOf(String(entry.outcome)) < 0 && kind !== 'progress_updated') {
+        parts.push(String(entry.outcome));
+      }
+      return parts.filter(Boolean).join(' · ').slice(0, 220);
+    }
+
     function buildStructuredMissionTaskTimeline(item, limit) {
       limit = Math.max(6, Number(limit) || 20);
       if (!item) return [];
-      var raw = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(item, limit * 2) : [];
       var structured = [];
       var seen = {};
       function push(ts, label) {
@@ -4724,9 +4759,15 @@
         var key = String(t) + '|' + String(label || '');
         if (!label || seen[key]) return;
         seen[key] = true;
-        structured.push({ ts: t, label: label });
+        structured.push({ ts: t, label: label, source: 'taskHistory' });
       }
 
+      (Array.isArray(item.taskHistory) ? item.taskHistory : []).forEach(function (entry) {
+        var label = formatTaskHistoryLabel(entry);
+        if (label) push(Number(entry.ts) || 0, label);
+      });
+
+      var raw = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(item, limit * 2) : [];
       raw.forEach(function (ev) {
         var type = String(ev && ev.type || '');
         var ts = Number(ev.ts) || 0;
@@ -5107,6 +5148,7 @@
     window.findMissionTaskForAgent = findMissionTaskForAgent;
     window.enrichMissionTaskItem = enrichMissionTaskItem;
     window.buildMissionTaskFromTurn = buildMissionTaskFromTurn;
+    window.formatTaskHistoryLabel = formatTaskHistoryLabel;
     window.buildMissionTaskTimeline = buildMissionTaskTimeline;
     window.buildMissionTaskSourceChain = buildMissionTaskSourceChain;
     window.buildMissionTaskInactionImpact = buildMissionTaskInactionImpact;
@@ -5125,6 +5167,8 @@
     window.summarizeTaskAssumptionForDisplay = summarizeTaskAssumptionForDisplay;
     window.hasAppliedTaskAssumption = hasAppliedTaskAssumption;
     window.canAssumeProductSpecFromLiveProduct = canAssumeProductSpecFromLiveProduct;
+    window.getTaskAssumptionRecord = getTaskAssumptionRecord;
+    window.getTaskBlockerHistory = getTaskBlockerHistory;
 
     function renderTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');

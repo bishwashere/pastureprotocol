@@ -72,6 +72,7 @@
     "test:missions-merge-tasks": "node scripts/test/test-missions-merge-tasks.js",
     "test:blocker-type": "node scripts/test/test-blocker-type.js",
     "test:product-assumptions": "node scripts/test/test-product-assumptions.js",
+    "test:task-history": "node scripts/test/test-task-history.js",
     "test:ai-suggested-tasks": "node scripts/test/test-ai-suggested-tasks.js",
     "test:curiosity-momentum": "node scripts/test/test-curiosity-momentum.js",
     "test:delegated-tasks": "node scripts/test/test-delegated-tasks.js",

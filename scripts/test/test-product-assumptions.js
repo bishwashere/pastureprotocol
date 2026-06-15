@@ -6,7 +6,7 @@ import {
   formatAssumptionPhasePromptBlock,
   formatMissionBlockersForPrompt,
   hasAppliedAssumption,
-  isBlockerCandidateTask,
+  isActiveBlockerTask,
   listAssumptionPendingBlockers,
   normalizeAssumptionRecord,
 } from '../../lib/product-assumptions.js';
@@ -32,8 +32,8 @@ const accessTask = {
   blockerType: 'need_access',
 };
 
-assert(isBlockerCandidateTask(specTask), 'spec task is still a blocker candidate');
-assert(isBlockerCandidateTask(accessTask), 'access task is blocker candidate');
+assert(isActiveBlockerTask(specTask), 'spec task is active blocker before conversion');
+assert(isActiveBlockerTask(accessTask), 'access task is active blocker');
 assert(canAssumeFromLiveProduct(specTask, liveCtx), 'spec + live url is assumable');
 assert(!canAssumeFromLiveProduct(accessTask, liveCtx), 'access task is not assumable');
 
@@ -65,7 +65,8 @@ const updatedTasks = applyAssumptionUpdates(mission.tasks, [{
   progress: 60,
 }], liveCtx);
 assert(hasAppliedAssumption(updatedTasks[0]), 'assumption applied to spec task');
-assert(isBlockerCandidateTask(updatedTasks[0]), 'blocker remains documented after assumption');
+assert(!isActiveBlockerTask(updatedTasks[0]), 'converted task is no longer an active blocker');
+assert(String(updatedTasks[0].status) === 'todo', 'converted task defaults to open/todo');
 assert(!hasAppliedAssumption(updatedTasks[1]), 'access task unchanged');
 
 const blockersPrompt = formatMissionBlockersForPrompt({ ...mission, tasks: updatedTasks }, liveCtx);

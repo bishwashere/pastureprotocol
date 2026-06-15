@@ -267,6 +267,40 @@
         '</div>';
       }
 
+      var auditHtml = '';
+      var auditLines = [];
+      if (item.blockerHistory && item.blockerHistory.wasBlocker) {
+        auditLines.push('Was blocker (' + String(item.blockerHistory.originalBlockerType || 'unknown') + '): ' +
+          String(item.blockerHistory.originalTitle || title));
+        if (item.blockerHistory.convertedAt) {
+          auditLines.push('Converted at ' + mc2FormatTaskTimestamp(item.blockerHistory.convertedAt));
+        }
+      }
+      if (item.assumptionRecord && String(item.assumptionRecord.status || '') === 'applied') {
+        if (item.assumptionRecord.summary) auditLines.push('Assumption: ' + String(item.assumptionRecord.summary));
+        if (Array.isArray(item.assumptionRecord.collectedEvidence) && item.assumptionRecord.collectedEvidence.length) {
+          auditLines.push('Evidence: ' + item.assumptionRecord.collectedEvidence.slice(0, 4).join('; '));
+        }
+      }
+      if (Array.isArray(item.taskHistory) && item.taskHistory.length) {
+        item.taskHistory.slice(-8).forEach(function (entry) {
+          var label = typeof formatTaskHistoryLabel === 'function'
+            ? formatTaskHistoryLabel(entry)
+            : String(entry.outcome || entry.kind || '');
+          if (!label) return;
+          auditLines.push((entry.ts ? mc2FormatTaskTimestamp(entry.ts) + ' — ' : '') + label);
+        });
+      }
+      if (auditLines.length) {
+        auditHtml = '<div class="mc-task-detail-section">' +
+          '<p class="mc-section-title" style="margin:0.55rem 0 0.35rem;">Task history</p>' +
+          '<ul class="mc-task-history-list">' +
+          auditLines.map(function (line) {
+            return '<li><span class="mc-task-history-summary">' + escapeHtml(line) + '</span></li>';
+          }).join('') +
+          '</ul></div>';
+      }
+
       return '' +
         '<div class="mc-task-detail-head">' +
           '<h3 class="mc-task-detail-title" id="mc2-task-drawer-title">' + escapeHtml(title) + '</h3>' +
@@ -283,6 +317,7 @@
         reviewNotesHtml +
         missionProgressHtml +
         historyHtml +
+        auditHtml +
         '<div id="mc2-task-retro-slot" class="mc-task-detail-section"></div>' +
         actionsHtml +
         '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">Timeline</p>' +
