@@ -189,9 +189,11 @@ const checks = [
   {
     name: 'waiting task statuses surface as open not work-in-progress',
     ok: chat.includes('function isTaskWaitingState(') &&
+      chat.includes('function missionAwaitingUserDecision(') &&
       chat.includes("if (s === 'waiting_dependency' || s === 'waiting' || s === 'assigned' || s === 'open') return 'todo'") &&
-      chat.includes("if (status === 'doing' && isTaskWaitingState(task)) return 'todo'") &&
+      chat.includes("if (status === 'doing' && missionAwaitingUserDecision(mission)) return 'todo'") &&
       chat.includes("status: agentState === 'waiting' ? 'todo' : 'doing'") &&
+      missionControlJs.includes('missionAwaitingUserDecision(currentMission)') &&
       missionControlJs.includes("if (s === 'doing' || s === 'done' || s === 'blocked') return;") &&
       !missionControlJs.includes("s === 'blocked' || s === 'waiting') return"),
   },

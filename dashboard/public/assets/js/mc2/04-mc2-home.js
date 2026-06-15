@@ -490,6 +490,12 @@
       var ctxMap = teamAgentContextSnapshot.agents || {};
       var items = [];
       var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var currentMission = typeof getCurrentMissionMission === 'function' ? getCurrentMissionMission() : null;
+      if (currentMission &&
+        typeof missionAwaitingUserDecision === 'function' &&
+        missionAwaitingUserDecision(currentMission)) {
+        return items;
+      }
       var missionAgentIds = {};
       if (selectedTeamMissionId) {
         allItems.forEach(function (it) {
@@ -499,17 +505,22 @@
           }
         });
       }
-      agents.forEach(function (a) {
-        var id = String(a.id || '');
-        var ctx = ctxMap[id] || { state: 'idle' };
-        if (String(ctx.state || 'idle').toLowerCase() !== 'working') return;
-        if (selectedTeamMissionId && !missionAgentIds[id]) return;
-        items.push({ kind: 'agent', a: a, ctx: ctx });
-      });
+      var doingAssignees = {};
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'doing') return;
         if (!mc2MatchesSelectedMission(it.missionId)) return;
+        var aid = String(it.assignee || it.agentId || '').trim();
+        if (aid) doingAssignees[aid] = true;
         items.push({ kind: 'task', item: it });
+      });
+      agents.forEach(function (a) {
+        var id = String(a.id || '');
+        var ctx = ctxMap[id] || { state: 'idle' };
+        var state = String(ctx.state || 'idle').toLowerCase();
+        if (state !== 'working') return;
+        if (selectedTeamMissionId && !missionAgentIds[id]) return;
+        if (doingAssignees[id]) return;
+        items.push({ kind: 'agent', a: a, ctx: ctx });
       });
       return items;
     }

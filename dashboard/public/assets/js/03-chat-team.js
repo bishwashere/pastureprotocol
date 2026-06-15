@@ -585,6 +585,15 @@
       return String(w.kind || '').toLowerCase() === 'partial';
     }
 
+    function missionAwaitingUserDecision(mission) {
+      if (!mission || typeof mission !== 'object') return false;
+      if (String(mission.needsUserInput || '').trim()) return true;
+      if (isMissionPartialWait(mission)) return true;
+      var snap = String(mission.contextSnapshot || '');
+      if (/userInputRequired"?\s*:\s*true/i.test(snap)) return true;
+      return false;
+    }
+
     function missionImplementationBlockedLabel(mission) {
       if (!mission) return '';
       var w = mission.waitCondition;
@@ -940,6 +949,8 @@
       // Paused / dependency / assigned work belongs in Open, not Work in Progress.
       if (status === 'doing' && isTaskWaitingState(task)) return 'todo';
       if (status === 'waiting') return 'todo';
+      // Mission decision gate: queued in_progress work is open backlog, not live agent work.
+      if (status === 'doing' && mission && missionAwaitingUserDecision(mission)) return 'todo';
       return status;
     }
 
@@ -1565,8 +1576,10 @@
       if (s === 'waiting_user') return 'blocked';
       // system errors are not user-actionable — treat as stalled, not blocked.
       if (s === 'error') return 'error';
-      // review_ready / in_progress are active agent work — treat as doing.
-      if (s === 'review_ready' || s === 'in_progress') return 'doing';
+      // review_ready is waiting on review — open backlog, not active work.
+      if (s === 'review_ready') return 'todo';
+      // in_progress is active agent work only when the mission is not waiting on the user.
+      if (s === 'in_progress') return 'doing';
       // Waiting states are open backlog, not active work.
       if (s === 'waiting_dependency' || s === 'waiting' || s === 'assigned' || s === 'open') return 'todo';
       // Everything else is open/todo work.

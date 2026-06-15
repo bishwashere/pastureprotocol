@@ -22,9 +22,9 @@ scripts/test/.tmp-cron-e2e-*
 /uploads/
 *.db
 
-# Cursor / local verification scratch (root of repo only; avoids accidental git push)
+# Cursor IDE + local verification scratch (never commit)
+.cursor/
 /verify/
-.cursor/verify/
 
 # Generated reports (e.g. node scripts/test/test-cron-e2e.js --report)
 *report*
