@@ -1275,6 +1275,9 @@ async function fetchCrons() {
     var configViewMode = (function () {
       try { return localStorage.getItem('pasture-config-view') || 'ui'; } catch (_) { return 'ui'; }
     })();
+    var configActiveSection = (function () {
+      try { return localStorage.getItem('pasture-config-section') || 'general'; } catch (_) { return 'general'; }
+    })();
     var configToggleWired = false;
     var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
 
@@ -1292,6 +1295,27 @@ async function fetchCrons() {
       return '<div class="field"><label for="' + id + '">' + escapeHtml(label) + '</label>' +
         '<input type="' + type + '" id="' + id + '" value="' + escapeHtml(value == null ? '' : String(value)) + '"' +
         (placeholder ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></div>';
+    }
+
+    function configSectionPanel(id, label, bodyHtml, isActive) {
+      return '<div class="config-section-panel' + (isActive ? ' active' : '') + '" data-config-section-panel="' + id + '" role="tabpanel"' +
+        (isActive ? '' : ' hidden') + '>' +
+        '<div class="config-section-body">' + bodyHtml + '</div></div>';
+    }
+
+    function setConfigSection(section) {
+      configActiveSection = section || 'general';
+      try { localStorage.setItem('pasture-config-section', configActiveSection); } catch (_) {}
+      document.querySelectorAll('#config-ui-section-nav button[data-config-section]').forEach(function (b) {
+        var on = b.getAttribute('data-config-section') === configActiveSection;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      document.querySelectorAll('#config-ui-sections .config-section-panel').forEach(function (p) {
+        var on = p.getAttribute('data-config-section-panel') === configActiveSection;
+        p.classList.toggle('active', on);
+        p.hidden = !on;
+      });
     }
 
     function renderConfigUi(config) {
@@ -1344,13 +1368,25 @@ async function fetchCrons() {
       var tideCooldown = tide.silenceCooldownMinutes != null ? tide.silenceCooldownMinutes : tide.intervalMinutes;
       var checklist = tide.checklist || {};
       var checklistTriggers = checklist.triggers || {};
-      var html = '' +
-        '<details class="config-section" open><summary>General</summary><div class="config-section-body">' +
+      var CONFIG_SECTIONS = [
+        { id: 'general', label: 'General' },
+        { id: 'agents', label: 'Agents' },
+        { id: 'llm', label: 'LLM' },
+        { id: 'skills', label: 'Skills' },
+        { id: 'channels', label: 'Channels' },
+        { id: 'owner', label: 'Owner' },
+        { id: 'tide', label: 'Tide' },
+        { id: 'messaging', label: 'Messaging' },
+        { id: 'retrospective', label: 'Retrospective' },
+        { id: 'pulse', label: 'Pulse' }
+      ];
+      var activeSection = CONFIG_SECTIONS.some(function (s) { return s.id === configActiveSection; })
+        ? configActiveSection : 'general';
+      var generalBody =
         '<div class="field"><label for="config-bio">Bio / personality</label><textarea id="config-bio" rows="3">' + escapeHtml(config.bio || '') + '</textarea></div>' +
         configTextField('config-title', 'Title', config.title || '', 'CEO') +
-        configTextField('config-color', 'Accent color', config.color || '', '#ef4444', 'color') +
-        '</div></details>' +
-        '<details class="config-section"><summary>Agents defaults</summary><div class="config-section-body">' +
+        configTextField('config-color', 'Accent color', config.color || '', '#ef4444', 'color');
+      var agentsBody =
         configTextField('config-user-timezone', 'User timezone', defaults.userTimezone || '', 'auto or America/New_York') +
         '<div class="field"><label for="config-time-format">Time format</label><select id="config-time-format">' +
         ['auto', '12h', '24h', '12', '24'].map(function (v) {
@@ -1358,32 +1394,28 @@ async function fetchCrons() {
           var label = v === '12' ? '12h (legacy)' : v === '24' ? '24h (legacy)' : v;
           return '<option value="' + v + '"' + sel + '>' + label + '</option>';
         }).join('') +
-        '</select></div></div></details>' +
-        '<details class="config-section" open><summary>LLM</summary><div class="config-section-body">' +
+        '</select></div>';
+      var llmBody =
         configTextField('config-llm-max-tokens', 'Max tokens', llm.maxTokens != null ? llm.maxTokens : 2048, '', 'number') +
         '<p class="skill-meta">Select one priority model. Local models are used as fallback when cloud is unavailable.</p>' +
         '<div id="config-llm-models" class="config-models-grid">' + modelsHtml + '</div>' +
-        '<button type="button" id="config-llm-add-model" class="link-btn">+ Add model</button>' +
-        '</div></details>' +
-        '<details class="config-section"><summary>Skills</summary><div class="config-section-body">' +
+        '<button type="button" id="config-llm-add-model" class="link-btn">+ Add model</button>';
+      var skillsBody =
         '<p class="skill-meta">Toggle enabled skills. Skill-specific settings below are optional.</p>' +
         '<div class="config-skills-grid">' + skillsHtml + '</div>' +
         configTextField('config-search-provider', 'Search provider', search.provider || 'brave', 'brave') +
         configTextField('config-search-count', 'Search result count', search.count != null ? search.count : 8, '', 'number') +
         configTextField('config-github-token', 'GitHub token env var', github.token || '', 'GITHUB_TOKEN') +
         configTextField('config-github-repo', 'GitHub default repo', github.defaultRepo || '', 'owner/repo') +
-        configTextField('config-gog-account', 'Google (gog) account', gog.account || '', 'you@gmail.com') +
-        '</div></details>' +
-        '<details class="config-section"><summary>Channels</summary><div class="config-section-body">' +
+        configTextField('config-gog-account', 'Google (gog) account', gog.account || '', 'you@gmail.com');
+      var channelsBody =
         '<div class="config-check-row">' + configBoolInput('config-whatsapp-enabled', !!whatsapp.enabled, 'WhatsApp enabled') + '</div>' +
         '<div class="config-check-row">' + configBoolInput('config-telegram-enabled', !!telegram.enabled, 'Telegram enabled') + '</div>' +
-        configTextField('config-telegram-token', 'Telegram bot token env var', telegram.botToken || '', 'TELEGRAM_BOT_TOKEN') +
-        '</div></details>' +
-        '<details class="config-section"><summary>Owner</summary><div class="config-section-body">' +
+        configTextField('config-telegram-token', 'Telegram bot token env var', telegram.botToken || '', 'TELEGRAM_BOT_TOKEN');
+      var ownerBody =
         configTextField('config-owner-whatsapp', 'WhatsApp JID', owner.whatsappJid || '', '1234567890@s.whatsapp.net') +
-        configTextField('config-owner-telegram', 'Telegram user ID', owner.telegramUserId != null ? owner.telegramUserId : '', '123456789', 'number') +
-        '</div></details>' +
-        '<details class="config-section"><summary>Tide</summary><div class="config-section-body">' +
+        configTextField('config-owner-telegram', 'Telegram user ID', owner.telegramUserId != null ? owner.telegramUserId : '', '123456789', 'number');
+      var tideBody =
         '<p class="skill-meta">Follow-ups and checklist items run as agent turns. Checklist requires Tide enabled for automatic runs.</p>' +
         '<div class="config-check-row">' + configBoolInput('config-tide-enabled', !!tide.enabled, 'Tide enabled') + '</div>' +
         configTextField('config-tide-cooldown', 'Silence cooldown (minutes)', tideCooldown != null ? tideCooldown : 30, '', 'number') +
@@ -1410,39 +1442,63 @@ async function fetchCrons() {
         '</div>' +
         '<p class="overview-label">Last run</p>' +
         '<pre id="config-tide-checklist-last" class="config-json-editable config-tide-last-run">—</pre>' +
-        '</div>' +
-        '</div></details>' +
-        '<details class="config-section"><summary>Agent messaging</summary><div class="config-section-body">' +
+        '</div>';
+      var messagingBody =
         '<div class="field"><label for="config-agent-allow">Allowed agents (one per line)</label><textarea id="config-agent-allow" rows="3">' + escapeHtml(allowLines) + '</textarea></div>' +
         configTextField('config-agent-max-depth', 'Max delegation depth', agentMessaging.maxDepth != null ? agentMessaging.maxDepth : 2, '', 'number') +
-        configTextField('config-agent-max-calls', 'Max calls per turn', agentMessaging.maxCallsPerTurn != null ? agentMessaging.maxCallsPerTurn : 5, '', 'number') +
-        '</div></details>' +
-        '<details class="config-section"><summary>Retrospective</summary><div class="config-section-body">' +
+        configTextField('config-agent-max-calls', 'Max calls per turn', agentMessaging.maxCallsPerTurn != null ? agentMessaging.maxCallsPerTurn : 5, '', 'number');
+      var retrospectiveBody =
         '<div class="config-check-row">' + configBoolInput('config-retro-enabled', !!retrospective.enabled, 'Retrospective enabled') + '</div>' +
         configTextField('config-retro-agent', 'Reflector agent ID', retrospective.reflectorAgentId || 'reflector', 'reflector') +
         configTextField('config-retro-threshold', 'Low score threshold', retrospective.lowScoreThreshold != null ? retrospective.lowScoreThreshold : 6, '', 'number') +
         configTextField('config-retro-lookback', 'Lookback days', retrospective.lookbackDays != null ? retrospective.lookbackDays : 7, '', 'number') +
         configTextField('config-retro-nightly-hour', 'Nightly hour (0–23)', retrospective.nightlyHour != null ? retrospective.nightlyHour : 2, '', 'number') +
         configTextField('config-retro-weekly-day', 'Weekly day (0=Sun)', retrospective.weeklyDay != null ? retrospective.weeklyDay : 0, '', 'number') +
-        configTextField('config-retro-weekly-hour', 'Weekly hour (0–23)', retrospective.weeklyHour != null ? retrospective.weeklyHour : 3, '', 'number') +
-        '</div></details>' +
-        '<details class="config-section"><summary>System pulse</summary><div class="config-section-body">' +
+        configTextField('config-retro-weekly-hour', 'Weekly hour (0–23)', retrospective.weeklyHour != null ? retrospective.weeklyHour : 3, '', 'number');
+      var pulseBody =
         '<div class="config-check-row">' + configBoolInput('config-pulse-enabled', !!systemPulse.enabled, 'System pulse enabled') + '</div>' +
         '<div class="config-check-row">' + configBoolInput('config-pulse-notify', systemPulse.healthNotify !== false, 'Health notify') + '</div>' +
         '<div class="config-check-row">' + configBoolInput('config-pulse-dry-run', !!systemPulse.dryRun, 'Dry run') + '</div>' +
         configTextField('config-pulse-health-interval', 'Health interval (minutes)', systemPulse.healthIntervalMinutes != null ? systemPulse.healthIntervalMinutes : 45, '', 'number') +
         configTextField('config-pulse-pattern-interval', 'Pattern interval (hours)', systemPulse.patternIntervalHours != null ? systemPulse.patternIntervalHours : 8, '', 'number') +
         configTextField('config-pulse-max-patterns', 'Max patterns per run', systemPulse.maxPatternsPerRun != null ? systemPulse.maxPatternsPerRun : 2, '', 'number') +
-        configTextField('config-pulse-confidence', 'Self-edit confidence threshold', systemPulse.selfEditConfidenceThreshold != null ? systemPulse.selfEditConfidenceThreshold : 0.7, '', 'number') +
-        '</div></details>';
+        configTextField('config-pulse-confidence', 'Self-edit confidence threshold', systemPulse.selfEditConfidenceThreshold != null ? systemPulse.selfEditConfidenceThreshold : 0.7, '', 'number');
+      var sectionBodies = {
+        general: generalBody,
+        agents: agentsBody,
+        llm: llmBody,
+        skills: skillsBody,
+        channels: channelsBody,
+        owner: ownerBody,
+        tide: tideBody,
+        messaging: messagingBody,
+        retrospective: retrospectiveBody,
+        pulse: pulseBody
+      };
+      var navHtml = CONFIG_SECTIONS.map(function (s) {
+        var on = s.id === activeSection;
+        return '<button type="button" data-config-section="' + s.id + '" role="tab"' +
+          (on ? ' class="active" aria-selected="true"' : ' aria-selected="false"') + '>' + escapeHtml(s.label) + '</button>';
+      }).join('');
+      var panelsHtml = CONFIG_SECTIONS.map(function (s) {
+        return configSectionPanel(s.id, s.label, sectionBodies[s.id], s.id === activeSection);
+      }).join('');
+      var nav = document.getElementById('config-ui-section-nav');
       var container = document.getElementById('config-ui-sections');
       if (!container) return;
-      container.innerHTML = html;
+      if (nav) nav.innerHTML = navHtml;
+      container.innerHTML = panelsHtml;
+      setConfigSection(activeSection);
       wireConfigUiActions();
       if (tideChecklistCache) renderTideChecklistItems(tideChecklistCache.items || []);
     }
 
     function wireConfigUiActions() {
+      document.querySelectorAll('#config-ui-section-nav button[data-config-section]').forEach(function (btn) {
+        if (btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', function () { setConfigSection(btn.getAttribute('data-config-section')); });
+      });
       var addBtn = document.getElementById('config-llm-add-model');
       if (addBtn && !addBtn.dataset.wired) {
         addBtn.dataset.wired = '1';

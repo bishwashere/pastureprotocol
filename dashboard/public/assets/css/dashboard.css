@@ -1564,28 +1564,13 @@
       flex-wrap: wrap;
     }
     .config-view-toggle { margin: 0; border-bottom: none; padding-bottom: 0; }
-    .config-section {
-      border: 1px solid var(--border);
-      border-radius: 8px;
+    .config-section-nav {
+      flex-wrap: wrap;
       margin-bottom: 0.75rem;
-      background: var(--bg);
     }
-    .config-section > summary {
-      cursor: pointer;
-      padding: 0.65rem 0.85rem;
-      font-weight: 500;
-      font-size: 0.92rem;
-      color: var(--accent);
-      list-style: none;
-    }
-    .config-section > summary::-webkit-details-marker { display: none; }
-    .config-section > summary::before {
-      content: '▸ ';
-      display: inline-block;
-      transition: transform 0.15s ease;
-    }
-    .config-section[open] > summary::before { transform: rotate(90deg); }
-    .config-section-body { padding: 0 0.85rem 0.85rem; }
+    .config-section-panel { display: none; }
+    .config-section-panel.active { display: block; }
+    .config-section-body { padding: 0; }
     .config-section-body .field textarea,
     .config-section-body .field select {
       width: 100%;
