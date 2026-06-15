@@ -853,6 +853,17 @@
       return resolveBlockerTypeForTask(task) === 'system_error';
     }
 
+    function isUserActionableBlockerTask(task) {
+      if (!task || typeof task !== 'object') return false;
+      if (normalizeTaskStatus(task.status) === 'done') return false;
+      if (isSystemErrorTask(task)) return false;
+      var status = normalizeTaskStatus(task.status);
+      if (status === 'blocked') return true;
+      if (String(task.status || '').toLowerCase() === 'waiting_user') return true;
+      var bt = resolveBlockerTypeForTask(task);
+      return bt === 'need_direction' || bt === 'need_access' || bt === 'need_content' || bt === 'need_approval';
+    }
+
     function dashboardTaskBlockedByWait(task, waitCondition) {
       if (!task || !isMissionPartialWait({ waitCondition: waitCondition })) return false;
       var w = waitCondition || {};
@@ -883,9 +894,8 @@
         var sgId = String(sg.id || '').trim();
         var title = String(sg.title || '').trim();
         var status = normalizeTaskStatus(sg.status);
-        // Only surface tasks that are genuinely blocked (need user input or error).
-        // wait-dependency tasks are open work; they are not user-action required.
-        if (status === 'blocked') {
+        // Blocked status or user-actionable blocker types (need_direction, need_access, etc.)
+        if (status === 'blocked' || isUserActionableBlockerTask(sg)) {
           refs.push({ kind: 'task', missionId: missionId, taskId: sgId, title: title });
         }
         walkMissionTasksForBlocked(sg.tasks, missionId, mission, refs);
@@ -3760,7 +3770,7 @@
       function walk(tasks) {
         (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          if (effectiveTaskStatus(sg, mission) === 'blocked') count++;
+          if (isUserActionableBlockerTask(sg)) count++;
           walk(sg.tasks);
         });
       }
@@ -3774,8 +3784,7 @@
       function walk(tasks) {
         (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          // system_error tasks auto-retry and are never user-actionable — hide from user.
-          if (effectiveTaskStatus(sg, mission) === 'blocked' && !isSystemErrorTask(sg)) result.push(sg);
+          if (isUserActionableBlockerTask(sg)) result.push(sg);
           walk(sg.tasks);
         });
       }

@@ -391,7 +391,8 @@
       suggestedTasks.forEach(function (it) {
         if (selectedTeamMissionId) {
           var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
-          if (ids.indexOf(selectedTeamMissionId) < 0) return;
+          // Empty relatedMissionIds = global proposal — still show for the selected mission.
+          if (ids.length && ids.indexOf(selectedTeamMissionId) < 0) return;
         }
         var suggestedTaskId = String(it.id || '');
         var ts = Number(it.updatedAt) || 0;
@@ -555,7 +556,7 @@
         if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return false;
         if (selectedTeamMissionId) {
           var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
-          if (ids.indexOf(selectedTeamMissionId) < 0) return false;
+          if (ids.length && ids.indexOf(selectedTeamMissionId) < 0) return false;
         }
         return true;
       }).sort(function (a, b) {
