@@ -797,6 +797,17 @@
       system_error: 'System error',
     };
 
+    function stripBlockerTitlePrefix(title) {
+      var t = String(title || '').replace(/\s+/g, ' ').trim();
+      var prefixes = ['Need direction', 'Need access', 'Need content', 'Need approval', 'System error'];
+      for (var i = 0; i < prefixes.length; i++) {
+        var prefix = prefixes[i];
+        var re = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*', 'i');
+        if (re.test(t)) return t.replace(re, '').trim();
+      }
+      return t;
+    }
+
     function inferBlockerTypeFromText(title, description) {
       var hay = (String(title || '') + ' ' + String(description || '')).toLowerCase();
       if (/\b(rate.?limit|quota|llm.?limit|daily.?limit|resets at|try again in|api.?limit|request.?limit|enoent|spawn|segfault|binary|not installed|runtime.?broken|cannot find module|playwright|chromium)\b/.test(hay)) {
@@ -1805,11 +1816,8 @@
         var actionsHtml = gid && sgKey
           ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromSuggestedTask: /^init-/.test(sgKey) })
           : '';
-        var blockerBadge = (status === 'blocked' && !isSystemErrorTask(sg))
-          ? '<span class="team-mission-blocker-type-badge ' + escapeHtml(resolveBlockerTypeForTask(sg)) + '">' + escapeHtml(blockerTypeLabel(sg) + ':') + '</span> '
-          : '';
         var summary = '<span class="team-mission-task-row" data-task-id="' + escapeHtml(sgKey) + '">' +
-          initBadge + blockerBadge +
+          initBadge +
           '<span class="team-mission-task-title">' + escapeHtml(title) + '</span>' +
           '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '<span class="team-mission-task-meta">' + escapeHtml(String(progress)) + '%</span>' +
@@ -2242,6 +2250,17 @@
             }
           } finally {
             btn.disabled = false;
+            var inDrawer = detailEl && detailEl.id === 'mc2-task-drawer-body';
+            if (inDrawer) {
+              if (typeof renderMissionControl === 'function') renderMissionControl();
+              if (typeof mc2RefreshSuggestedTaskDrawer === 'function') {
+                mc2RefreshSuggestedTaskDrawer(suggestedTask.id);
+              } else if (typeof mc2CloseTaskDrawer === 'function') {
+                mc2CloseTaskDrawer();
+              }
+            } else if (typeof renderSuggestedTasksPanels === 'function') {
+              renderSuggestedTasksPanels();
+            }
           }
         });
       });
@@ -2289,6 +2308,10 @@
         card.addEventListener('click', function () {
           var id = String(card.getAttribute('data-suggestedTask-id') || '').trim();
           if (!id) return;
+          if (typeof mc2OpenSuggestedTaskDetail === 'function') {
+            mc2OpenSuggestedTaskDetail(id);
+            return;
+          }
           selectedTeamSuggestedTaskId = id;
           renderSuggestedTasksPanels();
         });
@@ -3866,16 +3889,15 @@
         var first = blockedTasks[0];
         var taskTitle = String(first.title || '').trim();
         var taskDesc = String(first.description || first.expectedOutput || '').trim();
-        var typeLabel = blockerTypeLabel(first);
         if (taskTitle && taskDesc) {
-          var prompt = typeLabel + ': "' + taskTitle + '"\n' + taskDesc;
+          var prompt = '\u201c' + taskTitle + '\u201d\n' + taskDesc;
           if (blockedTasks.length > 1) {
             prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
           }
           return prompt;
         }
         if (taskTitle) {
-          var prompt = typeLabel + ': "' + taskTitle + '"\nPlease provide what\'s needed to unblock this task.';
+          var prompt = '\u201c' + taskTitle + '\u201d\nPlease provide what\'s needed to unblock this task.';
           if (blockedTasks.length > 1) {
             prompt += '\n\n(+' + (blockedTasks.length - 1) + ' more blocked task' + (blockedTasks.length > 2 ? 's' : '') + ')';
           }

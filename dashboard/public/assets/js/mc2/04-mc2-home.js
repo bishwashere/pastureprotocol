@@ -281,14 +281,13 @@
         if (String(it.status || '').toLowerCase() !== 'blocked') return;
         if (!mc2MatchesSelectedMission(it.missionId)) return;
         var ts = Number(it.updatedAt) || 0;
-        var btLabel = typeof blockerTypeLabel === 'function' ? blockerTypeLabel(it) : 'Need direction';
         var taskTitle = String(it.title || 'Blocked task').trim();
         mc2PushActionRequiredItem(items, {
           kind: 'error',
           action: 'mission-input',
           missionId: String(it.missionId || ''),
           taskId: String(it.taskId || ''),
-          title: btLabel + ': \u201c' + taskTitle.slice(0, 72) + (taskTitle.length > 72 ? '\u2026' : '') + '\u201d',
+          title: '\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d',
           subtitle: it.missionTitle
             ? (it.missionTitle + ' · waiting ' + mc2ShortWaitTime(ts))
             : ('Mission · waiting ' + mc2ShortWaitTime(ts)),

@@ -294,6 +294,7 @@
     function mc2RenderTaskDetail() {
       var panel = mc2El('mc2-task-detail');
       var drawerBody = mc2El('mc2-task-drawer-body');
+      mc2SetTaskDrawerKicker('Task');
       var item = mc2SelectedTask;
       if (typeof enrichMissionTaskItem === 'function' && item) {
         item = enrichMissionTaskItem(item);
@@ -442,9 +443,67 @@
       mc2OpenTaskDetail(item, { agentId: aid, filter: item && item.status === 'blocked' ? 'blocked' : 'all' });
     }
 
+    function mc2FindSuggestedTaskById(suggestedTaskId) {
+      var id = String(suggestedTaskId || '').trim();
+      if (!id) return null;
+      return (Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : []).find(function (it) {
+        return String(it.id || '') === id;
+      }) || null;
+    }
+
+    function mc2SetTaskDrawerKicker(label) {
+      var drawer = mc2El('mc2-task-drawer');
+      if (!drawer) return;
+      var kicker = drawer.querySelector('.mc-task-popup-kicker');
+      if (kicker) kicker.textContent = String(label || 'Task');
+    }
+
+    function mc2OpenSuggestedTaskDetail(suggestedTaskId) {
+      var id = String(suggestedTaskId || '').trim();
+      if (!id) return;
+      selectedTeamSuggestedTaskId = id;
+      mc2SelectedTask = null;
+      var suggestedTask = mc2FindSuggestedTaskById(id);
+      var drawerBody = mc2El('mc2-task-drawer-body');
+      if (!drawerBody) return;
+      mc2SetTaskDrawerKicker('Proposed task');
+      if (typeof renderSuggestedTaskDetail === 'function') {
+        renderSuggestedTaskDetail(suggestedTask, drawerBody);
+      } else {
+        drawerBody.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Suggested task details are unavailable.</p>';
+      }
+      var panel = mc2El('mc2-task-detail');
+      if (panel) {
+        panel.hidden = true;
+        panel.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Select a task from the board, list, or recent movement.</p>';
+      }
+      mc2OpenTaskDrawer();
+    }
+
+    function mc2RefreshSuggestedTaskDrawer(suggestedTaskId) {
+      var id = String(suggestedTaskId || '').trim();
+      if (!id) return;
+      var suggestedTask = mc2FindSuggestedTaskById(id);
+      if (!suggestedTask) {
+        mc2CloseTaskDrawer();
+        return;
+      }
+      var status = String(suggestedTask.status || 'proposed').toLowerCase();
+      if (status === 'rejected' || status === 'completed') {
+        mc2CloseTaskDrawer();
+        return;
+      }
+      mc2OpenSuggestedTaskDetail(id);
+    }
+
     function mc2OpenTaskForSuggestedTask(suggestedTaskId) {
       var id = String(suggestedTaskId || '').trim();
       if (!id) return;
+      var suggestedTask = mc2FindSuggestedTaskById(id);
+      if (suggestedTask && typeof suggestedTaskIsOnMission === 'function' && !suggestedTaskIsOnMission(suggestedTask)) {
+        mc2OpenSuggestedTaskDetail(id);
+        return;
+      }
       var taskId = 'init-' + id;
       var item = typeof findMissionTaskItem === 'function'
         ? findMissionTaskItem({ taskId: taskId })
@@ -453,8 +512,7 @@
         mc2OpenTaskDetail(item, { filter: 'all' });
         return;
       }
-      selectedTeamSuggestedTaskId = id;
-      mc2OpenTasksView('all');
+      mc2OpenSuggestedTaskDetail(id);
     }
 
     window.mc2OpenTasksView = mc2OpenTasksView;
@@ -462,6 +520,8 @@
     window.mc2OpenTaskDetail = mc2OpenTaskDetail;
     window.mc2OpenTaskDetailForAgent = mc2OpenTaskDetailForAgent;
     window.mc2OpenTaskForSuggestedTask = mc2OpenTaskForSuggestedTask;
+    window.mc2OpenSuggestedTaskDetail = mc2OpenSuggestedTaskDetail;
+    window.mc2RefreshSuggestedTaskDrawer = mc2RefreshSuggestedTaskDrawer;
     window.mc2CloseTaskDrawer = mc2CloseTaskDrawer;
 
     function mc2AgentInitials(a) {

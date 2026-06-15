@@ -243,6 +243,8 @@ const checks = [
       /data-mc-nav="mission"[\s\S]{0,220}data-mc-nav="tasks"/.test(fullHtml) &&
       missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
       missionControlJs.includes('mc2OpenTaskForSuggestedTask') &&
+      missionControlJs.includes('function mc2OpenSuggestedTaskDetail') &&
+      missionControlJs.includes('mc2OpenSuggestedTaskDetail(id)') &&
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
   },
   {
