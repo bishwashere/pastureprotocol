@@ -519,7 +519,7 @@
       var items = [];
       allItems.forEach(function (it) {
         var s = String(it.status || 'todo').toLowerCase();
-        if (s === 'doing' || s === 'done' || s === 'blocked' || s === 'waiting') return;
+        if (s === 'doing' || s === 'done' || s === 'blocked') return;
         if (!mc2MatchesSelectedMission(it.missionId)) return;
         items.push(it);
       });

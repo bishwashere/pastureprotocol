@@ -720,7 +720,8 @@
       if (!missionLabel && thought) missionLabel = thought.length > 120 ? thought.slice(0, 119) + '…' : thought;
       if (!missionLabel) missionLabel = 'Active team work';
       var tasks = [];
-      if (thought) tasks.push({ title: thought, status: 'doing' });
+      var agentState = String(ctx.state || 'idle').toLowerCase();
+      if (thought) tasks.push({ title: thought, status: agentState === 'waiting' ? 'todo' : 'doing' });
       if (waitingFor) {
         tasks.push({
           title: 'Waiting on ' + agentNameById(waitingFor),
@@ -917,11 +918,28 @@
       return refs[0] || null;
     }
 
+    function isTaskWaitingState(task) {
+      if (!task || typeof task !== 'object') return false;
+      var raw = String(task.status || '').toLowerCase();
+      if (raw === 'assigned' || raw === 'waiting_dependency' || raw === 'open' || raw === 'waiting') return true;
+      if (Number(task.waitingSince) > 0) return true;
+      var blocker = String(task.blockerType || '').toLowerCase();
+      if (blocker === 'need_direction' || blocker === 'need_access' || blocker === 'need_approval') return true;
+      var assignee = String(task.assignee || '').trim();
+      if (assignee) {
+        var ctx = (teamAgentContextSnapshot.agents || {})[assignee] || {};
+        if (String(ctx.state || '').toLowerCase() === 'waiting') return true;
+      }
+      return false;
+    }
+
     function effectiveTaskStatus(task, mission) {
       var status = normalizeTaskStatus(task && task.status);
       if (status === 'done') return 'done';
       if (status === 'blocked') return 'blocked';
-      // wait-conditioned tasks are dependencies, not user-input blockers — keep them as todo/open.
+      // Paused / dependency / assigned work belongs in Open, not Work in Progress.
+      if (status === 'doing' && isTaskWaitingState(task)) return 'todo';
+      if (status === 'waiting') return 'todo';
       return status;
     }
 
@@ -1549,9 +1567,9 @@
       if (s === 'error') return 'error';
       // review_ready / in_progress are active agent work — treat as doing.
       if (s === 'review_ready' || s === 'in_progress') return 'doing';
-      // waiting_dependency tasks are paused on internal deps, not open work.
-      if (s === 'waiting_dependency') return 'waiting';
-      // Everything else (open, assigned, etc.) is open/todo work.
+      // Waiting states are open backlog, not active work.
+      if (s === 'waiting_dependency' || s === 'waiting' || s === 'assigned' || s === 'open') return 'todo';
+      // Everything else is open/todo work.
       return 'todo';
     }
 
