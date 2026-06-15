@@ -122,10 +122,18 @@
           mc2HandleMovementClick(movementRow);
           return;
         }
+        var kanbanFocusBtn = e.target && e.target.closest ? e.target.closest('[data-mc-action="kanban-focus"]') : null;
+        if (kanbanFocusBtn) {
+          e.preventDefault();
+          var kanbanCol = kanbanFocusBtn.getAttribute('data-kanban-col') || '';
+          if (typeof mc2FocusKanbanColumn === 'function') mc2FocusKanbanColumn(kanbanCol);
+          return;
+        }
         var blockedBtn = e.target && e.target.closest ? e.target.closest('[data-mc-action="blocked"]') : null;
         if (blockedBtn) {
           e.preventDefault();
-          mc2OpenTasksView('blocked');
+          if (typeof mc2FocusKanbanColumn === 'function') mc2FocusKanbanColumn('attention');
+          else mc2OpenTasksView('blocked');
           return;
         }
         var tasksFilterBtn = e.target && e.target.closest ? e.target.closest('.mc2-tasks-filter[data-mc-tasks-filter]') : null;

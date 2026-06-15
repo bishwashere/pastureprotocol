@@ -168,6 +168,16 @@ const checks = [
       missionControlJs.includes('mission-input'),
   },
   {
+    name: 'home stat cards and kanban columns use shared count collectors',
+    ok: missionControlJs.includes('function computeMc2HomeCounts') &&
+      missionControlJs.includes('function mc2FocusKanbanColumn') &&
+      fullHtml.includes('id="mc2-stat-open"') &&
+      fullHtml.includes('id="mc2-stat-attention"') &&
+      fullHtml.includes('data-kanban-col="progress"') &&
+      fullHtml.includes('Needs Attention') &&
+      fullHtml.includes('In Progress'),
+  },
+  {
     name: 'mission kanban uses informative work-state column labels',
     ok: fullHtml.includes('NEEDS ATTENTION') &&
       fullHtml.includes('WORK COMPLETED') &&

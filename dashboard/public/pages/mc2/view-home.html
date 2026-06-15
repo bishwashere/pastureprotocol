@@ -15,20 +15,20 @@
         <span class="mc-progress-meta" id="mc2-eta-label">ETA: live</span>
       </div>
       <div class="mc-stat-grid">
-        <div class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="open" role="button" tabindex="0" aria-label="View open and in-progress tasks">
-          <div class="mc-stat-label">Active</div>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="progress" aria-label="Scroll to work in progress">
+          <div class="mc-stat-label">In Progress</div>
           <div class="mc-stat-value active" id="mc2-stat-active">0</div>
-        </div>
-        <div class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="blocked" role="button" tabindex="0" aria-label="View tasks needing attention">
-          <div class="mc-stat-label">Waiting</div>
-          <div class="mc-stat-value waiting" id="mc2-stat-waiting">0</div>
-        </div>
-        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="blocked" aria-label="View blocked tasks and subtasks">
-          <div class="mc-stat-label">Blocked</div>
-          <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
         </button>
-        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="done" aria-label="View completed tasks">
-          <div class="mc-stat-label">Done Today</div>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="open" aria-label="Scroll to open tasks">
+          <div class="mc-stat-label">Open</div>
+          <div class="mc-stat-value waiting" id="mc2-stat-open">0</div>
+        </button>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="attention" aria-label="Scroll to items needing attention">
+          <div class="mc-stat-label">Needs Attention</div>
+          <div class="mc-stat-value blocked" id="mc2-stat-attention">0</div>
+        </button>
+        <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="kanban-focus" data-kanban-col="completed" aria-label="Scroll to completed work">
+          <div class="mc-stat-label">Completed</div>
           <div class="mc-stat-value done" id="mc2-stat-done">0</div>
         </button>
         <div class="mc-stat-card">
@@ -73,7 +73,7 @@
       <div class="mc-panel-body" id="mc2-attention">
         <p class="mc-kanban-empty">All clear.</p>
       </div>
-      <button type="button" class="mc-panel-link" data-mc-nav="tasks" data-mc-tasks-filter="blocked">View blocked tasks →</button>
+      <button type="button" class="mc-panel-link" data-mc-action="kanban-focus" data-kanban-col="attention">View action queue →</button>
     </div>
   </div>
 </div>

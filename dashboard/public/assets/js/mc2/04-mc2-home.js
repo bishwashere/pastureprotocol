@@ -1,6 +1,31 @@
 /* MC2 Home page — mission progress, kanban, movement, attention (live refresh) */
+
+    /** Home stat cards and kanban columns share these collectors so counts always match. */
+    function computeMc2HomeCounts() {
+      return {
+        inProgress: mc2CollectKanbanProgressItems().length,
+        open: mc2CollectKanbanOpenItems().length,
+        completed: mc2CollectKanbanCompletedItems().length,
+        needsAttention: mc2CollectKanbanAttentionItems().length,
+      };
+    }
+
+    function mc2FocusKanbanColumn(col) {
+      var colId = {
+        progress: 'mc2-col-progress',
+        open: 'mc2-col-open',
+        completed: 'mc2-col-completed',
+        attention: 'mc2-col-attention',
+      }[String(col || '').trim()];
+      if (!colId) return;
+      var body = mc2El(colId);
+      if (!body) return;
+      var wrap = body.closest('.mc-kanban-col') || body;
+      wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     function mc2RenderMissionProgress() {
-      var summary = computeTeamTaskSummary();
+      var counts = computeMc2HomeCounts();
       var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var activeMission = getCurrentMissionMission();
       var pct = 0;
@@ -42,18 +67,14 @@
       var pp = mc2El('mc2-progress-percent');
       if (pp) pp.textContent = pct + '%';
       var eta = mc2El('mc2-eta-label');
-      var allWorkItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
-      var runningTasks = allWorkItems.filter(function (it) {
-        return it.kind === 'task' && String(it.status || '').toLowerCase() === 'doing';
-      });
-      var runningLabel = runningTasks.length > 0
-        ? '⏳ Agent working… (' + runningTasks.length + ' task' + (runningTasks.length === 1 ? '' : 's') + ')'
+      var runningLabel = counts.inProgress > 0
+        ? '⏳ Agent working… (' + counts.inProgress + ' in progress)'
         : (etaLabel || (activeMission ? 'ETA: tracking live work' : 'ETA: no active mission'));
       if (eta) eta.textContent = runningLabel;
-      var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;
-      var statWaiting = mc2El('mc2-stat-waiting'); if (statWaiting) statWaiting.textContent = summary.waiting;
-      var statBlocked = mc2El('mc2-stat-blocked'); if (statBlocked) statBlocked.textContent = summary.blocked;
-      var statDone = mc2El('mc2-stat-done'); if (statDone) statDone.textContent = summary.completedToday;
+      var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = counts.inProgress;
+      var statOpen = mc2El('mc2-stat-open'); if (statOpen) statOpen.textContent = counts.open;
+      var statAttention = mc2El('mc2-stat-attention'); if (statAttention) statAttention.textContent = counts.needsAttention;
+      var statDone = mc2El('mc2-stat-done'); if (statDone) statDone.textContent = counts.completed;
       var statPace = mc2El('mc2-stat-pace');
       if (statPace) {
         var events = teamActivityEvents || [];
@@ -279,11 +300,49 @@
       var items = [];
       var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var allWork = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var missionsWithInput = {};
+      missions.forEach(function (g) {
+        var missionId = String(g.id || '');
+        var ask = String(g.needsUserInput || '').trim();
+        if (!missionId || !ask) return;
+        if (typeof isOrphanedLetterPrompt === 'function' && isOrphanedLetterPrompt(ask)) return;
+        missionsWithInput[missionId] = true;
+      });
 
       allWork.forEach(function (it) {
         if (String(it.status || '').toLowerCase() !== 'blocked') return;
         if (!mc2MatchesSelectedMission(it.missionId)) return;
         var ts = Number(it.updatedAt) || 0;
+        if (it.kind === 'agent') {
+          var agentId = String(it.agentId || it.assignee || '').trim();
+          mc2PushActionRequiredItem(items, {
+            kind: 'error',
+            action: 'agent',
+            agentId: agentId,
+            title: String(it.title || 'Agent blocked').trim().slice(0, 96),
+            subtitle: agentNameById(agentId) + ' · waiting ' + mc2ShortWaitTime(ts),
+            ts: ts,
+          });
+          return;
+        }
+        if (it.kind === 'mission') {
+          var blockedMissionId = String(it.missionId || '');
+          var blockedTitle = String(it.description || it.title || 'Mission blocked').trim().slice(0, 96) || 'Mission blocked';
+          mc2PushActionRequiredItem(items, {
+            kind: 'error',
+            action: 'mission-input',
+            missionId: blockedMissionId,
+            isMission: true,
+            title: blockedTitle,
+            subtitle: mc2MissionWaitSubtitle(
+              missions.find(function (g) { return String(g.id || '') === blockedMissionId; }) || { title: it.title },
+              ts
+            ),
+            ts: ts,
+          });
+          return;
+        }
+        if (missionsWithInput[String(it.missionId || '')]) return;
         var taskTitle = String(it.title || 'Blocked task').trim();
         mc2PushActionRequiredItem(items, {
           kind: 'error',
@@ -305,64 +364,18 @@
       missions.forEach(function (g) {
         var missionId = String(g.id || '');
         if (!mc2MatchesSelectedMission(missionId)) return;
+        if (!missionsWithInput[missionId]) return;
         var ts = Number(g.updatedAt) || 0;
-        var status = String(g.status || '').toLowerCase();
         var needsInput = String(g.needsUserInput || '').trim();
-        var blockedSubs = typeof countBlockedTasksForMission === 'function' ? countBlockedTasksForMission(g) : 0;
-
-        if (needsInput) {
-          mc2PushActionRequiredItem(items, {
-            kind: 'warning',
-            action: 'mission-input',
-            missionId: missionId,
-            isMission: true,
-            title: needsInput.slice(0, 96),
-            subtitle: mc2MissionWaitSubtitle(g, ts),
-            ts: ts,
-          });
-          return;
-        }
-        if (status === 'blocked') {
-          var blockedTitle = String(g.blockedReason || '').trim().slice(0, 96) || 'Mission blocked';
-          var missionLabel = String(g.title || g.objective || '').trim();
-          mc2PushActionRequiredItem(items, {
-            kind: 'error',
-            action: 'mission-input',
-            missionId: missionId,
-            isMission: true,
-            title: blockedTitle,
-            subtitle: missionLabel + ' · waiting ' + mc2ShortWaitTime(ts),
-            ts: ts,
-          });
-          return;
-        }
-        if (blockedSubs > 0) {
-          mc2PushActionRequiredItem(items, {
-            kind: 'error',
-            action: 'mission-input',
-            missionId: missionId,
-            title: blockedSubs + ' blocked task' + (blockedSubs === 1 ? '' : 's') + ' need response',
-            subtitle: mc2MissionWaitSubtitle(g, ts),
-            ts: ts,
-          });
-          return;
-        }
-        if ((typeof isMissionPartialWait === 'function' && isMissionPartialWait(g)) ||
-          (typeof missionNeedsAttention === 'function' && missionNeedsAttention(g))) {
-          var reason = typeof missionImplementationBlockedLabel === 'function'
-            ? missionImplementationBlockedLabel(g)
-            : '';
-          var missionLabel2 = String(g.title || g.objective || '').trim();
-          mc2PushActionRequiredItem(items, {
-            kind: 'warning',
-            action: 'mission-input',
-            missionId: missionId,
-            isMission: true,
-            title: reason || 'Mission needs input',
-            subtitle: missionLabel2 + (missionLabel2 ? ' · waiting ' + mc2ShortWaitTime(ts) : ''),
-            ts: ts,
-          });
-        }
+        mc2PushActionRequiredItem(items, {
+          kind: 'warning',
+          action: 'mission-input',
+          missionId: missionId,
+          isMission: true,
+          title: needsInput.slice(0, 96),
+          subtitle: mc2MissionWaitSubtitle(g, ts),
+          ts: ts,
+        });
       });
 
       var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : [];
@@ -397,26 +410,6 @@
           subtitle: 'Awaiting your approval · ' + mc2ShortWaitTime(ts),
           ts: ts,
         });
-      });
-
-      var agents = agentMapData || [];
-      var ctxMap = teamAgentContextSnapshot.agents || {};
-      agents.forEach(function (a) {
-        var id = String(a.id || '');
-        var ctx = ctxMap[id] || { state: 'idle' };
-        var s = String(ctx.state || 'idle').toLowerCase();
-        var lastTs = Number(ctx.updatedAt) || 0;
-        if (s === 'error') {
-          var reason = String(ctx.currentThought || ctx.lastAction || '').trim() || 'Agent blocked';
-          mc2PushActionRequiredItem(items, {
-            kind: 'error',
-            action: 'agent',
-            agentId: id,
-            title: reason.slice(0, 96),
-            subtitle: agentCardShortName(a) + ' · waiting ' + mc2ShortWaitTime(lastTs),
-            ts: lastTs,
-          });
-        }
       });
 
       items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
@@ -756,3 +749,6 @@
       render('mc2-agents-overview');
       render('mc2-agents-detail');
     }
+
+    window.computeMc2HomeCounts = computeMc2HomeCounts;
+    window.mc2FocusKanbanColumn = mc2FocusKanbanColumn;

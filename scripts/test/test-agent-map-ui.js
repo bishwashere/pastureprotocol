@@ -319,36 +319,29 @@ const checks = [
       /\.mc-task-card-desc\s*\{[\s\S]{0,220}-webkit-line-clamp:\s*2/.test(html),
   },
   {
-    name: 'Team2 Done Today opens completed tasks cards view',
-    ok: html.includes('data-mc-nav="tasks"') &&
-      html.includes('data-mc-tasks-filter="done"') &&
-      html.includes('mc-stat-card-action') &&
+    name: 'Team2 Completed stat scrolls to completed kanban column',
+    ok: html.includes('data-kanban-col="completed"') &&
+      html.includes('function mc2FocusKanbanColumn') &&
       html.includes('id="mc2-view-tasks"') &&
       html.includes('id="mc2-tasks-list"') &&
-      html.includes('id="mc2-tasks-agent-filter"') &&
       html.includes('mc2RenderTasks') &&
-      html.includes('mc2OpenTasksView') &&
       html.includes('listCanonicalWorkItems') &&
       html.includes('mc2MissionTaskCard') &&
-      html.includes('mc2TaskDisplayTitle') &&
       html.includes('mc-task-card') &&
-      html.includes('No completed mission tasks for this range') &&
-      html.includes('View completed tasks'),
+      html.includes('Completed') &&
+      html.includes('WORK COMPLETED'),
   },
   {
-    name: 'Team2 Blocked stat opens tasks view with blocked filter',
-    ok: html.includes('data-mc-action="blocked"') &&
-      html.includes('mc2OpenTasksView') &&
-      html.includes('id="mc2-tasks-filters"') &&
-      html.includes('data-mc-tasks-filter="blocked"') &&
-      html.includes('flattenMissionWorkItems') &&
-      html.includes('groupMissionWorkItems') &&
-      html.includes('mc-mission-task-card') &&
-      html.includes('data-mc-task-action="respond"') &&
-      html.includes('openMissionWorkInputModal') &&
-      html.includes('missionNeedsAttention') &&
-      html.includes('countBlockedTasksForMission') &&
-      html.includes('View blocked tasks and subtasks'),
+    name: 'Team2 home stat cards share kanban count collectors',
+    ok: html.includes('function computeMc2HomeCounts') &&
+      html.includes('mc2CollectKanbanProgressItems().length') &&
+      html.includes('mc2CollectKanbanOpenItems().length') &&
+      html.includes('mc2CollectKanbanAttentionItems().length') &&
+      html.includes('id="mc2-stat-open"') &&
+      html.includes('id="mc2-stat-attention"') &&
+      html.includes('data-mc-action="kanban-focus"') &&
+      html.includes('data-kanban-col="attention"') &&
+      html.includes('View action queue'),
   },
   {
     name: 'Team2 attention lists blocked tasks needing input',
