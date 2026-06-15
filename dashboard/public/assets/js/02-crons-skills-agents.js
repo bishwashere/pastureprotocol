@@ -1399,13 +1399,15 @@ async function fetchCrons() {
     function configSectionPanel(id, label, bodyHtml, isActive) {
       return '<div class="config-section-panel' + (isActive ? ' active' : '') + '" data-config-section-panel="' + id + '" role="tabpanel"' +
         (isActive ? '' : ' hidden') + '>' +
-        '<div class="config-section-body">' + bodyHtml + '</div></div>';
+        '<div class="config-section-body">' +
+        '<h3 class="config-section-heading">' + escapeHtml(label) + '</h3>' +
+        bodyHtml + '</div></div>';
     }
 
     function setConfigSection(section) {
       configActiveSection = section || 'general';
       try { localStorage.setItem('pasture-config-section', configActiveSection); } catch (_) {}
-      document.querySelectorAll('#config-ui-section-nav button[data-config-section]').forEach(function (b) {
+      document.querySelectorAll('#config-ui-section-nav .config-section-tile[data-config-section]').forEach(function (b) {
         var on = b.getAttribute('data-config-section') === configActiveSection;
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -1468,16 +1470,16 @@ async function fetchCrons() {
       var checklist = tide.checklist || {};
       var checklistTriggers = checklist.triggers || {};
       var CONFIG_SECTIONS = [
-        { id: 'general', label: 'General' },
-        { id: 'agents', label: 'Agents' },
-        { id: 'llm', label: 'LLM' },
-        { id: 'skills', label: 'Skills' },
-        { id: 'channels', label: 'Channels' },
-        { id: 'owner', label: 'Owner' },
-        { id: 'tide', label: 'Tide' },
-        { id: 'messaging', label: 'Messaging' },
-        { id: 'retrospective', label: 'Retrospective' },
-        { id: 'pulse', label: 'Pulse' }
+        { id: 'general', label: 'General', desc: 'Overview' },
+        { id: 'agents', label: 'Agents', desc: 'Roster & defaults' },
+        { id: 'llm', label: 'LLM', desc: 'Models & tokens' },
+        { id: 'skills', label: 'Skills', desc: 'Enabled skills' },
+        { id: 'channels', label: 'Channels', desc: 'WhatsApp & Telegram' },
+        { id: 'owner', label: 'Owner', desc: 'Your contact IDs' },
+        { id: 'tide', label: 'Tide', desc: 'Follow-ups & checklist' },
+        { id: 'messaging', label: 'Messaging', desc: 'Agent delegation' },
+        { id: 'retrospective', label: 'Retrospective', desc: 'Self-improvement' },
+        { id: 'pulse', label: 'Pulse', desc: 'Health monitoring' }
       ];
       var activeSection = CONFIG_SECTIONS.some(function (s) { return s.id === configActiveSection; })
         ? configActiveSection : 'general';
@@ -1587,8 +1589,11 @@ async function fetchCrons() {
       };
       var navHtml = CONFIG_SECTIONS.map(function (s) {
         var on = s.id === activeSection;
-        return '<button type="button" data-config-section="' + s.id + '" role="tab"' +
-          (on ? ' class="active" aria-selected="true"' : ' aria-selected="false"') + '>' + escapeHtml(s.label) + '</button>';
+        return '<button type="button" class="config-section-tile' + (on ? ' active' : '') + '" data-config-section="' + s.id + '" role="tab"' +
+          ' aria-selected="' + (on ? 'true' : 'false') + '">' +
+          '<span class="config-section-tile-title">' + escapeHtml(s.label) + '</span>' +
+          '<span class="config-section-tile-desc">' + escapeHtml(s.desc || '') + '</span>' +
+          '</button>';
       }).join('');
       var panelsHtml = CONFIG_SECTIONS.map(function (s) {
         return configSectionPanel(s.id, s.label, sectionBodies[s.id], s.id === activeSection);
@@ -1605,7 +1610,7 @@ async function fetchCrons() {
     }
 
     function wireConfigUiActions() {
-      document.querySelectorAll('#config-ui-section-nav button[data-config-section]').forEach(function (btn) {
+      document.querySelectorAll('#config-ui-section-nav .config-section-tile[data-config-section]').forEach(function (btn) {
         if (btn.dataset.wired) return;
         btn.dataset.wired = '1';
         btn.addEventListener('click', function () { setConfigSection(btn.getAttribute('data-config-section')); });
