@@ -223,13 +223,12 @@ const checks = [
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
-    name: 'attention items use task titles and proposed task tags',
+    name: 'attention queue lists blockers only not proposed approvals',
     ok: !fullHtml.includes('id="mc2-action-banner"') &&
       !fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectActionRequiredItems') &&
       !missionControlJs.includes('function mc2RenderActionBanner') &&
-      missionControlJs.includes("action: 'suggestedTask-review'") &&
-      missionControlJs.includes("tag: 'Proposed'") &&
+      missionControlJs.includes('Proposed suggested tasks and pending mission plans are not blockers') &&
       missionControlJs.includes('function mc2ProposedSuggestedTaskNeedsApproval') &&
       missionControlJs.includes('function mc2TaskTitleForSuggestedTask') &&
       !missionControlJs.includes("'Review auto-promoted suggestedTask'"),

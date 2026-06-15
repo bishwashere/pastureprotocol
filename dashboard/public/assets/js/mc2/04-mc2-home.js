@@ -378,39 +378,8 @@
         });
       });
 
-      var suggestedTasks = Array.isArray(teamSuggestedTasksSnapshot.suggestedTasks) ? teamSuggestedTasksSnapshot.suggestedTasks : [];
-      suggestedTasks.forEach(function (it) {
-        if (selectedTeamMissionId) {
-          var ids = Array.isArray(it.relatedMissionIds) ? it.relatedMissionIds : [];
-          if (ids.indexOf(selectedTeamMissionId) < 0) return;
-        }
-        var suggestedTaskId = String(it.id || '');
-        var ts = Number(it.updatedAt) || 0;
-        if (!mc2ProposedSuggestedTaskNeedsApproval(it)) return;
-        mc2PushActionRequiredItem(items, {
-          kind: 'warning',
-          action: 'suggestedTask-review',
-          suggestedTaskId: suggestedTaskId,
-          title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
-          tag: 'Proposed',
-          discoveryType: String(it.type || 'observation').toLowerCase(),
-          subtitle: mc2ProposedSuggestedTaskSubtitle(it),
-          ts: ts,
-        });
-      });
-
-      mc2PendingItems().forEach(function (p) {
-        var pendingId = String(p.id || '');
-        var ts = Number(p.createdAt) || 0;
-        mc2PushActionRequiredItem(items, {
-          kind: 'warning',
-          action: 'pending',
-          pendingId: pendingId,
-          title: String(mc2PendingTitle(p) || 'Pending approval').trim().slice(0, 96),
-          subtitle: 'Awaiting your approval · ' + mc2ShortWaitTime(ts),
-          ts: ts,
-        });
-      });
+      // Proposed suggested tasks and pending mission plans are not blockers — they live in
+      // the approvals badge, pending banners, and mission/task views instead.
 
       items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
       return items;
