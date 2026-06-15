@@ -70,8 +70,8 @@ assert(String(updatedTasks[0].status) === 'todo', 'converted task defaults to op
 assert(!hasAppliedAssumption(updatedTasks[1]), 'access task unchanged');
 
 const blockersPrompt = formatMissionBlockersForPrompt({ ...mission, tasks: updatedTasks }, liveCtx);
-assert(blockersPrompt.includes('Blockers (2'), 'blockers prompt lists all blockers');
-assert(blockersPrompt.includes('assumption:'), 'blockers prompt includes assumption status');
+assert(blockersPrompt.includes('Active blockers'), 'blockers prompt lists active blockers');
+assert(blockersPrompt.includes('converted via assumption'), 'blockers prompt lists converted blockers');
 
 const prompt = buildMissionTickPrompt(mission, {
   missionMemory: '',
