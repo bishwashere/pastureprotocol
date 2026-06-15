@@ -70,6 +70,7 @@
     "test:agent-metrics": "node scripts/test/test-agent-metrics.js",
     "test:missions": "node scripts/test/test-missions.js",
     "test:missions-merge-tasks": "node scripts/test/test-missions-merge-tasks.js",
+    "test:blocker-type": "node scripts/test/test-blocker-type.js",
     "test:ai-suggested-tasks": "node scripts/test/test-ai-suggested-tasks.js",
     "test:curiosity-momentum": "node scripts/test/test-curiosity-momentum.js",
     "test:delegated-tasks": "node scripts/test/test-delegated-tasks.js",

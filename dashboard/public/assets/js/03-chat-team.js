@@ -797,13 +797,39 @@
       system_error: 'System error',
     };
 
-    function blockerTypeLabel(task) {
+    function inferBlockerTypeFromText(title, description) {
+      var hay = (String(title || '') + ' ' + String(description || '')).toLowerCase();
+      if (/\b(rate.?limit|quota|llm.?limit|daily.?limit|resets at|try again in|api.?limit|request.?limit|enoent|spawn|segfault|binary|not installed|runtime.?broken|cannot find module|playwright|chromium)\b/.test(hay)) {
+        return 'system_error';
+      }
+      if (/\b(access|credential|api.?key|token|oauth|secret|password|uri|url|database|warehouse|crm|analytics|billing|stripe|hubspot|salesforce|posthog|ga4|mixpanel|shopify|export|share.*data|read.?only|permission)\b/.test(hay)) {
+        return 'need_access';
+      }
+      if (/\b(provide|supply|upload|send.*file|brand|logo|copy|asset|content|archive|feedback|transcript|recording|export|notes|interview|survey|media)\b/.test(hay)) {
+        return 'need_content';
+      }
+      if (/\b(approve|approval|review|sign.?off|confirm.*plan|confirm.*draft|verify.*draft|proceed after|before.*launch)\b/.test(hay)) {
+        return 'need_approval';
+      }
+      return 'need_direction';
+    }
+
+    function resolveBlockerTypeForTask(task) {
       var bt = String(task && task.blockerType || '').toLowerCase().trim();
+      if (BLOCKER_TYPE_PREFIX_MAP[bt]) return bt;
+      return inferBlockerTypeFromText(
+        task && task.title,
+        (task && task.description) || (task && task.expectedOutput) || ''
+      );
+    }
+
+    function blockerTypeLabel(task) {
+      var bt = resolveBlockerTypeForTask(task);
       return BLOCKER_TYPE_PREFIX_MAP[bt] || 'Need direction';
     }
 
     function isSystemErrorTask(task) {
-      return !!(task && String(task.blockerType || '').toLowerCase() === 'system_error');
+      return resolveBlockerTypeForTask(task) === 'system_error';
     }
 
     function dashboardTaskBlockedByWait(task, waitCondition) {
@@ -1780,7 +1806,7 @@
           ? missionTaskActionButtonsHtml(gid, sgKey, status, { compact: true, fromSuggestedTask: /^init-/.test(sgKey) })
           : '';
         var blockerBadge = (status === 'blocked' && !isSystemErrorTask(sg))
-          ? '<span class="team-mission-blocker-type-badge ' + escapeHtml(String(sg.blockerType || 'need_direction')) + '">' + escapeHtml(blockerTypeLabel(sg) + ':') + '</span> '
+          ? '<span class="team-mission-blocker-type-badge ' + escapeHtml(resolveBlockerTypeForTask(sg)) + '">' + escapeHtml(blockerTypeLabel(sg) + ':') + '</span> '
           : '';
         var summary = '<span class="team-mission-task-row" data-task-id="' + escapeHtml(sgKey) + '">' +
           initBadge + blockerBadge +

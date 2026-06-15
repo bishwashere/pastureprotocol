@@ -8,7 +8,7 @@
       var etaLabel = '';
       if (activeMission) {
         var label = String(activeMission.title || activeMission.objective || '').trim();
-        var totalSubs = 0, doneSubs = 0, progressSum = 0;
+        var totalSubs = 0, doneSubs = 0;
         // Use the same deduplicated task list as the kanban (flattenMissionWorkItems) so the
         // progress bar and the Work Completed lane always show consistent numbers.
         // Direct recursive walks on activeMission.tasks double-count delegated originals.
@@ -20,22 +20,17 @@
         if (_missionTasks.length > 0) {
           totalSubs = _missionTasks.length;
           _missionTasks.forEach(function (it) {
-            var st = String(it.status || '').toLowerCase();
-            if (st === 'done') { doneSubs++; progressSum += 100; }
-            else { progressSum += Math.max(0, Math.min(100, Number(it.progress) || 0)); }
+            if (String(it.status || '').toLowerCase() === 'done') doneSubs++;
           });
         } else {
           // Fallback: raw walk when flattenMissionWorkItems returns nothing for this mission.
           (activeMission.tasks || []).forEach(function sg(s) {
             totalSubs++;
-            var st = String(s.status || '').toLowerCase();
-            if (st === 'done') { doneSubs++; progressSum += 100; }
-            else { progressSum += Math.max(0, Math.min(100, Number(s.progress) || 0)); }
+            if (String(s.status || '').toLowerCase() === 'done') doneSubs++;
             (s.tasks || []).forEach(sg);
           });
         }
-        // Derive pct from actual task progress values — not the agent's self-reported estimate.
-        pct = totalSubs > 0 ? Math.max(0, Math.min(100, Math.round(progressSum / totalSubs))) : 0;
+        pct = totalSubs > 0 ? Math.max(0, Math.min(100, Math.round((doneSubs / totalSubs) * 100))) : 0;
         progressLabel = totalSubs > 0
           ? doneSubs + ' / ' + totalSubs + ' tasks completed · ' + pct + '%'
           : (label ? label : 'Active mission') + ' — ' + pct + '%';
