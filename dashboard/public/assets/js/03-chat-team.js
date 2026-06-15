@@ -5062,6 +5062,7 @@
     window.openSuggestedTaskForTask = openSuggestedTaskForTask;
     window.missionNeedsAttention = missionNeedsAttention;
     window.countBlockedTasksForMission = countBlockedTasksForMission;
+    window.collectBlockedTasksForMission = collectBlockedTasksForMission;
 
     function renderTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');

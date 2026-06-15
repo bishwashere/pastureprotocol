@@ -223,15 +223,15 @@ const checks = [
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
   },
   {
-    name: 'attention queue lists blockers only and proposed items have their own lane',
+    name: 'attention queue lists blockers and need-review items in one lane',
     ok: !fullHtml.includes('id="mc2-action-banner"') &&
       !fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectBlockersNeedingAttention') &&
       missionControlJs.includes('function mc2CollectApprovalQueueItems') &&
-      missionControlJs.includes('function mc2CollectKanbanProposedItems') &&
+      missionControlJs.includes("tag: 'Need review'") &&
       missionControlJs.includes("action: 'suggestedTask-review'") &&
       missionControlJs.includes('mc-action-queue-label') &&
-      fullHtml.includes('id="mc2-col-proposed"') &&
+      !fullHtml.includes('id="mc2-col-proposed"') &&
       missionControlJs.includes('function mc2ProposedSuggestedTaskNeedsApproval') &&
       !missionControlJs.includes("'Review auto-promoted suggestedTask'"),
   },

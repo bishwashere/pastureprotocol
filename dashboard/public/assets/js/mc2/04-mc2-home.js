@@ -7,7 +7,6 @@
         open: mc2CollectKanbanOpenItems().length,
         completed: mc2CollectKanbanCompletedItems().length,
         needsAttention: mc2CollectKanbanAttentionItems().length,
-        proposed: mc2CollectKanbanProposedItems().length,
       };
     }
 
@@ -17,7 +16,6 @@
         open: 'mc2-col-open',
         completed: 'mc2-col-completed',
         attention: 'mc2-col-attention',
-        proposed: 'mc2-col-proposed',
       }[String(col || '').trim()];
       if (!colId) return;
       var body = mc2El(colId);
@@ -76,7 +74,6 @@
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = counts.inProgress;
       var statOpen = mc2El('mc2-stat-open'); if (statOpen) statOpen.textContent = counts.open;
       var statAttention = mc2El('mc2-stat-attention'); if (statAttention) statAttention.textContent = counts.needsAttention;
-      var statProposed = mc2El('mc2-stat-proposed'); if (statProposed) statProposed.textContent = counts.proposed;
       var statDone = mc2El('mc2-stat-done'); if (statDone) statDone.textContent = counts.completed;
       var statPace = mc2El('mc2-stat-pace');
       if (statPace) {
@@ -131,9 +128,13 @@
       return '💡';
     }
 
-    function mc2ProposedTagHtml(extraClass) {
+    function mc2AttentionTagHtml(label, extraClass) {
       var cls = 'mc-kanban-card-tag discovery' + (extraClass ? ' ' + extraClass : '');
-      return '<span class="' + cls + '">Proposed</span>';
+      return '<span class="' + cls + '">' + escapeHtml(String(label || 'Need review')) + '</span>';
+    }
+
+    function mc2ProposedTagHtml(extraClass) {
+      return mc2AttentionTagHtml('Need review', extraClass);
     }
 
     function mc2AutoPromotedTagHtml(extraClass) {
@@ -205,7 +206,7 @@
           ? '<div class="mc-kanban-card-meta"><span class="mc-task-card-label mc-task-label-mission">Mission</span></div>'
           : '') +
         (item.tag
-          ? '<div class="mc-kanban-card-meta">' + mc2ProposedTagHtml() + '</div>'
+          ? '<div class="mc-kanban-card-meta">' + mc2AttentionTagHtml(item.tag) + '</div>'
           : '') +
         (item.subtitle || item.text
           ? '<div class="mc-kanban-card-meta">' + escapeHtml(item.subtitle || String(item.text || '').replace(/^[^—]+—\s*/, '')) + '</div>'
@@ -304,6 +305,11 @@
       var missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
       var allWork = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       var missionsWithInput = {};
+      var seenBlockerTitles = {};
+      var collectBlocked = typeof collectBlockedTasksForMission === 'function'
+        ? collectBlockedTasksForMission
+        : (typeof window.collectBlockedTasksForMission === 'function' ? window.collectBlockedTasksForMission : null);
+
       missions.forEach(function (g) {
         var missionId = String(g.id || '');
         var ask = String(g.needsUserInput || '').trim();
@@ -326,43 +332,39 @@
             subtitle: agentNameById(agentId) + ' · waiting ' + mc2ShortWaitTime(ts),
             ts: ts,
           });
-          return;
         }
-        if (it.kind === 'mission') {
-          var blockedMissionId = String(it.missionId || '');
-          var blockedTitle = String(it.description || it.title || 'Mission blocked').trim().slice(0, 96) || 'Mission blocked';
-          mc2PushActionRequiredItem(items, {
-            kind: 'error',
-            action: 'mission-input',
-            missionId: blockedMissionId,
-            isMission: true,
-            title: blockedTitle,
-            subtitle: mc2MissionWaitSubtitle(
-              missions.find(function (g) { return String(g.id || '') === blockedMissionId; }) || { title: it.title },
-              ts
-            ),
-            ts: ts,
-          });
-          return;
-        }
-        if (missionsWithInput[String(it.missionId || '')]) return;
-        var taskTitle = String(it.title || 'Blocked task').trim();
-        mc2PushActionRequiredItem(items, {
-          kind: 'error',
-          action: 'mission-input',
-          missionId: String(it.missionId || ''),
-          taskId: String(it.taskId || ''),
-          title: '\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d',
-          subtitle: it.missionTitle
-            ? (it.missionTitle + ' · waiting ' + mc2ShortWaitTime(ts))
-            : ('Mission · waiting ' + mc2ShortWaitTime(ts)),
-          ts: ts,
-          status: 'blocked',
-          createdAt: Number(it.createdAt) || 0,
-          startedAt: Number(it.startedAt) || 0,
-          waitingSince: Number(it.waitingSince) || 0,
-        });
       });
+
+      if (collectBlocked) {
+        missions.forEach(function (g) {
+          var missionId = String(g.id || '');
+          if (!mc2MatchesSelectedMission(missionId)) return;
+          var blockedTasks = collectBlocked(g);
+          blockedTasks.forEach(function (sg) {
+            if (missionsWithInput[missionId]) return;
+            var taskTitle = String(sg.title || 'Blocked task').trim();
+            if (/persistent background mission tick/i.test(taskTitle)) return;
+            var dedupeKey = missionId + '::' + taskTitle.toLowerCase();
+            if (seenBlockerTitles[dedupeKey]) return;
+            seenBlockerTitles[dedupeKey] = true;
+            var taskTs = Number(sg.updatedAt || g.updatedAt) || 0;
+            mc2PushActionRequiredItem(items, {
+              kind: 'error',
+              action: 'mission-input',
+              missionId: missionId,
+              taskId: String(sg.id || ''),
+              title: '\u201c' + taskTitle.slice(0, 80) + (taskTitle.length > 80 ? '\u2026' : '') + '\u201d',
+              subtitle: String(g.title || g.objective || 'Mission').trim()
+                + ' · waiting ' + mc2ShortWaitTime(taskTs),
+              ts: taskTs,
+              status: 'blocked',
+              createdAt: Number(sg.createdAt) || 0,
+              startedAt: Number(sg.startedAt) || 0,
+              waitingSince: Number(sg.waitingSince) || 0,
+            });
+          });
+        });
+      }
 
       missions.forEach(function (g) {
         var missionId = String(g.id || '');
@@ -401,8 +403,8 @@
           kind: 'warning',
           action: 'suggestedTask-review',
           suggestedTaskId: suggestedTaskId,
-          title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
-          tag: 'Proposed',
+          title: String(it.title || 'Untitled item').trim().slice(0, 96),
+          tag: 'Need review',
           discoveryType: String(it.type || 'observation').toLowerCase(),
           subtitle: mc2ProposedSuggestedTaskSubtitle(it),
           ts: ts,
@@ -417,6 +419,7 @@
           action: 'pending',
           pendingId: pendingId,
           title: String(mc2PendingTitle(p) || 'Pending approval').trim().slice(0, 96),
+          tag: 'Need review',
           subtitle: 'Awaiting your approval · ' + mc2ShortWaitTime(ts),
           ts: ts,
         });
@@ -450,7 +453,9 @@
     }
 
     function mc2CollectKanbanAttentionItems() {
-      return mc2CollectBlockersNeedingAttention().map(mc2MapKanbanAttentionItem);
+      var blockers = mc2CollectBlockersNeedingAttention().map(mc2MapKanbanAttentionItem);
+      var review = mc2CollectApprovalQueueItems().map(mc2MapKanbanAttentionItem);
+      return blockers.concat(review);
     }
 
     function mc2CollectKanbanProposedItems() {
@@ -709,14 +714,6 @@
         mc2KanbanAttentionCard,
         'All clear',
         'attention'
-      );
-      mc2RenderKanbanCol(
-        'mc2-col-proposed',
-        'mc2-col-count-proposed',
-        mc2CollectKanbanProposedItems(),
-        mc2KanbanAttentionCard,
-        'Nothing to review',
-        'proposed'
       );
     }
 

@@ -69,7 +69,7 @@
 
 .mc-stat-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.45rem;
   align-items: stretch;
 }
@@ -136,7 +136,7 @@ button.mc-stat-card-action:focus-visible {
 
 .mc-kanban {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.55rem;
 }
 

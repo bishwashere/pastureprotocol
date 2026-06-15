@@ -55,7 +55,7 @@
         html += blockers.slice(0, 4).map(mc2RenderAttentionItemButton).join('');
       }
       if (approvals.length) {
-        html += '<p class="mc-action-queue-label">Proposed — awaiting approval</p>';
+        html += '<p class="mc-action-queue-label">Need review</p>';
         html += approvals.slice(0, 4).map(mc2RenderAttentionItemButton).join('');
       }
       el.innerHTML = html;
