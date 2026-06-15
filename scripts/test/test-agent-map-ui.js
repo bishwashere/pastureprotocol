@@ -351,6 +351,8 @@ const checks = [
     name: 'Team2 attention lists blocked tasks needing input',
     ok: html.includes('countBlockedTasksForMission') &&
       html.includes('function isUserActionableBlockerTask') &&
+      html.includes('summarizeTaskAssumptionForDisplay') &&
+      html.includes('hasAppliedTaskAssumption') &&
       html.includes('need_direction') &&
       html.includes('missionNeedsAttention') &&
       html.includes('missionAttentionPrompt') &&

@@ -853,7 +853,66 @@
       return resolveBlockerTypeForTask(task) === 'system_error';
     }
 
-    function isUserActionableBlockerTask(task) {
+    function liveProductUrlForMission(mission) {
+      if (!mission) return '';
+      var pid = Number(mission.projectId);
+      var projects = typeof mc2ProjectsSnapshot !== 'undefined' && Array.isArray(mc2ProjectsSnapshot)
+        ? mc2ProjectsSnapshot
+        : [];
+      var project = null;
+      if (Number.isFinite(pid) && pid > 0) {
+        for (var i = 0; i < projects.length; i++) {
+          if (Number(projects[i].id) === pid) { project = projects[i]; break; }
+        }
+      }
+      if (!project) {
+        var blob = String((mission.title || '') + ' ' + (mission.objective || '')).toLowerCase();
+        for (var j = 0; j < projects.length; j++) {
+          var n = String(projects[j].name || '').trim().toLowerCase();
+          if (n.length >= 3 && blob.indexOf(n) >= 0) { project = projects[j]; break; }
+        }
+      }
+      var url = project && project.url ? String(project.url).trim() : '';
+      return /^https?:\/\//i.test(url) ? url : '';
+    }
+
+    function isProductSpecDirectionBlockerTask(task) {
+      if (resolveBlockerTypeForTask(task) !== 'need_direction') return false;
+      var title = typeof stripBlockerTitlePrefix === 'function'
+        ? stripBlockerTitlePrefix(String(task.title || task.name || ''))
+        : String(task.title || task.name || '');
+      var hay = (title + ' ' + String(task.description || '') + ' ' + String(task.expectedOutput || '')).toLowerCase();
+      return /\b(product spec|mvp|feature set|ruleset|gameplay|core features?|product definition|define the product|what .+ is|clarify what|platform|target users?)\b/.test(hay);
+    }
+
+    function getTaskAssumptionRecord(task) {
+      var raw = task && task.assumptionRecord;
+      return raw && typeof raw === 'object' ? raw : null;
+    }
+
+    function hasAppliedTaskAssumption(task) {
+      var record = getTaskAssumptionRecord(task);
+      return String(record && record.status || '').toLowerCase() === 'applied';
+    }
+
+    function summarizeTaskAssumptionForDisplay(task) {
+      var record = getTaskAssumptionRecord(task);
+      if (!record) return '';
+      if (String(record.status || '').toLowerCase() !== 'applied') return 'Assumption pending';
+      var parts = [];
+      if (record.summary) parts.push(String(record.summary));
+      if (Array.isArray(record.collectedEvidence) && record.collectedEvidence.length) {
+        parts.push('Evidence: ' + record.collectedEvidence.slice(0, 2).join('; '));
+      }
+      return parts.join(' · ').slice(0, 180);
+    }
+
+    function canAssumeProductSpecFromLiveProduct(task, mission) {
+      if (!liveProductUrlForMission(mission)) return false;
+      return isProductSpecDirectionBlockerTask(task);
+    }
+
+    function isUserActionableBlockerTask(task, mission) {
       if (!task || typeof task !== 'object') return false;
       if (normalizeTaskStatus(task.status) === 'done') return false;
       if (isSystemErrorTask(task)) return false;
@@ -895,7 +954,7 @@
         var title = String(sg.title || '').trim();
         var status = normalizeTaskStatus(sg.status);
         // Blocked status or user-actionable blocker types (need_direction, need_access, etc.)
-        if (status === 'blocked' || isUserActionableBlockerTask(sg)) {
+        if (status === 'blocked' || isUserActionableBlockerTask(sg, mission)) {
           refs.push({ kind: 'task', missionId: missionId, taskId: sgId, title: title });
         }
         walkMissionTasksForBlocked(sg.tasks, missionId, mission, refs);
@@ -3770,7 +3829,7 @@
       function walk(tasks) {
         (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          if (isUserActionableBlockerTask(sg)) count++;
+          if (isUserActionableBlockerTask(sg, mission)) count++;
           walk(sg.tasks);
         });
       }
@@ -3784,7 +3843,7 @@
       function walk(tasks) {
         (tasks || []).forEach(function (sg) {
           if (!sg || typeof sg !== 'object') return;
-          if (isUserActionableBlockerTask(sg)) result.push(sg);
+          if (isUserActionableBlockerTask(sg, mission)) result.push(sg);
           walk(sg.tasks);
         });
       }
@@ -5063,6 +5122,9 @@
     window.missionNeedsAttention = missionNeedsAttention;
     window.countBlockedTasksForMission = countBlockedTasksForMission;
     window.collectBlockedTasksForMission = collectBlockedTasksForMission;
+    window.summarizeTaskAssumptionForDisplay = summarizeTaskAssumptionForDisplay;
+    window.hasAppliedTaskAssumption = hasAppliedTaskAssumption;
+    window.canAssumeProductSpecFromLiveProduct = canAssumeProductSpecFromLiveProduct;
 
     function renderTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');

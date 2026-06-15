@@ -348,14 +348,23 @@
             if (seenBlockerTitles[dedupeKey]) return;
             seenBlockerTitles[dedupeKey] = true;
             var taskTs = Number(sg.updatedAt || g.updatedAt) || 0;
+            var assumptionText = typeof window.summarizeTaskAssumptionForDisplay === 'function'
+              ? window.summarizeTaskAssumptionForDisplay(sg)
+              : '';
+            var assumptionTag = typeof window.hasAppliedTaskAssumption === 'function' && window.hasAppliedTaskAssumption(sg)
+              ? 'Assumed'
+              : (typeof window.canAssumeProductSpecFromLiveProduct === 'function' && window.canAssumeProductSpecFromLiveProduct(sg, g)
+                ? 'Assumption pending'
+                : '');
             mc2PushActionRequiredItem(items, {
               kind: 'error',
               action: 'mission-input',
               missionId: missionId,
               taskId: String(sg.id || ''),
               title: taskTitle.slice(0, 96) + (taskTitle.length > 96 ? '\u2026' : ''),
-              subtitle: String(g.title || g.objective || 'Mission').trim()
-                + ' · waiting ' + mc2ShortWaitTime(taskTs),
+              tag: assumptionTag || '',
+              subtitle: assumptionText
+                || (String(g.title || g.objective || 'Mission').trim() + ' · waiting ' + mc2ShortWaitTime(taskTs)),
               ts: taskTs,
               status: 'blocked',
               createdAt: Number(sg.createdAt) || 0,

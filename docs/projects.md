@@ -56,6 +56,8 @@ Broad project questions often need user input before the team can act responsibl
 
 Current templates cover digital product growth, ecommerce growth, physical/local businesses, B2B sales pipeline, and content/audience growth. The selected template depends on the request and project context. Already-known setup notes, connectors, or provided context suppress matching blockers, so a digital product with MongoDB and PostHog already configured will not ask for those again.
 
+When a project has a **live URL** (`https://…`), product-spec blockers are still created first. A separate **assumption phase** (last step of each mission tick) browses the live product, records `collectedEvidence` and `assumptions` on each task as `assumptionRecord`, and advances work without deleting the blocker audit trail. See `lib/product-assumptions.js`.
+
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.
