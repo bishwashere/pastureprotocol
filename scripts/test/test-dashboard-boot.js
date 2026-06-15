@@ -249,6 +249,7 @@ const checks = [
     name: 'config page has UI/JSON toggle and tide checklist in Tide section',
     ok: fullHtml.includes('data-config-view="ui"') &&
       fullHtml.includes('id="config-ui-sections"') &&
+      fullHtml.includes('id="config-agents-list"') &&
       script.includes('function renderConfigUi(') &&
       script.includes('id="config-tide-checklist-items"') &&
       script.includes('config-tide-checklist-run') &&

@@ -1272,6 +1272,12 @@ async function fetchCrons() {
 
     var configCache = null;
     var configSkillsList = [];
+    var configAgentsList = [];
+    var configAgentDrafts = {};
+    var configAgentDirtyIds = new Set();
+    var configSelectedAgentId = (function () {
+      try { return localStorage.getItem('pasture-config-agent') || 'main'; } catch (_) { return 'main'; }
+    })();
     var configViewMode = (function () {
       try { return localStorage.getItem('pasture-config-view') || 'ui'; } catch (_) { return 'ui'; }
     })();
@@ -1288,6 +1294,91 @@ async function fetchCrons() {
 
     function configBoolInput(id, checked, label) {
       return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '> ' + escapeHtml(label) + '</label>';
+    }
+
+    function configAgentIdentityFromConfig(cfg) {
+      cfg = cfg || {};
+      return {
+        title: typeof cfg.title === 'string' ? cfg.title : '',
+        bio: typeof cfg.bio === 'string' ? cfg.bio : '',
+        color: typeof cfg.color === 'string' ? cfg.color : '',
+      };
+    }
+
+    function getConfigAgentIdentity(agentId, rootConfig) {
+      if (configAgentDrafts[agentId]) return configAgentDrafts[agentId];
+      if (agentId === 'main') return configAgentIdentityFromConfig(rootConfig || {});
+      return { title: '', bio: '', color: '' };
+    }
+
+    function saveConfigAgentDraftFromUi() {
+      var titleEl = document.getElementById('config-agent-title');
+      var bioEl = document.getElementById('config-agent-bio');
+      var colorEl = document.getElementById('config-agent-color');
+      if (!titleEl && !bioEl && !colorEl) return;
+      var agentId = configSelectedAgentId || 'main';
+      configAgentDrafts[agentId] = {
+        title: titleEl ? titleEl.value : '',
+        bio: bioEl ? bioEl.value : '',
+        color: colorEl ? colorEl.value : '',
+      };
+      configAgentDirtyIds.add(agentId);
+    }
+
+    function applyMainAgentIdentityToConfig(config) {
+      var identity = getConfigAgentIdentity('main', config);
+      var title = String(identity.title || '').trim();
+      var bio = String(identity.bio || '').trim();
+      var color = String(identity.color || '').trim();
+      if (title) config.title = title; else delete config.title;
+      if (bio) config.bio = bio; else delete config.bio;
+      if (color) config.color = color; else delete config.color;
+      return config;
+    }
+
+    async function selectConfigAgent(agentId) {
+      saveConfigAgentDraftFromUi();
+      agentId = String(agentId || 'main').trim() || 'main';
+      if (!configAgentsList.some(function (a) { return a.id === agentId; })) agentId = 'main';
+      configSelectedAgentId = agentId;
+      try { localStorage.setItem('pasture-config-agent', configSelectedAgentId); } catch (_) {}
+      if (!configAgentDrafts[agentId] && agentId !== 'main') {
+        try {
+          var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+          configAgentDrafts[agentId] = configAgentIdentityFromConfig(cfg);
+        } catch (_) {
+          configAgentDrafts[agentId] = { title: '', bio: '', color: '' };
+        }
+      }
+      document.querySelectorAll('#config-agents-list li').forEach(function (li) {
+        var btn = li.querySelector('button[data-config-agent-id]');
+        li.classList.toggle('selected', btn && btn.getAttribute('data-config-agent-id') === configSelectedAgentId);
+      });
+      var identity = getConfigAgentIdentity(configSelectedAgentId, configCache || {});
+      var titleEl = document.getElementById('config-agent-title');
+      var bioEl = document.getElementById('config-agent-bio');
+      var colorEl = document.getElementById('config-agent-color');
+      var headingEl = document.getElementById('config-agent-heading');
+      if (titleEl) titleEl.value = identity.title || '';
+      if (bioEl) bioEl.value = identity.bio || '';
+      if (colorEl) colorEl.value = identity.color || '';
+      if (headingEl) headingEl.textContent = 'Agent: ' + configSelectedAgentId;
+    }
+
+    function renderConfigAgentsList() {
+      var ul = document.getElementById('config-agents-list');
+      if (!ul) return;
+      var list = configAgentsList.length ? configAgentsList : [{ id: 'main', title: '' }];
+      if (!list.some(function (a) { return a.id === configSelectedAgentId; })) configSelectedAgentId = list[0].id;
+      ul.innerHTML = list.map(function (a) {
+        var selected = a.id === configSelectedAgentId ? 'selected' : '';
+        var title = (a.title && String(a.title).trim()) ? String(a.title).trim() : '';
+        var label = title ? escapeHtml(title) + ' <span class="skill-meta">(' + escapeHtml(a.id) + ')</span>' : escapeHtml(a.id);
+        return '<li class="' + selected + '"><button type="button" class="link" data-config-agent-id="' + escapeHtml(a.id) + '">' + label + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('button[data-config-agent-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectConfigAgent(btn.getAttribute('data-config-agent-id')); });
+      });
     }
 
     function configTextField(id, label, value, placeholder, type) {
@@ -1383,10 +1474,10 @@ async function fetchCrons() {
       var activeSection = CONFIG_SECTIONS.some(function (s) { return s.id === configActiveSection; })
         ? configActiveSection : 'general';
       var generalBody =
-        '<div class="field"><label for="config-bio">Bio / personality</label><textarea id="config-bio" rows="3">' + escapeHtml(config.bio || '') + '</textarea></div>' +
-        configTextField('config-title', 'Title', config.title || '', 'CEO') +
-        configTextField('config-color', 'Accent color', config.color || '', '#ef4444', 'color');
+        '<p class="skill-meta" style="margin:0;">Project-wide settings are in the other tabs. Agent roster and per-agent display settings are under <strong>Agents</strong>.</p>';
+      var selectedIdentity = getConfigAgentIdentity(configSelectedAgentId, config);
       var agentsBody =
+        '<p class="overview-label">Defaults (all agents)</p>' +
         configTextField('config-user-timezone', 'User timezone', defaults.userTimezone || '', 'auto or America/New_York') +
         '<div class="field"><label for="config-time-format">Time format</label><select id="config-time-format">' +
         ['auto', '12h', '24h', '12', '24'].map(function (v) {
@@ -1394,7 +1485,18 @@ async function fetchCrons() {
           var label = v === '12' ? '12h (legacy)' : v === '24' ? '24h (legacy)' : v;
           return '<option value="' + v + '"' + sel + '>' + label + '</option>';
         }).join('') +
-        '</select></div>';
+        '</select></div>' +
+        configTextField('config-session-reset-hour', 'Session reset hour (0–23)', defaults.sessionResetHour != null ? defaults.sessionResetHour : 3, '', 'number') +
+        '<div class="config-subsection">' +
+        '<p class="overview-label">Agents</p>' +
+        '<p class="skill-meta" style="margin:0 0 0.5rem 0;">Select an agent to edit display name, bio, and accent color. Full skill and identity editing is on the Agents page.</p>' +
+        '<ul id="config-agents-list" class="groups-ul config-agents-list"></ul>' +
+        '<div id="config-agent-editor">' +
+        '<p id="config-agent-heading" class="overview-label" style="margin-top:0.75rem;">Agent: ' + escapeHtml(configSelectedAgentId) + '</p>' +
+        configTextField('config-agent-title', 'Display name', selectedIdentity.title || '', 'CEO') +
+        '<div class="field"><label for="config-agent-bio">Bio / personality</label><textarea id="config-agent-bio" rows="3">' + escapeHtml(selectedIdentity.bio || '') + '</textarea></div>' +
+        configTextField('config-agent-color', 'Accent color', selectedIdentity.color || '', '#ef4444', 'color') +
+        '</div></div>';
       var llmBody =
         configTextField('config-llm-max-tokens', 'Max tokens', llm.maxTokens != null ? llm.maxTokens : 2048, '', 'number') +
         '<p class="skill-meta">Select one priority model. Local models are used as fallback when cloud is unavailable.</p>' +
@@ -1489,6 +1591,7 @@ async function fetchCrons() {
       if (nav) nav.innerHTML = navHtml;
       container.innerHTML = panelsHtml;
       setConfigSection(activeSection);
+      renderConfigAgentsList();
       wireConfigUiActions();
       if (tideChecklistCache) renderTideChecklistItems(tideChecklistCache.items || []);
     }
@@ -1529,31 +1632,32 @@ async function fetchCrons() {
         });
       });
       wireConfigTideActions();
+      var agentTitleEl = document.getElementById('config-agent-title');
+      var agentBioEl = document.getElementById('config-agent-bio');
+      var agentColorEl = document.getElementById('config-agent-color');
+      [agentTitleEl, agentBioEl, agentColorEl].forEach(function (el) {
+        if (!el || el.dataset.wired) return;
+        el.dataset.wired = '1';
+        el.addEventListener('input', function () { saveConfigAgentDraftFromUi(); });
+        el.addEventListener('change', function () { saveConfigAgentDraftFromUi(); });
+      });
     }
 
     function collectConfigFromUi(base) {
+      saveConfigAgentDraftFromUi();
       var config = JSON.parse(JSON.stringify(base || {}));
-      var bioEl = document.getElementById('config-bio');
-      if (bioEl) {
-        var bio = bioEl.value.trim();
-        if (bio) config.bio = bio; else delete config.bio;
-      }
-      var titleEl = document.getElementById('config-title');
-      if (titleEl) {
-        var title = titleEl.value.trim();
-        if (title) config.title = title; else delete config.title;
-      }
-      var colorEl = document.getElementById('config-color');
-      if (colorEl) {
-        var color = colorEl.value.trim();
-        if (color) config.color = color; else delete config.color;
-      }
+      applyMainAgentIdentityToConfig(config);
       config.agents = config.agents || {};
       config.agents.defaults = config.agents.defaults || {};
       var tzEl = document.getElementById('config-user-timezone');
       if (tzEl) config.agents.defaults.userTimezone = tzEl.value.trim() || 'auto';
       var tfEl = document.getElementById('config-time-format');
       if (tfEl) config.agents.defaults.timeFormat = tfEl.value || 'auto';
+      var resetHourEl = document.getElementById('config-session-reset-hour');
+      if (resetHourEl) {
+        var hour = configNum(resetHourEl.value, 3);
+        if (hour >= 0 && hour <= 23) config.agents.defaults.sessionResetHour = hour;
+      }
 
       var maxTokEl = document.getElementById('config-llm-max-tokens');
       var modelCards = document.querySelectorAll('#config-llm-models .config-model-card');
@@ -1776,9 +1880,29 @@ async function fetchCrons() {
         var results = await Promise.all([
           fetch(API + '/api/config').then(function (r) { return r.json(); }),
           fetch(API + '/api/skills').then(function (r) { return r.json(); }).catch(function () { return { skills: [] }; }),
+          fetch(API + '/api/agents').then(function (r) { return r.json(); }).catch(function () { return { agents: [] }; }),
         ]);
         configCache = results[0];
         configSkillsList = results[1].skills || [];
+        configAgentsList = (results[2].agents || []).map(function (a) {
+          return { id: a.id, title: a.title || '' };
+        });
+        if (!configAgentsList.some(function (a) { return a.id === 'main'; })) {
+          configAgentsList.unshift({ id: 'main', title: configCache.title || '' });
+        }
+        if (!configAgentsList.some(function (a) { return a.id === configSelectedAgentId; })) {
+          configSelectedAgentId = configAgentsList[0] ? configAgentsList[0].id : 'main';
+        }
+        configAgentDrafts = { main: configAgentIdentityFromConfig(configCache) };
+        configAgentDirtyIds = new Set();
+        if (configSelectedAgentId !== 'main') {
+          try {
+            var selCfg = await fetch(API + '/api/agents/' + encodeURIComponent(configSelectedAgentId) + '/config').then(function (r) { return r.json(); });
+            configAgentDrafts[configSelectedAgentId] = configAgentIdentityFromConfig(selCfg);
+          } catch (_) {
+            configAgentDrafts[configSelectedAgentId] = { title: '', bio: '', color: '' };
+          }
+        }
         document.getElementById('full-config').value = JSON.stringify(configCache, null, 2);
         renderConfigUi(configCache);
         await fetchTideChecklistForConfig();
@@ -1822,6 +1946,32 @@ async function fetchCrons() {
         }
         var d = await r.json();
         configCache = d;
+        configAgentDrafts.main = configAgentIdentityFromConfig(d);
+        var dirtyAgents = Array.from(configAgentDirtyIds).filter(function (id) { return id && id !== 'main'; });
+        for (var i = 0; i < dirtyAgents.length; i++) {
+          var agentId = dirtyAgents[i];
+          var draft = configAgentDrafts[agentId];
+          if (!draft) continue;
+          var patchBody = {
+            title: String(draft.title || '').trim(),
+            bio: String(draft.bio || '').trim(),
+            color: String(draft.color || '').trim(),
+          };
+          var pr = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchBody),
+          });
+          if (!pr.ok) {
+            var pd = await pr.json().catch(function () { return {}; });
+            throw new Error(pd.error || 'Failed to save agent ' + agentId);
+          }
+          var savedCfg = await pr.json();
+          configAgentDrafts[agentId] = configAgentIdentityFromConfig(savedCfg);
+          var listAgent = configAgentsList.find(function (a) { return a.id === agentId; });
+          if (listAgent) listAgent.title = savedCfg.title || '';
+        }
+        configAgentDirtyIds = new Set();
         textarea.value = JSON.stringify(d, null, 2);
         renderConfigUi(d);
         await fetchTideChecklistForConfig();

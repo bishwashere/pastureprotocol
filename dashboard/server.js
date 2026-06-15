@@ -835,6 +835,16 @@ app.patch('/api/agents/:id/config', (req, res) => {
         delete config.title;
       }
     }
+    if (patch.bio !== undefined) {
+      const bio = String(patch.bio || '').trim();
+      if (bio) config.bio = bio;
+      else delete config.bio;
+    }
+    if (patch.color !== undefined) {
+      const color = String(patch.color || '').trim();
+      if (color) config.color = color;
+      else delete config.color;
+    }
     if (patch.agentMessaging !== undefined) {
       config.agentMessaging = normalizeAgentMessagingPolicy({
         ...(config.agentMessaging || {}),

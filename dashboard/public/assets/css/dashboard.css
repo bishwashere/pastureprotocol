@@ -1571,6 +1571,11 @@
     .config-section-panel { display: none; }
     .config-section-panel.active { display: block; }
     .config-section-body { padding: 0; }
+    .config-agents-list {
+      max-height: 14rem;
+      overflow-y: auto;
+      margin-bottom: 0.25rem;
+    }
     .config-section-body .field textarea,
     .config-section-body .field select {
       width: 100%;
