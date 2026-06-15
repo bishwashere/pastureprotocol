@@ -339,8 +339,7 @@ const checks = [
       html.includes('mc2CollectKanbanAttentionItems().length') &&
       html.includes('mc2CollectKanbanProposedItems().length') &&
       html.includes('function mc2CollectBlockersNeedingAttention') &&
-      html.includes('missionNeedsAttention(g)') &&
-      html.includes('collectBlockedTasksForMission(g)') &&
+      html.includes('function mc2CollectApprovalQueueItems') &&
       html.includes('id="mc2-stat-open"') &&
       html.includes('id="mc2-stat-attention"') &&
       html.includes('id="mc2-stat-proposed"') &&
