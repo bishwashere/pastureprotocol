@@ -1905,6 +1905,16 @@ app.get('/api/llm/usage', (_req, res) => {
   }
 });
 
+app.post('/api/llm/usage/reset', (_req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    writeFileSync(getLlmUsagePath(), JSON.stringify({ date: today, count: 0 }), 'utf8');
+    res.json({ ok: true, date: today, count: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.patch('/api/llm/local-rpm', (req, res) => {
   try {
     const rpm = Number(req.body?.localRpm);
