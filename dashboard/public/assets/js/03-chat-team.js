@@ -3738,6 +3738,22 @@
       } catch (_) {}
     }
 
+    (function setupLlmUsageResetBtn() {
+      var chip = document.getElementById('mc2-llm-usage');
+      if (!chip) return;
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', async function () {
+        var txt = document.getElementById('mc2-llm-usage-text');
+        var current = txt ? txt.textContent : '?';
+        if (!window.confirm('Reset API usage counter (' + current + ') back to 0?')) return;
+        try {
+          var r = await fetch(API + '/api/llm/usage/reset', { method: 'POST' });
+          if (!r.ok) { var e = await r.json().catch(function () { return {}; }); alert('Failed: ' + (e.error || r.status)); return; }
+          fetchLlmUsage();
+        } catch (ex) { alert('Error resetting: ' + ex.message); }
+      });
+    })();
+
     (function setupLocalRpmBtn() {
       var btn = document.getElementById('mc2-local-rpm-btn');
       if (!btn) return;
