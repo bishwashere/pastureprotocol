@@ -44,6 +44,7 @@
     "test:spawn-with-timeout": "node scripts/test/test-spawn-with-timeout.js",
     "test:tool-call-retry-exhaustion": "node scripts/test/test-tool-call-retry-exhaustion.js",
     "test:atomic-write": "node scripts/test/test-atomic-write.js",
+    "test:blocked-delegation-gate": "node scripts/test/test-blocked-delegation-gate.js",
     "test:output-parse": "node scripts/test/test-output-parse.js",
     "test:retrospective": "node scripts/test/test-retrospective.js",
     "test:tide": "node scripts/test/test-tide.js",

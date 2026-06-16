@@ -1240,8 +1240,14 @@ async function main() {
     const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
       ? (delegationContext?.recommendation?.targetAgentId || '')
       : '';
+    const delegationBlocked = !!delegationContext?.recommendation?.blocked;
     const delegationDecision = buildDelegationDecisionDetails(delegationContext);
-    const presetDelegationPlan = delegatedTarget && delegationContext?.recommendation?.action === 'delegate'
+    // Don't force agent-send when the explicit target isn't linked from this
+    // caller (recommendation.blocked === true) — that just wastes an LLM call
+    // and surfaces a policy error. Let the coordinator answer instead.
+    const presetDelegationPlan = delegatedTarget
+      && delegationContext?.recommendation?.action === 'delegate'
+      && !delegationBlocked
       ? {
           mode: 'tool',
           skills: [
@@ -1269,12 +1275,23 @@ async function main() {
         type: 'delegation_decision',
         agentId,
         targetAgentId: delegatedTarget,
-        status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
+        status: 'ok',
         depth: 0,
         jid,
         message: delegationContext?.recommendation?.routingMethod === 'llm'
           ? `Delegation decision (LLM router) selected ${delegatedTarget}`
           : `Delegation decision selected ${delegatedTarget}`,
+        details: delegationDecision,
+      });
+    } else if (delegationBlocked && delegatedTarget && delegationDecision) {
+      logTeamActivity({
+        type: 'delegation_decision',
+        agentId,
+        targetAgentId: delegatedTarget,
+        status: 'blocked',
+        depth: 0,
+        jid,
+        message: `User mentioned ${delegatedTarget}, but ${delegatedTarget} is not linked from ${agentId}; coordinator will answer instead.`,
         details: delegationDecision,
       });
     } else if (delegationDecision && delegationContext?.teamCapability) {
