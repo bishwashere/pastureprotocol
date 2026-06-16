@@ -46,6 +46,7 @@
     "test:atomic-write": "node scripts/test/test-atomic-write.js",
     "test:blocked-delegation-gate": "node scripts/test/test-blocked-delegation-gate.js",
     "test:delegated-task-auto-complete": "node scripts/test/test-delegated-task-auto-complete.js",
+    "test:tool-round-caps": "node scripts/test/test-tool-round-caps.js",
     "test:output-parse": "node scripts/test/test-output-parse.js",
     "test:retrospective": "node scripts/test/test-retrospective.js",
     "test:tide": "node scripts/test/test-tide.js",
