@@ -12,7 +12,7 @@ import {
   getSkillsToRemove,
   runSkillInstall,
   runSkillRemove,
-} from '../../lib/skill-install.js';
+} from '../../lib/util/skill-install.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');

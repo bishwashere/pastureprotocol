@@ -9,8 +9,8 @@ import {
   isActiveBlockerTask,
   listAssumptionPendingBlockers,
   normalizeAssumptionRecord,
-} from '../../lib/product-assumptions.js';
-import { buildMissionTickPrompt } from '../../lib/missions.js';
+} from '../../lib/context/product-assumptions.js';
+import { buildMissionTickPrompt } from '../../lib/context/missions.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

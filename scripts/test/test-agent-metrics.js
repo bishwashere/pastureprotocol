@@ -11,8 +11,8 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-agent-metrics-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { logTeamActivity } = await import('../../lib/team-activity.js');
-    const { computeAgentMetrics, readAgentMetrics } = await import('../../lib/agent-metrics.js');
+    const { logTeamActivity } = await import('../../lib/agent/team-activity.js');
+    const { computeAgentMetrics, readAgentMetrics } = await import('../../lib/agent/agent-metrics.js');
 
     const t0 = Date.now();
     logTeamActivity({

@@ -39,9 +39,9 @@ const stateDir = mkdtempSync(join(tmpdir(), 'pasture-mongodb-test-'));
 process.env.PASTURE_STATE_DIR = stateDir;
 
 try {
-  const { createProject, updateProject } = await import('../../lib/projects-db.js');
-  const { buildProjectWorkflowContextBlock } = await import('../../lib/project-workflow.js');
-  const { formatProjectsForPrompt } = await import('../../lib/projects-context.js');
+  const { createProject, updateProject } = await import('../../lib/context/projects-db.js');
+  const { buildProjectWorkflowContextBlock } = await import('../../lib/context/project-workflow.js');
+  const { formatProjectsForPrompt } = await import('../../lib/context/projects-context.js');
 
   // ── 1. URI parsing ──────────────────────────────────────────────────────────
   console.log('\nURI parsing');
@@ -49,7 +49,7 @@ try {
   // Access the private helper indirectly through the executor error path.
   // We assert the executor returns a clean error when URI is missing, not a crash.
   await test('executor returns error when project not found', async () => {
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     const result = JSON.parse(await executeMongodb({}, { project: 'nonexistent-project-xyz', collection: 'test' }, 'mongodb_stats'));
     assert(result.error && /not found/i.test(result.error), `Expected 'not found' error, got: ${result.error}`);
   });
@@ -76,7 +76,7 @@ try {
   });
 
   await test('executor resolves project by name (case-insensitive)', async () => {
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     // This will fail to connect (no real Atlas), but it should get past project lookup.
     const result = JSON.parse(await executeMongodb({}, { project: 'testproject', collection: 'analytics' }, 'mongodb_stats'));
     // Either a connection error (expected) or success — not a "project not found" error
@@ -84,7 +84,7 @@ try {
   });
 
   await test('executor returns safe error (no credentials in error text)', async () => {
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     const result = JSON.parse(await executeMongodb({}, { project: 'testproject', collection: 'analytics' }, 'mongodb_stats'));
     const resultStr = JSON.stringify(result);
     assert(!resultStr.includes('user:pass'), `Credentials leaked in error: ${resultStr}`);
@@ -92,13 +92,13 @@ try {
   });
 
   await test('executor returns error when collection missing for query action', async () => {
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     const result = JSON.parse(await executeMongodb({}, { project: 'testproject' }, 'mongodb_query'));
     assert(result.error && /collection/i.test(result.error), `Expected collection required error, got: ${result.error}`);
   });
 
   await test('executor returns error when pipeline missing for aggregate action', async () => {
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     const result = JSON.parse(await executeMongodb({}, { project: 'testproject', collection: 'analytics' }, 'mongodb_aggregate'));
     assert(result.error && /pipeline/i.test(result.error), `Expected pipeline required error, got: ${result.error}`);
   });
@@ -109,7 +109,7 @@ try {
   await test('executor returns error (not project error) for known project without URI', async () => {
     // Create a project with no MongoDB connector
     createProject({ name: 'NoMongoProject', description: 'No DB configured' });
-    const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+    const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
     const result = JSON.parse(await executeMongodb({}, { project: 'NoMongoProject' }, 'mongodb_project_health'));
     assert(result.error && /No MongoDB URI/i.test(result.error), `Expected no-URI error, got: ${result.error}`);
   });
@@ -186,7 +186,7 @@ try {
     console.log('\nLive connection smoke test (MONGODB_TEST_LIVE=1)');
     await test('mongodb_project_health returns data for nextpostai', async () => {
       process.env.PASTURE_STATE_DIR = process.env.HOME + '/.pasture';
-      const { executeMongodb } = await import('../../lib/executors/mongodb.js');
+      const { executeMongodb } = await import('../../lib/agent/executors/mongodb.js');
       const result = JSON.parse(await executeMongodb({}, { project: 'nextpostai' }, 'mongodb_project_health'));
       assert(result.ok, `Expected ok:true, got: ${JSON.stringify(result)}`);
       assert(result.health, 'health object missing');

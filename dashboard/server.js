@@ -11,40 +11,40 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/paths.js';
-import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent-avatar.js';
-import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
-import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/team-activity.js';
-import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent-context-state.js';
-import { readAgentMetrics } from '../lib/agent-metrics.js';
-import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/missions.js';
-import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/ai-suggested-tasks.js';
-import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
-import { collectBadExchanges, readQualityMetrics } from '../lib/retrospective.js';
+import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
+import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent/agent-avatar.js';
+import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/context/chat-log.js';
+import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/agent/team-activity.js';
+import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent/agent-context-state.js';
+import { readAgentMetrics } from '../lib/agent/agent-metrics.js';
+import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/context/missions.js';
+import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/context/ai-suggested-tasks.js';
+import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
+import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
-import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
+import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/util/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
-import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent-config.js';
+import { getGroupRestrictions, saveGroupRestrictions } from '../lib/channels/group-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
   readLastChecklistRun,
   runTideChecklist,
-} from '../lib/tide-checklist.js';
+} from '../lib/agent/tide-checklist.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject,
   getProjectGraph, createUpdate, editUpdate, deleteUpdate,
   createBranch, deleteBranch,
-} from '../lib/projects-db.js';
+} from '../lib/context/projects-db.js';
 import {
   listPendingProposals,
   approvePendingProposal,
   rejectPendingProposal,
-} from '../lib/project-workflow-pending.js';
+} from '../lib/context/project-workflow-pending.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -654,7 +654,7 @@ app.post('/api/missions/:id/respond', (req, res) => {
 // Voice transcription endpoint — accepts raw audio/webm and returns { text }
 app.post('/api/transcribe', express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
   try {
-    const { getSpeechConfig, transcribe } = await import('../lib/speech-client.js');
+    const { getSpeechConfig, transcribe } = await import('../lib/integrations/speech-client.js');
     const config = getSpeechConfig();
     if (!config?.whisperApiKey) {
       res.status(503).json({ error: 'Whisper API key not configured. Add openai.apiKey in settings.' });

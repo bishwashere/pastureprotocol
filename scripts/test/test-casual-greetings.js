@@ -47,9 +47,9 @@ function assertNoTools(skillsCalled) {
 }
 
 async function runUnitTests() {
-  const { isNonTaskMessage } = await import('../../lib/evaluate-team-capability.js');
-  const { buildCasualChatIntentPlan, planIntent } = await import('../../lib/intent-planner.js');
-  const { getMissionsDiscoveryIntentHint, isWorkOrDiscoveryRequest } = await import('../../lib/missions-context.js');
+  const { isNonTaskMessage } = await import('../../lib/agent/evaluate-team-capability.js');
+  const { buildCasualChatIntentPlan, planIntent } = await import('../../lib/agent/intent-planner.js');
+  const { getMissionsDiscoveryIntentHint, isWorkOrDiscoveryRequest } = await import('../../lib/context/missions-context.js');
 
   const rows = [];
 

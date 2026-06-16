@@ -8,7 +8,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 import { startReport, recordCase, endReport } from './e2e-report.js';
-import { runPm2DaemonAction, daemonLog, ensurePm2 } from '../../lib/daemon-pm2.js';
+import { runPm2DaemonAction, daemonLog, ensurePm2 } from '../../lib/util/daemon-pm2.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 

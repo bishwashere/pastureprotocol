@@ -17,7 +17,7 @@ async function main() {
       getProject,
       normalizeProjectUrl,
       getProjectsDb,
-    } = await import('../../lib/projects-db.js');
+    } = await import('../../lib/context/projects-db.js');
 
     assert(normalizeProjectUrl('') === '', 'empty url');
     assert(normalizeProjectUrl('https://example.com') === 'https://example.com', 'https kept');

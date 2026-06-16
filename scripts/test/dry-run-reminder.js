@@ -15,7 +15,7 @@
 import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getCronStorePath, getWorkspaceDir, getEnvPath } from '../../lib/paths.js';
+import { getCronStorePath, getWorkspaceDir, getEnvPath } from '../../lib/util/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -23,7 +23,7 @@ dotenv.config({ path: getEnvPath() });
 import { getSkillContext } from '../../skills/loader.js';
 import { chatWithTools } from '../../llm.js';
 import { executeSkill } from '../../skills/executor.js';
-import { getSchedulingTimeContext } from '../../lib/timezone.js';
+import { getSchedulingTimeContext } from '../../lib/util/timezone.js';
 
 const DEFAULT_MSG = 'Remind me to call Bishwas tomorrow at 5.30 p.m.';
 

@@ -8,8 +8,8 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-proj-wf-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createProject, getProjectGraph } = await import('../../lib/projects-db.js');
-    const { createMission } = await import('../../lib/missions.js');
+    const { createProject, getProjectGraph } = await import('../../lib/context/projects-db.js');
+    const { createMission } = await import('../../lib/context/missions.js');
     const {
       resolveProjectRef,
       lookupProjectRef,
@@ -30,18 +30,18 @@ async function main() {
       syncTurnToProjectWork,
       buildProjectWorkflowContextBlock,
       isProjectWorkflowTurn,
-    } = await import('../../lib/project-workflow.js');
-    const { executeProjectWorkflow } = await import('../../lib/executors/project-workflow.js');
+    } = await import('../../lib/context/project-workflow.js');
+    const { executeProjectWorkflow } = await import('../../lib/agent/executors/project-workflow.js');
     const {
       listPendingProposals,
       approvePendingProposal,
       rejectPendingProposal,
       getPendingProposal,
-    } = await import('../../lib/project-workflow-pending.js');
+    } = await import('../../lib/context/project-workflow-pending.js');
     const {
       BLOCKER_TEMPLATES,
       inferBlockerTemplateTasks,
-    } = await import('../../lib/templates/blocker-templates.js');
+    } = await import('../../lib/agent/templates/blocker-templates.js');
 
     const project = createProject({
       name: 'NextPostAI',
@@ -329,7 +329,7 @@ async function main() {
         name: 'update task status',
         input: 'update_task doing → done',
         run: async () => {
-          const { createMission } = await import('../../lib/missions.js');
+          const { createMission } = await import('../../lib/context/missions.js');
           const mission = createMission({
             title: 'Temp task update',
             objective: 'x',

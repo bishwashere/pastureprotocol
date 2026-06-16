@@ -11,7 +11,7 @@ import {
   normalizeChecklistConfig,
   removeChecklistItem,
   setChecklistEnabled,
-} from '../../lib/tide-checklist.js';
+} from '../../lib/agent/tide-checklist.js';
 
 function setupStateDir() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-tide-cl-'));

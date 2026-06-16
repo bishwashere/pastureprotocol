@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-proj-ctx-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createProject } = await import('../../lib/projects-db.js');
+    const { createProject } = await import('../../lib/context/projects-db.js');
     const {
       buildProjectsContextBlock,
       formatProjectsForPrompt,
@@ -19,7 +19,7 @@ async function main() {
       pickFocusedProject,
       enrichMessageWithProjectContext,
       isProjectDiscoveryRequest,
-    } = await import('../../lib/projects-context.js');
+    } = await import('../../lib/context/projects-context.js');
 
     assert(formatProjectsForPrompt([]).includes('No projects'), 'empty list copy');
     assert(isProjectDiscoveryRequest('what is this project all about find out'), 'discovery phrase');

@@ -2,8 +2,8 @@
  * Unit tests for Home Assistant natural-language formatting.
  */
 
-import { describeEntityState, enrichHaToolResult, friendlyLabel } from '../../lib/home-assistant-format.js';
-import { normalizeHaDomain } from '../../lib/home-assistant-client.js';
+import { describeEntityState, enrichHaToolResult, friendlyLabel } from '../../lib/integrations/home-assistant-format.js';
+import { normalizeHaDomain } from '../../lib/integrations/home-assistant-client.js';
 
 let passed = 0;
 let failed = 0;

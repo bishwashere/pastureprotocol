@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-delegated-tasks-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createMission, getMission } = await import('../../lib/missions.js');
+    const { createMission, getMission } = await import('../../lib/context/missions.js');
     const {
       createDelegatedTask,
       updateDelegatedTaskProgress,
@@ -24,9 +24,9 @@ async function main() {
       buildDelegatedTasksContextBlock,
       resolveMissionForDelegation,
       shouldPersistDelegatedTask,
-    } = await import('../../lib/delegated-tasks.js');
-    const { buildMissionTickPrompt } = await import('../../lib/missions.js');
-    const { onAgentWaitingFor, readAgentContext } = await import('../../lib/agent-context-state.js');
+    } = await import('../../lib/agent/delegated-tasks.js');
+    const { buildMissionTickPrompt } = await import('../../lib/context/missions.js');
+    const { onAgentWaitingFor, readAgentContext } = await import('../../lib/agent/agent-context-state.js');
 
     const mission = createMission({
       title: 'Improve onboarding',

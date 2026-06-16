@@ -15,7 +15,7 @@
  *   node ha-cli.js call <domain> <service> [entity_id] [json_service_data]
  */
 
-import { listStates, searchEntities, getState, callService } from '../../lib/home-assistant-client.js';
+import { listStates, searchEntities, getState, callService } from '../../lib/integrations/home-assistant-client.js';
 
 const args = process.argv.slice(2);
 const sub = (args[0] || '').toLowerCase();

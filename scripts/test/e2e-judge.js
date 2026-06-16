@@ -9,7 +9,7 @@
  */
 
 import dotenv from 'dotenv';
-import { getEnvPath } from '../../lib/paths.js';
+import { getEnvPath } from '../../lib/util/paths.js';
 
 /**
  * @param {string} userMessage - What the user asked.

@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 import {
   buildSessionBootstrapContext,
   getTodayAndYesterdayDates,
-} from '../../lib/session-bootstrap.js';
+} from '../../lib/agent/session-bootstrap.js';
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'pasture-bootstrap-'));

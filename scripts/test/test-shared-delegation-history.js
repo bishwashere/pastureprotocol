@@ -8,8 +8,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const agentSend = readFileSync(join(root, 'lib/executors/agent-send.js'), 'utf8');
-const internalTurn = readFileSync(join(root, 'lib/internal-agent-turn.js'), 'utf8');
+const agentSend = readFileSync(join(root, 'lib/agent/executors/agent-send.js'), 'utf8');
+const internalTurn = readFileSync(join(root, 'lib/agent/internal-agent-turn.js'), 'utf8');
 const indexJs = readFileSync(join(root, 'index.js'), 'utf8');
 
 const checks = [

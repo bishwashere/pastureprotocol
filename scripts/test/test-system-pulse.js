@@ -43,7 +43,7 @@ async function main() {
       loadPulseConfig,
       isPulseEnabled,
       getPendingHealthFlags,
-    } = await import('../../lib/system-pulse.js');
+    } = await import('../../lib/agent/system-pulse.js');
 
     const cfg = loadPulseConfig();
     assert(cfg.enabled === true, 'default config enabled');

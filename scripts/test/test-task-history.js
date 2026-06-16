@@ -6,7 +6,7 @@ import {
   formatTaskHistoryLabel,
   normalizeTaskHistory,
   TASK_HISTORY_KIND,
-} from '../../lib/task-history.js';
+} from '../../lib/context/task-history.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

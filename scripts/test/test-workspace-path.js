@@ -4,7 +4,7 @@
  */
 
 import { join } from 'path';
-import { resolveWorkspacePath } from '../../lib/workspace-path.js';
+import { resolveWorkspacePath } from '../../lib/util/workspace-path.js';
 
 let passed = 0;
 let failed = 0;

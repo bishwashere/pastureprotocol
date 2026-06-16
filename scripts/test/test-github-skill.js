@@ -8,7 +8,7 @@
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir, homedir } from 'os';
-import { executeGithub } from '../../lib/executors/github.js';
+import { executeGithub } from '../../lib/agent/executors/github.js';
 
 let passed = 0;
 let failed = 0;

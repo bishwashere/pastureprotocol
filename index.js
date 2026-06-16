@@ -3,7 +3,7 @@
  * Config and state live in ~/.pasture (or PASTURE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir } from './lib/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir } from './lib/util/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -25,22 +25,22 @@ const {
   downloadMediaMessage,
 } = Baileys;
 import { loadConfig, chat as llmChat, isDailyLimitReached, msUntilLimitResets } from './llm.js';
-import { runAgentTurn, stripThinking } from './lib/agent.js';
-import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
-import { onAgentTurnStart, onAgentTurnDone } from './lib/agent-context-state.js';
-import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/intent-planner.js';
-import { isNonTaskMessage } from './lib/evaluate-team-capability.js';
-import { buildDelegationContext } from './lib/agent-delegation-router.js';
-import { buildDelegationDecisionDetails } from './lib/delegation-routing-details.js';
+import { runAgentTurn, stripThinking } from './lib/agent/agent.js';
+import { runInternalAgentTurn } from './lib/agent/internal-agent-turn.js';
+import { onAgentTurnStart, onAgentTurnDone } from './lib/agent/agent-context-state.js';
+import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/agent/intent-planner.js';
+import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
+import { buildDelegationContext } from './lib/agent/agent-delegation-router.js';
+import { buildDelegationDecisionDetails } from './lib/agent/delegation-routing-details.js';
 import { executeSkill } from './skills/executor.js';
-import { logTeamActivity } from './lib/team-activity.js';
+import { logTeamActivity } from './lib/agent/team-activity.js';
 import {
   startRequestTrace,
   runWithRequestTrace,
   logRequestStart,
   logRequestEnd,
   traceAsyncStep,
-} from './lib/request-timing.js';
+} from './lib/util/request-timing.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from 'fs';
@@ -48,59 +48,59 @@ import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries, DEFAULT_ENABLED } from './skills/loader.js';
-import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText, ensurePollingAlive } from './lib/telegram.js';
-import { isWhatsAppGroupJid } from './lib/whatsapp.js';
-import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/pending-telegram.js';
-import { getChannelsConfig } from './lib/channels-config.js';
-import { getSchedulingTimeContext, isInTideInactiveWindow } from './lib/timezone.js';
+import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText, ensurePollingAlive } from './lib/channels/telegram.js';
+import { isWhatsAppGroupJid } from './lib/channels/whatsapp.js';
+import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/channels/pending-telegram.js';
+import { getChannelsConfig } from './lib/channels/channels-config.js';
+import { getSchedulingTimeContext, isInTideInactiveWindow } from './lib/util/timezone.js';
 import {
   defaultTideChecklistBlock,
   shouldRunChecklistForTrigger,
   runTideChecklist,
-} from './lib/tide-checklist.js';
-import { getOwnerConfig, isOwner } from './lib/owner-config.js';
-import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.js';
-import { isTelegramGroup } from './lib/group-guard.js';
-import { getMemoryConfig } from './lib/memory-config.js';
-import { indexChatExchange } from './lib/memory-index.js';
+} from './lib/agent/tide-checklist.js';
+import { getOwnerConfig, isOwner } from './lib/util/owner-config.js';
+import { getGroupAddedBy, setGroupAddedBy } from './lib/channels/telegram-group-added-by.js';
+import { isTelegramGroup } from './lib/channels/group-guard.js';
+import { getMemoryConfig } from './lib/context/memory-config.js';
+import { indexChatExchange } from './lib/context/memory-index.js';
 import {
   migrateRetrospectiveConfig,
   startRetrospective,
   afterExchangeLogged,
   buildRetrospectiveContextBlock,
-} from './lib/retrospective.js';
-import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/system-pulse.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges } from './lib/chat-log.js';
-import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
-import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
+} from './lib/agent/retrospective.js';
+import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
+import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges } from './lib/context/chat-log.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/context/chat-session.js';
+import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
-} from './lib/projects-context.js';
-import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from './lib/missions-context.js';
-import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/project-workflow.js';
+} from './lib/context/projects-context.js';
+import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from './lib/context/missions-context.js';
+import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/context/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
   buildDurableDelegationContext,
   delegationArgsFromDurability,
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
-} from './lib/work-durability.js';
-import { getGithubSourceIntentHint } from './lib/github-context.js';
-import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/user-facing-reply.js';
-import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
-import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
-import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
-import { ensureGroupConfigFor } from './lib/group-config.js';
-import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
-import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
-import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent-config.js';
-import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
-import { startMissionEngine } from './lib/mission-engine.js';
-import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
-import { resetBrowseSession } from './lib/executors/browse.js';
-import { toUserMessage, getErrorMessageForLog } from './lib/user-error.js';
-import { getSpeechConfig, transcribe, synthesizeToBuffer } from './lib/speech-client.js';
+} from './lib/context/work-durability.js';
+import { getGithubSourceIntentHint } from './lib/context/github-context.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/agent/user-facing-reply.js';
+import { toLogJid, getOwnerLogJid } from './lib/util/owner-config.js';
+import { handleTelegramPrivateMessage } from './lib/channels/telegram-private-handler.js';
+import { handleTelegramGroupMessage } from './lib/channels/telegram-group-handler.js';
+import { ensureGroupConfigFor } from './lib/channels/group-config.js';
+import { loadGroupMd, buildGroupPromptBlock } from './lib/channels/group-prompt.js';
+import { buildOneOnOneSystemPrompt } from './lib/agent/system-prompt.js';
+import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent/agent-config.js';
+import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/agent/background-tasks.js';
+import { startMissionEngine } from './lib/agent/mission-engine.js';
+import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/channels/group-display-names.js';
+import { resetBrowseSession } from './lib/agent/executors/browse.js';
+import { toUserMessage, getErrorMessageForLog } from './lib/util/user-error.js';
+import { getSpeechConfig, transcribe, synthesizeToBuffer } from './lib/integrations/speech-client.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);

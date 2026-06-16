@@ -6,8 +6,8 @@
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import { getStateDir } from '../../lib/paths.js';
-import { enrichHaToolResult } from '../../lib/home-assistant-format.js';
+import { getStateDir } from '../../lib/util/paths.js';
+import { enrichHaToolResult } from '../../lib/integrations/home-assistant-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

@@ -13,7 +13,7 @@
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getCronStorePath } from '../lib/paths.js';
+import { getCronStorePath } from '../lib/util/paths.js';
 import { loadJobs, addJob, removeJob, updateJob } from './store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

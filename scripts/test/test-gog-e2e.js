@@ -13,7 +13,7 @@ import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 import { skipSuiteIf } from './e2e-skip.js';
 import dotenv from 'dotenv';
-import { getEnvPath } from '../../lib/paths.js';
+import { getEnvPath } from '../../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');

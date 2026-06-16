@@ -5,7 +5,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { listMemoryFiles, listChatLogFiles } from '../../lib/memory-index.js';
+import { listMemoryFiles, listChatLogFiles } from '../../lib/context/memory-index.js';
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'pasture-memidx-'));

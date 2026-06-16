@@ -39,6 +39,8 @@
     "test:dashboard-boot": "node scripts/test/test-dashboard-boot.js",
     "test:dashboard-browser-e2e": "node scripts/test/test-dashboard-browser-e2e.js",
     "test:apply-patch-unit": "node scripts/test/test-apply-patch-unit.js",
+    "test:group-blocklist": "node scripts/test/test-group-blocklist.js",
+    "test:skill-result-envelope": "node scripts/test/test-skill-result-envelope.js",
     "test:output-parse": "node scripts/test/test-output-parse.js",
     "test:retrospective": "node scripts/test/test-retrospective.js",
     "test:tide": "node scripts/test/test-tide.js",

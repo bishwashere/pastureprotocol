@@ -6,7 +6,7 @@
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { executeApplyPatch } from '../../lib/executors/apply-patch.js';
+import { executeApplyPatch } from '../../lib/agent/executors/apply-patch.js';
 
 let passed = 0;
 let failed = 0;

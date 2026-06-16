@@ -14,8 +14,8 @@ import {
   shouldAckNewSessionOnly,
   NEW_SESSION_ACK,
   startNewSession,
-} from '../../lib/chat-session.js';
-import { appendExchange, readLastPrivateExchanges } from '../../lib/chat-log.js';
+} from '../../lib/context/chat-session.js';
+import { appendExchange, readLastPrivateExchanges } from '../../lib/context/chat-log.js';
 
 function setup() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-session-test-'));

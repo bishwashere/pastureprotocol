@@ -23,11 +23,11 @@ function createStateDir() {
 }
 
 async function loadAgentConfigModule() {
-  return import('../../lib/agent-config.js');
+  return import('../../lib/agent/agent-config.js');
 }
 
 async function loadAgentSendModule() {
-  return import('../../lib/executors/agent-send.js');
+  return import('../../lib/agent/executors/agent-send.js');
 }
 
 async function patchAgentConfig(agentId, patch, ac) {

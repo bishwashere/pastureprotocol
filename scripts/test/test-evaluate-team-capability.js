@@ -16,7 +16,7 @@ async function run() {
   await setupAgentTeamFixture(stateDir);
 
   const { getEnabledSkillIds } = await import('../../skills/loader.js');
-  const { evaluateTeamCapability, isNonTaskMessage } = await import('../../lib/evaluate-team-capability.js');
+  const { evaluateTeamCapability, isNonTaskMessage } = await import('../../lib/agent/evaluate-team-capability.js');
 
   const ids = getEnabledSkillIds({ agentId: 'main' });
 

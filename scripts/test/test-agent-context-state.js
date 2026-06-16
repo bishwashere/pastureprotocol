@@ -19,9 +19,10 @@ async function main() {
       onAgentTurnDone,
       onAgentDelegationError,
       onAgentSkillError,
+      onAgentTurnError,
       readAllAgentContext,
       readAgentContext,
-    } = await import('../../lib/agent-context-state.js');
+    } = await import('../../lib/agent/agent-context-state.js');
 
     onAgentTurnStart({
       agentId: 'main',
@@ -109,7 +110,7 @@ async function main() {
 
     const { writeFileSync, mkdirSync } = await import('fs');
     const { dirname } = await import('path');
-    const { getAgentContextStatePath } = await import('../../lib/paths.js');
+    const { getAgentContextStatePath } = await import('../../lib/util/paths.js');
     const stalePath = getAgentContextStatePath();
     mkdirSync(dirname(stalePath), { recursive: true });
     writeFileSync(stalePath, JSON.stringify({
@@ -135,6 +136,35 @@ async function main() {
     const all = readAllAgentContext();
     assert(all.agents.main, 'snapshot includes main');
     assert(Number(all.updatedAt) > 0, 'snapshot has updatedAt');
+
+    onAgentTurnStart({ agentId: 'tester', userText: 'do a thing', ctx: { jid: 'user@local' } });
+    onAgentSkillError({ agentId: 'tester', skillId: 'github', message: 'token missing' });
+    let tester = readAgentContext('tester');
+    assert(tester.state === 'error', `error state set by skill error: ${tester.state}`);
+    onAgentTurnDone({ agentId: 'tester', status: 'error' });
+    tester = readAgentContext('tester');
+    assert(
+      tester.state === 'error',
+      `onAgentTurnDone(status=error) keeps state=error (got ${tester.state}) so the dashboard can show failure`
+    );
+    assert(
+      tester.lastAction && tester.lastAction.includes('errors'),
+      `lastAction reflects error: ${tester.lastAction}`
+    );
+
+    onAgentTurnStart({ agentId: 'crasher', userText: 'crash me', ctx: { jid: 'user@local' } });
+    onAgentTurnError({ agentId: 'crasher', message: 'rate limit exceeded' });
+    const crasher = readAgentContext('crasher');
+    assert(crasher.state === 'error', `onAgentTurnError sets state=error (got ${crasher.state})`);
+    assert(
+      crasher.currentThought && crasher.currentThought.toLowerCase().includes('failed'),
+      `error thought set: ${crasher.currentThought}`
+    );
+
+    onAgentTurnStart({ agentId: 'okboy', userText: 'easy task', ctx: { jid: 'user@local' } });
+    onAgentTurnDone({ agentId: 'okboy', status: 'ok' });
+    const okboy = readAgentContext('okboy');
+    assert(okboy.state === 'idle', `status=ok still resets to idle: ${okboy.state}`);
 
     console.log('agent-context-state tests passed');
   } finally {

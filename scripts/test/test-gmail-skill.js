@@ -7,7 +7,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { executeGmail } from '../../lib/executors/gmail.js';
+import { executeGmail } from '../../lib/agent/executors/gmail.js';
 
 let passed = 0;
 let failed = 0;

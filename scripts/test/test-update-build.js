@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { formatVersionLabel, readBuild, fetchRemoteBuildSync, BUILD_FILE } from '../../lib/build-info.js';
+import { formatVersionLabel, readBuild, fetchRemoteBuildSync, BUILD_FILE } from '../../lib/util/build-info.js';
 
 let failed = 0;
 

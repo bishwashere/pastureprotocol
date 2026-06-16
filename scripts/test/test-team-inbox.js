@@ -5,7 +5,7 @@ import {
   buildTurnStartInboxDetails,
   buildTurnDoneInboxDetails,
   buildDelegationStartInboxDetails,
-} from '../../lib/team-inbox.js';
+} from '../../lib/agent/team-inbox.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

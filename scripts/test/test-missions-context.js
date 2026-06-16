@@ -11,15 +11,15 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-missions-ctx-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createProject } = await import('../../lib/projects-db.js');
-    const { createMission } = await import('../../lib/missions.js');
+    const { createProject } = await import('../../lib/context/projects-db.js');
+    const { createMission } = await import('../../lib/context/missions.js');
     const {
       resolveMissionForUserTurn,
       buildMissionsContextBlock,
       getMissionsDiscoveryIntentHint,
       isWorkOrDiscoveryRequest,
       missionLabelForAgentContext,
-    } = await import('../../lib/missions-context.js');
+    } = await import('../../lib/context/missions-context.js');
 
     assert(isWorkOrDiscoveryRequest('find out what this project is about'), 'work request');
 
@@ -64,7 +64,7 @@ async function main() {
 
     // Any status (blocked, paused, completed) must resolve when user mentions
     // the project by name — same data the dashboard UI shows.
-    const { updateMission } = await import('../../lib/missions.js');
+    const { updateMission } = await import('../../lib/context/missions.js');
     for (const status of ['blocked', 'paused', 'completed']) {
       updateMission(mission.id, { status });
       const resolved2 = resolveMissionForUserTurn({

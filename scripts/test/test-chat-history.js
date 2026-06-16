@@ -11,8 +11,8 @@ import {
   DEFAULT_CHAT_HISTORY_EXCHANGES,
   readLastPrivateExchanges,
   resolveChatHistoryExchanges,
-} from '../../lib/chat-log.js';
-import { startNewSession } from '../../lib/chat-session.js';
+} from '../../lib/context/chat-log.js';
+import { startNewSession } from '../../lib/context/chat-session.js';
 
 function setupWorkspace() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-chat-history-state-'));

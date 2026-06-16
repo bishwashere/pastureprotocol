@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mergeTaskTrees, createTasksFromTick } from '../../lib/missions.js';
+import { mergeTaskTrees, createTasksFromTick } from '../../lib/context/missions.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

@@ -22,7 +22,7 @@ async function main() {
     process.env.HOME = fakeHome;
     delete process.env.PASTURE_STATE_DIR;
 
-    const mod = await import('../../lib/paths.js');
+    const mod = await import('../../lib/util/paths.js');
 
     const expected = join(fakeHome, '.pasture');
     assert(mod.getStateDir() === expected, `getStateDir should return ~/.pasture, got ${mod.getStateDir()}`);

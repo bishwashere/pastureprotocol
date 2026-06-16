@@ -8,8 +8,8 @@ import {
   normalizeBlockerType,
   resolveBlockerType,
   stripBlockerTitlePrefix,
-} from '../../lib/tasks.js';
-import { mergeTaskTrees } from '../../lib/missions.js';
+} from '../../lib/context/tasks.js';
+import { mergeTaskTrees } from '../../lib/context/missions.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

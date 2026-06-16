@@ -6,9 +6,9 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/paths.js';
-import { DEFAULT_AGENT_ID } from './lib/agent-config.js';
-import { beginLlmCall, endLlmCall, getActiveTrace } from './lib/request-timing.js';
+import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/util/paths.js';
+import { DEFAULT_AGENT_ID } from './lib/agent/agent-config.js';
+import { beginLlmCall, endLlmCall, getActiveTrace } from './lib/util/request-timing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

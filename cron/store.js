@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getCronStorePath } from '../lib/paths.js';
+import { getCronStorePath } from '../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

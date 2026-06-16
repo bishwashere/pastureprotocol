@@ -16,8 +16,8 @@ async function main() {
   await setupAgentTeamFixture(stateDir);
 
   const { getEnabledSkillIds } = await import('../../skills/loader.js');
-  const { buildDelegationContext } = await import('../../lib/agent-delegation-router.js');
-  const { buildDelegationDecisionDetails } = await import('../../lib/delegation-routing-details.js');
+  const { buildDelegationContext } = await import('../../lib/agent/agent-delegation-router.js');
+  const { buildDelegationDecisionDetails } = await import('../../lib/agent/delegation-routing-details.js');
 
   const ids = getEnabledSkillIds({ agentId: 'main' });
 

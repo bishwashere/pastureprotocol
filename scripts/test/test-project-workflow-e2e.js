@@ -80,7 +80,7 @@ async function seedProjectOnly(stateDir, { name, description, url }) {
   const prev = process.env.PASTURE_STATE_DIR;
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createProject } = await import('../../lib/projects-db.js');
+    const { createProject } = await import('../../lib/context/projects-db.js');
     createProject({ name, description, url });
   } finally {
     if (prev !== undefined) process.env.PASTURE_STATE_DIR = prev;

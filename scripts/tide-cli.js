@@ -15,7 +15,7 @@ import {
   setChecklistEnabled,
   setChecklistItemEnabled,
   setChecklistTriggers,
-} from '../lib/tide-checklist.js';
+} from '../lib/agent/tide-checklist.js';
 
 function parseFlags(argv) {
   const flags = {};

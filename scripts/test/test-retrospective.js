@@ -8,8 +8,8 @@ import {
   appendExchange,
   patchExchangeRetrospective,
   getLastPrivateExchangeLocation,
-} from '../../lib/chat-log.js';
-import { buildOneOnOneSystemPrompt } from '../../lib/system-prompt.js';
+} from '../../lib/context/chat-log.js';
+import { buildOneOnOneSystemPrompt } from '../../lib/agent/system-prompt.js';
 import {
   migrateRetrospectiveConfig,
   getRetrospectiveConfig,
@@ -20,8 +20,8 @@ import {
   recordScoredExchange,
   recordImplicitFeedback,
   LESSONS_MD,
-} from '../../lib/retrospective.js';
-import { getConfigPath, getRetrospectiveMetricsPath } from '../../lib/paths.js';
+} from '../../lib/agent/retrospective.js';
+import { getConfigPath, getRetrospectiveMetricsPath } from '../../lib/util/paths.js';
 
 function setupStateDir() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-retro-'));

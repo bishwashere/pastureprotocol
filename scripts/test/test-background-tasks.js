@@ -25,8 +25,8 @@ const {
   listTasksForJid,
   recoverStaleBackgroundTasks,
   _setBackgroundRunTurnForTests,
-} = await import('../../lib/background-tasks.js');
-const { executeBackgroundTasks } = await import('../../lib/executors/background-tasks.js');
+} = await import('../../lib/agent/background-tasks.js');
+const { executeBackgroundTasks } = await import('../../lib/agent/executors/background-tasks.js');
 const { getEnabledSkillIds } = await import('../../skills/loader.js');
 
 let passed = 0;

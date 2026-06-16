@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-team-activity-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { logTeamActivity, readTeamActivity } = await import('../../lib/team-activity.js');
+    const { logTeamActivity, readTeamActivity } = await import('../../lib/agent/team-activity.js');
 
     logTeamActivity({
       type: 'delegation_decision',

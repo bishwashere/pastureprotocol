@@ -9,8 +9,8 @@
 
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
-import { getEnvPath } from '../../lib/paths.js';
-import { getChannelsConfig } from '../../lib/channels-config.js';
+import { getEnvPath } from '../../lib/util/paths.js';
+import { getChannelsConfig } from '../../lib/channels/channels-config.js';
 
 dotenv.config({ path: getEnvPath() });
 

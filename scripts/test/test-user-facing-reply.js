@@ -5,7 +5,7 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const { formatUserFacingReply } = await import('../../lib/user-facing-reply.js');
+  const { formatUserFacingReply } = await import('../../lib/agent/user-facing-reply.js');
 
   const cases = [
     {

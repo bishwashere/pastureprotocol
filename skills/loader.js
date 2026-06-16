@@ -7,10 +7,11 @@
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { getConfigPath } from '../lib/paths.js';
-import { getGroupRestrictions } from '../lib/group-config.js';
-import { loadAgentConfig, DEFAULT_AGENT_ID, resolveEnabledSkillsForAgent } from '../lib/agent-config.js';
-import { hasGithubToken } from '../lib/github-context.js';
+import { getConfigPath } from '../lib/util/paths.js';
+import { getGroupRestrictions } from '../lib/channels/group-config.js';
+import { loadAgentConfig, DEFAULT_AGENT_ID, resolveEnabledSkillsForAgent } from '../lib/agent/agent-config.js';
+import { hasGithubToken } from '../lib/context/github-context.js';
+import { GROUP_BLOCKED_SKILLS } from './executor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -261,9 +262,10 @@ export function getEnabledSkillIds(options = {}) {
   const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
   const deny = new Set(Array.isArray(restrictions?.skillsDeny) ? restrictions.skillsDeny : []);
   if (groupJid) {
-    for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
+    for (const id of GROUP_BLOCKED_SKILLS) deny.add(id);
   }
-  return applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
+  const list = applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
+  return list.filter((id) => !deny.has(id));
 }
 
 /**
@@ -297,9 +299,6 @@ export function getEnabledSkillSummaries(options = {}) {
  * @param {{ groupNonOwner?: boolean, groupJid?: string }} [options] - When groupNonOwner true, use group config; groupJid = that group's id for per-group skills.
  * @returns {{ compactList: string, runSkillTool: Array, getFullSkillDoc: (skillId: string) => string, toolNameToSkill: (name: string) => { skillId: string, action: string } | null }}
  */
-/** Skills never exposed to the LLM in group chats (mirrors executor.js BLOCKED_IN_GROUP). */
-const ALWAYS_HIDDEN_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect', 'agent-send']);
-
 export function getSkillContext(options = {}) {
   const { groupJid, agentId = DEFAULT_AGENT_ID, hintSkills } = options;
   const agentConfig = loadAgentConfig(agentId);
@@ -307,9 +306,10 @@ export function getSkillContext(options = {}) {
   const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
   const deny = new Set(Array.isArray(restrictions?.skillsDeny) ? restrictions.skillsDeny : []);
   if (groupJid) {
-    for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
+    for (const id of GROUP_BLOCKED_SKILLS) deny.add(id);
   }
-  const enabled = applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))));
+  const enabled = applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))))
+    .filter((id) => !deny.has(id));
   // When the intent planner provided skill hints, restrict to only those skills.
   // Fall back to the full enabled list if the intersection is empty (safety net).
   const hinted =

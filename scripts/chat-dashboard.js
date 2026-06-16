@@ -10,45 +10,45 @@
  */
 
 import { writeSync } from 'fs';
-import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/paths.js';
+import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/util/paths.js';
 import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
-import { runAgentTurn } from '../lib/agent.js';
-import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
-import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/intent-planner.js';
-import { isNonTaskMessage } from '../lib/evaluate-team-capability.js';
-import { buildDelegationContext } from '../lib/agent-delegation-router.js';
-import { buildDelegationDecisionDetails } from '../lib/delegation-routing-details.js';
+import { runAgentTurn } from '../lib/agent/agent.js';
+import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
+import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/agent/intent-planner.js';
+import { isNonTaskMessage } from '../lib/agent/evaluate-team-capability.js';
+import { buildDelegationContext } from '../lib/agent/agent-delegation-router.js';
+import { buildDelegationDecisionDetails } from '../lib/agent/delegation-routing-details.js';
 import { executeSkill } from '../skills/executor.js';
-import { logTeamActivity } from '../lib/team-activity.js';
-import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
-import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent-config.js';
-import { appendExchange, readLastPrivateExchanges, resolveChatHistoryExchanges } from '../lib/chat-log.js';
-import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from '../lib/chat-session.js';
-import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
-import { getOwnerLogJid } from '../lib/owner-config.js';
-import { getMemoryConfig } from '../lib/memory-config.js';
-import { indexChatExchange } from '../lib/memory-index.js';
+import { logTeamActivity } from '../lib/agent/team-activity.js';
+import { buildOneOnOneSystemPrompt } from '../lib/agent/system-prompt.js';
+import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent/agent-config.js';
+import { appendExchange, readLastPrivateExchanges, resolveChatHistoryExchanges } from '../lib/context/chat-log.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from '../lib/context/chat-session.js';
+import { buildSessionBootstrapContext } from '../lib/agent/session-bootstrap.js';
+import { getOwnerLogJid } from '../lib/util/owner-config.js';
+import { getMemoryConfig } from '../lib/context/memory-config.js';
+import { indexChatExchange } from '../lib/context/memory-index.js';
 import {
   afterExchangeLogged,
   buildRetrospectiveContextBlock,
-} from '../lib/retrospective.js';
+} from '../lib/agent/retrospective.js';
 import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
-} from '../lib/projects-context.js';
-import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from '../lib/missions-context.js';
-import { buildProjectWorkflowContextBlock } from '../lib/project-workflow.js';
+} from '../lib/context/projects-context.js';
+import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from '../lib/context/missions-context.js';
+import { buildProjectWorkflowContextBlock } from '../lib/context/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
   buildDurableDelegationContext,
   delegationArgsFromDurability,
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
-} from '../lib/work-durability.js';
-import { getGithubSourceIntentHint } from '../lib/github-context.js';
-import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/user-facing-reply.js';
-import { getPendingHealthFlags } from '../lib/system-pulse.js';
+} from '../lib/context/work-durability.js';
+import { getGithubSourceIntentHint } from '../lib/context/github-context.js';
+import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/agent/user-facing-reply.js';
+import { getPendingHealthFlags } from '../lib/agent/system-pulse.js';
 
 // Match Telegram/WhatsApp default. Override via PASTURE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.PASTURE_DASHBOARD_HISTORY);

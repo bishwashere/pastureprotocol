@@ -17,7 +17,7 @@ const ROOT = join(__dirname, '..', '..');
 
 dotenv.config({ path: join(homedir(), '.pasture', '.env') });
 
-const { planIntent } = await import('../../lib/intent-planner.js');
+const { planIntent } = await import('../../lib/agent/intent-planner.js');
 const { getEnabledSkillSummaries } = await import('../../skills/loader.js');
 
 const TIMEOUT_MS = 30_000;

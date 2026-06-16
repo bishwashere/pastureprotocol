@@ -10,7 +10,7 @@ export const MARKETER_TAGLINE = 'Ship faster, moo less.';
 
 /** Distinct specialist skills so delegation router can match by topic, not agent name. */
 export async function configureSpecialistSkills() {
-  const { loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } = await import('../../lib/agent-config.js');
+  const { loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } = await import('../../lib/agent/agent-config.js');
 
   const marketerCfg = loadAgentConfig('marketer');
   marketerCfg.skills = marketerCfg.skills || {};
@@ -35,7 +35,7 @@ export async function patchAgentConfig(agentId, patch) {
     appendAgentTitleAlias,
     normalizeAgentMessagingPolicy,
     syncAgentSendSkillInConfig,
-  } = await import('../../lib/agent-config.js');
+  } = await import('../../lib/agent/agent-config.js');
   const config = loadAgentConfig(agentId);
   if (patch.title !== undefined) {
     const previousTitle = getAgentTitle(agentId);
@@ -68,8 +68,8 @@ export async function setupAgentTeamFixture(stateDir, opts = {}) {
   process.env.PASTURE_STATE_DIR = stateDir;
   process.env.PASTURE_LLM_DELEGATION_ROUTER = '0';
   const { ensureMainAgentInitialized, createAgent, loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } =
-    await import('../../lib/agent-config.js');
-  const { getAgentWorkspaceDir } = await import('../../lib/paths.js');
+    await import('../../lib/agent/agent-config.js');
+  const { getAgentWorkspaceDir } = await import('../../lib/util/paths.js');
 
   ensureMainAgentInitialized();
   createAgent('marketer', { fromAgentId: 'main', title: 'Marketer' });
@@ -104,7 +104,7 @@ export async function setupAgentTeamFixture(stateDir, opts = {}) {
 
 export async function seedAgentTeamStatusFixture(stateDir) {
   process.env.PASTURE_STATE_DIR = stateDir;
-  const { getTeamActivityLogPath } = await import('../../lib/paths.js');
+  const { getTeamActivityLogPath } = await import('../../lib/util/paths.js');
   const base = Date.now() - 60_000;
   const rows = [];
   let i = 0;

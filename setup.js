@@ -10,7 +10,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
-import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/paths.js';
+import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/util/paths.js';
 
 /** Default Tide checklist block — inlined so setup.js does not import tide-checklist.js (needs dotenv) before deps install. */
 function defaultTideChecklistBlock() {

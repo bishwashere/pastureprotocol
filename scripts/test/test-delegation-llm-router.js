@@ -17,15 +17,15 @@ async function run() {
   await setupAgentTeamFixture(stateDir);
   process.env.PASTURE_LLM_DELEGATION_ROUTER = '1';
 
-  const { getAgentWorkspaceDir } = await import('../../lib/paths.js');
+  const { getAgentWorkspaceDir } = await import('../../lib/util/paths.js');
   writeFileSync(
     join(getAgentWorkspaceDir('marketer'), 'SOUL.md'),
     'You are the marketing specialist. You own growth, analytics, SEO, content strategy, and brand positioning for products.',
     'utf8',
   );
 
-  const { parseDelegationRouterResponse, buildAgentRoutingProfile } = await import('../../lib/delegation-llm-router.js');
-  const { buildDelegationContext } = await import('../../lib/agent-delegation-router.js');
+  const { parseDelegationRouterResponse, buildAgentRoutingProfile } = await import('../../lib/agent/delegation-llm-router.js');
+  const { buildDelegationContext } = await import('../../lib/agent/agent-delegation-router.js');
   const { getEnabledSkillIds } = await import('../../skills/loader.js');
 
   const ids = getEnabledSkillIds({ agentId: 'main' });

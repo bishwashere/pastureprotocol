@@ -2,7 +2,7 @@
  * Tests for shared credential normalization helpers.
  */
 
-import { normalizeSelfAlias, resolveEnvCredential, resolveAccount } from '../../lib/credential-utils.js';
+import { normalizeSelfAlias, resolveEnvCredential, resolveAccount } from '../../lib/util/credential-utils.js';
 
 let passed = 0;
 let failed = 0;

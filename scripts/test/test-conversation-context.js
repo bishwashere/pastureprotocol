@@ -7,7 +7,7 @@ import {
   formatHistoryForClassifier,
   resolveSharedTurnHistory,
   buildPairHistoryContextBlock,
-} from '../../lib/conversation-context.js';
+} from '../../lib/context/conversation-context.js';
 
 const HISTORY = [
   { role: 'user', content: 'Can we rename marketer to something lady name?' },

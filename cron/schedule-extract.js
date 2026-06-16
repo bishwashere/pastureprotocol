@@ -4,7 +4,7 @@
  */
 
 import { chat as llmChat } from '../llm.js';
-import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
+import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/util/timezone.js';
 
 const SCHEDULE_SYSTEM = `You are a task interpreter. The user may:
 A) Ask to schedule a reminder or to be sent a message at a future time.

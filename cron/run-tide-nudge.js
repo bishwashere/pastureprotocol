@@ -15,13 +15,13 @@
  * }
  */
 
-import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
+import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/util/paths.js';
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
-import { runAgentTurn } from '../lib/agent.js';
-import { getSchedulingTimeContext } from '../lib/timezone.js';
-import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
-import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
+import { runAgentTurn } from '../lib/agent/agent.js';
+import { getSchedulingTimeContext } from '../lib/util/timezone.js';
+import { buildOneOnOneSystemPrompt } from '../lib/agent/system-prompt.js';
+import { buildSessionBootstrapContext } from '../lib/agent/session-bootstrap.js';
 
 dotenv.config({ path: getEnvPath() });
 

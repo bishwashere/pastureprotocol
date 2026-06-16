@@ -23,7 +23,7 @@ async function main() {
       isSourceCodeAccessQuestion,
       getGithubSourceIntentHint,
       getGithubSystemPromptBlock,
-    } = await import('../../lib/github-context.js');
+    } = await import('../../lib/context/github-context.js');
     const { getEnabledSkillIds } = await import('../../skills/loader.js');
 
     assert(hasGithubToken(), 'token detected');

@@ -17,8 +17,8 @@ async function main() {
       updateSuggestedTask,
       analyzeTeamActivityForSuggestedTasks,
       isSuggestedTaskAwaitingApproval,
-    } = await import('../../lib/ai-suggested-tasks.js');
-    const { logTeamActivity } = await import('../../lib/team-activity.js');
+    } = await import('../../lib/context/ai-suggested-tasks.js');
+    const { logTeamActivity } = await import('../../lib/agent/team-activity.js');
 
     const first = createSuggestedTasks([
       {
@@ -75,11 +75,11 @@ async function main() {
       assert(analysis.created[0].status === 'proposed', 'team analysis creates proposals only');
     }
 
-    const { createMission, getMission } = await import('../../lib/missions.js');
+    const { createMission, getMission } = await import('../../lib/context/missions.js');
     const {
       autoPromoteSuggestedTasks,
       promoteSuggestedTaskToTask,
-    } = await import('../../lib/ai-suggested-tasks.js');
+    } = await import('../../lib/context/ai-suggested-tasks.js');
 
     const mission = createMission({
       title: 'Grow signups',

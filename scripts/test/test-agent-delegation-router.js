@@ -16,7 +16,7 @@ async function run() {
   await setupAgentTeamFixture(stateDir);
 
   const { getEnabledSkillIds } = await import('../../skills/loader.js');
-  const { buildDelegationContext } = await import('../../lib/agent-delegation-router.js');
+  const { buildDelegationContext } = await import('../../lib/agent/agent-delegation-router.js');
 
   const availableSkillIds = getEnabledSkillIds({ agentId: 'main' });
   assert(availableSkillIds.includes('agent-send'), 'Expected main to have agent-send enabled');

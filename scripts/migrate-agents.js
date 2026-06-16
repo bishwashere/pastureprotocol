@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { ensureStateDir } from '../lib/paths.js';
-import { ensureMainAgentInitialized, purgeLegacyGroups, DEFAULT_AGENT_ID } from '../lib/agent-config.js';
-import { ensureGroupConfigFor, saveGroupRestrictions } from '../lib/group-config.js';
+import { ensureStateDir } from '../lib/util/paths.js';
+import { ensureMainAgentInitialized, purgeLegacyGroups, DEFAULT_AGENT_ID } from '../lib/agent/agent-config.js';
+import { ensureGroupConfigFor, saveGroupRestrictions } from '../lib/channels/group-config.js';
 
 function main() {
   ensureStateDir();

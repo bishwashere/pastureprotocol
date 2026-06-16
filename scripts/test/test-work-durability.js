@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-work-durability-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createMission, getMission } = await import('../../lib/missions.js');
+    const { createMission, getMission } = await import('../../lib/context/missions.js');
     const {
       classifyWorkDurability,
       classifyWorkDurabilityWithAi,
@@ -21,7 +21,7 @@ async function main() {
       delegationRoutingTextFromDurability,
       prepareWorkDurability,
       prepareWorkDurabilityWithAi,
-    } = await import('../../lib/work-durability.js');
+    } = await import('../../lib/context/work-durability.js');
 
     const direct = classifyWorkDurability({ userText: 'hi', agentId: 'main' });
     assert(direct.kind === 'direct_answer', 'greeting is direct answer');
@@ -109,7 +109,7 @@ async function main() {
     // ── Known-project three-tier tests ────────────────────────────────────────
     // Use separate project names per tier so earlier mission creation doesn't
     // cause deterministicFastPath to return existing_mission_task_update.
-    const { createProject } = await import('../../lib/projects-db.js');
+    const { createProject } = await import('../../lib/context/projects-db.js');
     createProject({ name: 'alphapp', url: 'https://alpha.example.com' });
     createProject({ name: 'betapp', url: 'https://beta.example.com' });
     createProject({ name: 'gammaapp', url: 'https://gamma.example.com' });

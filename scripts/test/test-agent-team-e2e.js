@@ -11,7 +11,7 @@ import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 import { createTempStateDir, runE2E, runDashboardE2E, isNoLlmError } from './e2e-run.js';
 import { setupAgentTeamFixture, seedAgentTeamStatusFixture, patchAgentConfig, MARKETER_TAGLINE } from './agent-team-fixture.js';
-import { NEW_SESSION_ACK } from '../../lib/chat-session.js';
+import { NEW_SESSION_ACK } from '../../lib/context/chat-session.js';
 
 /** Marketing topic — should route to marketer by specialization, not by name. */
 const ASK_COMPANY_TAGLINE = "What's our company tagline for marketing materials?";

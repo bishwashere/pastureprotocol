@@ -12,9 +12,9 @@
 import dotenv from 'dotenv';
 import { homedir } from 'os';
 import { join } from 'path';
-import { getEnvPath } from '../lib/paths.js';
-import { getMemoryConfig } from '../lib/memory-config.js';
-import { sync, indexFilesystem } from '../lib/memory-index.js';
+import { getEnvPath } from '../lib/util/paths.js';
+import { getMemoryConfig } from '../lib/context/memory-config.js';
+import { sync, indexFilesystem } from '../lib/context/memory-index.js';
 
 // Load .env from state dir so API keys (e.g. LLM_1_API_KEY) are available
 dotenv.config({ path: getEnvPath() });

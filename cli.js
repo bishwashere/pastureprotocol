@@ -10,8 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import readline from 'readline';
-import { runPm2DaemonAction } from './lib/daemon-pm2.js';
-import { runUninstall as runWindowsUninstall } from './lib/uninstall-win.js';
+import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
+import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR

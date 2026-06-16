@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
 import dotenv from 'dotenv';
 import { runSkillTests } from './skill-test-runner.js';
-import { getEnvPath } from '../../lib/paths.js';
+import { getEnvPath } from '../../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');

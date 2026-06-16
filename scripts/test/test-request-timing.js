@@ -17,8 +17,8 @@ const {
   traceAsyncStep,
   beginLlmCall,
   endLlmCall,
-} = await import('../../lib/request-timing.js');
-const { getRequestTimingLogPath } = await import('../../lib/paths.js');
+} = await import('../../lib/util/request-timing.js');
+const { getRequestTimingLogPath } = await import('../../lib/util/paths.js');
 
 function readRows() {
   const raw = readFileSync(getRequestTimingLogPath(), 'utf8').trim();

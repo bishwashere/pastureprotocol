@@ -9,7 +9,7 @@ import {
   collectChatLogDates,
   readChatLogDayExchanges,
   formatExchangesAsText,
-} from '../../lib/chat-log.js';
+} from '../../lib/context/chat-log.js';
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'pasture-chatday-'));

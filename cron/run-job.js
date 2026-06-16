@@ -7,11 +7,11 @@
  * Payload: { "message": "...", "jid": "...", "storePath": "?", "workspaceDir": "?" }
  */
 
-import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
+import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/util/paths.js';
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
-import { runAgentTurn } from '../lib/agent.js';
-import { getTimezoneContextLine } from '../lib/timezone.js';
+import { runAgentTurn } from '../lib/agent/agent.js';
+import { getTimezoneContextLine } from '../lib/util/timezone.js';
 
 dotenv.config({ path: getEnvPath() });
 

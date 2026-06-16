@@ -11,7 +11,7 @@ async function main() {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-curiosity-'));
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
-    const { createMission, getMission, getMissionMemoryPath } = await import('../../lib/missions.js');
+    const { createMission, getMission, getMissionMemoryPath } = await import('../../lib/context/missions.js');
     const {
       buildCuriosityMomentumPrompt,
       listCuriosityCandidateMissions,
@@ -19,7 +19,7 @@ async function main() {
       applyCuriositySuggestion,
       runCuriosityMomentumForMission,
       runCuriosityMomentumCycle,
-    } = await import('../../lib/curiosity-momentum.js');
+    } = await import('../../lib/agent/curiosity-momentum.js');
 
     const mission = createMission({
       title: 'Grow signups',
@@ -58,7 +58,7 @@ async function main() {
       status: 'active',
     });
     const oldTouch = Date.now() - (3 * 60 * 60_000);
-    const { updateMission } = await import('../../lib/missions.js');
+    const { updateMission } = await import('../../lib/context/missions.js');
     updateMission(idleMission.id, {
       lastRunAt: oldTouch,
       lastCuriosityAt: 0,

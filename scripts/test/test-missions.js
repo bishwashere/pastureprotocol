@@ -29,8 +29,8 @@ async function main() {
       taskBlockedByWait,
       normalizeWaitAppliesTo,
       normalizeNeedsUserInput,
-    } = await import('../../lib/missions.js');
-    const { logTeamActivity } = await import('../../lib/team-activity.js');
+    } = await import('../../lib/context/missions.js');
+    const { logTeamActivity } = await import('../../lib/agent/team-activity.js');
 
     const created = createMission({
       title: 'Ship missions feature',
@@ -347,7 +347,7 @@ async function main() {
     assert(notFoundErr && /not found/i.test(notFoundErr.message), 'deleting non-existent mission throws');
 
     // recoverStaleMissions: unstick missions left running after a crash.
-    const { recoverStaleMissions } = await import('../../lib/missions.js');
+    const { recoverStaleMissions } = await import('../../lib/context/missions.js');
     const staleMission = createMission({
       title: 'Stuck mission',
       objective: 'Test stale recovery',
