@@ -5,9 +5,9 @@
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 import { getStateDir } from '../../lib/util/paths.js';
 import { enrichHaToolResult } from '../../lib/integrations/home-assistant-format.js';
+import { spawnWithTimeout } from '../../lib/agent/executors/spawn-with-timeout.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -60,38 +60,30 @@ function buildCliArgs(args) {
  * @param {string[]} argv - Arguments for ha-cli.js (e.g. ['list', 'lights'])
  * @returns {Promise<string>}
  */
-function runCli(argv) {
-  return new Promise((resolve, reject) => {
-    const cliPath = getHaCliPath();
-    const cwd = getInstallRoot();
-    const env = { ...process.env, PASTURE_STATE_DIR: getStateDir() };
-    const child = spawn(process.execPath, [cliPath, ...argv], {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
-    child.on('error', (err) => reject(err));
-    child.on('close', (code) => {
-      const out = stdout.trim() || stderr.trim();
-      if (code !== 0) {
-        try {
-          const parsed = JSON.parse(out);
-          if (parsed.error) resolve(JSON.stringify(parsed));
-          else resolve(JSON.stringify({ error: out || `CLI exited with code ${code}` }));
-        } catch (_) {
-          resolve(JSON.stringify({ error: out || `CLI exited with code ${code}` }));
-        }
-        return;
-      }
-      resolve(out || '{}');
-    });
+async function runCli(argv) {
+  const cliPath = getHaCliPath();
+  const cwd = getInstallRoot();
+  const env = { ...process.env, PASTURE_STATE_DIR: getStateDir() };
+  const result = await spawnWithTimeout(process.execPath, [cliPath, ...argv], {
+    cwd,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  if (result.timedOut) {
+    return JSON.stringify({ error: result.error || 'Home Assistant CLI timed out.' });
+  }
+  if (result.error && !result.code && !result.stdout && !result.stderr) {
+    return JSON.stringify({ error: result.error });
+  }
+  const out = (result.stdout.trim() || result.stderr.trim());
+  if (!result.ok) {
+    try {
+      const parsed = JSON.parse(out);
+      if (parsed.error) return JSON.stringify(parsed);
+    } catch (_) {}
+    return JSON.stringify({ error: out || `CLI exited with code ${result.code}` });
+  }
+  return out || '{}';
 }
 
 /**
