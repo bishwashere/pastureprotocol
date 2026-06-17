@@ -105,3 +105,215 @@
   opacity: 0.55;
   cursor: wait;
 }
+
+/* ── Mission history modal ─────────────────────────────────────────────── */
+
+.mc2-history-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.mc2-history-modal-card {
+  background: #111c2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  width: 100%;
+  max-width: 680px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.mc2-history-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.mc2-history-modal-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text, #e2e8f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 85%;
+}
+
+.mc2-history-modal-close {
+  background: none;
+  border: none;
+  color: var(--muted, #718096);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.3rem;
+  flex-shrink: 0;
+}
+
+.mc2-history-modal-close:hover {
+  color: var(--text, #e2e8f0);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mc2-history-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  padding: 0 1rem;
+}
+
+.mc2-history-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted, #718096);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.mc2-history-tab.active,
+.mc2-history-tab:hover {
+  color: var(--text, #e2e8f0);
+}
+
+.mc2-history-tab.active {
+  border-bottom-color: #63b3ed;
+}
+
+.mc2-history-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+}
+
+.mc2-history-loading {
+  color: var(--muted, #718096);
+  font-size: 0.75rem;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.mc2-history-empty {
+  color: var(--muted, #718096);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.5rem 0;
+}
+
+/* Tick log */
+
+.mc2-history-tick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.mc2-history-tick-row {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.45rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.mc2-history-tick-row.latest {
+  border-color: rgba(99, 179, 237, 0.3);
+  background: rgba(99, 179, 237, 0.04);
+}
+
+.mc2-history-tick-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.mc2-history-tick-time {
+  font-size: 0.62rem;
+  color: var(--muted, #718096);
+  font-variant-numeric: tabular-nums;
+}
+
+.mc2-history-tick-status {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--muted, #718096);
+  text-transform: capitalize;
+}
+
+.mc2-history-tick-badge {
+  font-size: 0.58rem;
+  padding: 0.08rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(99, 179, 237, 0.18);
+  border: 1px solid rgba(99, 179, 237, 0.35);
+  color: #63b3ed;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mc2-history-tick-summary {
+  font-size: 0.73rem;
+  color: var(--text, #e2e8f0);
+  line-height: 1.45;
+}
+
+.mc2-history-tick-evidence {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.64rem;
+  color: var(--muted, #718096);
+  line-height: 1.5;
+}
+
+.mc2-history-tick-evidence li {
+  margin: 0.1rem 0;
+}
+
+.mc2-history-tick-skills {
+  margin-top: 0.3rem;
+  font-size: 0.6rem;
+  color: var(--muted, #718096);
+  font-style: italic;
+}
+
+/* Memory tab */
+
+.mc2-history-memory-pre {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--text, #e2e8f0);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.4rem;
+  padding: 0.85rem 0.9rem;
+}

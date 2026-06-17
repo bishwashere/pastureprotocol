@@ -410,6 +410,152 @@
       });
     })();
 
+    (function wireMc2MissionHistoryModal() {
+      var historyBtn = mc2El('mc2-mission-history-btn');
+      var modal = mc2El('mc2-mission-history-modal');
+      var closeBtn = mc2El('mc2-history-modal-close');
+      var bodyEl = mc2El('mc2-history-body');
+      var titleEl = mc2El('mc2-history-modal-title');
+      if (!historyBtn || !modal) return;
+
+      var currentTab = 'ticks';
+      var cachedData = null;
+
+      function getMc2SelectedMissionForHistory() {
+        var sel = mc2El('mc2-mission-select');
+        var id = sel ? sel.value : '';
+        if (!id) id = selectedTeamMissionId;
+        if (!id) return null;
+        var missions = Array.isArray(teamMissionsSnapshot && teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+        return missions.find(function (g) { return String(g.id || '') === id; }) || null;
+      }
+
+      function formatHistoryTs(ts) {
+        if (!ts) return '';
+        try {
+          var d = new Date(Number(ts));
+          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+            d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        } catch (_) { return ''; }
+      }
+
+      function statusDot(status) {
+        var s = String(status || '').toLowerCase();
+        var color = s === 'completed' ? '#48bb78' : s === 'blocked' ? '#d63031' : s === 'paused' ? '#f6ad55' : '#63b3ed';
+        return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + color + ';margin-right:5px;flex-shrink:0;"></span>';
+      }
+
+      function renderTicksTab(history) {
+        if (!Array.isArray(history) || !history.length) {
+          return '<p class="mc2-history-empty">No tick history yet. The mission hasn\'t run any cycles.</p>';
+        }
+        var rows = history.slice().reverse();
+        return '<div class="mc2-history-tick-list">' +
+          rows.map(function (tick, i) {
+            var ts = Number(tick.ts) || 0;
+            var skills = Array.isArray(tick.skillsCalled) && tick.skillsCalled.length
+              ? '<div class="mc2-history-tick-skills">Tools: ' + escapeHtml(tick.skillsCalled.join(', ')) + '</div>'
+              : '';
+            var evidence = Array.isArray(tick.evidence) && tick.evidence.length
+              ? '<ul class="mc2-history-tick-evidence">' + tick.evidence.map(function (e) {
+                  return '<li>' + escapeHtml(String(e)) + '</li>';
+                }).join('') + '</ul>'
+              : '';
+            var isFirst = i === 0;
+            return '<div class="mc2-history-tick-row' + (isFirst ? ' latest' : '') + '">' +
+              '<div class="mc2-history-tick-meta">' +
+                statusDot(tick.status) +
+                '<span class="mc2-history-tick-time">' + escapeHtml(formatHistoryTs(ts)) + '</span>' +
+                '<span class="mc2-history-tick-status">' + escapeHtml(String(tick.status || '')) + '</span>' +
+                (isFirst ? '<span class="mc2-history-tick-badge">latest</span>' : '') +
+              '</div>' +
+              '<div class="mc2-history-tick-summary">' + escapeHtml(String(tick.summary || '')) + '</div>' +
+              evidence +
+              skills +
+            '</div>';
+          }).join('') +
+        '</div>';
+      }
+
+      function renderMemoryTab(memory) {
+        if (!memory || !memory.trim()) {
+          return '<p class="mc2-history-empty">No memory recorded yet. Memory is written after the first tick completes.</p>';
+        }
+        return '<pre class="mc2-history-memory-pre">' + escapeHtml(memory) + '</pre>';
+      }
+
+      function renderTab(data, tab) {
+        if (!data) return '<p class="mc2-history-empty">Could not load history.</p>';
+        if (tab === 'memory') return renderMemoryTab(data.memory || '');
+        return renderTicksTab(data.history || []);
+      }
+
+      function switchTab(tab) {
+        currentTab = tab;
+        var tabs = modal.querySelectorAll('.mc2-history-tab');
+        tabs.forEach(function (t) {
+          var active = t.getAttribute('data-history-tab') === tab;
+          t.classList.toggle('active', active);
+          t.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        if (bodyEl) bodyEl.innerHTML = renderTab(cachedData, tab);
+      }
+
+      async function openHistoryModal() {
+        var mission = getMc2SelectedMissionForHistory();
+        if (!mission) { alert('Select a mission first.'); return; }
+        if (titleEl) titleEl.textContent = 'History: ' + (mission.title || 'Untitled mission');
+        if (bodyEl) bodyEl.innerHTML = '<div class="mc2-history-loading">Loading…</div>';
+        currentTab = 'ticks';
+        var tabs = modal.querySelectorAll('.mc2-history-tab');
+        tabs.forEach(function (t) {
+          var active = t.getAttribute('data-history-tab') === 'ticks';
+          t.classList.toggle('active', active);
+          t.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        modal.style.display = 'flex';
+        cachedData = null;
+        try {
+          var resp = await fetch(API + '/api/missions/' + encodeURIComponent(String(mission.id || '')) + '/memory');
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          cachedData = await resp.json();
+        } catch (err) {
+          if (bodyEl) bodyEl.innerHTML = '<p class="mc2-history-empty">Failed to load: ' + escapeHtml(String(err && err.message || err)) + '</p>';
+          return;
+        }
+        if (bodyEl) bodyEl.innerHTML = renderTab(cachedData, currentTab);
+      }
+
+      function closeHistoryModal() {
+        modal.style.display = 'none';
+        cachedData = null;
+      }
+
+      historyBtn.addEventListener('click', function () {
+        var menuBtn = mc2El('mc2-mission-menu-btn');
+        var dropdown = mc2El('mc2-mission-menu-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+        openHistoryModal();
+      });
+
+      closeBtn && closeBtn.addEventListener('click', closeHistoryModal);
+
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeHistoryModal();
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeHistoryModal();
+      });
+
+      modal.querySelectorAll('.mc2-history-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          switchTab(tab.getAttribute('data-history-tab') || 'ticks');
+        });
+      });
+    })();
+
     (function wireMc2TaskDrawer() {
       var drawer = mc2El('mc2-task-drawer');
       if (!drawer || drawer._wired) return;

@@ -79,9 +79,13 @@ check(
 );
 
 // 5. turnStatus marked error when exhausted.
+// Now wrapped with cancellation handling (audit finding #14): turnStatus is
+// 'cancelled' when wasCancelled, otherwise 'error' on tool error or rounds
+// exhausted, otherwise 'ok'. Verify the inner ternary still includes
+// roundsExhausted in the error branch.
 check(
   'turnStatus = "error" when roundsExhausted',
-  /turnStatus\s*=\s*lastRoundHadToolError\s*\|\|\s*roundsExhausted\s*\?\s*['"]error['"]\s*:\s*['"]ok['"]/.test(agent)
+  /turnStatus\s*=[\s\S]{0,200}?lastRoundHadToolError\s*\|\|\s*roundsExhausted\s*\?\s*['"]error['"]\s*:\s*['"]ok['"]/.test(agent)
 );
 
 console.log(`\n[tool-round-caps] passed=${passed} failed=${failed}`);

@@ -17,7 +17,7 @@ import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsTe
 import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/agent/team-activity.js';
 import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent/agent-metrics.js';
-import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission } from '../lib/context/missions.js';
+import { listMissions, createMission, updateMission, getMission, runMissionTick, respondToMissionUserInput, deleteMission, readMissionMemory } from '../lib/context/missions.js';
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/context/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
@@ -620,6 +620,31 @@ app.delete('/api/missions/:id', (req, res) => {
       res.status(404).json({ error: err.message });
       return;
     }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/missions/:id/memory', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'mission id is required' });
+      return;
+    }
+    const mission = getMission(id);
+    if (!mission) {
+      res.status(404).json({ error: `Mission not found: ${id}` });
+      return;
+    }
+    const memory = readMissionMemory(id, { maxChars: 40_000 });
+    res.json({
+      missionId: id,
+      title: mission.title,
+      memory,
+      history: Array.isArray(mission.history) ? mission.history : [],
+      updatedAt: mission.updatedAt || 0,
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

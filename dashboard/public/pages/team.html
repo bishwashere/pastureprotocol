@@ -49,6 +49,8 @@
             <div style="position:relative;">
               <button type="button" id="mc2-mission-menu-btn" class="secondary" style="margin:0;padding:0.2rem 0.55rem;font-size:1.1rem;line-height:1.2;letter-spacing:0.04em;font-weight:700;" title="Mission options" aria-haspopup="true" aria-expanded="false">⋯</button>
               <div id="mc2-mission-menu-dropdown" style="display:none;position:absolute;top:calc(100% + 5px);right:0;z-index:300;background:#1a2535;border:1px solid rgba(255,255,255,0.1);border-radius:0.45rem;min-width:178px;box-shadow:0 6px 22px rgba(0,0,0,0.45);overflow:hidden;">
+                <button type="button" id="mc2-mission-history-btn" class="mc2-mission-menu-item" style="display:block;width:100%;text-align:left;padding:0.6rem 0.9rem;background:none;border:none;color:inherit;cursor:pointer;font-size:0.83rem;white-space:nowrap;">View history…</button>
+                <div style="height:1px;background:rgba(255,255,255,0.08);margin:0 0.6rem;"></div>
                 <button type="button" id="mc2-mission-assign-btn" class="mc2-mission-menu-item" style="display:block;width:100%;text-align:left;padding:0.6rem 0.9rem;background:none;border:none;color:inherit;cursor:pointer;font-size:0.83rem;white-space:nowrap;">Assign to agent…</button>
                 <div style="height:1px;background:rgba(255,255,255,0.08);margin:0 0.6rem;"></div>
                 <button type="button" id="mc2-mission-delete-btn" class="mc2-mission-menu-item" style="display:block;width:100%;text-align:left;padding:0.6rem 0.9rem;background:none;border:none;color:var(--color-danger,#d63031);cursor:pointer;font-size:0.83rem;white-space:nowrap;">Delete mission…</button>
@@ -83,6 +85,23 @@
               </div>
             </div>
           </div>
+          <!-- Mission history modal -->
+          <div id="mc2-mission-history-modal" class="mc2-history-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mc2-history-modal-title" style="display:none;">
+            <div class="mc2-history-modal-card">
+              <div class="mc2-history-modal-header">
+                <h4 id="mc2-history-modal-title" class="mc2-history-modal-title">Mission history</h4>
+                <button type="button" id="mc2-history-modal-close" class="mc2-history-modal-close" aria-label="Close history">×</button>
+              </div>
+              <div class="mc2-history-tabs" role="tablist">
+                <button type="button" class="mc2-history-tab active" data-history-tab="ticks" role="tab" aria-selected="true">Tick log</button>
+                <button type="button" class="mc2-history-tab" data-history-tab="memory" role="tab" aria-selected="false">Memory</button>
+              </div>
+              <div id="mc2-history-body" class="mc2-history-body">
+                <div class="mc2-history-loading">Loading…</div>
+              </div>
+            </div>
+          </div>
+
           <div class="mc-header-actions">
             <span class="mc-llm-usage-chip" id="mc2-llm-usage" title="Cloud LLM calls today / daily limit">
               <span class="mc-llm-usage-icon" aria-hidden="true">◈</span>

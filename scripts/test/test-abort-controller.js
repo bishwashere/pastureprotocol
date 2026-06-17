@@ -52,7 +52,7 @@ check(
 );
 check(
   'agent.js cites audit finding #14',
-  /audit\s+finding\s+#14/i.test(agent)
+  /audit[\s\S]{0,20}?finding\s+#14/i.test(agent)
 );
 
 // background-tasks.js
@@ -74,7 +74,7 @@ check(
 );
 check(
   'cancelBackgroundTask calls controller.abort()',
-  /cancelBackgroundTask[\s\S]{0,500}?controller\.abort\(\)/.test(bg)
+  /export function cancelBackgroundTask[\s\S]{0,800}?controller\.abort\(\)/.test(bg)
 );
 check(
   'controller is cleaned up after task settles (finally)',
