@@ -2,16 +2,24 @@ function renderCronsTable(rows, emptyText, opts) {
       opts = opts || {};
       if (!rows.length) return '<p class="empty">' + escapeHtml(emptyText) + '</p>';
       if (opts.system) {
-        return '<table class="crons-table crons-table-system"><thead><tr><th>Schedule</th><th>Command</th><th>Enabled</th></tr></thead><tbody>' +
+        return '<div class="crons-system-list">' +
           rows.map(function (row) {
             var expr = row.expr || row.schedule || '—';
-            var isComment = row.kind === 'comment';
-            var cmd = row.command || row.name || (isComment ? '—' : '—');
+            var cmd = row.command || row.name || '—';
             var enabled = row.enabled !== false;
-            return '<tr' + (isComment ? ' class="crons-row-comment"' : '') + '><td><code class="crons-expr">' + escapeHtml(expr) + '</code></td>' +
-              '<td>' + escapeHtml(cmd) + '</td>' +
-              '<td><span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span></td></tr>';
-          }).join('') + '</tbody></table>';
+            var desc = row.description || row.descriptionError || '';
+            var scriptHint = row.scriptPath ? ('<span class="crons-script-path">' + escapeHtml(row.scriptPath) + '</span>') : '';
+            return '<div class="crons-system-item' + (enabled ? '' : ' crons-system-item-off') + '">' +
+              '<div class="crons-system-head">' +
+              '<code class="crons-expr">' + escapeHtml(expr) + '</code> ' +
+              '<code class="crons-system-cmd">' + escapeHtml(cmd) + '</code> ' +
+              '<span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span>' +
+              '</div>' +
+              (scriptHint ? '<div class="crons-system-script">' + scriptHint + '</div>' : '') +
+              (desc ? '<p class="crons-system-desc' + (row.descriptionError ? ' crons-system-desc-muted' : '') + '">' + escapeHtml(desc) + '</p>' : '') +
+              '</div>';
+          }).join('') +
+          '</div>';
       }
       return '<table class="crons-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +
         rows.map(function (row) {
