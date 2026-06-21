@@ -2,7 +2,7 @@
 /**
  * Unit tests for system crons = OS crontab -l parsing.
  */
-import { parseCrontabLines, readUserCrontab } from '../../lib/util/system-crons.js';
+import { parseCrontabLines, readUserCrontab, readSystemCrontabForConfig } from '../../lib/util/system-crons.js';
 
 function check(label, ok, detail = '') {
   const status = ok ? '✅ Pass' : '❌ Fail';
@@ -25,6 +25,9 @@ check('parses active cron', parsed.some((e) => e.enabled && e.expr === '5 */12 *
 check('parses disabled cron', parsed.some((e) => !e.enabled && e.expr === '5 */12 * * *'), 'disabled.sh');
 check('parses @reboot', parsed.some((e) => e.expr === '@reboot'), '@reboot');
 check('skips pure comments in read filter', readUserCrontab().entries.every((e) => e.kind !== 'comment') || process.platform === 'win32', 'no comment rows');
+
+check('blocks crontab when read skill off', readSystemCrontabForConfig({ skills: { enabled: ['cron'] } }).skillRequired === 'read', 'read');
+check('allows crontab when read skill on', readSystemCrontabForConfig({ skills: { enabled: ['read'] } }).skillRequired == null, 'no gate');
 
 const live = readUserCrontab();
 if (process.platform !== 'win32') {

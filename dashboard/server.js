@@ -21,7 +21,7 @@ import { listMissions, createMission, updateMission, getMission, runMissionTick,
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/context/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
-import { readUserCrontab } from '../lib/util/system-crons.js';
+import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -358,9 +358,10 @@ app.get('/api/overview', async (_req, res) => {
 
 app.get('/api/crons', (_req, res) => {
   try {
+    const config = loadConfig();
     const storePath = getCronStorePath();
     const store = loadStore(storePath);
-    const crontab = readUserCrontab();
+    const crontab = readSystemCrontabForConfig(config);
     res.json({
       jobs: store.jobs || [],
       system: crontab.entries || [],
@@ -369,6 +370,7 @@ app.get('/api/crons', (_req, res) => {
         empty: !!crontab.empty,
         error: crontab.error || null,
         user: crontab.user || null,
+        skillRequired: crontab.skillRequired || null,
       },
     });
   } catch (err) {

@@ -42,7 +42,10 @@ function renderCronsTable(rows, emptyText, opts) {
       var crontab = d.crontab || {};
       var metaEl = document.getElementById('crons-system-meta');
       if (metaEl) {
-        if (crontab.error) {
+        if (crontab.skillRequired) {
+          metaEl.hidden = false;
+          metaEl.textContent = crontab.error || ('Enable the ' + crontab.skillRequired + ' skill on the Skills page.');
+        } else if (crontab.error) {
           metaEl.hidden = false;
           metaEl.textContent = 'Could not read crontab: ' + crontab.error;
         } else if (crontab.user) {
@@ -53,7 +56,9 @@ function renderCronsTable(rows, emptyText, opts) {
           metaEl.textContent = '';
         }
       }
-      var systemEmpty = crontab && crontab.error
+      var systemEmpty = crontab && crontab.skillRequired
+        ? (crontab.error || 'Enable the read skill to view system crontab.')
+        : crontab && crontab.error
         ? 'Could not read crontab — ' + crontab.error
         : 'No entries in crontab -l (empty or comments only).';
       systemEl.innerHTML = renderCronsTable(systemRows, systemEmpty, { system: true });
