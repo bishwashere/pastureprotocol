@@ -1,17 +1,20 @@
 :root {
-      --bg: #0f0f12;
-      --card: #1a1a1f;
-      --text: #e4e4e7;
-      --muted: #71717a;
+      --bg: #050816;
+      --card: #0f1729;
+      --text: #dbeafe;
+      --muted: #7f8eaa;
       --green: #22c55e;
       --red: #ef4444;
       --accent: #a78bfa;
-      --border: #27272a;
+      --border: #1a2744;
     }
     * { box-sizing: border-box; }
     body {
       font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 20% -12%, rgba(124, 58, 237, 0.18), transparent 25rem),
+        radial-gradient(circle at 82% 4%, rgba(59, 130, 246, 0.12), transparent 22rem),
+        var(--bg);
       color: var(--text);
       margin: 0;
       padding: 1.5rem 2rem;

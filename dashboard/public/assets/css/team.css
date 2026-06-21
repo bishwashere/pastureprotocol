@@ -5,14 +5,14 @@
  */
 
 :root {
-  --bg:     #0f0f12;
-  --card:   #1a1a1f;
-  --text:   #e4e4e7;
-  --muted:  #71717a;
+  --bg:     #050816;
+  --card:   #0f1729;
+  --text:   #dbeafe;
+  --muted:  #7f8eaa;
   --green:  #22c55e;
   --red:    #ef4444;
   --accent: #a78bfa;
-  --border: #27272a;
+  --border: #1a2744;
 }
 
 /* ── Body / page shell ─────────────────────────────────────────────────── */
@@ -47,7 +47,7 @@ body.dashboard-team-active > nav {
   padding: 0 !important;
   margin-bottom: 0 !important;
   gap: 0 !important;
-  background: #0b0b10;
+  background: #050816;
   border: none !important;
   border-radius: 0 !important;
   overflow: hidden;
@@ -62,7 +62,7 @@ body.dashboard-team-active > nav {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  background: #101018;
+  background: #0b1120;
   border-right: 1px solid var(--border);
   padding: 0.55rem 0.35rem;
 }
