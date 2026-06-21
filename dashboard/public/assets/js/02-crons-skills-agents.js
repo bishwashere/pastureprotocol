@@ -1,18 +1,32 @@
-async function fetchCrons() {
-      const r = await fetch(API + '/api/crons');
-      const d = await r.json();
-      const el = document.getElementById('crons-list');
-      const jobs = d.jobs || [];
-      if (jobs.length === 0) {
-        el.innerHTML = '<p class="empty">No scheduled crons.</p>';
-        return;
-      }
-      el.innerHTML = '<table><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Message</th></tr></thead><tbody>' +
-        jobs.map(j => {
-          const s = j.schedule || {};
-          const sched = s.kind === 'cron' ? (s.expr || '') : (s.at || '');
-          return '<tr><td>' + escapeHtml(j.name || j.id) + '</td><td><span class="badge ' + (j.enabled ? 'enabled' : 'disabled') + '">' + (j.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(sched) + '</td><td>' + escapeHtml((j.message || '').slice(0, 60)) + (j.message && j.message.length > 60 ? '…' : '') + '</td></tr>';
+function renderGroundsTable(rows, emptyText) {
+      if (!rows.length) return '<p class="empty">' + escapeHtml(emptyText) + '</p>';
+      return '<table class="grounds-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +
+        rows.map(function (row) {
+          return '<tr><td>' + escapeHtml(row.name || row.id || '—') + '</td><td><span class="badge ' + (row.enabled ? 'enabled' : 'disabled') + '">' + (row.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(row.schedule || '—') + '</td><td>' + escapeHtml(row.detail || row.message || '—') + '</td></tr>';
         }).join('') + '</tbody></table>';
+    }
+
+    async function fetchCrons() {
+      const r = await fetch(API + '/api/grounds');
+      const d = await r.json();
+      const scheduledEl = document.getElementById('grounds-scheduled-list');
+      const systemEl = document.getElementById('grounds-system-list');
+      if (!scheduledEl || !systemEl) return;
+      const jobs = d.scheduled || d.jobs || [];
+      const scheduledRows = jobs.map(function (j) {
+        const s = j.schedule || {};
+        const sched = s.kind === 'cron' ? (s.expr || '') : (s.at || '');
+        return {
+          id: j.id,
+          name: j.name || j.id,
+          enabled: j.enabled !== false,
+          schedule: sched,
+          detail: (j.message || '').slice(0, 80) + (j.message && j.message.length > 80 ? '…' : ''),
+        };
+      });
+      scheduledEl.innerHTML = renderGroundsTable(scheduledRows, 'No scheduled grounds yet. Ask the agent to set a reminder.');
+      const systemRows = Array.isArray(d.system) ? d.system : [];
+      systemEl.innerHTML = renderGroundsTable(systemRows, 'No system grounds found.');
     }
 
     function escapeHtml(s) {

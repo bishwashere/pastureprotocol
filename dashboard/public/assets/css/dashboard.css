@@ -2959,3 +2959,32 @@
 
     /* Empty state */
     .proj-empty { color: var(--muted); font-size: 0.88rem; padding: 3rem; text-align: center; }
+
+    /* Grounds page */
+    .grounds-section {
+      margin-top: 1.25rem;
+      padding-top: 1.1rem;
+      border-top: 1px solid var(--border);
+    }
+    .grounds-section:first-of-type {
+      margin-top: 0.5rem;
+      padding-top: 0;
+      border-top: none;
+    }
+    .grounds-section-system {
+      background: rgba(148, 163, 184, 0.04);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 8px;
+      padding: 0.85rem 0.95rem 1rem;
+      margin-top: 1.5rem;
+    }
+    .grounds-section-title {
+      margin: 0 0 0.25rem 0;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+    .grounds-section-desc {
+      margin: 0 0 0.75rem 0 !important;
+    }
+    .grounds-table { width: 100%; }
+    .grounds-table td:last-child { color: var(--muted); font-size: 0.85rem; }

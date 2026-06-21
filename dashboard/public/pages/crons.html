@@ -1,6 +1,18 @@
 <div id="page-crons" class="page">
-    <div class="card">
-      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Scheduled crons</h2>
-      <div id="crons-list"></div>
+    <div class="card grounds-card">
+      <h2 style="margin:0 0 0.35rem 0; font-size:1rem;">Grounds</h2>
+      <p class="skill-meta grounds-intro" style="margin:0 0 1rem 0;">Scheduled work around the pasture — user reminders inside the system, and daemon timers just outside it.</p>
+
+      <section class="grounds-section" aria-labelledby="grounds-scheduled-title">
+        <h3 id="grounds-scheduled-title" class="grounds-section-title">Scheduled grounds</h3>
+        <p class="skill-meta grounds-section-desc">Reminders and recurring messages you set — part of the Pasture system (<code>jobs.json</code>).</p>
+        <div id="grounds-scheduled-list"></div>
+      </section>
+
+      <section class="grounds-section grounds-section-system" aria-labelledby="grounds-system-title">
+        <h3 id="grounds-system-title" class="grounds-section-title">System grounds</h3>
+        <p class="skill-meta grounds-section-desc">Daemon-level maintenance just outside the pasture — Tide, missions, pulse, and retrospective.</p>
+        <div id="grounds-system-list"></div>
+      </section>
     </div>
   </div>

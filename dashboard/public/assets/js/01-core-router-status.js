@@ -1,5 +1,5 @@
 const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'config', 'memory', 'test', 'team', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'grounds', 'skills', 'groups', 'config', 'memory', 'test', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -83,16 +83,18 @@ const API = '';
     function setPage(name, memoryFileId, openIdentityFileId, teamAgentId, mc2View) {
       if (name === 'chat' || name === 'status') name = 'home';
       if (!name || !validPages.includes(name)) name = 'home';
+      var navName = name === 'crons' ? 'grounds' : name;
+      var pageName = (name === 'grounds' || name === 'crons') ? 'crons' : name;
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-      var pageId = pageIdForRoute(name);
+      var pageId = pageIdForRoute(pageName);
       var page = document.getElementById('page-' + pageId);
-      var link = document.querySelector('nav a[data-page="' + name + '"]');
+      var link = document.querySelector('nav a[data-page="' + navName + '"]');
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
       document.body.classList.toggle('dashboard-team-active', pageId === 'team');
-      if (name === 'crons') fetchCrons();
+      if (pageName === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
       if (name === 'home') {
@@ -133,6 +135,7 @@ const API = '';
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
+      if (name === 'grounds' || name === 'crons') name = 'grounds';
       if (name === 'agents') name = 'team';
       if (name === 'projects') {
         return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null, mc2View: 'projects' };

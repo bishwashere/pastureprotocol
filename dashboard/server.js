@@ -21,6 +21,7 @@ import { listMissions, createMission, updateMission, getMission, runMissionTick,
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/context/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
+import { listSystemGrounds } from '../lib/util/grounds.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -360,6 +361,22 @@ app.get('/api/crons', (_req, res) => {
     const storePath = getCronStorePath();
     const store = loadStore(storePath);
     res.json({ jobs: store.jobs || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/grounds', (_req, res) => {
+  try {
+    const config = loadConfig();
+    const storePath = getCronStorePath();
+    const store = loadStore(storePath);
+    const missions = listMissions();
+    const activeMissionCount = missions.filter((m) => String(m.status || '').toLowerCase() === 'active').length;
+    res.json({
+      scheduled: store.jobs || [],
+      system: listSystemGrounds(config, { activeMissionCount }),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
