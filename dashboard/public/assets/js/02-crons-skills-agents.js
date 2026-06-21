@@ -5,18 +5,30 @@ function renderCronsTable(rows, emptyText, opts) {
         return '<div class="crons-system-list">' +
           rows.map(function (row) {
             var expr = row.expr || row.schedule || '—';
-            var cmd = row.command || row.name || '—';
             var enabled = row.enabled !== false;
-            var desc = row.description || '';
+            var name = row.name || 'Cron job';
+            var scheduleHuman = row.scheduleHuman || expr;
+            var purpose = row.purpose || row.description || '';
             var err = row.descriptionError || '';
+            var scriptLabel = row.scriptLabel || '—';
+            var tech = Array.isArray(row.technicalDetails) ? row.technicalDetails : [];
+            var techHtml = '<div class="crons-system-tech">' +
+              '<span class="crons-system-tech-line">Cron: <code>' + escapeHtml(expr) + '</code></span>' +
+              tech.map(function (line) {
+                return '<span class="crons-system-tech-line">' + escapeHtml(line) + '</span>';
+              }).join('') +
+              '</div>';
             return '<div class="crons-system-item' + (enabled ? '' : ' crons-system-item-off') + '">' +
-              '<div class="crons-system-head">' +
-              '<code class="crons-expr">' + escapeHtml(expr) + '</code> ' +
+              '<div class="crons-system-name">' + escapeHtml(name) + '</div>' +
+              '<div class="crons-system-meta-line">' +
               '<span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span>' +
+              '<span class="crons-system-meta-sep">·</span>' +
+              '<span class="crons-system-schedule">' + escapeHtml(scheduleHuman) + '</span>' +
               '</div>' +
-              '<code class="crons-system-cmd">' + escapeHtml(cmd) + '</code>' +
-              (desc ? '<p class="crons-system-desc">' + escapeHtml(desc) + '</p>' : '') +
-              (err && !desc ? '<p class="crons-system-desc crons-system-desc-muted">' + escapeHtml(err) + '</p>' : '') +
+              (purpose ? '<p class="crons-system-purpose">' + escapeHtml(purpose) + '</p>' : '') +
+              (err && !purpose ? '<p class="crons-system-purpose crons-system-purpose-muted">' + escapeHtml(err) + '</p>' : '') +
+              '<code class="crons-system-script">' + escapeHtml(scriptLabel) + '</code>' +
+              techHtml +
               '</div>';
           }).join('') +
           '</div>';
