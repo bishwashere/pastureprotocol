@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Unit tests for system grounds catalog (dashboard Grounds page).
+ * Unit tests for system crons catalog (dashboard Crons page).
  */
-import { listSystemGrounds } from '../../lib/util/grounds.js';
+import { listSystemCrons } from '../../lib/util/system-crons.js';
 
 function check(label, ok, detail = '') {
   const status = ok ? '✅ Pass' : '❌ Fail';
@@ -13,16 +13,16 @@ function check(label, ok, detail = '') {
 console.log('| Test | Input | Output | Status |');
 console.log('|------|-------|--------|--------|');
 
-const base = listSystemGrounds({}, { activeMissionCount: 0 });
+const base = listSystemCrons({}, { activeMissionCount: 0 });
 check('includes cron runner', base.some((g) => g.id === 'cron-runner'), 'cron-runner');
 check('includes system pulse health', base.some((g) => g.id === 'system-pulse-health'), 'system-pulse-health');
 check('includes retrospective', base.some((g) => g.id === 'retrospective'), 'retrospective');
 
-const tideOff = listSystemGrounds({ tide: { enabled: false } });
+const tideOff = listSystemCrons({ tide: { enabled: false } });
 const tideFollow = tideOff.find((g) => g.id === 'tide-followup');
 check('tide follow-up disabled when tide off', tideFollow && tideFollow.enabled === false, 'enabled=false');
 
-const tideOn = listSystemGrounds({
+const tideOn = listSystemCrons({
   tide: {
     enabled: true,
     silenceCooldownMinutes: 45,
@@ -33,16 +33,16 @@ const tideOn = listSystemGrounds({
 const checklist = tideOn.find((g) => g.id === 'tide-checklist');
 check('tide checklist enabled with items', checklist && checklist.enabled === true, checklist?.detail || '');
 
-const withMissions = listSystemGrounds({}, { activeMissionCount: 2 });
+const withMissions = listSystemCrons({}, { activeMissionCount: 2 });
 const curiosity = withMissions.find((g) => g.id === 'mission-curiosity');
 check('curiosity enabled with active missions', curiosity && curiosity.enabled === true, curiosity?.detail || '');
 
-const pulseOff = listSystemGrounds({ systemPulse: { enabled: false } });
+const pulseOff = listSystemCrons({ systemPulse: { enabled: false } });
 const health = pulseOff.find((g) => g.id === 'system-pulse-health');
 check('pulse health respects enabled flag', health && health.enabled === false, 'enabled=false');
 
 if (process.exitCode) {
-  console.error('\nSome grounds tests failed.');
+  console.error('\nSome system-crons tests failed.');
   process.exit(process.exitCode);
 }
-console.log('\nAll grounds tests passed.');
+console.log('\nAll system-crons tests passed.');

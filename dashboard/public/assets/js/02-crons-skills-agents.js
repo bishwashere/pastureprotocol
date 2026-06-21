@@ -1,18 +1,18 @@
-function renderGroundsTable(rows, emptyText) {
+function renderCronsTable(rows, emptyText) {
       if (!rows.length) return '<p class="empty">' + escapeHtml(emptyText) + '</p>';
-      return '<table class="grounds-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +
+      return '<table class="crons-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +
         rows.map(function (row) {
           return '<tr><td>' + escapeHtml(row.name || row.id || '—') + '</td><td><span class="badge ' + (row.enabled ? 'enabled' : 'disabled') + '">' + (row.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(row.schedule || '—') + '</td><td>' + escapeHtml(row.detail || row.message || '—') + '</td></tr>';
         }).join('') + '</tbody></table>';
     }
 
     async function fetchCrons() {
-      const r = await fetch(API + '/api/grounds');
+      const r = await fetch(API + '/api/crons');
       const d = await r.json();
-      const scheduledEl = document.getElementById('grounds-scheduled-list');
-      const systemEl = document.getElementById('grounds-system-list');
+      const scheduledEl = document.getElementById('crons-scheduled-list');
+      const systemEl = document.getElementById('crons-system-list');
       if (!scheduledEl || !systemEl) return;
-      const jobs = d.scheduled || d.jobs || [];
+      const jobs = d.jobs || [];
       const scheduledRows = jobs.map(function (j) {
         const s = j.schedule || {};
         const sched = s.kind === 'cron' ? (s.expr || '') : (s.at || '');
@@ -24,9 +24,9 @@ function renderGroundsTable(rows, emptyText) {
           detail: (j.message || '').slice(0, 80) + (j.message && j.message.length > 80 ? '…' : ''),
         };
       });
-      scheduledEl.innerHTML = renderGroundsTable(scheduledRows, 'No scheduled grounds yet. Ask the agent to set a reminder.');
+      scheduledEl.innerHTML = renderCronsTable(scheduledRows, 'No scheduled crons.');
       const systemRows = Array.isArray(d.system) ? d.system : [];
-      systemEl.innerHTML = renderGroundsTable(systemRows, 'No system grounds found.');
+      systemEl.innerHTML = renderCronsTable(systemRows, 'No system crons found.');
     }
 
     function escapeHtml(s) {

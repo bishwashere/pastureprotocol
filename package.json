@@ -39,7 +39,7 @@
     "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
     "test:dashboard-boot": "node scripts/test/test-dashboard-boot.js",
     "test:dev-script": "node scripts/test/test-dev-script.js",
-    "test:grounds": "node scripts/test/test-grounds.js",
+    "test:system-crons": "node scripts/test/test-system-crons.js",
     "test:dashboard-browser-e2e": "node scripts/test/test-dashboard-browser-e2e.js",
     "test:apply-patch-unit": "node scripts/test/test-apply-patch-unit.js",
     "test:group-blocklist": "node scripts/test/test-group-blocklist.js",
