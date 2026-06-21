@@ -21,13 +21,14 @@ import { listMissions, createMission, updateMission, getMission, runMissionTick,
 import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSuggestedTaskToTask } from '../lib/context/ai-suggested-tasks.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
-import { listSystemCrons } from '../lib/util/system-crons.js';
+import { readUserCrontab } from '../lib/util/system-crons.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/util/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
+import { getGroupRestrictions, saveGroupRestrictions } from '../lib/channels/group-config.js';
 import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent/agent-config.js';
 import {
   getTideChecklistFromConfig,
@@ -357,14 +358,18 @@ app.get('/api/overview', async (_req, res) => {
 
 app.get('/api/crons', (_req, res) => {
   try {
-    const config = loadConfig();
     const storePath = getCronStorePath();
     const store = loadStore(storePath);
-    const missions = listMissions();
-    const activeMissionCount = missions.filter((m) => String(m.status || '').toLowerCase() === 'active').length;
+    const crontab = readUserCrontab();
     res.json({
       jobs: store.jobs || [],
-      system: listSystemCrons(config, { activeMissionCount }),
+      system: crontab.entries || [],
+      crontab: {
+        ok: crontab.ok,
+        empty: !!crontab.empty,
+        error: crontab.error || null,
+        user: crontab.user || null,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

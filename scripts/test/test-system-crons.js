@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Unit tests for system crons catalog (dashboard Crons page).
+ * Unit tests for system crons = OS crontab -l parsing.
  */
-import { listSystemCrons } from '../../lib/util/system-crons.js';
+import { parseCrontabLines, readUserCrontab } from '../../lib/util/system-crons.js';
 
 function check(label, ok, detail = '') {
   const status = ok ? '✅ Pass' : '❌ Fail';
@@ -13,33 +13,29 @@ function check(label, ok, detail = '') {
 console.log('| Test | Input | Output | Status |');
 console.log('|------|-------|--------|--------|');
 
-const base = listSystemCrons({}, { activeMissionCount: 0 });
-check('includes cron runner', base.some((g) => g.id === 'cron-runner'), 'cron-runner');
-check('includes system pulse health', base.some((g) => g.id === 'system-pulse-health'), 'system-pulse-health');
-check('includes retrospective', base.some((g) => g.id === 'retrospective'), 'retrospective');
+const sample = `# disabled job
+#5 */12 * * * /path/disabled.sh
+5 */12 * * * /path/active.sh
+*/5 * * * * sh /path/every5.sh
+@reboot /path/boot.sh
+`;
 
-const tideOff = listSystemCrons({ tide: { enabled: false } });
-const tideFollow = tideOff.find((g) => g.id === 'tide-followup');
-check('tide follow-up disabled when tide off', tideFollow && tideFollow.enabled === false, 'enabled=false');
+const parsed = parseCrontabLines(sample);
+check('parses active cron', parsed.some((e) => e.enabled && e.expr === '5 */12 * * *'), '/path/active.sh');
+check('parses disabled cron', parsed.some((e) => !e.enabled && e.expr === '5 */12 * * *'), 'disabled.sh');
+check('parses @reboot', parsed.some((e) => e.expr === '@reboot'), '@reboot');
+check('skips pure comments in read filter', readUserCrontab().entries.every((e) => e.kind !== 'comment') || process.platform === 'win32', 'no comment rows');
 
-const tideOn = listSystemCrons({
-  tide: {
-    enabled: true,
-    silenceCooldownMinutes: 45,
-    healthCheckMinutes: 5,
-    checklist: { enabled: true, triggers: { onRestart: true, onCycle: true }, items: [{ id: 'a', label: 'Ping', enabled: true }] },
-  },
-});
-const checklist = tideOn.find((g) => g.id === 'tide-checklist');
-check('tide checklist enabled with items', checklist && checklist.enabled === true, checklist?.detail || '');
-
-const withMissions = listSystemCrons({}, { activeMissionCount: 2 });
-const curiosity = withMissions.find((g) => g.id === 'mission-curiosity');
-check('curiosity enabled with active missions', curiosity && curiosity.enabled === true, curiosity?.detail || '');
-
-const pulseOff = listSystemCrons({ systemPulse: { enabled: false } });
-const health = pulseOff.find((g) => g.id === 'system-pulse-health');
-check('pulse health respects enabled flag', health && health.enabled === false, 'enabled=false');
+const live = readUserCrontab();
+if (process.platform !== 'win32') {
+  check('readUserCrontab ok on unix', live.ok === true, `${live.entries.length} entries`);
+  if (live.entries.length > 0) {
+    check('live entry has expr', !!live.entries[0].expr, live.entries[0].expr);
+    check('live entry has command', !!live.entries[0].command, live.entries[0].command.slice(0, 40));
+  }
+} else {
+  check('win32 reports unavailable', live.ok === false && /Windows/i.test(live.error || ''), live.error || '');
+}
 
 if (process.exitCode) {
   console.error('\nSome system-crons tests failed.');

@@ -1,8 +1,21 @@
-function renderCronsTable(rows, emptyText) {
+function renderCronsTable(rows, emptyText, opts) {
+      opts = opts || {};
       if (!rows.length) return '<p class="empty">' + escapeHtml(emptyText) + '</p>';
+      if (opts.system) {
+        return '<table class="crons-table crons-table-system"><thead><tr><th>Schedule</th><th>Command</th><th>Enabled</th></tr></thead><tbody>' +
+          rows.map(function (row) {
+            var expr = row.expr || row.schedule || '—';
+            var isComment = row.kind === 'comment';
+            var cmd = row.command || row.name || (isComment ? '—' : '—');
+            var enabled = row.enabled !== false;
+            return '<tr' + (isComment ? ' class="crons-row-comment"' : '') + '><td><code class="crons-expr">' + escapeHtml(expr) + '</code></td>' +
+              '<td>' + escapeHtml(cmd) + '</td>' +
+              '<td><span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span></td></tr>';
+          }).join('') + '</tbody></table>';
+      }
       return '<table class="crons-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +
         rows.map(function (row) {
-          return '<tr><td>' + escapeHtml(row.name || row.id || '—') + '</td><td><span class="badge ' + (row.enabled ? 'enabled' : 'disabled') + '">' + (row.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(row.schedule || '—') + '</td><td>' + escapeHtml(row.detail || row.message || '—') + '</td></tr>';
+          return '<tr><td>' + escapeHtml(row.name || row.id || '—') + '</td><td><span class="badge ' + (row.enabled ? 'enabled' : 'disabled') + '">' + (row.enabled ? 'On' : 'Off') + '</span></td><td><code class="crons-expr">' + escapeHtml(row.schedule || row.expr || '—') + '</code></td><td>' + escapeHtml(row.detail || row.message || '—') + '</td></tr>';
         }).join('') + '</tbody></table>';
     }
 
@@ -26,7 +39,24 @@ function renderCronsTable(rows, emptyText) {
       });
       scheduledEl.innerHTML = renderCronsTable(scheduledRows, 'No scheduled crons.');
       const systemRows = Array.isArray(d.system) ? d.system : [];
-      systemEl.innerHTML = renderCronsTable(systemRows, 'No system crons found.');
+      var crontab = d.crontab || {};
+      var metaEl = document.getElementById('crons-system-meta');
+      if (metaEl) {
+        if (crontab.error) {
+          metaEl.hidden = false;
+          metaEl.textContent = 'Could not read crontab: ' + crontab.error;
+        } else if (crontab.user) {
+          metaEl.hidden = false;
+          metaEl.textContent = 'User: ' + crontab.user + ' (crontab -l)';
+        } else {
+          metaEl.hidden = true;
+          metaEl.textContent = '';
+        }
+      }
+      var systemEmpty = crontab && crontab.error
+        ? 'Could not read crontab — ' + crontab.error
+        : 'No entries in crontab -l (empty or comments only).';
+      systemEl.innerHTML = renderCronsTable(systemRows, systemEmpty, { system: true });
     }
 
     function escapeHtml(s) {
