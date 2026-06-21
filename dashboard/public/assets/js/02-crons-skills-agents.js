@@ -7,16 +7,16 @@ function renderCronsTable(rows, emptyText, opts) {
             var expr = row.expr || row.schedule || '—';
             var cmd = row.command || row.name || '—';
             var enabled = row.enabled !== false;
-            var desc = row.description || row.descriptionError || '';
-            var scriptHint = row.scriptPath ? ('<span class="crons-script-path">' + escapeHtml(row.scriptPath) + '</span>') : '';
+            var desc = row.description || '';
+            var err = row.descriptionError || '';
             return '<div class="crons-system-item' + (enabled ? '' : ' crons-system-item-off') + '">' +
               '<div class="crons-system-head">' +
               '<code class="crons-expr">' + escapeHtml(expr) + '</code> ' +
-              '<code class="crons-system-cmd">' + escapeHtml(cmd) + '</code> ' +
               '<span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span>' +
               '</div>' +
-              (scriptHint ? '<div class="crons-system-script">' + scriptHint + '</div>' : '') +
-              (desc ? '<p class="crons-system-desc' + (row.descriptionError ? ' crons-system-desc-muted' : '') + '">' + escapeHtml(desc) + '</p>' : '') +
+              '<code class="crons-system-cmd">' + escapeHtml(cmd) + '</code>' +
+              (desc ? '<p class="crons-system-desc">' + escapeHtml(desc) + '</p>' : '') +
+              (err && !desc ? '<p class="crons-system-desc crons-system-desc-muted">' + escapeHtml(err) + '</p>' : '') +
               '</div>';
           }).join('') +
           '</div>';
