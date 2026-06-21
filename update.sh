@@ -23,19 +23,20 @@ trap 'rm -rf "$WORK"' EXIT
 # Git short SHA for install dir (BUILD file or .git); remote via GitHub API
 read_build() {
   node --input-type=module -e "
-    import { readBuild } from 'file://$ROOT/lib/build-info.js';
+    import { readBuild } from 'file://$ROOT/lib/util/build-info.js';
     const b = readBuild('$ROOT');
     if (b) console.log(b);
   " 2>/dev/null || {
     [ -f "$ROOT/BUILD" ] && tr -d '[:space:]' < "$ROOT/BUILD" && return
     [ -d "$ROOT/.git" ] && git -C "$ROOT" rev-parse --short HEAD 2>/dev/null
   }
+  return 0
 }
 
 fetch_remote_build() {
   local sha
   sha=$(node --input-type=module -e "
-    import { fetchRemoteBuild } from 'file://$ROOT/lib/build-info.js';
+    import { fetchRemoteBuild } from 'file://$ROOT/lib/util/build-info.js';
     const b = await fetchRemoteBuild('$BRANCH');
     if (b) console.log(b);
   " 2>/dev/null) || true
@@ -46,11 +47,12 @@ fetch_remote_build() {
   sha=$(git ls-remote https://github.com/bishwashere/pastureprotocol.git "refs/heads/${BRANCH}" 2>/dev/null \
     | awk 'NR==1 { print substr($1, 1, 7) }') || true
   [ -n "$sha" ] && echo "$sha"
+  return 0
 }
 
 format_version_label() {
   node --input-type=module -e "
-    import { formatVersionLabel } from 'file://$ROOT/lib/build-info.js';
+    import { formatVersionLabel } from 'file://$ROOT/lib/util/build-info.js';
     console.log(formatVersionLabel(process.argv[1], process.argv[2] || ''));
   " "$1" "${2:-}" 2>/dev/null || {
     if [ -n "${2:-}" ]; then echo "v$1 ($2)"; else echo "v$1"; fi
@@ -61,7 +63,7 @@ write_build() {
   local build="$1"
   [ -z "$build" ] && return
   node --input-type=module -e "
-    import { writeBuild } from 'file://$ROOT/lib/build-info.js';
+    import { writeBuild } from 'file://$ROOT/lib/util/build-info.js';
     writeBuild('$ROOT', '$build');
   " 2>/dev/null || echo "$build" > "$ROOT/BUILD"
 }

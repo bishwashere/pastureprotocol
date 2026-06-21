@@ -51,7 +51,7 @@ cd "$INSTALL_DIR"
 
 # Record build info (best effort)
 INSTALL_BUILD=$(node --input-type=module -e "
-  import { fetchRemoteBuild, writeBuild } from 'file://$INSTALL_DIR/lib/build-info.js';
+  import { fetchRemoteBuild, writeBuild } from 'file://$INSTALL_DIR/lib/util/build-info.js';
   const b = await fetchRemoteBuild('$BRANCH');
   if (b) { writeBuild('$INSTALL_DIR', b); console.log(b); }
 " 2>/dev/null || true)

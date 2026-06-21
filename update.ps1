@@ -208,13 +208,13 @@ function Invoke-PastureBuildInfo {
         [Parameter(Mandatory = $true)][string]$Root,
         [Parameter(Mandatory = $true)][string]$Branch
     )
-    $buildJs = Join-Path $Root "lib\build-info.js"
+    $buildJs = Join-Path $Root "lib\util\build-info.js"
     if (-not (Test-Path -LiteralPath $buildJs)) { return $null }
     Push-Location $Root
     try {
         $env:PASTURE_BRANCH = $Branch
         $out = node --input-type=module -e @"
-import { fetchRemoteBuild, writeBuild } from './lib/build-info.js';
+import { fetchRemoteBuild, writeBuild } from './lib/util/build-info.js';
 const root = process.cwd().replace(/\\/g, '/');
 const branch = process.env.PASTURE_BRANCH || 'master';
 const b = await fetchRemoteBuild(branch);
