@@ -304,7 +304,13 @@ app.get('/api/status', async (_req, res) => {
   try {
     const daemonRunning = await getDaemonRunning();
     const dashboardUrl = `http://${HOST}:${PORT}`;
-    res.json({ daemonRunning, dashboardUrl, port: PORT });
+    res.json({
+      daemonRunning,
+      dashboardUrl,
+      port: PORT,
+      stateDir: getStateDir(),
+      installDir: INSTALL_DIR,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -333,6 +339,8 @@ app.get('/api/overview', async (_req, res) => {
       daemonRunning,
       dashboardUrl,
       port: PORT,
+      stateDir: getStateDir(),
+      installDir: INSTALL_DIR,
       cronCount,
       skillsEnabledCount,
       groupSkillsDeniedCount,

@@ -93,6 +93,18 @@ const checks = [
       !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="projects"'),
   },
   {
+    name: 'home status line shows daemon, dashboard URL, and Pasture state dir',
+    ok: core.includes('function buildStatusLine(') &&
+      core.includes("'Pasture: ' + data.stateDir") &&
+      core.includes("' | '") &&
+      !fullHtml.includes('id="chat-dashboard-url"'),
+  },
+  {
+    name: 'dashboard /api/status exposes stateDir for home status line',
+    ok: serverJs.includes('stateDir: getStateDir()') &&
+      /app\.get\('\/api\/status'[\s\S]{0,400}stateDir/.test(serverJs),
+  },
+  {
     name: 'wireClick and wireEl helpers exist',
     ok: script.includes('function wireClick(') && script.includes('function wireEl('),
   },
@@ -349,7 +361,16 @@ async function testDashboardServerStarts() {
     await Promise.race([waitForDashboard(url), exitEarly]);
     const res = await fetch(url);
     if (!res.ok) throw new Error(`GET / returned ${res.status}`);
-    return `HTTP ${res.status} on port ${port}`;
+    const statusRes = await fetch(`${url}api/status`);
+    if (!statusRes.ok) throw new Error(`GET /api/status returned ${statusRes.status}`);
+    const status = await statusRes.json();
+    if (!status.stateDir || typeof status.stateDir !== 'string') {
+      throw new Error('/api/status missing stateDir');
+    }
+    if (status.stateDir !== stateDir) {
+      throw new Error(`stateDir mismatch: expected ${stateDir}, got ${status.stateDir}`);
+    }
+    return `HTTP ${res.status} on port ${port}, stateDir=${status.stateDir}`;
   } finally {
     if (child && !child.killed) {
       child.kill('SIGTERM');

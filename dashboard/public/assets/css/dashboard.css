@@ -1265,7 +1265,11 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.5rem 0.75rem;
     }
-    .chat-upper-left .url-box { font-size: 0.78rem; margin-top: 0.5rem; }
+    .chat-upper-left .status-row {
+      font-size: 0.78rem;
+      line-height: 1.45;
+      word-break: break-all;
+    }
     .home-soul-section {
       margin-top: 0.75rem;
       padding-top: 0.75rem;

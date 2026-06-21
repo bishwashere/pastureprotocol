@@ -187,26 +187,29 @@ const API = '';
       dashboardRouteFromPath();
     });
 
+    function buildStatusLine(data) {
+      var parts = [];
+      if (data && data.daemonRunning) parts.push('Daemon is running');
+      else parts.push('Daemon is not running');
+      if (data && data.dashboardUrl) parts.push('Dashboard: ' + data.dashboardUrl);
+      if (data && data.stateDir) parts.push('Pasture: ' + data.stateDir);
+      return parts.join(' | ');
+    }
+    function setDaemonStatus(data) {
+      var dot = document.getElementById('chat-status-dot');
+      var text = document.getElementById('chat-status-text');
+      var running = !!(data && data.daemonRunning);
+      var cls = running ? 'status-dot running' : 'status-dot stopped';
+      if (dot) dot.className = cls;
+      if (text) text.textContent = buildStatusLine(data || {});
+    }
     async function fetchStatus() {
-      const dot = document.getElementById('chat-status-dot');
-      const text = document.getElementById('chat-status-text');
-      const urlEl = document.getElementById('chat-dashboard-url');
-      function setDaemonStatus(running, label) {
-        var cls = running ? 'status-dot running' : 'status-dot stopped';
-        if (dot) { dot.className = cls; if (text) text.textContent = label; }
-      }
       try {
         const statusRes = await fetch(API + '/api/status');
         const statusData = await statusRes.json();
-        if (statusData.dashboardUrl && urlEl) urlEl.textContent = statusData.dashboardUrl;
-        if (statusData.daemonRunning) {
-          setDaemonStatus(true, 'Daemon is running');
-        } else {
-          setDaemonStatus(false, 'Daemon is not running');
-        }
+        setDaemonStatus(statusData);
       } catch (e) {
-        setDaemonStatus(false, 'Daemon is not running');
-        if (urlEl) urlEl.textContent = '—';
+        setDaemonStatus({ daemonRunning: false });
       }
       function formatUptime(sec) {
         if (sec == null || typeof sec !== 'number' || sec < 0) return '—';
@@ -244,6 +247,7 @@ const API = '';
         const overviewRes = await fetch(API + '/api/overview');
         if (overviewRes.ok) {
           const d = await overviewRes.json();
+          setDaemonStatus(d);
           setOverview(d);
           return;
         }
