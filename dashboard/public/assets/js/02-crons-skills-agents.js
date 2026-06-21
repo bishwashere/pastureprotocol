@@ -1,36 +1,91 @@
 function renderCronsTable(rows, emptyText, opts) {
       opts = opts || {};
       if (!rows.length) return '<p class="empty">' + escapeHtml(emptyText) + '</p>';
-      if (opts.system) {
-        return '<div class="crons-system-list">' +
-          rows.map(function (row) {
+function renderSystemCronVariant(row) {
             var expr = row.expr || row.schedule || '—';
             var enabled = row.enabled !== false;
-            var name = row.name || 'Cron job';
             var scheduleHuman = row.scheduleHuman || expr;
-            var purpose = row.purpose || row.description || '';
-            var err = row.descriptionError || '';
-            var scriptLabel = row.scriptLabel || '—';
             var tech = Array.isArray(row.technicalDetails) ? row.technicalDetails : [];
-            var techHtml = '<div class="crons-system-tech">' +
+            var variantTech = tech.filter(function (line) {
+              return !/^Path:\s/i.test(line);
+            });
+            var techHtml = '<div class="crons-system-tech crons-system-tech-variant">' +
               '<span class="crons-system-tech-line">Cron: <code>' + escapeHtml(expr) + '</code></span>' +
-              tech.map(function (line) {
+              variantTech.map(function (line) {
                 return '<span class="crons-system-tech-line">' + escapeHtml(line) + '</span>';
               }).join('') +
               '</div>';
-            return '<div class="crons-system-item' + (enabled ? '' : ' crons-system-item-off') + '">' +
-              '<div class="crons-system-name">' + escapeHtml(name) + '</div>' +
-              '<div class="crons-system-meta-line">' +
+            return '<div class="crons-system-variant' + (enabled ? '' : ' crons-system-variant-off') + '">' +
+              '<div class="crons-system-meta-line crons-system-variant-meta">' +
               '<span class="badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'On' : 'Off') + '</span>' +
               '<span class="crons-system-meta-sep">·</span>' +
               '<span class="crons-system-schedule">' + escapeHtml(scheduleHuman) + '</span>' +
               '</div>' +
+              techHtml +
+              '</div>';
+          }
+
+          function renderSystemCronGroup(group) {
+            var entries = group.entries || [];
+            var primary = group.primary || entries[0] || {};
+            var name = primary.name || 'Cron job';
+            var purpose = primary.purpose || primary.description || '';
+            var err = primary.descriptionError || '';
+            var scriptLabel = primary.scriptLabel || '—';
+            var sharedTech = Array.isArray(primary.technicalDetails)
+              ? primary.technicalDetails.filter(function (line) { return /^Path:\s/i.test(line); })
+              : [];
+            var countLabel = entries.length > 1 ? ('<span class="crons-system-count">' + entries.length + ' schedules</span>') : '';
+            var groupOff = entries.every(function (e) { return e.enabled === false; });
+            var variantsHtml = entries.length > 1
+              ? ('<div class="crons-system-variants">' + entries.map(renderSystemCronVariant).join('') + '</div>')
+              : renderSystemCronVariant(entries[0] || primary);
+            return '<div class="crons-system-group' + (groupOff ? ' crons-system-group-off' : '') + '">' +
+              '<div class="crons-system-name">' + escapeHtml(name) + countLabel + '</div>' +
               (purpose ? '<p class="crons-system-purpose">' + escapeHtml(purpose) + '</p>' : '') +
               (err && !purpose ? '<p class="crons-system-purpose crons-system-purpose-muted">' + escapeHtml(err) + '</p>' : '') +
               '<code class="crons-system-script">' + escapeHtml(scriptLabel) + '</code>' +
-              techHtml +
+              (sharedTech.length ? ('<div class="crons-system-tech crons-system-tech-shared">' +
+                sharedTech.map(function (line) {
+                  return '<span class="crons-system-tech-line">' + escapeHtml(line) + '</span>';
+                }).join('') +
+                '</div>') : '') +
+              variantsHtml +
               '</div>';
-          }).join('') +
+          }
+
+          function systemCronGroupKey(row) {
+            return String(row.scriptPath || row.scriptLabel || row.command || row.id || '').trim().toLowerCase();
+          }
+
+          function groupSystemCrons(rows) {
+            var map = new Map();
+            rows.forEach(function (row) {
+              var key = systemCronGroupKey(row);
+              if (!map.has(key)) map.set(key, []);
+              map.get(key).push(row);
+            });
+            return Array.from(map.values()).map(function (entries) {
+              var sorted = entries.slice().sort(function (a, b) {
+                if (!!a.enabled !== !!b.enabled) return a.enabled ? -1 : 1;
+                return String(a.expr || '').localeCompare(String(b.expr || ''));
+              });
+              var primary = sorted.find(function (e) { return e.purpose; })
+                || sorted.find(function (e) { return e.enabled; })
+                || sorted[0];
+              return { entries: sorted, primary: primary };
+            }).sort(function (a, b) {
+              var aOn = a.entries.some(function (e) { return e.enabled; });
+              var bOn = b.entries.some(function (e) { return e.enabled; });
+              if (aOn !== bOn) return aOn ? -1 : 1;
+              return String(a.primary.name || '').localeCompare(String(b.primary.name || ''));
+            });
+          }
+
+      if (opts.system) {
+        var groups = groupSystemCrons(rows);
+        return '<div class="crons-system-list">' +
+          groups.map(renderSystemCronGroup).join('') +
           '</div>';
       }
       return '<table class="crons-table"><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Detail</th></tr></thead><tbody>' +

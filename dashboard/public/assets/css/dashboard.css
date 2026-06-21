@@ -3015,6 +3015,47 @@
       flex-direction: column;
       gap: 0.85rem;
     }
+    .crons-system-group {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+    .crons-system-group-off {
+      opacity: 0.72;
+    }
+    .crons-system-count {
+      margin-left: 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    .crons-system-variants {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .crons-system-variant {
+      padding: 0.45rem 0.55rem;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.14);
+    }
+    .crons-system-variant-off {
+      opacity: 0.85;
+    }
+    .crons-system-variant-meta {
+      margin-bottom: 0.25rem;
+    }
+    .crons-system-tech-shared {
+      margin-top: 0.15rem;
+    }
+    .crons-system-tech-variant {
+      margin-top: 0;
+    }
     .crons-system-item {
       padding: 0.65rem 0.75rem;
       border: 1px solid rgba(148, 163, 184, 0.14);
