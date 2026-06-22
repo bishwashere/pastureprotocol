@@ -66,25 +66,111 @@ async function main() {
       '2. 3 launch posts',
       '3. a landing page checklist',
     ].join('\n');
+    // Policy: chat-detected multi-deliverable work must ASK before creating a
+    // mission. Even with an explicit deliverables list, no mission is created
+    // until the user confirms (or explicitly says "create a mission").
     const durable = prepareWorkDurability({ userText: launchMessage, agentId: 'main' });
-    assert(durable.kind === 'new_mission_candidate', 'launch work classified as new mission');
-    assert(durable.persistence === 'create_lightweight_mission', 'launch work creates lightweight mission');
-    assert(durable.missionId, 'new mission has mission id before delegation');
-    assert(durable.createdMission === true, 'mission created by durability step');
-    const mission = getMission(durable.missionId);
-    assert(mission?.title === 'Launch TestProduct', 'mission title uses product name');
-    const taskTitles = (mission?.tasks || []).map((sg) => sg.title).join(' | ').toLowerCase();
-    assert(taskTitles.includes('positioning'), 'positioning task created');
-    assert(taskTitles.includes('launch posts'), 'launch posts task created');
-    assert(taskTitles.includes('landing page checklist'), 'landing page checklist task created');
+    assert(durable.kind === 'mission_suggest', 'launch work proposes mission_suggest, not auto-create');
+    assert(durable.persistence === 'none', 'launch work does NOT auto-persist mission');
+    assert(!durable.missionId, 'launch work does not create mission id before confirmation');
+    assert(!durable.createdMission, 'no mission created at the chat-detection step');
+    assert(durable.title === 'Launch TestProduct', 'suggested mission title uses product name');
+    const suggestedTaskTitles = (durable.tasks || []).map((sg) => sg.title).join(' | ').toLowerCase();
+    assert(suggestedTaskTitles.includes('positioning'), 'positioning task suggested');
+    assert(suggestedTaskTitles.includes('launch posts'), 'launch posts task suggested');
+    assert(suggestedTaskTitles.includes('landing page checklist'), 'landing page checklist task suggested');
 
-    const args = delegationArgsFromDurability(durable, launchMessage);
-    assert(args.missionId === durable.missionId, 'delegation args include mission id');
-    assert(/positioning/i.test(args.expectedOutput), 'delegation expected output includes tasks');
+    // The system block must instruct the agent to ask the user, list the
+    // proposed tasks, and explicitly NOT create the mission yet.
+    const launchSuggestBlock = buildDurabilitySystemBlock(durable);
+    assert(launchSuggestBlock.includes('Do NOT create a mission yet'), 'launch suggest block tells agent to wait');
+    assert(/positioning/i.test(launchSuggestBlock), 'launch suggest block lists proposed tasks');
 
-    const routingText = delegationRoutingTextFromDurability(durable, launchMessage);
+    // Confirming via "yes" after the agent's mission_suggest reply turns the
+    // suggestion into an actual mission, using the original message (not "yes")
+    // for AI decomposition.
+    const launchHistory = [
+      { role: 'user', content: launchMessage },
+      { role: 'assistant', content: 'Sounds great. Would you like me to open a tracked mission for TestProduct so I can plan and delegate this? Proposed tasks: positioning, launch posts, landing page checklist.' },
+    ];
+    let launchDecomposeCalls = 0;
+    let launchDecomposeSawOriginal = false;
+    const confirmedLaunch = await prepareWorkDurabilityWithAi({
+      userText: 'yes please',
+      agentId: 'main',
+      historyMessages: launchHistory,
+      llmChat: async (messages) => {
+        const system = String(messages?.[0]?.content || '');
+        const user = String(messages?.[1]?.content || '');
+        if (system.includes('decompose persistent user work')) {
+          launchDecomposeCalls += 1;
+          if (user.includes('TestProduct')) launchDecomposeSawOriginal = true;
+          return JSON.stringify({
+            subtasks: [
+              { title: 'Create positioning statement', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.9, reason: 'Marketing work.' },
+              { title: 'Draft launch posts', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.88, reason: 'Marketing work.' },
+              { title: 'Build landing page checklist', type: 'product', suggestedAgent: 'alex', confidence: 0.78, reason: 'Product work.' },
+            ],
+          });
+        }
+        return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Should not be called' });
+      },
+    });
+    assert(launchDecomposeCalls === 1, 'AI decomposition called once on confirmation');
+    assert(launchDecomposeSawOriginal === true, 'decomposition runs on the original user message, not "yes"');
+    assert(confirmedLaunch.kind === 'new_mission_candidate', 'confirmation creates new_mission_candidate');
+    assert(confirmedLaunch.persistence === 'create_lightweight_mission', 'confirmation persists mission');
+    assert(confirmedLaunch.missionId, 'confirmation produces mission id');
+    const confirmedMission = getMission(confirmedLaunch.missionId);
+    assert(confirmedMission?.title === 'TestProduct work' || confirmedMission?.title === 'Launch TestProduct',
+      'confirmed mission title references TestProduct');
+    assert((confirmedMission?.tasks || []).length === 3, 'AI decomposition tasks persisted on confirm');
+
+    const args = delegationArgsFromDurability(confirmedLaunch, launchMessage);
+    assert(args.missionId === confirmedLaunch.missionId, 'delegation args include mission id after confirm');
+    assert(/positioning/i.test(args.expectedOutput), 'delegation expected output includes tasks after confirm');
+
+    const routingText = delegationRoutingTextFromDurability(confirmedLaunch, launchMessage);
     assert(/marketing/.test(routingText), 'routing text includes marketing hint after decomposition');
 
+    // Explicit "create a mission" wording bypasses the ask-first flow — the
+    // user already gave consent in this turn so the mission is created
+    // immediately (with AI-decomposed tasks).
+    let explicitDecomposeCalls = 0;
+    const explicitCreate = await prepareWorkDurabilityWithAi({
+      userText: 'Please create a mission to launch ExplicitProduct with positioning, posts, and a landing page.',
+      agentId: 'main',
+      llmChat: async (messages) => {
+        const system = String(messages?.[0]?.content || '');
+        if (system.includes('decompose persistent user work')) {
+          explicitDecomposeCalls += 1;
+          return JSON.stringify({
+            subtasks: [
+              { title: 'Create positioning statement', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.9, reason: 'Marketing.' },
+              { title: 'Draft launch posts', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.88, reason: 'Marketing.' },
+            ],
+          });
+        }
+        return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Should not be called' });
+      },
+    });
+    assert(explicitDecomposeCalls === 1, 'explicit mission request triggers AI decomposition');
+    assert(explicitCreate.kind === 'new_mission_candidate', 'explicit request creates new mission');
+    assert(explicitCreate.persistence === 'create_lightweight_mission', 'explicit request persists immediately');
+    assert(explicitCreate.explicitMissionRequest === true, 'explicit request marked on decision');
+    assert(explicitCreate.missionId, 'explicit request produces mission id');
+
+    // Negated "don't create a mission" must NOT trigger explicit creation.
+    const negated = await prepareWorkDurabilityWithAi({
+      userText: "Don't create a mission, just answer me directly: what's a good positioning for TestProduct?",
+      agentId: 'main',
+      llmChat: async () => JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Direct answer.' }),
+    });
+    assert(negated.kind !== 'new_mission_candidate', 'negated explicit phrasing does not create mission');
+    assert(!negated.missionId, 'negated explicit phrasing creates no mission');
+
+    // AI classifier returning new_mission_candidate must also be downgraded to
+    // mission_suggest — chat-detected work never auto-creates.
     const messyLaunch = 'I’m launching this next week and need to get the messaging, posts, and page ready.';
     const aiDurable = await prepareWorkDurabilityWithAi({
       userText: messyLaunch,
@@ -98,13 +184,12 @@ async function main() {
         deliverables: ['Positioning', 'Launch posts', 'Landing page'],
       }),
     });
-    assert(aiDurable.classifier === 'ai', 'messy launch uses AI classifier');
-    assert(aiDurable.persistence === 'create_lightweight_mission', 'AI can create durable mission');
-    assert(aiDurable.confidence === 0.88, 'AI confidence retained');
-    assert(aiDurable.missionId, 'AI durable decision creates mission before delegation');
-    const aiMission = getMission(aiDurable.missionId);
-    assert(aiMission?.title === 'Launch TestProduct', 'AI projectName used in mission title');
-    assert((aiMission?.tasks || []).length === 3, 'AI deliverables become tasks');
+    assert(aiDurable.classifier === 'ai', 'messy launch still uses AI classifier');
+    assert(aiDurable.kind === 'mission_suggest', 'AI-classified new mission becomes mission_suggest');
+    assert(aiDurable.persistence === 'none', 'AI-classified mission_suggest does not persist');
+    assert(!aiDurable.missionId, 'AI-classified mission_suggest creates no mission yet');
+    assert(aiDurable.confidence === 0.88, 'AI confidence retained on mission_suggest');
+    assert(Array.isArray(aiDurable.tasks) && aiDurable.tasks.length === 3, 'AI deliverables surfaced as proposed tasks');
 
     // ── Known-project three-tier tests ────────────────────────────────────────
     // Use separate project names per tier so earlier mission creation doesn't
@@ -115,14 +200,16 @@ async function main() {
     createProject({ name: 'gammaapp', url: 'https://gamma.example.com' });
 
     // TIER 1 — HIGH confidence: project + explicit multi-deliverable list
-    // → auto-create mission, skip AI durability classifier entirely.
+    // → mission_suggest (ask first), no auto-create, no AI decomposition yet.
     let highTierLlmCalls = 0;
+    let highTierDecomposeCalls = 0;
     const highTierResult = await prepareWorkDurabilityWithAi({
       userText: 'for alphapp I need:\n1. a new onboarding flow\n2. updated signup copy\n3. analytics tracking',
       agentId: 'main',
       llmChat: async (messages) => {
         const system = String(messages?.[0]?.content || '');
         if (system.includes('decompose persistent user work')) {
+          highTierDecomposeCalls += 1;
           return JSON.stringify({ subtasks: [{ title: 'Redesign onboarding flow', type: 'product', suggestedAgent: 'alex', confidence: 0.85, reason: 'Product work.' }] });
         }
         highTierLlmCalls += 1;
@@ -130,11 +217,12 @@ async function main() {
       },
     });
     assert(highTierLlmCalls === 0, 'high-confidence known-project skips AI durability classifier');
-    assert(highTierResult.kind === 'new_mission_candidate', 'high-confidence creates new mission');
-    assert(highTierResult.persistence === 'create_lightweight_mission', 'high-confidence persistence correct');
+    assert(highTierDecomposeCalls === 0, 'high-confidence does not decompose until user confirms');
+    assert(highTierResult.kind === 'mission_suggest', 'high-confidence returns mission_suggest, not auto-create');
+    assert(highTierResult.persistence === 'none', 'high-confidence does NOT auto-persist');
     assert(highTierResult.projectName === 'alphapp', 'high-confidence project name captured');
-    assert(highTierResult.missionId, 'high-confidence mission created before delegation');
-    assert(highTierResult.decomposition === 'ai-constrained', 'high-confidence uses AI decomposition for tasks');
+    assert(!highTierResult.missionId, 'high-confidence does not create mission before confirmation');
+    assert(Array.isArray(highTierResult.tasks) && highTierResult.tasks.length >= 3, 'high-confidence carries deterministic tasks for confirmation prompt');
 
     // TIER 2 — MEDIUM confidence: project + action verb but no deliverables
     // → mission_suggest, agent asks confirmation, no mission created yet.
