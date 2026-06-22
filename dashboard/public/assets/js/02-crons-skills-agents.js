@@ -2164,7 +2164,7 @@ function renderSystemCronVariant(row) {
     var activeTestGroup = 'all';
     var activeStatusFilter = 'all';
     var activeSearchQuery = '';
-    var activeDetailTab = 'cases';
+    var activeCaseIdx = null;
     var testRunBusy = false;
     var TEST_GROUP_ORDER = [
       'Core Skills',
@@ -2224,15 +2224,6 @@ function renderSystemCronVariant(row) {
       'update-build': 'Utilities & Infra',
     };
 
-    var TEST_GROUP_SHORT = {
-      'Core Skills': 'core',
-      'Agent-to-Agent': 'agent-to-agent',
-      'User Skills': 'user',
-      'Memory & Workspace': 'memory',
-      'Utilities & Infra': 'utilities',
-      'Other Tests': 'other',
-    };
-
     function getTestGroupName(testId) {
       return TEST_GROUP_BY_ID[testId] || 'Other Tests';
     }
@@ -2256,44 +2247,25 @@ function renderSystemCronVariant(row) {
         var q = activeSearchQuery.toLowerCase();
         filtered = filtered.filter(function (t) { return (t.name || t.id).toLowerCase().indexOf(q) >= 0; });
       }
-      if (activeStatusFilter === 'pass') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === true; });
-      else if (activeStatusFilter === 'fail') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === false; });
+      if (activeStatusFilter === 'fail') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === false; });
       else if (activeStatusFilter === 'notrun') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === undefined; });
       return filtered;
     }
 
-    function renderSummaryBar(tests) {
-      var el = document.getElementById('test-summary-bar');
+    function updateRunSummary() {
+      var el = document.getElementById('test-run-summary');
       if (!el) return;
-      var groups = groupTestsByCategory(tests);
+      var tests = testListCache;
       var done = tests.filter(function (t) { return testStatusMap[t.id] !== undefined; });
+      if (!done.length) { el.className = 'test-run-summary'; return; }
       var passed = done.filter(function (t) { return !!testStatusMap[t.id]; }).length;
       var failed = done.filter(function (t) { return !testStatusMap[t.id]; }).length;
       var notRun = tests.length - done.length;
-      var html = '<div class="test-summary-cats">';
-      html += '<button class="test-cat-chip' + (activeTestGroup === 'all' ? ' active' : '') + '" data-test-group="all">' + tests.length + ' tests</button>';
-      groups.forEach(function (g) {
-        var short = TEST_GROUP_SHORT[g.name] || g.name.toLowerCase();
-        html += '<button class="test-cat-chip' + (activeTestGroup === g.name ? ' active' : '') + '" data-test-group="' + escapeHtml(g.name) + '">' + g.tests.length + ' ' + escapeHtml(short) + '</button>';
-      });
-      html += '</div>';
-      if (done.length > 0) {
-        html += '<div class="test-summary-status">';
-        html += '<span class="test-summary-pass">Passed ' + passed + '</span>';
-        html += '<span style="color:var(--muted)"> · </span>';
-        html += '<span class="test-summary-fail">Failed ' + failed + '</span>';
-        html += '<span style="color:var(--muted)"> · </span>';
-        html += '<span class="test-summary-notrun">Not run ' + notRun + '</span>';
-        html += '</div>';
-      }
-      el.innerHTML = html;
-      el.querySelectorAll('.test-cat-chip').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          activeTestGroup = btn.getAttribute('data-test-group') || 'all';
-          renderSummaryBar(testListCache);
-          refreshTestSidebar();
-        });
-      });
+      el.innerHTML = tests.length + ' tests · ' +
+        '<span class="s-pass">' + passed + ' passed</span> · ' +
+        '<span class="s-fail">' + failed + ' failed</span> · ' +
+        notRun + ' not run';
+      el.className = 'test-run-summary visible';
     }
 
     function getStatusIcon(testId) {
@@ -2317,10 +2289,7 @@ function renderSystemCronVariant(row) {
             '</div>';
         }).join('');
         return '<div class="test-sidebar-group">' +
-          '<div class="test-sidebar-group-title">' +
-            escapeHtml(group.name) +
-            '<span class="test-sidebar-group-count">' + group.tests.length + '</span>' +
-          '</div>' +
+          '<div class="test-sidebar-group-title">' + escapeHtml(group.name) + '</div>' +
           groupItems +
           '</div>';
       }).join('');
@@ -2363,65 +2332,128 @@ function renderSystemCronVariant(row) {
       if (runSkill) runSkill.disabled = busy;
     }
 
-    function renderCasesTab(testId, messages) {
-      if (!messages || !messages.length) {
-        return '<div class="test-results-empty">No test cases defined.<br>Run the test or check the test definition file.</div>';
+    function countCases(inputs) {
+      if (!inputs) return 0;
+      return inputs.reduce(function (n, g) { return n + (g.messages || []).length; }, 0);
+    }
+
+    function getCaseAt(inputs, idx) {
+      var n = 0;
+      for (var gi = 0; gi < inputs.length; gi++) {
+        var msgs = inputs[gi].messages || [];
+        for (var mi = 0; mi < msgs.length; mi++) {
+          if (n === idx) return { name: inputs[gi].group || null, input: msgs[mi] };
+          n++;
+        }
       }
-      var result = testRawResults[testId];
-      var parsed = result ? parseTestOutput(result) : null;
-      var html = '';
-      var caseNum = 0;
-      messages.forEach(function (g) {
-        var groupLabel = g.group || '';
-        (g.messages || []).forEach(function (m) {
-          caseNum++;
-          var caseName = groupLabel || ('Input ' + caseNum);
-          var parsedEntry = parsed && parsed.entries[caseNum - 1];
-          var statusHtml = '';
-          if (parsedEntry) {
-            statusHtml = parsedEntry.pass
-              ? '<span class="test-status-icon pass" style="font-size:0.75rem;">✓ Passed</span>'
-              : '<span class="test-status-icon fail" style="font-size:0.75rem;">✕ Failed</span>';
-          }
-          html += '<div class="test-case-item">';
-          html += '<div class="test-case-header">';
-          html += '<span class="test-case-number">Case ' + caseNum + '</span>';
-          html += '<span class="test-case-name">' + escapeHtml(caseName) + '</span>';
-          if (statusHtml) html += '<span class="test-case-status">' + statusHtml + '</span>';
-          html += '</div>';
-          html += '<div class="test-case-field"><div class="test-case-field-label">Input</div><div class="test-case-field-value">' + escapeHtml(m) + '</div></div>';
-          if (parsedEntry) {
-            var outputText = parsedEntry.output || parsedEntry.reply;
-            if (outputText) {
-              var valClass = parsedEntry.pass ? 'actual-pass' : 'actual-fail';
-              html += '<div class="test-case-field"><div class="test-case-field-label">Actual output</div><div class="test-case-field-value ' + valClass + '">' + escapeHtml(outputText) + '</div></div>';
-            }
-            if (parsedEntry.judge) {
-              html += '<div class="test-case-field"><div class="test-case-field-label">Detail</div><div class="test-case-field-value">' + escapeHtml(parsedEntry.judge) + '</div></div>';
-            }
-            if (parsedEntry.skillsCalled) {
-              html += '<div class="test-case-toolcalls">Tool calls: ' + escapeHtml(parsedEntry.skillsCalled) + '</div>';
-            }
-          } else {
-            html += '<div class="test-case-field"><div class="test-case-field-label">Expected</div><div class="test-case-field-value" style="color:var(--muted); font-style:italic;">Run the test to see results here</div></div>';
-          }
-          html += '</div>';
-        });
-      });
+      return null;
+    }
+
+    function buildCasesSection(testId, inputs) {
+      var parsed = testRawResults[testId] ? parseTestOutput(testRawResults[testId]) : null;
+      var html = '<div class="test-cases-section">';
+      html += '<div class="test-cases-label">Test Cases</div>';
+      if (!inputs) {
+        html += '<div style="padding:0.5rem 1rem; font-size:0.82rem; color:var(--muted);">Loading…</div>';
+      } else {
+        var total = countCases(inputs);
+        if (!total) {
+          html += '<div style="padding:0.5rem 1rem; font-size:0.82rem; color:var(--muted); font-style:italic;">No test cases defined.</div>';
+        } else {
+          var idx = 0;
+          inputs.forEach(function (g) {
+            (g.messages || []).forEach(function (m) {
+              var caseName = g.group || ('Case ' + (idx + 1));
+              var entry = parsed && parsed.entries[idx];
+              var iconClass, icon;
+              if (!entry) { icon = '○'; iconClass = 'notrun'; }
+              else if (entry.pass) { icon = '●'; iconClass = 'pass'; }
+              else { icon = '●'; iconClass = 'fail'; }
+              var isActive = activeCaseIdx === idx;
+              html += '<div class="test-case-row' + (isActive ? ' active' : '') + '" data-case-idx="' + idx + '">' +
+                '<span class="test-status-icon ' + iconClass + '">' + icon + '</span>' +
+                '<span class="test-case-row-num">' + (idx + 1) + '</span>' +
+                '<span class="test-case-row-name">' + escapeHtml(caseName) + '</span>' +
+                '</div>';
+              idx++;
+            });
+          });
+        }
+      }
+      html += '</div>';
       return html;
     }
 
-    function renderResultsTab(testId) {
-      if (!testRawResults[testId]) {
-        return '<div class="test-results-empty">No results yet.<br>Press <strong>Run test</strong> to execute and see output here.</div>';
+    function buildCaseDetail(testId, idx) {
+      var inputs = testInputsCache[testId];
+      if (!inputs || idx == null) return '';
+      var c = getCaseAt(inputs, idx);
+      if (!c) return '';
+      var parsed = testRawResults[testId] ? parseTestOutput(testRawResults[testId]) : null;
+      var entry = parsed && parsed.entries[idx];
+      var caseName = c.name || ('Case ' + (idx + 1));
+
+      var html = '<div class="test-case-detail-inner">';
+      html += '<div class="test-case-detail-heading">Case ' + (idx + 1) + ' \u2014 ' + escapeHtml(caseName) + '</div>';
+
+      html += '<div class="test-case-field"><div class="test-case-field-label">Input</div>' +
+        '<div class="test-case-field-value">' + escapeHtml(c.input) + '</div></div>';
+
+      if (entry) {
+        var statusText = entry.pass ? '✓ Passed' : '✕ Failed';
+        var barClass = entry.pass ? 'pass' : 'fail';
+        if (entry.durationMs) statusText += ' · ' + (entry.durationMs / 1000).toFixed(1) + ' s';
+        html += '<div class="test-case-result-bar ' + barClass + '">' + escapeHtml(statusText) + '</div>';
+        var outputText = entry.output || entry.reply;
+        if (outputText) {
+          html += '<div class="test-case-field"><div class="test-case-field-label">Actual response</div>' +
+            '<div class="test-case-field-value ' + (entry.pass ? 'actual-pass' : 'actual-fail') + '">' + escapeHtml(outputText) + '</div></div>';
+        }
+        if (entry.skillsCalled) {
+          html += '<div class="test-case-field"><div class="test-case-field-label">Tool calls</div>' +
+            '<div class="test-case-field-value">' + escapeHtml(entry.skillsCalled) + '</div></div>';
+        }
+        if (entry.judge) {
+          html += '<div class="test-case-field"><div class="test-case-field-label">Detail</div>' +
+            '<div class="test-case-field-value">' + escapeHtml(entry.judge) + '</div></div>';
+        }
+        html += '<div class="test-case-detail-actions">' +
+          '<button type="button" class="test-run-case-btn" style="font-size:0.78rem;">Run again</button>' +
+          '</div>';
+      } else {
+        html += '<div class="test-case-result-bar notrun">Not run yet</div>';
+        html += '<div class="test-case-detail-actions">' +
+          '<button type="button" class="test-run-case-btn" style="font-size:0.78rem;">Run test</button>' +
+          '</div>';
       }
-      var parsed = parseTestOutput(testRawResults[testId]);
-      return renderOutputResults(parsed, escapeHtml);
+      html += '</div>';
+      return html;
     }
 
-    function renderConfigTab(testId) {
+    function selectCase(testId, idx) {
+      activeCaseIdx = idx;
+      document.querySelectorAll('.test-case-row').forEach(function (row) {
+        row.classList.toggle('active', parseInt(row.getAttribute('data-case-idx'), 10) === idx);
+      });
+      var detailEl = document.getElementById('test-case-detail');
+      if (detailEl) {
+        detailEl.innerHTML = buildCaseDetail(testId, idx);
+        var btn = detailEl.querySelector('.test-run-case-btn');
+        if (btn) btn.addEventListener('click', function () { runTest(testId); });
+      }
+    }
+
+    function bindCaseRowHandlers(testId) {
+      document.querySelectorAll('.test-case-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+          selectCase(testId, parseInt(row.getAttribute('data-case-idx'), 10));
+        });
+      });
+    }
+
+    function buildConfigFields(testId) {
       var test = testListCache.find(function (t) { return t.id === testId; });
-      if (!test) return '<div class="test-results-empty">No configuration available.</div>';
+      if (!test) return '';
       var fields = [];
       if (test.agent) fields.push(['Agent', test.agent]);
       if (test.model) fields.push(['Model', test.model]);
@@ -2429,20 +2461,11 @@ function renderSystemCronVariant(row) {
       if (test.timeout) fields.push(['Timeout', test.timeout + 'ms']);
       if (test.fixture) fields.push(['Fixture', test.fixture]);
       if (test.env) fields.push(['Environment', JSON.stringify(test.env)]);
-      if (!fields.length) return '<div class="test-results-empty">No configuration details available for this test.</div>';
-      var html = '';
-      fields.forEach(function (f) {
-        html += '<div class="test-case-field"><div class="test-case-field-label">' + escapeHtml(f[0]) + '</div>' +
+      if (!fields.length) return '<div style="color:var(--muted); font-size:0.82rem; font-style:italic;">No configuration details available.</div>';
+      return fields.map(function (f) {
+        return '<div class="test-case-field"><div class="test-case-field-label">' + escapeHtml(f[0]) + '</div>' +
           '<div class="test-case-field-value">' + escapeHtml(String(f[1])) + '</div></div>';
-      });
-      return html;
-    }
-
-    function getTabContent(testId, tab, inputs) {
-      if (tab === 'cases') return renderCasesTab(testId, inputs);
-      if (tab === 'results') return renderResultsTab(testId);
-      if (tab === 'config') return renderConfigTab(testId);
-      return '';
+      }).join('');
     }
 
     function updateSidebarStatus(testId, passed) {
@@ -2455,14 +2478,14 @@ function renderSystemCronVariant(row) {
           icon.textContent = passed ? '✓' : '✕';
         }
       }
-      renderSummaryBar(testListCache);
+      updateRunSummary();
     }
 
     function showTestDetail(testId) {
       activeTestId = testId;
+      activeCaseIdx = null;
       document.querySelectorAll('.test-sidebar-item').forEach(function (el) {
-        var isActive = el.getAttribute('data-test-id') === testId;
-        el.classList.toggle('active', isActive);
+        el.classList.toggle('active', el.getAttribute('data-test-id') === testId);
       });
 
       var detailArea = document.getElementById('test-detail-area');
@@ -2471,42 +2494,46 @@ function renderSystemCronVariant(row) {
       var test = testListCache.find(function (t) { return t.id === testId; }) || { id: testId, name: testId };
       var groupName = getTestGroupName(testId);
       var inputs = testInputsCache[testId];
-      var caseCount = inputs ? inputs.reduce(function (n, g) { return n + (g.messages || []).length; }, 0) : 0;
+      var caseCount = countCases(inputs);
+      var testName = test.name || testId;
       var metaParts = [groupName];
       if (caseCount > 0) metaParts.push(caseCount + ' case' + (caseCount !== 1 ? 's' : ''));
-      var testName = test.name || testId;
 
       var html = '<div class="test-detail-header">';
       html += '<div class="test-detail-title-area">';
       html += '<div class="test-detail-name">' + escapeHtml(testName) + '</div>';
-      html += '<div class="test-detail-meta">' + escapeHtml(metaParts.join(' · ')) + '</div>';
+      html += '<div class="test-detail-meta" id="test-detail-meta">' + escapeHtml(metaParts.join(' · ')) + '</div>';
       html += '</div>';
       html += '<div class="test-detail-actions">';
       html += '<button type="button" id="test-run-skill" style="font-size:0.8rem;"' + (testRunBusy ? ' disabled' : '') + '>Run test</button>';
+      html += '<button type="button" id="test-settings-btn" style="font-size:0.8rem;">Settings</button>';
       html += '</div>';
       html += '</div>';
-      html += '<div class="test-detail-tabs">';
-      [['cases', 'Cases'], ['results', 'Results'], ['config', 'Configuration']].forEach(function (pair) {
-        html += '<button class="test-tab' + (activeDetailTab === pair[0] ? ' active' : '') + '" data-tab="' + pair[0] + '">' + pair[1] + '</button>';
-      });
+      html += '<div class="test-detail-scroll" id="test-detail-scroll">';
+      html += buildCasesSection(testId, inputs);
+      html += '<div id="test-case-detail" class="test-case-detail"></div>';
       html += '</div>';
-      html += '<div class="test-tab-body" id="test-tab-body">' + getTabContent(testId, activeDetailTab, inputs) + '</div>';
 
       detailArea.innerHTML = html;
 
       var runBtn = document.getElementById('test-run-skill');
-      if (runBtn) {
-        runBtn.addEventListener('click', function () { runTest(testId); });
+      if (runBtn) runBtn.addEventListener('click', function () { runTest(testId); });
+
+      var settingsBtn = document.getElementById('test-settings-btn');
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', function () {
+          var existing = document.getElementById('test-settings-panel');
+          if (existing) { existing.remove(); return; }
+          var panel = document.createElement('div');
+          panel.id = 'test-settings-panel';
+          panel.className = 'test-settings-panel';
+          panel.innerHTML = '<div class="test-settings-panel-title">Configuration</div>' + buildConfigFields(testId);
+          var header = detailArea.querySelector('.test-detail-header');
+          if (header) header.insertAdjacentElement('afterend', panel);
+        });
       }
 
-      detailArea.querySelectorAll('.test-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-          activeDetailTab = tab.getAttribute('data-tab');
-          detailArea.querySelectorAll('.test-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
-          var body = document.getElementById('test-tab-body');
-          if (body) body.innerHTML = getTabContent(testId, activeDetailTab, testInputsCache[testId]);
-        });
-      });
+      bindCaseRowHandlers(testId);
 
       if (!inputs) {
         fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId))
@@ -2514,14 +2541,15 @@ function renderSystemCronVariant(row) {
           .then(function (d) {
             testInputsCache[testId] = d.messages || [];
             if (activeTestId !== testId) return;
-            var body = document.getElementById('test-tab-body');
-            if (body && activeDetailTab === 'cases') {
-              body.innerHTML = getTabContent(testId, 'cases', testInputsCache[testId]);
+            var scroll = document.getElementById('test-detail-scroll');
+            if (scroll) {
+              var section = scroll.querySelector('.test-cases-section');
+              if (section) section.outerHTML = buildCasesSection(testId, testInputsCache[testId]);
+              bindCaseRowHandlers(testId);
             }
-            var metaEl = detailArea.querySelector('.test-detail-meta');
+            var metaEl = document.getElementById('test-detail-meta');
             if (metaEl) {
-              var msgs = testInputsCache[testId];
-              var count = msgs.reduce(function (n, g) { return n + (g.messages || []).length; }, 0);
+              var count = countCases(testInputsCache[testId]);
               var parts = [groupName];
               if (count > 0) parts.push(count + ' case' + (count !== 1 ? 's' : ''));
               metaEl.textContent = parts.join(' · ');
@@ -2536,7 +2564,6 @@ function renderSystemCronVariant(row) {
         var r = await fetch(API + '/api/tests');
         var d = await r.json();
         testListCache = d.tests || [];
-        renderSummaryBar(testListCache);
         refreshTestSidebar();
       } catch (e) {
         var sidebar = document.getElementById('test-sidebar');
@@ -2548,8 +2575,15 @@ function renderSystemCronVariant(row) {
       testRawResults[testId] = result;
       updateSidebarStatus(testId, passed);
       if (activeTestId === testId) {
-        var body = document.getElementById('test-tab-body');
-        if (body) body.innerHTML = getTabContent(testId, activeDetailTab, testInputsCache[testId]);
+        // Refresh case rows to update status icons
+        var scroll = document.getElementById('test-detail-scroll');
+        if (scroll) {
+          var section = scroll.querySelector('.test-cases-section');
+          if (section) section.outerHTML = buildCasesSection(testId, testInputsCache[testId]);
+          bindCaseRowHandlers(testId);
+          // Re-select case if one was open
+          if (activeCaseIdx !== null) selectCase(testId, activeCaseIdx);
+        }
       }
     }
 

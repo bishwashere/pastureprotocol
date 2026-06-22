@@ -1,20 +1,21 @@
 <div id="page-test" class="page">
   <div class="card" style="padding:0; overflow:hidden;">
     <div class="test-page-header">
-      <h2 style="margin:0; font-size:1rem;">Skill Tests</h2>
+      <div>
+        <h2 style="margin:0; font-size:1rem;">Skill Tests</h2>
+        <div id="test-run-summary" class="test-run-summary"></div>
+      </div>
       <div style="display:flex; gap:0.5rem; align-items:center;">
         <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
         <button type="button" id="test-run-all" style="font-size:0.8rem;">Run all</button>
       </div>
     </div>
-    <div id="test-summary-bar" class="test-summary-bar"></div>
     <div class="test-master-detail">
       <div class="test-sidebar-wrap">
         <div class="test-sidebar-controls">
           <input type="search" id="test-search" class="test-search" placeholder="Search tests…">
           <div id="test-status-filter" class="test-status-filter">
             <button class="test-filter-btn active" data-filter="all">All</button>
-            <button class="test-filter-btn" data-filter="pass">Passed</button>
             <button class="test-filter-btn" data-filter="fail">Failed</button>
             <button class="test-filter-btn" data-filter="notrun">Not run</button>
           </div>
