@@ -2162,6 +2162,9 @@ function renderSystemCronVariant(row) {
     var testListCache = [];
     var activeTestId = null;
     var activeTestGroup = 'all';
+    var activeStatusFilter = 'all';
+    var activeSearchQuery = '';
+    var activeDetailTab = 'cases';
     var testRunBusy = false;
     var TEST_GROUP_ORDER = [
       'Core Skills',
@@ -2221,12 +2224,14 @@ function renderSystemCronVariant(row) {
       'update-build': 'Utilities & Infra',
     };
 
-    function updateTestRunSkillButton() {
-      var btn = document.getElementById('test-run-skill');
-      if (!btn) return;
-      btn.disabled = testRunBusy || !activeTestId;
-      btn.textContent = activeTestId ? ('Run ' + activeTestId) : 'Run skill';
-    }
+    var TEST_GROUP_SHORT = {
+      'Core Skills': 'core',
+      'Agent-to-Agent': 'agent-to-agent',
+      'User Skills': 'user',
+      'Memory & Workspace': 'memory',
+      'Utilities & Infra': 'utilities',
+      'Other Tests': 'other',
+    };
 
     function getTestGroupName(testId) {
       return TEST_GROUP_BY_ID[testId] || 'Other Tests';
@@ -2246,70 +2251,76 @@ function renderSystemCronVariant(row) {
     }
 
     function getVisibleTests(tests) {
-      if (activeTestGroup === 'all') return tests.slice();
-      return tests.filter(function (t) { return getTestGroupName(t.id) === activeTestGroup; });
+      var filtered = activeTestGroup === 'all' ? tests.slice() : tests.filter(function (t) { return getTestGroupName(t.id) === activeTestGroup; });
+      if (activeSearchQuery) {
+        var q = activeSearchQuery.toLowerCase();
+        filtered = filtered.filter(function (t) { return (t.name || t.id).toLowerCase().indexOf(q) >= 0; });
+      }
+      if (activeStatusFilter === 'pass') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === true; });
+      else if (activeStatusFilter === 'fail') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === false; });
+      else if (activeStatusFilter === 'notrun') filtered = filtered.filter(function (t) { return testStatusMap[t.id] === undefined; });
+      return filtered;
     }
 
-    function groupTileStatusText(tests) {
-      if (!tests.length) return 'No tests';
-      var done = tests.filter(function (t) { return testStatusMap[t.id] !== undefined; });
-      if (!done.length) return 'Not run yet';
-      var pass = done.filter(function (t) { return !!testStatusMap[t.id]; }).length;
-      var fail = done.length - pass;
-      if (!fail) return pass + '/' + done.length + ' passed';
-      if (!pass) return fail + '/' + done.length + ' failed';
-      return pass + ' pass · ' + fail + ' fail';
-    }
-
-    function renderOverviewTiles(tests) {
-      var el = document.getElementById('test-overview-tiles');
+    function renderSummaryBar(tests) {
+      var el = document.getElementById('test-summary-bar');
       if (!el) return;
       var groups = groupTestsByCategory(tests);
-      var allStatus = groupTileStatusText(tests);
-      var tiles = [
-        '<button type="button" class="test-overview-tile' + (activeTestGroup === 'all' ? ' active' : '') + '" data-test-group="all">' +
-          '<span class="test-overview-tile-title">All Tests</span>' +
-          '<span class="test-overview-tile-count">' + tests.length + '</span>' +
-          '<span class="test-overview-tile-status">' + escapeHtml(allStatus) + '</span>' +
-        '</button>',
-      ];
-      groups.forEach(function (group) {
-        tiles.push(
-          '<button type="button" class="test-overview-tile' + (activeTestGroup === group.name ? ' active' : '') + '" data-test-group="' + escapeHtml(group.name) + '">' +
-            '<span class="test-overview-tile-title">' + escapeHtml(group.name) + '</span>' +
-            '<span class="test-overview-tile-count">' + group.tests.length + '</span>' +
-            '<span class="test-overview-tile-status">' + escapeHtml(groupTileStatusText(group.tests)) + '</span>' +
-          '</button>',
-        );
+      var done = tests.filter(function (t) { return testStatusMap[t.id] !== undefined; });
+      var passed = done.filter(function (t) { return !!testStatusMap[t.id]; }).length;
+      var failed = done.filter(function (t) { return !testStatusMap[t.id]; }).length;
+      var notRun = tests.length - done.length;
+      var html = '<div class="test-summary-cats">';
+      html += '<button class="test-cat-chip' + (activeTestGroup === 'all' ? ' active' : '') + '" data-test-group="all">' + tests.length + ' tests</button>';
+      groups.forEach(function (g) {
+        var short = TEST_GROUP_SHORT[g.name] || g.name.toLowerCase();
+        html += '<button class="test-cat-chip' + (activeTestGroup === g.name ? ' active' : '') + '" data-test-group="' + escapeHtml(g.name) + '">' + g.tests.length + ' ' + escapeHtml(short) + '</button>';
       });
-      el.innerHTML = tiles.join('');
-      el.querySelectorAll('.test-overview-tile').forEach(function (btn) {
+      html += '</div>';
+      if (done.length > 0) {
+        html += '<div class="test-summary-status">';
+        html += '<span class="test-summary-pass">Passed ' + passed + '</span>';
+        html += '<span style="color:var(--muted)"> · </span>';
+        html += '<span class="test-summary-fail">Failed ' + failed + '</span>';
+        html += '<span style="color:var(--muted)"> · </span>';
+        html += '<span class="test-summary-notrun">Not run ' + notRun + '</span>';
+        html += '</div>';
+      }
+      el.innerHTML = html;
+      el.querySelectorAll('.test-cat-chip').forEach(function (btn) {
         btn.addEventListener('click', function () {
           activeTestGroup = btn.getAttribute('data-test-group') || 'all';
-          renderOverviewTiles(testListCache);
+          renderSummaryBar(testListCache);
           refreshTestSidebar();
         });
       });
     }
 
+    function getStatusIcon(testId) {
+      if (testStatusMap[testId] === undefined) return '<span class="test-status-icon notrun">○</span>';
+      return testStatusMap[testId]
+        ? '<span class="test-status-icon pass">✓</span>'
+        : '<span class="test-status-icon fail">✕</span>';
+    }
+
     function renderTestSidebarHtml(tests) {
-      return groupTestsByCategory(getVisibleTests(tests)).map(function (group) {
+      var visible = getVisibleTests(tests);
+      if (!visible.length) return '<p class="skill-meta" style="padding:0.65rem 0.75rem; margin:0; font-style:italic;">No tests match.</p>';
+      return groupTestsByCategory(visible).map(function (group) {
         var groupItems = group.tests.map(function (t) {
           var tid = escapeHtml(t.id);
-          var name = escapeHtml(t.name);
-          var statusHtml = '';
-          if (testStatusMap[t.id] !== undefined) {
-            var p = testStatusMap[t.id];
-            statusHtml = '<span class="test-sidebar-status ' + (p ? 'pass' : 'fail') + '">' + (p ? 'PASS' : 'FAIL') + '</span>';
-          }
-          return '<div class="test-sidebar-item" data-test-id="' + tid + '">' +
-            '<span class="test-sidebar-name">' + name + '</span>' +
-            '<button type="button" class="test-run-one" data-test-id="' + tid + '" style="font-size:0.75rem; padding:0.15rem 0.45rem;">Run</button>' +
-            statusHtml +
+          var name = escapeHtml(t.name || t.id);
+          return '<div class="test-sidebar-item' + (t.id === activeTestId ? ' active' : '') + '" data-test-id="' + tid + '">' +
+            getStatusIcon(t.id) +
+            '<span class="test-sidebar-name" title="' + name + '">' + name + '</span>' +
+            '<button type="button" class="test-run-hover" data-test-id="' + tid + '" title="Run ' + name + '">▶</button>' +
             '</div>';
         }).join('');
         return '<div class="test-sidebar-group">' +
-          '<div class="test-sidebar-group-title">' + escapeHtml(group.name) + '</div>' +
+          '<div class="test-sidebar-group-title">' +
+            escapeHtml(group.name) +
+            '<span class="test-sidebar-group-count">' + group.tests.length + '</span>' +
+          '</div>' +
           groupItems +
           '</div>';
       }).join('');
@@ -2318,11 +2329,11 @@ function renderSystemCronVariant(row) {
     function bindSidebarHandlers(sidebar) {
       sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
         item.addEventListener('click', function (e) {
-          if (e.target.classList.contains('test-run-one')) return;
+          if (e.target.classList.contains('test-run-hover')) return;
           showTestDetail(item.getAttribute('data-test-id'));
         });
       });
-      sidebar.querySelectorAll('.test-run-one').forEach(function (btn) {
+      sidebar.querySelectorAll('.test-run-hover').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
           var tid = btn.getAttribute('data-test-id');
@@ -2335,87 +2346,188 @@ function renderSystemCronVariant(row) {
     function refreshTestSidebar() {
       var sidebar = document.getElementById('test-sidebar');
       if (!sidebar) return;
-      var visibleTests = getVisibleTests(testListCache);
-      if (!visibleTests.length) {
-        sidebar.innerHTML = '<p class="skill-meta" style="padding:0.65rem 0.75rem; margin:0;">No tests in this group.</p>';
-        activeTestId = null;
-        updateTestRunSkillButton();
-        return;
-      }
       sidebar.innerHTML = renderTestSidebarHtml(testListCache);
       bindSidebarHandlers(sidebar);
+      var visibleTests = getVisibleTests(testListCache);
       var visibleHasActive = visibleTests.some(function (t) { return t.id === activeTestId; });
-      var nextId = visibleHasActive ? activeTestId : visibleTests[0].id;
+      var nextId = visibleHasActive ? activeTestId : (visibleTests[0] ? visibleTests[0].id : null);
       if (nextId) showTestDetail(nextId);
     }
 
     function setTestRunBusy(busy) {
       testRunBusy = busy;
-      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = busy; });
+      document.querySelectorAll('.test-run-hover').forEach(function (b) { b.disabled = busy; });
       var runAll = document.getElementById('test-run-all');
       if (runAll) runAll.disabled = busy;
-      updateTestRunSkillButton();
+      var runSkill = document.getElementById('test-run-skill');
+      if (runSkill) runSkill.disabled = busy;
     }
 
-    function renderInputMessages(messages) {
-      if (!messages || !messages.length) return '<div class="test-detail-empty">No inputs defined</div>';
+    function renderCasesTab(testId, messages) {
+      if (!messages || !messages.length) {
+        return '<div class="test-results-empty">No test cases defined.<br>Run the test or check the test definition file.</div>';
+      }
+      var result = testRawResults[testId];
+      var parsed = result ? parseTestOutput(result) : null;
       var html = '';
+      var caseNum = 0;
       messages.forEach(function (g) {
-        html += '<div class="test-input-group">';
-        if (g.group) html += '<div class="test-input-group-title">' + escapeHtml(g.group) + '</div>';
+        var groupLabel = g.group || '';
         (g.messages || []).forEach(function (m) {
-          html += '<div class="test-input-msg">' + escapeHtml(m) + '</div>';
+          caseNum++;
+          var caseName = groupLabel || ('Input ' + caseNum);
+          var parsedEntry = parsed && parsed.entries[caseNum - 1];
+          var statusHtml = '';
+          if (parsedEntry) {
+            statusHtml = parsedEntry.pass
+              ? '<span class="test-status-icon pass" style="font-size:0.75rem;">✓ Passed</span>'
+              : '<span class="test-status-icon fail" style="font-size:0.75rem;">✕ Failed</span>';
+          }
+          html += '<div class="test-case-item">';
+          html += '<div class="test-case-header">';
+          html += '<span class="test-case-number">Case ' + caseNum + '</span>';
+          html += '<span class="test-case-name">' + escapeHtml(caseName) + '</span>';
+          if (statusHtml) html += '<span class="test-case-status">' + statusHtml + '</span>';
+          html += '</div>';
+          html += '<div class="test-case-field"><div class="test-case-field-label">Input</div><div class="test-case-field-value">' + escapeHtml(m) + '</div></div>';
+          if (parsedEntry) {
+            var outputText = parsedEntry.output || parsedEntry.reply;
+            if (outputText) {
+              var valClass = parsedEntry.pass ? 'actual-pass' : 'actual-fail';
+              html += '<div class="test-case-field"><div class="test-case-field-label">Actual output</div><div class="test-case-field-value ' + valClass + '">' + escapeHtml(outputText) + '</div></div>';
+            }
+            if (parsedEntry.judge) {
+              html += '<div class="test-case-field"><div class="test-case-field-label">Detail</div><div class="test-case-field-value">' + escapeHtml(parsedEntry.judge) + '</div></div>';
+            }
+            if (parsedEntry.skillsCalled) {
+              html += '<div class="test-case-toolcalls">Tool calls: ' + escapeHtml(parsedEntry.skillsCalled) + '</div>';
+            }
+          } else {
+            html += '<div class="test-case-field"><div class="test-case-field-label">Expected</div><div class="test-case-field-value" style="color:var(--muted); font-style:italic;">Run the test to see results here</div></div>';
+          }
+          html += '</div>';
         });
-        html += '</div>';
       });
       return html;
+    }
+
+    function renderResultsTab(testId) {
+      if (!testRawResults[testId]) {
+        return '<div class="test-results-empty">No results yet.<br>Press <strong>Run test</strong> to execute and see output here.</div>';
+      }
+      var parsed = parseTestOutput(testRawResults[testId]);
+      return renderOutputResults(parsed, escapeHtml);
+    }
+
+    function renderConfigTab(testId) {
+      var test = testListCache.find(function (t) { return t.id === testId; });
+      if (!test) return '<div class="test-results-empty">No configuration available.</div>';
+      var fields = [];
+      if (test.agent) fields.push(['Agent', test.agent]);
+      if (test.model) fields.push(['Model', test.model]);
+      if (test.skills) fields.push(['Skills', Array.isArray(test.skills) ? test.skills.join(', ') : test.skills]);
+      if (test.timeout) fields.push(['Timeout', test.timeout + 'ms']);
+      if (test.fixture) fields.push(['Fixture', test.fixture]);
+      if (test.env) fields.push(['Environment', JSON.stringify(test.env)]);
+      if (!fields.length) return '<div class="test-results-empty">No configuration details available for this test.</div>';
+      var html = '';
+      fields.forEach(function (f) {
+        html += '<div class="test-case-field"><div class="test-case-field-label">' + escapeHtml(f[0]) + '</div>' +
+          '<div class="test-case-field-value">' + escapeHtml(String(f[1])) + '</div></div>';
+      });
+      return html;
+    }
+
+    function getTabContent(testId, tab, inputs) {
+      if (tab === 'cases') return renderCasesTab(testId, inputs);
+      if (tab === 'results') return renderResultsTab(testId);
+      if (tab === 'config') return renderConfigTab(testId);
+      return '';
     }
 
     function updateSidebarStatus(testId, passed) {
       testStatusMap[testId] = passed;
       var item = document.querySelector('.test-sidebar-item[data-test-id="' + testId + '"]');
       if (item) {
-        var badge = item.querySelector('.test-sidebar-status');
-        if (!badge) {
-          badge = document.createElement('span');
-          badge.className = 'test-sidebar-status';
-          item.appendChild(badge);
+        var icon = item.querySelector('.test-status-icon');
+        if (icon) {
+          icon.className = 'test-status-icon ' + (passed ? 'pass' : 'fail');
+          icon.textContent = passed ? '✓' : '✕';
         }
-        badge.textContent = passed ? 'PASS' : 'FAIL';
-        badge.className = 'test-sidebar-status ' + (passed ? 'pass' : 'fail');
       }
-      renderOverviewTiles(testListCache);
+      renderSummaryBar(testListCache);
     }
 
     function showTestDetail(testId) {
       activeTestId = testId;
-      updateTestRunSkillButton();
       document.querySelectorAll('.test-sidebar-item').forEach(function (el) {
-        el.classList.toggle('active', el.getAttribute('data-test-id') === testId);
+        var isActive = el.getAttribute('data-test-id') === testId;
+        el.classList.toggle('active', isActive);
       });
-      var inputEl = document.getElementById('test-detail-input');
-      var outputEl = document.getElementById('test-detail-output');
 
-      if (testInputsCache[testId]) {
-        inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
-      } else {
-        inputEl.innerHTML = '<div class="test-detail-empty">Loading…</div>';
+      var detailArea = document.getElementById('test-detail-area');
+      if (!detailArea) return;
+
+      var test = testListCache.find(function (t) { return t.id === testId; }) || { id: testId, name: testId };
+      var groupName = getTestGroupName(testId);
+      var inputs = testInputsCache[testId];
+      var caseCount = inputs ? inputs.reduce(function (n, g) { return n + (g.messages || []).length; }, 0) : 0;
+      var metaParts = [groupName];
+      if (caseCount > 0) metaParts.push(caseCount + ' case' + (caseCount !== 1 ? 's' : ''));
+      var testName = test.name || testId;
+
+      var html = '<div class="test-detail-header">';
+      html += '<div class="test-detail-title-area">';
+      html += '<div class="test-detail-name">' + escapeHtml(testName) + '</div>';
+      html += '<div class="test-detail-meta">' + escapeHtml(metaParts.join(' · ')) + '</div>';
+      html += '</div>';
+      html += '<div class="test-detail-actions">';
+      html += '<button type="button" id="test-run-skill" style="font-size:0.8rem;"' + (testRunBusy ? ' disabled' : '') + '>Run test</button>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="test-detail-tabs">';
+      [['cases', 'Cases'], ['results', 'Results'], ['config', 'Configuration']].forEach(function (pair) {
+        html += '<button class="test-tab' + (activeDetailTab === pair[0] ? ' active' : '') + '" data-tab="' + pair[0] + '">' + pair[1] + '</button>';
+      });
+      html += '</div>';
+      html += '<div class="test-tab-body" id="test-tab-body">' + getTabContent(testId, activeDetailTab, inputs) + '</div>';
+
+      detailArea.innerHTML = html;
+
+      var runBtn = document.getElementById('test-run-skill');
+      if (runBtn) {
+        runBtn.addEventListener('click', function () { runTest(testId); });
+      }
+
+      detailArea.querySelectorAll('.test-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          activeDetailTab = tab.getAttribute('data-tab');
+          detailArea.querySelectorAll('.test-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
+          var body = document.getElementById('test-tab-body');
+          if (body) body.innerHTML = getTabContent(testId, activeDetailTab, testInputsCache[testId]);
+        });
+      });
+
+      if (!inputs) {
         fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId))
           .then(function (r) { return r.json(); })
           .then(function (d) {
             testInputsCache[testId] = d.messages || [];
-            if (activeTestId === testId) inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
+            if (activeTestId !== testId) return;
+            var body = document.getElementById('test-tab-body');
+            if (body && activeDetailTab === 'cases') {
+              body.innerHTML = getTabContent(testId, 'cases', testInputsCache[testId]);
+            }
+            var metaEl = detailArea.querySelector('.test-detail-meta');
+            if (metaEl) {
+              var msgs = testInputsCache[testId];
+              var count = msgs.reduce(function (n, g) { return n + (g.messages || []).length; }, 0);
+              var parts = [groupName];
+              if (count > 0) parts.push(count + ' case' + (count !== 1 ? 's' : ''));
+              metaEl.textContent = parts.join(' · ');
+            }
           })
-          .catch(function () {
-            if (activeTestId === testId) inputEl.innerHTML = '<div class="test-detail-empty">Failed to load inputs</div>';
-          });
-      }
-
-      if (testRawResults[testId]) {
-        var parsed = parseTestOutput(testRawResults[testId]);
-        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
-      } else {
-        outputEl.innerHTML = '<div class="test-detail-empty">No output yet. Run the test.</div>';
+          .catch(function () {});
       }
     }
 
@@ -2424,10 +2536,11 @@ function renderSystemCronVariant(row) {
         var r = await fetch(API + '/api/tests');
         var d = await r.json();
         testListCache = d.tests || [];
-        renderOverviewTiles(testListCache);
+        renderSummaryBar(testListCache);
         refreshTestSidebar();
       } catch (e) {
-        document.getElementById('test-sidebar').innerHTML = '<p class="error" style="padding:0.5rem;">Failed to load tests.</p>';
+        var sidebar = document.getElementById('test-sidebar');
+        if (sidebar) sidebar.innerHTML = '<p class="error" style="padding:0.5rem;">Failed to load tests.</p>';
       }
     }
 
@@ -2435,15 +2548,14 @@ function renderSystemCronVariant(row) {
       testRawResults[testId] = result;
       updateSidebarStatus(testId, passed);
       if (activeTestId === testId) {
-        var outputEl = document.getElementById('test-detail-output');
-        var parsed = parseTestOutput(result);
-        outputEl.innerHTML = renderOutputResults(parsed, escapeHtml);
+        var body = document.getElementById('test-tab-body');
+        if (body) body.innerHTML = getTabContent(testId, activeDetailTab, testInputsCache[testId]);
       }
     }
 
     async function runTest(id) {
       var statusEl = document.getElementById('test-run-status');
-      statusEl.textContent = 'Running ' + id + '…';
+      if (statusEl) statusEl.textContent = 'Running ' + id + '…';
       setTestRunBusy(true);
       try {
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: id }) });
@@ -2453,18 +2565,18 @@ function renderSystemCronVariant(row) {
           var passed = results[0].exitCode === 0;
           setTestOutput(id, results[0], passed);
         }
-        statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
+        if (statusEl) statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
       } catch (e) {
         var err = 'Error: ' + (e.message || 'Request failed');
         setTestOutput(id, { stdout: err, stderr: '', exitCode: 1, durationMs: 0 }, false);
-        statusEl.textContent = err;
+        if (statusEl) statusEl.textContent = err;
       }
       setTestRunBusy(false);
     }
 
     async function runAllTests() {
       var statusEl = document.getElementById('test-run-status');
-      statusEl.textContent = 'Running all tests…';
+      if (statusEl) statusEl.textContent = 'Running all tests…';
       setTestRunBusy(true);
       try {
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
@@ -2473,18 +2585,33 @@ function renderSystemCronVariant(row) {
         results.forEach(function (x) {
           setTestOutput(x.testId, x, x.exitCode === 0);
         });
-        var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
-        statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
+        var passedCount = results.filter(function (x) { return x.exitCode === 0; }).length;
+        if (statusEl) statusEl.textContent = 'Done: ' + passedCount + '/' + results.length + ' passed.';
       } catch (e) {
-        statusEl.textContent = 'Error: ' + (e.message || '');
+        if (statusEl) statusEl.textContent = 'Error: ' + (e.message || '');
       }
       setTestRunBusy(false);
     }
 
-    wireEl('test-run-skill', 'click', function () {
-      if (activeTestId) runTest(activeTestId);
-    });
     wireEl('test-run-all', 'click', function () { runAllTests(); });
+
+    var testSearchInput = document.getElementById('test-search');
+    if (testSearchInput) {
+      testSearchInput.addEventListener('input', function () {
+        activeSearchQuery = testSearchInput.value.trim();
+        refreshTestSidebar();
+      });
+    }
+
+    document.querySelectorAll('.test-filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeStatusFilter = btn.getAttribute('data-filter') || 'all';
+        document.querySelectorAll('.test-filter-btn').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+        refreshTestSidebar();
+      });
+    });
 
     var selectedMemoryFileId = null;
     var selectedMemoryFileReadOnly = false;
