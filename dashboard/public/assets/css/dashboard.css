@@ -2090,6 +2090,25 @@
     .chat-input-area textarea { flex: 1; min-height: 2.5rem; max-height: 8rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: inherit; font-size: 0.76rem; resize: none; }
     .chat-input-area textarea:focus { outline: none; border-color: var(--accent); }
     .chat-input-area button { flex-shrink: 0; }
+    .chat-mic-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .chat-mic-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .chat-mic-btn--recording { color: var(--red); border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); animation: chat-mic-pulse 1s ease-in-out infinite; }
+    .chat-mic-btn--transcribing { color: var(--muted); opacity: 0.6; cursor: not-allowed; }
+    @keyframes chat-mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     #chat-send.chat-btn-stop {
       background: var(--red);
       color: #fff;

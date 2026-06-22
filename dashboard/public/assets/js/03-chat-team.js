@@ -39,6 +39,7 @@
     var chatStreamActive = false;
     var chatAbortController = null;
     var currentSessionId = null;
+    var chatLastInputWasVoice = false;
 
     function newSessionId() { return 'cs-' + Date.now(); }
 
@@ -5923,11 +5924,128 @@
       return (st ? st + '\n\n' : '') + 'Stopped.';
     }
 
+    function speakChatReply(text) {
+      if (!text || !window.speechSynthesis) return;
+      try {
+        window.speechSynthesis.cancel();
+        var utt = new SpeechSynthesisUtterance(String(text));
+        utt.rate = 1;
+        utt.pitch = 1;
+        window.speechSynthesis.speak(utt);
+      } catch (_) {}
+    }
+
+    (function wireHomeMicInput() {
+      var micBtn = document.getElementById('chat-mic');
+      if (!micBtn) return;
+      var chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.addEventListener('input', function () {
+          chatLastInputWasVoice = false;
+        });
+      }
+      var mediaRecorder = null;
+      var chunks = [];
+      var stream = null;
+      var isRecording = false;
+      var isStopping = false;
+
+      function setRecordingState(active) {
+        micBtn.classList.toggle('chat-mic-btn--recording', active);
+        micBtn.setAttribute('aria-label', active ? 'Stop recording' : 'Start voice input');
+        micBtn.title = active ? 'Stop recording' : 'Speak your message';
+      }
+
+      function setTranscribingState(active) {
+        micBtn.disabled = active;
+        micBtn.classList.toggle('chat-mic-btn--transcribing', active);
+      }
+
+      async function transcribeBlob(blob) {
+        setTranscribingState(true);
+        try {
+          var res = await fetch(API + '/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/webm' },
+            body: blob,
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok) throw new Error(data.error || data.message || 'Transcription failed');
+          return (data.data && data.data.text) || data.text || '';
+        } finally {
+          setTranscribingState(false);
+          micBtn.disabled = false;
+        }
+      }
+
+      async function stopRecording() {
+        if (isStopping || !isRecording) return;
+        isStopping = true;
+        isRecording = false;
+        setRecordingState(false);
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          await new Promise(function (resolve) {
+            var settled = false;
+            function done() { if (settled) return; settled = true; resolve(); }
+            mediaRecorder.addEventListener('stop', done, { once: true });
+            mediaRecorder.addEventListener('error', done, { once: true });
+            try { mediaRecorder.stop(); } catch (_) { done(); }
+            setTimeout(done, 1500);
+          });
+        }
+        if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+        if (chunks.length) {
+          var blob = new Blob(chunks, { type: 'audio/webm' });
+          chunks = [];
+          try {
+            var text = await transcribeBlob(blob);
+            if (text && text.trim() && chatInput) {
+              chatInput.value = chatInput.value ? chatInput.value.trimEnd() + ' ' + text.trim() : text.trim();
+              chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+              chatLastInputWasVoice = true;
+              chatInput.focus();
+            }
+          } catch (err) {
+            console.warn('[home-mic] transcription failed:', err && err.message || err);
+          }
+        }
+        mediaRecorder = null;
+        isStopping = false;
+      }
+
+      async function startRecording() {
+        if (isRecording || isStopping) return;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+          console.warn('[home-mic] mic access denied:', err && err.message || err);
+          return;
+        }
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.addEventListener('dataavailable', function (e) {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        });
+        mediaRecorder.start(200);
+        isRecording = true;
+        setRecordingState(true);
+      }
+
+      micBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isRecording) stopRecording();
+        else startRecording();
+      });
+    })();
+
     async function sendChatMessage() {
       var input = document.getElementById('chat-input');
       if (!input) return;
       var text = (input.value || '').trim();
       if (!text || chatLoading) return;
+      var isVoice = chatLastInputWasVoice;
+      chatLastInputWasVoice = false;
       chatMessages.push({ role: 'user', content: text });
       var historyPayload = chatMessages.slice(0, -1).slice(-20).map(function (m) { return { role: m.role, content: m.content }; });
       chatMessages.push({ role: 'assistant', content: 'Thinking…' });
@@ -5949,7 +6067,7 @@
         var r = await fetch(API + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId }),
+          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId, voiceInput: isVoice }),
           signal: chatAbortController.signal
         });
         var ct = (r.headers.get('content-type') || '').toLowerCase();
@@ -5998,6 +6116,9 @@
                     finalReply = (obj.reply != null ? String(obj.reply) : '').trim() || '(No reply)';
                     var st = progressLines.map(function (s) { return '• ' + s; }).join('\n');
                     setAssistantBody((st ? st + '\n\n' : '') + finalReply);
+                    if (obj.voiceReplyText && typeof obj.voiceReplyText === 'string') {
+                      speakChatReply(obj.voiceReplyText);
+                    }
                   } else if (obj.type === 'error') {
                     streamError = obj.error != null ? String(obj.error) : 'Error';
                     setAssistantBody('Error: ' + streamError);

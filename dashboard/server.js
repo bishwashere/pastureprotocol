@@ -1334,11 +1334,12 @@ app.post('/api/chat', (req, res) => {
   const message = req.body?.message != null ? String(req.body.message).trim() : '';
   const history = Array.isArray(req.body?.history) ? req.body.history : [];
   const agentId = req.body?.agentId != null ? String(req.body.agentId).trim() : '';
+  const voiceInput = req.body?.voiceInput === true;
   if (!message) {
     res.status(400).json({ error: 'message is required' });
     return;
   }
-  const payload = JSON.stringify({ message, history, agentId });
+  const payload = JSON.stringify({ message, history, agentId, voiceInput });
   const child = spawn(process.execPath, [CHAT_SCRIPT], {
     cwd: INSTALL_DIR,
     stdio: ['pipe', 'pipe', 'inherit'],

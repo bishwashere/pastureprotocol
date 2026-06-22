@@ -14,6 +14,9 @@ import {
   shouldAckNewSessionOnly,
   NEW_SESSION_ACK,
   startNewSession,
+  detectReplyModeSwitch,
+  setSessionReplyMode,
+  getSessionReplyMode,
 } from '../../lib/context/chat-session.js';
 import { appendExchange, readLastPrivateExchanges } from '../../lib/context/chat-log.js';
 
@@ -77,6 +80,35 @@ async function main() {
   if (dayKey !== '2026-05-28') throw new Error('day key at 4 UTC: ' + dayKey);
   const dayKey2 = getSessionDayKey(new Date('2026-05-28T02:00:00Z'), 'UTC', 3);
   if (dayKey2 !== '2026-05-27') throw new Error('day key at 2 UTC: ' + dayKey2);
+
+  // ── Reply-mode preference tests ──────────────────────────────────────────────
+  // detectReplyModeSwitch — text triggers
+  if (detectReplyModeSwitch('reply in text') !== 'text') throw new Error('detect: reply in text');
+  if (detectReplyModeSwitch('Reply as text please') !== 'text') throw new Error('detect: reply as text please');
+  if (detectReplyModeSwitch('text mode') !== 'text') throw new Error('detect: text mode');
+  if (detectReplyModeSwitch('switch to text') !== 'text') throw new Error('detect: switch to text');
+  if (detectReplyModeSwitch('no more voice') !== 'text') throw new Error('detect: no more voice');
+  // detectReplyModeSwitch — voice triggers
+  if (detectReplyModeSwitch('reply in voice') !== 'voice') throw new Error('detect: reply in voice');
+  if (detectReplyModeSwitch('voice mode') !== 'voice') throw new Error('detect: voice mode');
+  if (detectReplyModeSwitch('switch to voice') !== 'voice') throw new Error('detect: switch to voice');
+  // detectReplyModeSwitch — no match
+  if (detectReplyModeSwitch('hi how are you') !== null) throw new Error('false positive: hi how are you');
+  if (detectReplyModeSwitch('what is the weather') !== null) throw new Error('false positive: weather');
+
+  // setSessionReplyMode / getSessionReplyMode
+  const modeKey = 'test-mode-jid';
+  startNewSession(modeKey, 'daily');
+  if (getSessionReplyMode(modeKey) !== 'voice') throw new Error('default mode should be voice');
+  setSessionReplyMode(modeKey, 'text');
+  if (getSessionReplyMode(modeKey) !== 'text') throw new Error('mode should be text after set');
+  setSessionReplyMode(modeKey, 'voice');
+  if (getSessionReplyMode(modeKey) !== 'voice') throw new Error('mode should be voice after reset');
+
+  // New session wipes the mode (fresh entry has no replyMode)
+  setSessionReplyMode(modeKey, 'text');
+  startNewSession(modeKey, 'daily');
+  if (getSessionReplyMode(modeKey) !== 'voice') throw new Error('new session should reset mode to voice');
 
   console.log('Chat session test passed.');
 }

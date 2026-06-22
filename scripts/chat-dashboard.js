@@ -79,7 +79,8 @@ async function main() {
   let raw = '';
   for await (const chunk of process.stdin) raw += chunk;
   const payload = JSON.parse(raw || '{}');
-  const message = payload.message && String(payload.message).trim();
+  const voiceInput = payload.voiceInput === true;
+  let message = payload.message && String(payload.message).trim();
   const requestedAgentId = payload.agentId && String(payload.agentId).trim();
   ensureMainAgentInitialized();
   const agentId = requestedAgentId || DEFAULT_AGENT_ID;
@@ -87,6 +88,10 @@ async function main() {
   if (!message) {
     writeNdjsonLine({ type: 'error', error: 'message is required' });
     process.exit(1);
+  }
+  // Append voice hint so the agent knows to reply as voice when available
+  if (voiceInput) {
+    message += '\n\n[The user sent a voice message. If the speech skill is available, call it with action reply_as_voice and a concise spoken reply. Otherwise give a brief, spoken-friendly text reply.]';
   }
   const workspaceDir = getAgentWorkspaceDir(agentId) || getWorkspaceDir();
   // Single super-admin model: the dashboard chat is always the owner talking to
@@ -270,6 +275,7 @@ async function main() {
 
   try {
     let textToSend = '';
+    let voiceReplyText = '';
     let skillsCalled = [];
     if (presetDelegationPlan && delegatedTarget) {
       try {
@@ -305,6 +311,7 @@ async function main() {
         },
       });
       textToSend = turn?.textToSend || '';
+      voiceReplyText = turn?.voiceReplyText || '';
       skillsCalled = Array.isArray(turn?.skillsCalled) ? turn.skillsCalled : [];
     }
     if (skillsCalled.length) {
@@ -313,6 +320,9 @@ async function main() {
     const healthNote = getPendingHealthFlags();
     if (healthNote && textToSend) textToSend = healthNote + '\n\n' + textToSend;
     const reply = formatDashboardReply(textToSend);
+    // For voice inputs, fall back to the full reply text if the agent didn't
+    // explicitly call reply_as_voice (e.g. speech skill not enabled).
+    const speakText = voiceReplyText || (voiceInput ? reply : '');
     const exchange = {
       user: message,
       assistant: reply,
@@ -333,7 +343,7 @@ async function main() {
         process.stderr.write(`[chat-dashboard] memory index failed: ${memErr?.message || memErr}\n`);
       } catch (_) {}
     }
-    writeNdjsonLine({ type: 'done', reply });
+    writeNdjsonLine({ type: 'done', reply, ...(speakText ? { voiceReplyText: speakText } : {}) });
   } catch (err) {
     writeNdjsonLine({ type: 'error', error: err.message || String(err) });
     process.exit(1);
