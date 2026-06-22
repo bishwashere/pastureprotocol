@@ -34,6 +34,7 @@ const INTERNAL_LEAK_PATTERNS = [
   /skill called/i,
   /completeness probe/i,
   /\[retry with search\]/i,
+  /<skill\s+action/i,
 ];
 
 function createTempStateDir() {

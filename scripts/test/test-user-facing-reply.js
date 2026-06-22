@@ -5,7 +5,27 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const { formatUserFacingReply } = await import('../../lib/agent/user-facing-reply.js');
+  const {
+    formatUserFacingReply,
+    unwrapFakeSkillMarkup,
+    looksLikeFakeSkillMarkup,
+  } = await import('../../lib/agent/user-facing-reply.js');
+
+  const fakeSpeech =
+    '<skill action="speech" data="{\\"text\\":\\"Alright Bishwas, here is what is still remaining.\\"}"/>';
+
+  assert(
+    looksLikeFakeSkillMarkup(fakeSpeech),
+    'fake speech skill tag should be detected as non-human markup',
+  );
+  assert(
+    unwrapFakeSkillMarkup(fakeSpeech) === 'Alright Bishwas, here is what is still remaining.',
+    'fake speech skill tag should unwrap to embedded human text',
+  );
+  assert(
+    formatUserFacingReply('[Pasture] ' + fakeSpeech) === 'Alright Bishwas, here is what is still remaining.',
+    'formatUserFacingReply should strip prefix and unwrap fake skill markup',
+  );
 
   const cases = [
     {
