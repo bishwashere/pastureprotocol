@@ -301,13 +301,30 @@ async function main() {
     assert(suggestBlock.includes('betapp'), 'mission_suggest system block includes project name');
     assert(suggestBlock.includes('Do NOT create a mission yet'), 'mission_suggest system block tells agent to wait');
 
+    // mission_suggest with proposed tasks should surface them in the block so
+    // the agent can mention concrete tasks when asking for confirmation.
+    const suggestWithTasks = {
+      kind: 'mission_suggest',
+      persistence: 'none',
+      projectName: 'alphapp',
+      title: 'alphapp work',
+      tasks: [
+        { title: 'Redesign onboarding flow' },
+        { title: 'Update signup copy' },
+      ],
+    };
+    const suggestTasksBlock = buildDurabilitySystemBlock(suggestWithTasks);
+    assert(suggestTasksBlock.includes('Proposed tasks'), 'system block lists proposed tasks header');
+    assert(suggestTasksBlock.includes('Redesign onboarding flow'), 'proposed task surfaced in block');
+    assert(suggestTasksBlock.includes('Update signup copy'), 'second proposed task surfaced in block');
+
     const followup = await prepareWorkDurabilityWithAi({
       userText: 'Make the positioning less corporate',
       agentId: 'main',
       historyMessages: [],
       llmChat: async () => JSON.stringify({
         missionMatch: 'recent_mission',
-        missionId: aiDurable.missionId,
+        missionId: confirmedLaunch.missionId,
         taskMatch: 'positioning',
         confidence: 0.84,
         reason: "User refers to 'the positioning', which belongs to the recent launch package.",
@@ -315,12 +332,14 @@ async function main() {
     });
     assert(followup.kind === 'existing_mission_task_update', 'follow-up attaches to existing mission');
     assert(followup.classifier === 'ai-mission-resolution', 'follow-up uses AI mission resolution');
-    assert(followup.missionId === aiDurable.missionId, 'follow-up keeps launch mission id');
+    assert(followup.missionId === confirmedLaunch.missionId, 'follow-up keeps launch mission id');
     assert(followup.taskId, 'follow-up finds positioning task');
     assert(followup.taskMatch === 'positioning', 'task match retained');
     assert(followup.confidence === 0.84, 'mission resolution confidence retained');
 
-    const unnumberedLaunch = 'I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.';
+    // AI decomposition end-to-end: explicit "create a mission" wording bypasses
+    // the ask-first flow and triggers full AI decomposition + persistence.
+    const unnumberedLaunch = 'Please create a mission. I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.';
     let decompositionCalls = 0;
     const decomposed = await prepareWorkDurabilityWithAi({
       userText: unnumberedLaunch,
@@ -363,18 +382,19 @@ async function main() {
           });
         }
         return JSON.stringify({
-          workMode: 'new_mission_candidate',
-          requiresPersistence: true,
-          confidence: 0.86,
-          reason: 'User describes launch preparation with multiple implied deliverables.',
-          projectName: '',
-          deliverables: [],
+          workMode: 'direct_answer',
+          requiresPersistence: false,
+          confidence: 0.9,
+          reason: 'Should not be called — explicit request short-circuits the classifier.',
         });
       },
     });
-    assert(decompositionCalls === 1, 'AI decomposition called for persistent work');
+    assert(decompositionCalls === 1, 'AI decomposition called for explicit mission request');
+    assert(decomposed.kind === 'new_mission_candidate', 'explicit request creates new_mission_candidate');
+    assert(decomposed.explicitMissionRequest === true, 'decomposed flagged as explicit request');
     assert(decomposed.decomposition === 'ai-constrained', 'decomposition marked ai-constrained');
     assert(decomposed.tasks.length === 4, 'AI decomposition creates four subtasks');
+    assert(decomposed.missionId, 'explicit request persists mission immediately');
     const decomposedMission = getMission(decomposed.missionId);
     const typed = decomposedMission.tasks || [];
     assert(typed.some((sg) => sg.title === 'Create positioning statement' && sg.type === 'marketing' && sg.suggestedAgent === 'marketer'), 'positioning task typed for marketer');
