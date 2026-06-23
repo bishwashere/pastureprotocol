@@ -9,12 +9,17 @@
  */
 
 import { spawn } from 'child_process';
-import { readFileSync, mkdirSync, writeFileSync, existsSync, copyFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync, existsSync, copyFileSync, rmSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { homedir, tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
+
+/** JIDs that this suite uses for synthetic reminders. Anything written under these
+ *  must NEVER survive a test run. We scrub them from the real state dir at suite
+ *  start and end as a safety net for past or future leaks. */
+const TEST_JIDS = new Set(['test@s.whatsapp.net', 'test-e2e@s.whatsapp.net', '999888777']);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -72,10 +77,12 @@ function assert(condition, message) {
  * Create a temp state dir with empty cron store. Copies config.json and .env from default state dir
  * so the child process has LLM config (otherwise we get ERR_INVALID_URL for baseUrl).
  * Uses tmpdir so it works when INSTALL_ROOT is read-only (e.g. system install for all users).
+ * The returned dir must be passed to cleanupTempStateDir() (typically in a try/finally) so the
+ * suite leaves no scratch dirs behind in tmpdir.
  * @returns {{ stateDir: string, storePath: string }}
  */
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-cron-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-cron-e2e-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
   const cronDir = join(stateDir, 'cron');
   const storePath = join(cronDir, 'jobs.json');
   mkdirSync(cronDir, { recursive: true });
@@ -87,6 +94,48 @@ function createTempStateDir() {
     copyFileSync(join(DEFAULT_STATE_DIR, '.env'), join(stateDir, '.env'));
   }
   return { stateDir, storePath };
+}
+
+/** Idempotent best-effort removal of a temp state dir. Failures are swallowed so a
+ *  half-removed dir cannot fail the test. */
+function cleanupTempStateDir(stateDir) {
+  if (!stateDir || typeof stateDir !== 'string') return;
+  if (!stateDir.startsWith(tmpdir())) return; // refuse to nuke anything outside tmpdir
+  try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}
+}
+
+/** Scrub any synthetic reminders this suite may have leaked into the real state dir from
+ *  past or present buggy runs. Called at suite start and end. Idempotent. */
+function scrubLeakedTestJobs(stateDir = DEFAULT_STATE_DIR) {
+  const storePath = join(stateDir, 'cron', 'jobs.json');
+  if (!existsSync(storePath)) return { removed: 0, kept: 0 };
+  let store;
+  try {
+    store = JSON.parse(readFileSync(storePath, 'utf8'));
+  } catch (_) {
+    return { removed: 0, kept: 0 };
+  }
+  if (!Array.isArray(store?.jobs)) return { removed: 0, kept: 0 };
+  const before = store.jobs.length;
+  const kept = store.jobs.filter((j) => !TEST_JIDS.has(String(j?.jid || '')));
+  const removed = before - kept.length;
+  if (removed > 0) {
+    store.jobs = kept;
+    writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+  }
+  return { removed, kept: kept.length };
+}
+
+/** Wrap a test body so it always runs in an isolated temp state dir AND the dir is
+ *  always removed afterwards. If the body needs the storePath (to assert on the store),
+ *  declare it via the `body(ctx)` signature; otherwise body() is fine. */
+async function withTempState(body) {
+  const ctx = createTempStateDir();
+  try {
+    return await body(ctx);
+  } finally {
+    cleanupTempStateDir(ctx.stateDir);
+  }
 }
 
 /**
@@ -239,17 +288,17 @@ async function runReport() {
   ];
   console.log('Cron E2E report: running each query and capturing reply + store…\n');
   for (const { query, type } of allQueries) {
+    const { stateDir, storePath } = createTempStateDir();
     try {
       let reply = '';
       let cronSet = '—';
       if (type === 'add' || type === 'add-single' || type === 'add-recurring') {
-        const { stateDir, storePath } = createTempStateDir();
         const res = await runE2E(query, { stateDir });
         reply = res.reply ?? res;
         const { jobs } = loadStore(storePath);
         cronSet = formatCronSet(jobs);
       } else {
-        const res = await runE2E(query);
+        const res = await runE2E(query, { stateDir });
         reply = res.reply ?? res;
       }
       rows.push({ query, reply, cronSet });
@@ -257,6 +306,8 @@ async function runReport() {
     } catch (err) {
       rows.push({ query, reply: `(error: ${err.message})`, cronSet: '—' });
       console.log('  ✗', query.slice(0, 50), err.message);
+    } finally {
+      cleanupTempStateDir(stateDir);
     }
   }
   const outPath = join(__dirname, 'CRON_E2E_TABLE.md');
@@ -275,16 +326,23 @@ async function main() {
   console.log('E2E cron tests: intent → LLM → cron tool → reply.');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.');
   if (INSTALL_ROOT !== ROOT) console.log('Using system install (PASTURE_INSTALL_DIR):', INSTALL_ROOT);
+
+  // Safety net: scrub any synthetic reminders this suite may have leaked into the
+  // real state dir from past buggy runs, so re-running the test self-heals.
+  const preScrub = scrubLeakedTestJobs();
+  if (preScrub.removed > 0) {
+    console.log(`[cleanup] Scrubbed ${preScrub.removed} stale test reminder(s) from ${DEFAULT_STATE_DIR}/cron/jobs.json before starting.`);
+  }
   console.log('');
 
   const singleAddQuery = 'Remind me to check lock after two minutes';
   const tests = [
     ...CRON_ADD_QUERIES.map((query) => ({
       name: `cron add: "${query}"`,
-      run: async () => {
-        const result = await runE2E(query);
+      run: () => withTempState(async ({ stateDir }) => {
+        const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
@@ -292,12 +350,11 @@ async function main() {
           throw err;
         }
         return { reply, skillsCalled: result.skillsCalled };
-      },
+      }),
     })),
     {
       name: `cron add: exact job count — "${singleAddQuery}"`,
-      run: async () => {
-        const { stateDir, storePath } = createTempStateDir();
+      run: () => withTempState(async ({ stateDir, storePath }) => {
         const result = await runE2E(singleAddQuery, { stateDir });
         const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(singleAddQuery, reply, stateDir, { skillHint: 'cron' });
@@ -312,14 +369,14 @@ async function main() {
         const atTimes = jobs.filter((j) => j.schedule?.kind === 'at' && j.schedule?.at).map((j) => j.schedule.at);
         assert(new Set(atTimes).size === atTimes.length, `All one-shot jobs must have unique "at" times; got duplicates.`);
         return { reply, skillsCalled: result.skillsCalled };
-      },
+      }),
     },
     ...CRON_LIST_QUERIES.map((query) => ({
       name: `cron list: "${query}"`,
-      run: async () => {
-        const result = await runE2E(query);
+      run: () => withTempState(async ({ stateDir }) => {
+        const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
@@ -327,12 +384,11 @@ async function main() {
           throw err;
         }
         return { reply, skillsCalled: result.skillsCalled };
-      },
+      }),
     })),
     ...CRON_RECURRING_ADD_QUERIES.map(({ query, expectedExpr }) => ({
       name: `cron recurring: "${query}"`,
-      run: async () => {
-        const { stateDir, storePath } = createTempStateDir();
+      run: () => withTempState(async ({ stateDir, storePath }) => {
         const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
@@ -350,24 +406,23 @@ async function main() {
           assert(found, `Expected cron expr "${expectedExpr}" for "${query}". Got: ${cronJobs.map((j) => j.schedule.expr).join(', ')}`);
         }
         return { reply, skillsCalled: result.skillsCalled };
-      },
+      }),
     })),
     {
       name: 'cron execute: run-job textToSend',
-      run: async () => {
+      run: () => withTempState(async ({ stateDir }) => {
         const message = 'Reminder: Cron E2E execute test OK';
-        const result = await runJobOnce(message, { stateDir: DEFAULT_STATE_DIR });
+        const result = await runJobOnce(message, { stateDir });
         assert(!result.error, `run-job should not return error; got: ${result.error}`);
         assert(result.textToSend && result.textToSend.length > 0, `run-job should return non-empty textToSend; got: ${JSON.stringify(result)}`);
         const hasExpected = /Cron E2E execute test OK|execute test OK/i.test(result.textToSend);
         assert(result.textToSend.length > 10 && (hasExpected || result.textToSend.length > 30), `run-job should return substantive reply; got (first 200): ${result.textToSend.slice(0, 200)}`);
         return { reply: result.textToSend };
-      },
+      }),
     },
     {
       name: 'cron one-shot when Telegram-only (no sock)',
-      run: async () => {
-        const { stateDir, storePath } = createTempStateDir();
+      run: () => withTempState(async ({ storePath }) => {
         const runnerPath = pathToFileURL(join(INSTALL_ROOT, 'cron', 'runner.js')).href;
         const storePathMod = pathToFileURL(join(INSTALL_ROOT, 'cron', 'store.js')).href;
         const runner = await import(runnerPath);
@@ -378,12 +433,11 @@ async function main() {
         runner.scheduleOneShot(job);
         const count = runner.getOneShotCountForTest();
         assert(count === 1, `One-shot must be scheduled when only telegramBot is set. Got getOneShotCountForTest()=${count}.`);
-      },
+      }),
     },
     {
       name: 'cron send to channel (recording transport)',
-      run: async () => {
-        const { stateDir, storePath } = createTempStateDir();
+      run: () => withTempState(async ({ storePath }) => {
         const runnerPath = pathToFileURL(join(INSTALL_ROOT, 'cron', 'runner.js')).href;
         const storePathMod = pathToFileURL(join(INSTALL_ROOT, 'cron', 'store.js')).href;
         const runner = await import(runnerPath);
@@ -404,14 +458,14 @@ async function main() {
         assert(sent.length === 1, `sendMessage must be called exactly once; got ${sent.length}`);
         assert(sent[0].jid === '999888777', `Expected jid 999888777; got ${sent[0].jid}`);
         assert(sent[0].text.includes('channel send test OK') || sent[0].text.length > 10, `Reply must contain expected phrase or be substantive; got (first 120): ${sent[0].text.slice(0, 120)}`);
-      },
+      }),
     },
     ...REMINDER_MANAGE_QUERIES.map((query) => ({
       name: `cron manage: "${query}"`,
-      run: async () => {
-        const result = await runE2E(query);
+      run: () => withTempState(async ({ stateDir }) => {
+        const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
@@ -419,7 +473,7 @@ async function main() {
           throw err;
         }
         return { reply, skillsCalled: result.skillsCalled };
-      },
+      }),
     })),
   ];
 
@@ -427,6 +481,15 @@ async function main() {
 
   console.log('\n--- Report ---');
   await runReport();
+
+  // Safety net (post): even though every test now uses an isolated state dir, scrub
+  // again at the end so any future regression in a single test case doesn't leak
+  // synthetic reminders into the real state dir.
+  const postScrub = scrubLeakedTestJobs();
+  if (postScrub.removed > 0) {
+    console.log(`[cleanup] Scrubbed ${postScrub.removed} synthetic reminder(s) that leaked into ${DEFAULT_STATE_DIR}/cron/jobs.json — investigate the test that wrote them.`);
+  }
+
   process.exit(failed > 0 ? 1 : 0);
 }
 
