@@ -12,6 +12,7 @@ import { tmpdir, homedir } from 'os';
 import readline from 'readline';
 import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
+import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -141,8 +142,68 @@ function runDaemonAction(action) {
   child.on('close', (code) => process.exit(code ?? 0));
 }
 
+/**
+ * Runtime dependency preflight for `pasture start` / `pasture restart`.
+ *
+ * Catches "Playwright Chromium binary missing at rev N" and missing cloud LLM
+ * keys *before* the daemon comes up. Required deps abort the start; soft
+ * issues print as warnings and proceed.
+ *
+ * Skip with `PASTURE_SKIP_PREFLIGHT=1` (e.g. CI, container init) or when a
+ * fatal check has an autoFix and the user is interactive: ask once, run it,
+ * re-check, then continue.
+ */
+async function runStartPreflight(action) {
+  if (process.env.PASTURE_SKIP_PREFLIGHT === '1') return;
+  console.log(`pasture: preflight checks before ${action}...`);
+  let { results, hasFatal } = await runPreflight({ installDir: INSTALL_DIR });
+  for (const r of results) console.log(formatCheckResult(r));
+
+  if (!hasFatal) return;
+
+  // Try interactive auto-fix for the first fatal result that exposes one.
+  const fixable = results.find((r) => !r.ok && r.severity === 'fatal' && r.autoFix);
+  if (fixable && process.stdin.isTTY) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((res) => {
+      rl.question(`\npasture: ${fixable.label} is broken. Run \`${fixable.autoFix.label}\` now? [Y/n] `, res);
+    });
+    rl.close();
+    if (!/^n/i.test(String(answer || '').trim())) {
+      const fixResult = spawnSync(fixable.autoFix.command, fixable.autoFix.args, {
+        stdio: 'inherit',
+        cwd: INSTALL_DIR,
+        env: process.env,
+      });
+      if (fixResult.status !== 0) {
+        console.error(`pasture: auto-fix \`${fixable.autoFix.label}\` failed (exit ${fixResult.status}).`);
+        process.exit(1);
+      }
+      ({ results, hasFatal } = await runPreflight({ installDir: INSTALL_DIR }));
+      console.log('pasture: re-running preflight...');
+      for (const r of results) console.log(formatCheckResult(r));
+      if (hasFatal) {
+        console.error('pasture: fatal preflight issues remain after auto-fix. Aborting.');
+        process.exit(1);
+      }
+      return;
+    }
+  }
+
+  console.error('pasture: fatal preflight issues. Refusing to start.');
+  console.error('  Set PASTURE_SKIP_PREFLIGHT=1 to bypass (NOT recommended).');
+  process.exit(1);
+}
+
 if (['start', 'stop', 'status', 'restart'].includes(sub)) {
-  runDaemonAction(sub);
+  if (sub === 'start' || sub === 'restart') {
+    (async () => {
+      await runStartPreflight(sub);
+      runDaemonAction(sub);
+    })();
+  } else {
+    runDaemonAction(sub);
+  }
 } else if (sub === 'dashboard') {
   (async () => {
     const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');

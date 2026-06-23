@@ -24,7 +24,8 @@ import { logTeamActivity } from '../lib/agent/team-activity.js';
 import { buildOneOnOneSystemPrompt } from '../lib/agent/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent/agent-config.js';
 import { appendExchange, readLastPrivateExchanges, resolveChatHistoryExchanges } from '../lib/context/chat-log.js';
-import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from '../lib/context/chat-session.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from '../lib/context/chat-session.js';
+import { resolveWorkModeForTurn } from '../lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from '../lib/agent/session-bootstrap.js';
 import { getOwnerLogJid } from '../lib/util/owner-config.js';
 import { getMemoryConfig } from '../lib/context/memory-config.js';
@@ -147,9 +148,32 @@ async function main() {
   // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
   const enabledSkillIds = getEnabledSkillIds({ agentId });
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
+  // Step 1.5: classify work-mode for this turn (LLM, MD-driven). The
+  // multi-agent pipeline only runs when this session is in "multi". Default
+  // is "single" — focus on direct tool execution.
+  let workModeAck = null;
+  let workMode = getSessionWorkMode(dashboardJid);
+  const wm = await resolveWorkModeForTurn({
+    userText: message,
+    logKey: dashboardJid,
+    agentId,
+  });
+  if (wm) {
+    workMode = wm.modeAfter;
+    if (wm.toggled) {
+      workModeAck = wm.ack;
+      process.stderr.write('[work-mode] ' + JSON.stringify({ before: wm.modeBefore, after: wm.modeAfter, reason: wm.reason }) + '\n');
+    } else {
+      process.stderr.write('[work-mode] ' + JSON.stringify({ mode: workMode }) + '\n');
+    }
+  }
+  const isMultiAgent = workMode === 'multi';
   // Step 2: decide work durability before delegation. Persistence must be
   // attached to the turn before agent-send chooses who should do the work.
-  const durabilityDecision = await prepareWorkDurabilityWithAi({ userText: message, historyMessages, agentId });
+  // Single-agent mode skips this entirely.
+  const durabilityDecision = isMultiAgent
+    ? await prepareWorkDurabilityWithAi({ userText: message, historyMessages, agentId })
+    : null;
   if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
   if (durabilityDecision) {
     process.stderr.write('[work-durability] ' + JSON.stringify({
@@ -159,16 +183,21 @@ async function main() {
       createdMission: !!durabilityDecision.createdMission,
     }) + '\n');
   }
-  // Step 3: specialization-aware delegation check before planner (same as index.js private chat).
-  const durableDelegationContext = buildDurableDelegationContext(durabilityDecision, {
-    agentId,
-    availableSkillIds: enabledSkillIds,
-  });
-  const delegationContext = durableDelegationContext || await buildDelegationContext({
-    agentId,
-    userText: delegationRoutingTextFromDurability(durabilityDecision, message),
-    availableSkillIds: enabledSkillIds,
-  });
+  // Step 3: specialization-aware delegation check before planner.
+  // Skipped in single-agent mode.
+  const durableDelegationContext = isMultiAgent
+    ? buildDurableDelegationContext(durabilityDecision, {
+        agentId,
+        availableSkillIds: enabledSkillIds,
+      })
+    : null;
+  const delegationContext = durableDelegationContext || (isMultiAgent
+    ? await buildDelegationContext({
+        agentId,
+        userText: delegationRoutingTextFromDurability(durabilityDecision, message),
+        availableSkillIds: enabledSkillIds,
+      })
+    : null);
   const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
     ? (delegationContext?.recommendation?.targetAgentId || '')
     : '';
@@ -224,7 +253,7 @@ async function main() {
   const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
     ? buildCasualChatIntentPlan()
     : null;
-  const missionsIntentHint = !presetDelegationPlan && !casualIntentPlan
+  const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
     ? getMissionsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
     : null;
   const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
@@ -264,7 +293,7 @@ async function main() {
   const memoryConfig = getMemoryConfig();
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
-  if (!isNonTaskMessage(message)) {
+  if (isMultiAgent && !isNonTaskMessage(message)) {
     const missionsBlock = buildMissionsContextBlock({ userText: message, historyMessages, agentId });
     if (missionsBlock) systemPrompt += missionsBlock;
     const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
@@ -319,6 +348,11 @@ async function main() {
     }
     const healthNote = getPendingHealthFlags();
     if (healthNote && textToSend) textToSend = healthNote + '\n\n' + textToSend;
+    if (workModeAck) {
+      textToSend = textToSend
+        ? '[Pasture] ' + workModeAck + '\n\n' + textToSend.replace(/^\[Pasture\]\s*/i, '')
+        : '[Pasture] ' + workModeAck;
+    }
     const reply = formatDashboardReply(textToSend);
     // For voice inputs, fall back to the full reply text if the agent didn't
     // explicitly call reply_as_voice (e.g. speech skill not enabled).

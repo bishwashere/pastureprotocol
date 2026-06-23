@@ -28,6 +28,7 @@ import { executeCalendar } from '../lib/agent/executors/calendar.js';
 import { executeEvaluateTeamCapability } from '../lib/agent/executors/evaluate-team-capability.js';
 import { executeProjectWorkflow } from '../lib/agent/executors/project-workflow.js';
 import { executeMongodb } from '../lib/agent/executors/mongodb.js';
+import { executeHttp } from '../lib/agent/executors/http.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -54,6 +55,7 @@ const EXECUTORS = {
   'evaluate-team-capability': executeEvaluateTeamCapability,
   'project-workflow': executeProjectWorkflow,
   mongodb: executeMongodb,
+  http: executeHttp,
 };
 
 /**

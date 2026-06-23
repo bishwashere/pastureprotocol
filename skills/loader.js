@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Default skill ids enabled on new install and added by migration on update. */
 export const DEFAULT_ENABLED = [
   'cron',
+  'http',
   'search',
   'browse',
   'vision',

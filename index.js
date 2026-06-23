@@ -3,7 +3,7 @@
  * Config and state live in ~/.pasture (or PASTURE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir } from './lib/util/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir, getAgentsDir } from './lib/util/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -71,7 +71,8 @@ import {
 } from './lib/agent/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges } from './lib/context/chat-log.js';
-import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/context/chat-session.js';
+import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from './lib/context/chat-session.js';
+import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
@@ -324,11 +325,9 @@ async function runAuthOnly(opts = {}) {
 
 /** Migration: ensure all default skills (cron, search, browse, vision, memory, speech, etc.) are in skills.enabled so new installs and updates get them without fresh install. */
 function migrateSkillsConfigToIncludeDefaults() {
-  try {
-    const path = getConfigPath();
-    if (!existsSync(path)) return;
-    const raw = readFileSync(path, 'utf8');
-    const config = JSON.parse(raw);
+  // Helper: add any missing DEFAULT_ENABLED ids to a parsed config in-place.
+  // Returns true when something changed.
+  const ensureDefaults = (config) => {
     const skills = config.skills || {};
     let enabled = Array.isArray(skills.enabled) ? skills.enabled : [];
     let changed = false;
@@ -338,9 +337,50 @@ function migrateSkillsConfigToIncludeDefaults() {
         changed = true;
       }
     }
-    if (!changed) return;
-    config.skills = { ...skills, enabled };
-    writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+    if (changed) config.skills = { ...skills, enabled };
+    return changed;
+  };
+
+  // 1) Global config — kept for backward compatibility with code paths that
+  //    still read getConfigPath() directly (and as the source for
+  //    ensureMainAgentInitialized when a main agent config is empty).
+  try {
+    const path = getConfigPath();
+    if (existsSync(path)) {
+      const raw = readFileSync(path, 'utf8');
+      const config = JSON.parse(raw);
+      if (ensureDefaults(config)) {
+        writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+      }
+    }
+  } catch (_) {}
+
+  // 2) Per-agent configs — these are what the runtime actually reads via
+  //    loadAgentConfig() / getEnabledSkillIds(). Without this loop, a brand
+  //    new default skill (e.g. `http`) added to DEFAULT_ENABLED never reaches
+  //    existing agents because their skills.enabled list was forked off the
+  //    global config the first time the agent was created. Walking the
+  //    agents directory keeps the runtime list and DEFAULT_ENABLED in sync
+  //    on every daemon start.
+  try {
+    const agentsDir = getAgentsDir();
+    if (!existsSync(agentsDir)) return;
+    for (const entry of readdirSync(agentsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const cfgPath = join(agentsDir, entry.name, 'config.json');
+      if (!existsSync(cfgPath)) continue;
+      try {
+        const raw = readFileSync(cfgPath, 'utf8');
+        const config = JSON.parse(raw);
+        // Only migrate agents that already opted into skills (i.e. they have a
+        // skills.enabled list). Agents that fall through to the global config
+        // (loadAgentConfig returns {} -> falls back to main) don't need it.
+        if (!config.skills || !Array.isArray(config.skills.enabled)) continue;
+        if (ensureDefaults(config)) {
+          writeFileSync(cfgPath, JSON.stringify(config, null, 2), 'utf8');
+        }
+      } catch (_) {}
+    }
   } catch (_) {}
 }
 
@@ -1208,9 +1248,34 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
+    // Step 1.5: classify work-mode for this turn (LLM, MD-driven). The
+    // multi-agent pipeline (work-durability, delegation, missions, projects,
+    // project-workflow context) only runs when this session is in "multi".
+    // Every session starts in "single" and the user opts in by saying so.
+    // Group chats are always single-mode (group flows skip multi-agent today).
+    let workModeAck = null;
+    let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
+    if (!isGroupJid) {
+      const wm = await traceAsyncStep('work_mode', () => resolveWorkModeForTurn({
+        userText: text,
+        logKey: sessionLogKey,
+        agentId,
+      }));
+      if (wm) {
+        workMode = wm.modeAfter;
+        if (wm.toggled) {
+          workModeAck = wm.ack;
+          console.log('[work-mode]', JSON.stringify({ before: wm.modeBefore, after: wm.modeAfter, reason: wm.reason }));
+        } else {
+          console.log('[work-mode]', JSON.stringify({ mode: workMode }));
+        }
+      }
+    }
+    const isMultiAgent = !isGroupJid && workMode === 'multi';
     // Step 2: decide work durability before delegation. Persistence must be
     // attached to the turn before agent-send chooses who should do the work.
-    const durabilityDecision = !isGroupJid
+    // Single-agent mode skips this entirely — focus is on tool execution.
+    const durabilityDecision = isMultiAgent
       ? await traceAsyncStep('work_durability', () => prepareWorkDurabilityWithAi({ userText: text, historyMessages, agentId }))
       : null;
     if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
@@ -1224,13 +1289,14 @@ async function main() {
     }
     // Step 3: specialization-aware delegation check before planner.
     // This runs after durability so agent-send can receive a missionId up front.
-    const durableDelegationContext = !isGroupJid
+    // Skipped in single-agent mode.
+    const durableDelegationContext = isMultiAgent
       ? buildDurableDelegationContext(durabilityDecision, {
           agentId,
           availableSkillIds: enabledSkillIds,
         })
       : null;
-    const delegationContext = durableDelegationContext || (!isGroupJid
+    const delegationContext = durableDelegationContext || (isMultiAgent
       ? await traceAsyncStep('delegation_context', () => buildDelegationContext({
           agentId,
           userText: delegationRoutingTextFromDurability(durabilityDecision, text),
@@ -1309,7 +1375,8 @@ async function main() {
     const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(text)
       ? buildCasualChatIntentPlan()
       : null;
-    const missionsIntentHint = !presetDelegationPlan && !casualIntentPlan
+    // Missions discovery hint is multi-agent specific.
+    const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
       ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
     const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
@@ -1360,11 +1427,14 @@ async function main() {
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     if (!isGroupJid) {
+      // durability block is null-safe when durabilityDecision is null
       systemPromptWithPlan += buildDurabilitySystemBlock(durabilityDecision);
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
-      if (!isNonTaskMessage(text)) {
+      // Multi-agent mode adds mission / project / workflow context. Single-agent
+      // mode keeps the system prompt focused on direct tool execution.
+      if (isMultiAgent && !isNonTaskMessage(text)) {
         const missionsBlock = buildMissionsContextBlock({ userText: text, historyMessages, agentId });
         if (missionsBlock) systemPromptWithPlan += missionsBlock;
         const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
@@ -1440,6 +1510,13 @@ async function main() {
     let rawTextToSend = (textToSend || '').trim();
     const healthNote = !isGroupJid ? getPendingHealthFlags() : '';
     if (healthNote && rawTextToSend) rawTextToSend = healthNote + '\n\n' + rawTextToSend;
+    // If the user toggled work mode this turn, surface the acknowledgement
+    // up front so they see the mode change before the rest of the reply.
+    if (workModeAck) {
+      rawTextToSend = rawTextToSend
+        ? '[Pasture] ' + workModeAck + '\n\n' + rawTextToSend.replace(/^\[Pasture\]\s*/i, '')
+        : '[Pasture] ' + workModeAck;
+    }
     const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
     logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');

@@ -110,11 +110,16 @@
     "test:delegation-routing-details": "node scripts/test/test-delegation-routing-details.js",
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:work-durability": "node scripts/test/test-work-durability.js",
+    "test:work-mode": "node scripts/test/test-work-mode.js",
     "test:state-migration": "node scripts/test/test-state-migration.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",
     "test:system-pulse": "node scripts/test/test-system-pulse.js",
-    "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"
+    "test:http-skill": "node scripts/test/test-http-skill.js",
+    "test:preflight": "node scripts/test/test-preflight.js",
+    "test:system-prompt-grounding": "node scripts/test/test-system-prompt-grounding.js",
+    "test:skill-migration": "node scripts/test/test-skill-migration.js",
+    "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner && pnpm run test:http-skill && pnpm run test:preflight && pnpm run test:system-prompt-grounding && pnpm run test:skill-migration"
   },
   "dependencies": {
     "@inquirer/select": "^5.0.4",

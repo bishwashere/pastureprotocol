@@ -17,8 +17,14 @@ dotenv.config({ path: getEnvPath() });
 
 const CRON_EXECUTOR_RULE = `This is a cron executor run: you are fulfilling a reminder the user already set. They chose the content when they created the reminder—do NOT ask for clarification (e.g. weather location, "current or 7-day?", or news scope). Use the search skill with concrete queries: for weather use e.g. "current weather Enola PA" or "weather [place name]"; for "top N news" use search with query "top N news" (e.g. "top 5 news") to fetch real headlines with links, not a list of source websites. Execute and return the combined result.`;
 
-function buildCronSystemPrompt() {
-  return `You are Pasture. Reply concisely. Use run_skill when you need search, browse, vision, cron, or memory. Do not use <think> or any thinking/reasoning blocks—output only your final reply.\n\n${getTimezoneContextLine()}\n\n# Cron executor\n${CRON_EXECUTOR_RULE}`;
+// Runtime grounding so the LLM stops inventing constraints like "I can't reach
+// localhost from here." The daemon IS the local machine: localhost/127.0.0.1
+// and LAN URLs are reachable. Prefer http_get for plain JSON; reserve browse
+// for actually-rendered pages (login, JS SPA, screenshots).
+const RUNTIME_GROUNDING = `You are running as a daemon process on the user's own machine (this same machine, not a remote sandbox). Any localhost / 127.0.0.1 / 192.168.x.x / 10.x.x.x / .local URL the user gives you IS reachable from this process. For plain HTTP / JSON URLs, prefer the http skill (http_get). Use browse only when you actually need a rendered page (login, JS-driven SPA, screenshot). Never tell the user "I can't reach localhost from here" — fetch it.`;
+
+export function buildCronSystemPrompt() {
+  return `You are Pasture. Reply concisely. Use run_skill when you need http, search, browse, vision, cron, or memory. Do not use <think> or any thinking/reasoning blocks—output only your final reply.\n\n${RUNTIME_GROUNDING}\n\n${getTimezoneContextLine()}\n\n# Cron executor\n${CRON_EXECUTOR_RULE}`;
 }
 
 async function main() {
