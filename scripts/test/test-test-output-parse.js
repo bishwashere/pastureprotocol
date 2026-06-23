@@ -1,15 +1,15 @@
 /**
- * Unit tests for dashboard test output parsing (dashboard/public/test-output-parse.js).
+ * Unit tests for dashboard test output parsing (dashboard/public/assets/js/test-output-parse.js).
  */
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { parseTestOutput, renderOutputResults } from '../../dashboard/public/test-output-parse.js';
+import { parseTestOutput, renderOutputResults } from '../../dashboard/public/assets/js/test-output-parse.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(__dirname, '../../dashboard/public/index.html'), 'utf8');
-if (!html.includes('src="test-output-parse.js"')) {
-  console.error('FAIL index.html must load test-output-parse.js');
+if (!html.includes('assets/js/test-output-parse.js')) {
+  console.error('FAIL index.html must load assets/js/test-output-parse.js');
   process.exit(1);
 }
 if (html.includes('function parseTestOutput(result)')) {
