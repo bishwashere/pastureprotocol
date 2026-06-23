@@ -12,6 +12,8 @@ import {
   getSkillsToRemove,
   runSkillInstall,
   runSkillRemove,
+  listSkillCatalog,
+  runSkillsWizard,
 } from '../../lib/util/skill-install.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -158,6 +160,40 @@ await testAsync('runSkillRemove disables skill but keeps credentials by default'
     if (!envText.includes('BRAVE_API_KEY=BSA_test_brave_key')) {
       throw new Error('credentials should remain when not clearing');
     }
+  } finally {
+    process.env.PASTURE_STATE_DIR = prev || '';
+  }
+});
+
+test('listSkillCatalog includes github and hides core', () => {
+  const catalog = listSkillCatalog(ROOT);
+  if (!catalog.includes('github')) throw new Error('expected github in catalog');
+  if (catalog.includes('core')) throw new Error('core should be hidden');
+  if (catalog.includes('background-tasks')) throw new Error('background-tasks should be hidden');
+});
+
+await testAsync('runSkillsWizard lists then quits', async () => {
+  const answers = ['3', 'q'];
+  const result = await runSkillsWizard(ROOT, {
+    ask: async () => answers.shift() || 'q',
+  });
+  if (!result.ok) throw new Error('wizard should succeed');
+});
+
+await testAsync('runSkillsWizard add path enables search', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-skill-wizard-'));
+  const prev = process.env.PASTURE_STATE_DIR;
+  process.env.PASTURE_STATE_DIR = stateDir;
+  try {
+    const answers = ['1', 'search', 'q'];
+    const result = await runSkillsWizard(ROOT, {
+      ask: async () => answers.shift() || 'q',
+      promptSecret: async (_p, existing) => existing || 'BSA_wizard_brave_key',
+      onSkillChanged: async () => {},
+    });
+    if (!result.ok || !result.changed) throw new Error('expected successful add');
+    const config = JSON.parse(readFileSync(join(stateDir, 'config.json'), 'utf8'));
+    if (!config.skills.enabled.includes('search')) throw new Error('search not enabled');
   } finally {
     process.env.PASTURE_STATE_DIR = prev || '';
   }

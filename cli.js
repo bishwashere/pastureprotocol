@@ -66,7 +66,7 @@ function restartBotAfterSkillChange() {
 
 async function runSkillCommand(action, skillArg) {
   try {
-    const skillInstallPath = join(INSTALL_DIR, 'lib', 'skill-install.js');
+    const skillInstallPath = join(INSTALL_DIR, 'lib', 'util', 'skill-install.js');
     const mod = await import(pathToFileURL(skillInstallPath).href);
     const result = action === 'remove'
       ? await mod.runSkillRemove(skillArg, INSTALL_DIR)
@@ -557,22 +557,53 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     }
   })();
 } else if (sub === 'skills' || sub === 'add' || sub === 'remove') {
-  const skillSub = args[1];
+  const skillSub = sub === 'skills' ? (args[1] || '').toLowerCase() : '';
   const skillArg = (sub === 'add' || sub === 'remove') ? args[1] : args[2];
   const wantsInstall = sub === 'add' ? !!skillArg : (skillSub === 'install' && !!skillArg);
   const wantsRemove = sub === 'remove' ? !!skillArg : (skillSub === 'remove' && !!skillArg);
+  const wantsList = sub === 'skills' && skillSub === 'list';
+  const wantsWizard = sub === 'skills' && !skillSub;
+
   if (wantsInstall) {
     runSkillCommand('install', skillArg);
   } else if (wantsRemove) {
     runSkillCommand('remove', skillArg);
+  } else if (wantsList) {
+    (async () => {
+      try {
+        const skillInstallPath = join(INSTALL_DIR, 'lib', 'util', 'skill-install.js');
+        const mod = await import(pathToFileURL(skillInstallPath).href);
+        mod.printSkillList(INSTALL_DIR);
+      } catch (err) {
+        console.error('pasture: skills list failed.', err?.message || err);
+        process.exit(1);
+      }
+    })();
+  } else if (wantsWizard) {
+    (async () => {
+      try {
+        const skillInstallPath = join(INSTALL_DIR, 'lib', 'util', 'skill-install.js');
+        const mod = await import(pathToFileURL(skillInstallPath).href);
+        await mod.runSkillsWizard(INSTALL_DIR, {
+          onSkillChanged: () => restartBotAfterSkillChange(),
+        });
+      } catch (err) {
+        console.error('pasture: skills wizard failed.', err?.message || err);
+        process.exit(1);
+      }
+    })();
   } else {
-    console.log('Usage: pasture add <skill-id>');
+    console.log('Usage: pasture skills');
+    console.log('       pasture skills list');
+    console.log('       pasture skills install <skill-id>');
+    console.log('       pasture skills remove <skill-id>');
+    console.log('       pasture add <skill-id>');
     console.log('       pasture remove <skill-id>');
-    console.log('   or: pasture skills install <skill-id>');
-    console.log('   or: pasture skills remove <skill-id>');
-    console.log('  Example: pasture add speech');
+    console.log('  Example: pasture skills');
+    console.log('  Example: pasture skills install speech');
     console.log('  Example: pasture remove github');
-    console.log('  add: enables a skill and prompts for credentials.');
+    console.log('  skills: interactive wizard to add, remove, or list skills.');
+    console.log('  install: enables a skill and prompts for credentials.');
     console.log('  remove: disables a skill; optionally clears saved credentials.');
     process.exit((sub === 'add' || sub === 'remove' || skillSub === 'install' || skillSub === 'remove') ? 1 : 0);
   }
@@ -588,6 +619,8 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('       pasture delete agent <name> [--yes]');
   console.log('       pasture add <skill-id>');
   console.log('       pasture remove <skill-id>');
+  console.log('       pasture skills');
+  console.log('       pasture skills list');
   console.log('       pasture skills install <skill-id>');
   console.log('       pasture skills remove <skill-id>');
   console.log('       pasture server add <host> <name> [--user <user>] [--alias <alias>]');
