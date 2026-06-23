@@ -13,6 +13,7 @@ import dotenv from 'dotenv';
 import { homedir } from 'os';
 import { join } from 'path';
 import { getEnvPath } from '../lib/util/paths.js';
+import { beginCliSession } from '../lib/util/cli-banner.js';
 import { getMemoryConfig } from '../lib/context/memory-config.js';
 import { sync, indexFilesystem } from '../lib/context/memory-index.js';
 
@@ -51,6 +52,7 @@ const wantMemory = wantAll || sources.includes('memory');
 const wantFilesystem = wantAll || sources.includes('filesystem');
 
 async function main() {
+  beginCliSession();
   const config = getMemoryConfig();
   if (!config) {
     console.error('pasture index: Memory is not enabled. Add "memory" to skills.enabled in config and set an embedding API key.');

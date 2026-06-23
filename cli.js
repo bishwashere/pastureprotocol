@@ -13,6 +13,7 @@ import readline from 'readline';
 import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
+import { maybeBeginCliSession } from './lib/util/cli-banner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -24,6 +25,8 @@ const sub = args[0];
 const isForceUpdate = args.slice(1).some((a) => a === '--force' || a === '-f');
 
 const IS_WIN = process.platform === 'win32';
+
+maybeBeginCliSession(sub, args);
 
 function installHint() {
   if (IS_WIN) {

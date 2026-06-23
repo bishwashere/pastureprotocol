@@ -5,8 +5,8 @@
 import {
   CLI_BANNER,
   shouldShowCliBanner,
+  shouldBannerAtCliEntry,
   beginCliSession,
-  refreshCliBanner,
   endCliSession,
   isCliSessionActive,
 } from '../../lib/util/cli-banner.js';
@@ -50,11 +50,21 @@ test('shouldShowCliBanner false when PASTURE_NO_BANNER=1', () => {
   }
 });
 
+test('shouldBannerAtCliEntry covers logs and skips subprocess entry points', () => {
+  if (!shouldBannerAtCliEntry('logs', [])) throw new Error('logs should banner in cli.js');
+  if (shouldBannerAtCliEntry('setup', [])) throw new Error('setup is subprocess-owned');
+  if (shouldBannerAtCliEntry('auth', [])) throw new Error('auth is subprocess-owned');
+  if (shouldBannerAtCliEntry('tide', [])) throw new Error('tide is subprocess-owned');
+  if (shouldBannerAtCliEntry('index', [])) throw new Error('index is subprocess-owned');
+  if (shouldBannerAtCliEntry('skills', [])) throw new Error('skills wizard is menu-owned');
+  if (!shouldBannerAtCliEntry('skills', ['skills', 'list'])) throw new Error('skills list should banner');
+  if (!shouldBannerAtCliEntry('start', [])) throw new Error('start should banner');
+});
+
 test('session helpers track active state without printing when not TTY', () => {
   endCliSession();
   if (isCliSessionActive()) throw new Error('expected inactive after end');
   beginCliSession();
-  refreshCliBanner();
   endCliSession();
   if (isCliSessionActive()) throw new Error('expected inactive after endCliSession');
 });

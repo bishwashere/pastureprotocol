@@ -4,6 +4,7 @@
  */
 
 import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir, getAgentsDir } from './lib/util/paths.js';
+import { beginCliSession } from './lib/util/cli-banner.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -424,6 +425,7 @@ async function main() {
   }
 
   if (authOnly) {
+    beginCliSession();
     while (true) {
       try {
         const result = await runAuthOnly();

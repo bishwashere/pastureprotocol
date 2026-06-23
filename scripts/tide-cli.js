@@ -16,6 +16,7 @@ import {
   setChecklistItemEnabled,
   setChecklistTriggers,
 } from '../lib/agent/tide-checklist.js';
+import { beginCliSession } from '../lib/util/cli-banner.js';
 
 function parseFlags(argv) {
   const flags = {};
@@ -71,6 +72,7 @@ function printList() {
 }
 
 async function main() {
+  beginCliSession();
   let argv = process.argv.slice(2);
   if ((argv[0] || '').toLowerCase() === 'checklist') argv = argv.slice(1);
   const sub = (argv[0] || '').toLowerCase();
