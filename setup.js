@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
 import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/util/paths.js';
+import { beginCliSession } from './lib/util/cli-banner.js';
 
 /** Default Tide checklist block — inlined so setup.js does not import tide-checklist.js (needs dotenv) before deps install. */
 function defaultTideChecklistBlock() {
@@ -65,8 +66,7 @@ function section(title) {
   console.log('');
 }
 function welcome() {
-  console.log('');
-  console.log(C.green + '  Welcome to Pasture Protocol' + C.reset);
+  beginCliSession();
   console.log(C.dim + '  WhatsApp + Telegram bot powered by your own LLM (local or cloud)' + C.reset);
   console.log('');
 }

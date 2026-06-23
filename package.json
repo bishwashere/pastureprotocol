@@ -80,6 +80,7 @@
     "test:gmail-skill": "node scripts/test/test-gmail-skill.js",
     "test:calendar-skill": "node scripts/test/test-calendar-skill.js",
     "test:skill-install": "node scripts/test/test-skill-install.js",
+    "test:cli-banner": "node scripts/test/test-cli-banner.js",
     "test:home-assistant-format": "node scripts/test/test-home-assistant-format.js",
     "test:e2e-expect": "node scripts/test/test-e2e-expect.js",
     "test:team-activity": "node scripts/test/test-team-activity.js",
