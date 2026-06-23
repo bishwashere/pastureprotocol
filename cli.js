@@ -13,7 +13,7 @@ import readline from 'readline';
 import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
-import { maybeBeginCliSession } from './lib/util/cli-banner.js';
+import { maybeBeginCliSession, envForNestedCliCall } from './lib/util/cli-banner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -99,7 +99,7 @@ function runPostUpdateRestartAndDashboard() {
   if (existsSync(serverPath)) {
     const dashResult = spawnSync(process.execPath, [join(INSTALL_DIR, 'cli.js'), 'dashboard'], {
       stdio: 'inherit',
-      env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+      env: envForNestedCliCall({ ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR }),
       cwd: INSTALL_DIR,
     });
     if (dashResult.status === 0) {

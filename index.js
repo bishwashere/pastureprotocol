@@ -3,7 +3,7 @@
  * Config and state live in ~/.pasture (or PASTURE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir, getAgentsDir } from './lib/util/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir, getAgentsDir, getMemoryIndexPath } from './lib/util/paths.js';
 import { beginCliSession } from './lib/util/cli-banner.js';
 import dotenv from 'dotenv';
 
@@ -63,7 +63,7 @@ import { getOwnerConfig, isOwner } from './lib/util/owner-config.js';
 import { getGroupAddedBy, setGroupAddedBy } from './lib/channels/telegram-group-added-by.js';
 import { isTelegramGroup } from './lib/channels/group-guard.js';
 import { getMemoryConfig } from './lib/context/memory-config.js';
-import { indexChatExchange } from './lib/context/memory-index.js';
+import { indexChatExchange, renameIndexedChatLogPath } from './lib/context/memory-index.js';
 import {
   migrateRetrospectiveConfig,
   startRetrospective,
@@ -71,7 +71,7 @@ import {
   buildRetrospectiveContextBlock,
 } from './lib/agent/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs } from './lib/context/chat-log.js';
+import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs, migratePrivateChatLogFileNames } from './lib/context/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from './lib/context/chat-session.js';
 import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
@@ -423,6 +423,17 @@ async function main() {
     const migrated = migrateLegacyDatedChatLogs(getWorkspaceDir());
     if (migrated.files > 0) {
       console.log(`[chat-log] Migrated ${migrated.lines} exchange(s) from ${migrated.files} legacy daily log file(s) to chat-log/private/`);
+    }
+  } catch (_) {}
+  try {
+    const indexPath = getMemoryIndexPath();
+    const renamed = migratePrivateChatLogFileNames(getWorkspaceDir(), {
+      onRenamed(oldRel, newRel) {
+        renameIndexedChatLogPath(indexPath, oldRel, newRel);
+      },
+    });
+    if (renamed.renamed > 0) {
+      console.log(`[chat-log] Renamed ${renamed.renamed} private chat log file(s) to human-readable names`);
     }
   } catch (_) {}
   if (authOnly && existsSync(getAuthDir())) {

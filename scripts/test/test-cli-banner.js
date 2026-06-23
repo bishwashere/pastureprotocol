@@ -12,6 +12,7 @@ import {
   beginCliSession,
   endCliSession,
   isCliSessionActive,
+  envForNestedCliCall,
 } from '../../lib/util/cli-banner.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -113,6 +114,32 @@ test('skills wizard does not refresh banner on each menu turn', () => {
   }
   if (/refreshCliBanner|beginCliSession|printCliBanner/.test(loopBody)) {
     throw new Error('banner must not refresh inside the skills wizard menu loop');
+  }
+});
+
+test('envForNestedCliCall suppresses banner on nested cli.js spawns', () => {
+  const env = envForNestedCliCall({ FOO: 'bar' });
+  if (env.PASTURE_NO_BANNER !== '1') throw new Error('expected PASTURE_NO_BANNER=1');
+  if (env.FOO !== 'bar') throw new Error('expected base env preserved');
+  const prev = process.env.PASTURE_NO_BANNER;
+  process.env.PASTURE_NO_BANNER = '1';
+  try {
+    if (shouldShowCliBanner()) throw new Error('nested env should suppress banner');
+  } finally {
+    if (prev === undefined) delete process.env.PASTURE_NO_BANNER;
+    else process.env.PASTURE_NO_BANNER = prev;
+  }
+});
+
+test('post-update dashboard spawn suppresses nested CLI banner', () => {
+  const src = readFileSync(join(ROOT, 'cli.js'), 'utf8');
+  if (!src.includes('envForNestedCliCall')) {
+    throw new Error('cli.js must use envForNestedCliCall for nested dashboard spawn');
+  }
+  const fn = src.slice(src.indexOf('function runPostUpdateRestartAndDashboard'));
+  const fnBody = fn.slice(0, fn.indexOf('\n}', fn.indexOf('dashboard')));
+  if (!/envForNestedCliCall[\s\S]*dashboard/.test(fnBody)) {
+    throw new Error('runPostUpdateRestartAndDashboard must pass envForNestedCliCall to dashboard spawn');
   }
 });
 
