@@ -35,18 +35,18 @@ async function run() {
   assert(profile.soul.includes('growth'), 'profile includes SOUL excerpt');
 
   const parsed = parseDelegationRouterResponse(
-    JSON.stringify({
+    {
       action: 'delegate',
       targetAgentId: 'marketer',
       confidence: 0.88,
       reason: 'Growth analysis is marketing work.',
-    }),
+    },
     ['marketer', 'alex'],
   );
   assert(parsed.action === 'delegate' && parsed.targetAgentId === 'marketer', 'parse delegate');
 
   const lowConf = parseDelegationRouterResponse(
-    JSON.stringify({ action: 'delegate', targetAgentId: 'marketer', confidence: 0.4, reason: 'maybe' }),
+    { action: 'delegate', targetAgentId: 'marketer', confidence: 0.4, reason: 'maybe' },
     ['marketer'],
   );
   assert(lowConf.action === 'handle-in-main', 'low confidence stays in main');
