@@ -8,13 +8,21 @@ This is the live inventory of JavaScript code in `pastureprotocol` that currentl
 > - Tests must stub the LLM via the `llmChat` test seam — never call live models from unit tests.
 > - Update this file as part of the migration PR (move the row to `done`, link the PR if applicable).
 
-## Done (canonical pilot)
+## Done
 
 | Item | Where it was | Where it is now | Status |
 |---|---|---|---|
 | Work-mode toggle (single vs. multi-agent) | _new feature_ | `lib/agent/templates/work-mode-classifier.md` + `lib/agent/work-mode.js` | done |
 | Generic MD-prompt runner | _new_ | `lib/agent/md-llm.js` | done |
 | Architectural principle | _new_ | `AGENTS.md` (repo root) | done |
+| Delegation LLM router prompt | inlined string in `lib/agent/delegation-llm-router.js` | `lib/agent/templates/delegation-router.md` (called via `runMdPrompt`) | done |
+| Intent-planner JS wrapper | manual `readFileSync` + LLM call + `JSON.parse` in `lib/agent/intent-planner.js` | thin call to `runMdPrompt({ promptName: 'intent-planner', ... })` | done |
+| Retrospective: score exchange | inlined prompt string in `lib/agent/retrospective.js` | `lib/agent/templates/retrospective-score.md` | done |
+| Retrospective: implicit feedback classifier | inlined prompt string in `lib/agent/retrospective.js` | `lib/agent/templates/retrospective-implicit-feedback.md` | done |
+| System-pulse: pattern detector | inlined prompt string in `lib/agent/system-pulse.js` | `lib/agent/templates/system-pulse-pattern-detector.md` | done |
+| System-pulse: self-edit safety critique | inlined prompt string in `lib/agent/system-pulse.js` | `lib/agent/templates/system-pulse-self-critique.md` | done |
+| Tide-checklist instruction block | inlined template literal in `lib/agent/tide-checklist.js` | `lib/agent/templates/tide-checklist-instruction.md` | done |
+| `parseWriteIntent` / `parseEditIntent` / `parseHomeAssistantListIntent` fast paths | regex parsers + bypass blocks in `lib/agent/agent.js` | **deleted** — intent-planner LLM call routes these via the normal tool loop | done |
 
 ## Tier 1 — small, isolated classifiers (start here)
 
@@ -26,20 +34,18 @@ These are single-purpose regex/keyword classifiers. Each can be migrated in one 
 | `isNewSessionRequest` / `isNewSessionOnlyRequest` | `lib/context/chat-session.js` | "Start a new session" detection. New MD: `new-session-classifier.md`. **Pending.** |
 | `detectReplyModeSwitch` | `lib/context/chat-session.js` | Text-vs-voice reply mode toggle. New MD: `reply-mode-classifier.md`. Mirrors work-mode shape. **Pending.** |
 | `isYesReply` (and similar) | `lib/channels/telegram.js` | Yes/no confirmations. New MD: `yes-no-classifier.md`. **Pending.** |
-| `parseWriteIntent`, `parseEditIntent` | `lib/agent/agent.js` | "Write/edit a file…" fast paths that bypass the LLM tool loop. The current intent-planner already covers this; once migrated, the fast paths can be deleted entirely. **Pending.** |
-| `parseHomeAssistantListIntent` | `lib/agent/agent.js` | "List lights/automations" shortcut. Same: planner already routes home-assistant. **Pending.** |
 | `detectExplicitTargetAgent` | `lib/agent/evaluate-team-capability.js` | Token-match for explicit @-mentions. The LLM delegation router already handles this; the JS one is a precomputed hint. Migrate or remove. **Pending.** |
 
 ## Tier 2 — medium decision blocks
 
 | Item | Current location | Notes |
 |---|---|---|
-| `intent-planner.js` | `lib/agent/intent-planner.js` (+ `templates/intent-planner-prompt.md`) | Already MD-driven for the *prompt*, but `planIntent()` itself contains JS branching (`isNonTaskMessage` shortcut, validators, durable-mode coercion). Slim the JS once Tier 1 ships. **Pending.** |
+| `intent-planner.js` validators | `lib/agent/intent-planner.js` (+ `templates/intent-planner-prompt.md`) | The MD prompt + `runMdPrompt` plumbing is now in place (see Done). Remaining JS: `isNonTaskMessage` shortcut, output validators, durable-mode coercion. **Pending.** |
 | `getMissionsDiscoveryIntentHint` | `lib/context/missions-context.js` | Keyword/feature hint computed before the planner. Should be an MD classifier or merged into the planner output. **Pending.** |
 | `getGithubSourceIntentHint` | `lib/context/github-context.js` | Same shape as above. **Pending.** |
-| Tide checklist triggers | `lib/agent/tide-checklist.js` | Decision logic for when to send a follow-up. Move to MD. **Pending.** |
+| Tide checklist *triggers* | `lib/agent/tide-checklist.js` | Instruction block is now MD (see Done). Remaining JS: decision logic for *when* to fire a follow-up. **Pending.** |
 | Curiosity-momentum prompts | `lib/agent/curiosity-momentum.js` (+ `templates/curiosity-momentum-prompt.md`) | Prompt is MD; surrounding decision wrapper is JS. Slim. **Pending.** |
-| Retrospective triggers / decisions | `lib/agent/retrospective.js` | Decision logic for when to inject retrospective context. Move to MD. **Pending.** |
+| Retrospective *triggers* | `lib/agent/retrospective.js` | Score + implicit-feedback prompts are now MD (see Done). Remaining JS: decision logic for *when* to inject retrospective context into the system prompt. **Pending.** |
 
 ## Tier 3 — larger surgery
 
@@ -48,7 +54,6 @@ These are single-purpose regex/keyword classifiers. Each can be migrated in one 
 | Work-durability classifier | `lib/context/work-durability.js` | Already partially LLM-driven (`classifyWorkDurabilityWithAi`), but has heavy JS fast paths and keyword scoring. Convert fast paths to LLM. **Pending.** |
 | Delegation router | `lib/agent/agent-delegation-router.js`, `lib/agent/delegation-llm-router.js` | Hybrid scoring + LLM. Move scoring into the LLM prompt. **Pending.** |
 | Forced-delegation rules | `lib/agent/forced-delegation.js` | Should follow the LLM router's recommendation; currently has its own heuristics. **Pending.** |
-| `agent.js` write/edit/HA fast-path bypasses | `lib/agent/agent.js` | Tied to Tier-1 `parseWriteIntent`/`parseEditIntent`/`parseHomeAssistantListIntent`. Once those migrate, the fast paths in `agent.js` can be deleted. **Pending.** |
 | User-facing reply formatter | `lib/agent/user-facing-reply.js` | Formatting logic for the final reply. Some is mechanical (markdown sanitization) and stays JS; some is editorial (which lines to keep) and moves to MD. **Pending.** |
 
 ## Tier 4 — runtime / orchestration glue

@@ -77,7 +77,8 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [speech/](speech/inputs.md) | `test-speech-e2e.js` | `--test` |
 | [gog/](gog/inputs.md) | `test-gog-e2e.js` | `--test` |
 | [tide/](tide/inputs.md) | `test-tide.js` | direct (payload) |
-| - | `test-work-mode.js` | direct (LLM-stubbed; chat-session storage + md-llm runner + work-mode classifier) |
+| - | `test-work-mode.js` | direct (LLM-stubbed; chat-session storage + md-llm runner + work-mode classifier; pins "toggle takes effect next turn" contract) |
+| - | `test-autonomy-gating.js` | direct (mission engine + system pulse only start once the first mission is created or already on disk; idempotent) |
 | [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `test-project-workflow-e2e.js` | `--test` (multi-turn) |
 
 ### Dashboard Tests panel (all `scripts/test/<id>/inputs.md` + matching script)

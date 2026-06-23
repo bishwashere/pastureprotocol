@@ -98,6 +98,7 @@ import { buildOneOnOneSystemPrompt } from './lib/agent/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID, buildAgentTeamPromptBlock } from './lib/agent/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/agent/background-tasks.js';
 import { startMissionEngine } from './lib/agent/mission-engine.js';
+import { configureAutonomy, maybeStartOnBoot } from './lib/agent/autonomy-gate.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/channels/group-display-names.js';
 import { resetBrowseSession } from './lib/agent/executors/browse.js';
 import { toUserMessage, getErrorMessageForLog } from './lib/util/user-error.js';
@@ -436,44 +437,58 @@ async function main() {
     return;
   }
 
-  // Persistent autonomous missions loop (agent background work above single turns).
-  try {
-    const cfg = loadConfig();
-    const loopMs = Number(cfg?.missions?.loopMs) || 45 * 60_000;
-    const curiosityIntervalMs = Number(cfg?.missions?.curiosityIntervalMs) || 150 * 60_000;
-    startMissionEngine({
-      loopMs,
-      curiosityIntervalMs,
-      runMissionTurn: async (mission, prompt) =>
-        runInternalAgentTurn({
-          targetAgentId: mission?.ownerAgentId || DEFAULT_AGENT_ID,
-          userText: prompt,
-          callerAgentId: DEFAULT_AGENT_ID,
-          depth: 1,
-          callChain: [DEFAULT_AGENT_ID, mission?.ownerAgentId || DEFAULT_AGENT_ID],
-          persistHistory: true,
-          missionId: mission?.id || '',
-        }),
-      onLog: (event) => {
-        const baseDetails = event?.details && typeof event.details === 'object' ? event.details : {};
-        logTeamActivity({
-          type: event.type || 'mission_tick',
-          agentId: event.ownerAgentId || event.agentId || DEFAULT_AGENT_ID,
-          status: event.status || 'ok',
-          message: event.message || event.title || 'Mission tick',
-          title: event.title || baseDetails.title || '',
-          details: {
-            ...baseDetails,
-            missionId: event.missionId || baseDetails.missionId || '',
+  // Autonomy loops (mission engine + system pulse) are NOT started eagerly.
+  // Per the architecture (see AGENTS.md and lib/agent/autonomy-gate.js): the
+  // agent runs as a single-shot single-agent skills loop by default. Mission
+  // engine ticking, curiosity-momentum, AI-suggested-tasks scanning, and the
+  // system pulse only come online once the user has at least one durable
+  // mission. We register the starter here; autonomy-gate fires it either
+  // at boot (if missions already exist) or on the first createMission().
+  configureAutonomy(() => {
+    try {
+      const cfg = loadConfig();
+      const loopMs = Number(cfg?.missions?.loopMs) || 45 * 60_000;
+      const curiosityIntervalMs = Number(cfg?.missions?.curiosityIntervalMs) || 150 * 60_000;
+      startMissionEngine({
+        loopMs,
+        curiosityIntervalMs,
+        runMissionTurn: async (mission, prompt) =>
+          runInternalAgentTurn({
+            targetAgentId: mission?.ownerAgentId || DEFAULT_AGENT_ID,
+            userText: prompt,
+            callerAgentId: DEFAULT_AGENT_ID,
+            depth: 1,
+            callChain: [DEFAULT_AGENT_ID, mission?.ownerAgentId || DEFAULT_AGENT_ID],
+            persistHistory: true,
+            missionId: mission?.id || '',
+          }),
+        onLog: (event) => {
+          const baseDetails = event?.details && typeof event.details === 'object' ? event.details : {};
+          logTeamActivity({
+            type: event.type || 'mission_tick',
+            agentId: event.ownerAgentId || event.agentId || DEFAULT_AGENT_ID,
+            status: event.status || 'ok',
+            message: event.message || event.title || 'Mission tick',
             title: event.title || baseDetails.title || '',
-          },
-        });
-      },
-    });
-    console.log('[missions] engine started');
-  } catch (err) {
-    console.log('[missions] engine failed to start:', getErrorMessageForLog(err));
-  }
+            details: {
+              ...baseDetails,
+              missionId: event.missionId || baseDetails.missionId || '',
+              title: event.title || baseDetails.title || '',
+            },
+          });
+        },
+      });
+      console.log('[missions] engine started');
+    } catch (err) {
+      console.log('[missions] engine failed to start:', getErrorMessageForLog(err));
+    }
+    try {
+      startSystemPulse();
+    } catch (err) {
+      console.log('[system-pulse] failed to start:', getErrorMessageForLog(err));
+    }
+  });
+  maybeStartOnBoot();
 
   let sock;
   const channelsConfig = getChannelsConfig();
@@ -1248,10 +1263,21 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
-    // Step 1.5: classify work-mode for this turn (LLM, MD-driven). The
-    // multi-agent pipeline (work-durability, delegation, missions, projects,
-    // project-workflow context) only runs when this session is in "multi".
-    // Every session starts in "single" and the user opts in by saying so.
+    // Step 1.5: classify work-mode for this turn (LLM, MD-driven).
+    //
+    // Two-tier gating:
+    //   - The classifier always runs (so any turn can be the one that
+    //     toggles the mode), and the persisted mode is updated immediately.
+    //   - But the operational mode that gates THIS turn's pipeline is the
+    //     mode the session was in BEFORE the classifier ran. That is, when
+    //     the user says "enable work mode", this turn still runs as a
+    //     single-agent skills loop and just acks the switch. The next turn
+    //     onwards picks up the multi-agent pipeline (delegation, intent
+    //     planner, work-durability pre-fill, missions/projects/workflow
+    //     context blocks). This matches the design described by the user
+    //     and avoids running heavy multi-agent context for a turn whose
+    //     only real content is the toggle acknowledgement.
+    //
     // Group chats are always single-mode (group flows skip multi-agent today).
     let workModeAck = null;
     let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
@@ -1262,10 +1288,15 @@ async function main() {
         agentId,
       }));
       if (wm) {
-        workMode = wm.modeAfter;
+        workMode = wm.modeBefore;
         if (wm.toggled) {
           workModeAck = wm.ack;
-          console.log('[work-mode]', JSON.stringify({ before: wm.modeBefore, after: wm.modeAfter, reason: wm.reason }));
+          console.log('[work-mode]', JSON.stringify({
+            before: wm.modeBefore,
+            after: wm.modeAfter,
+            effectiveThisTurn: wm.modeBefore,
+            reason: wm.reason,
+          }));
         } else {
           console.log('[work-mode]', JSON.stringify({ mode: workMode }));
         }
@@ -1372,17 +1403,24 @@ async function main() {
       });
     }
     // Step 4: intent planner — one small LLM call before loading any tool schemas.
-    const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(text)
+    //
+    // The planner (and its companion hint classifiers — casual chat, missions
+    // discovery, github source) is a multi-agent / work-mode concern. In
+    // single-agent mode the agent simply runs the skills tool loop directly
+    // with the full enabled skill list; there is no pre-routing decision to
+    // make, no delegation to plan around, no durable work to preserve. Skipping
+    // the planner in single mode saves one LLM call per turn and keeps the
+    // default conversational path lean.
+    const casualIntentPlan = isMultiAgent && !presetDelegationPlan && isNonTaskMessage(text)
       ? buildCasualChatIntentPlan()
       : null;
-    // Missions discovery hint is multi-agent specific.
     const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
       ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
-    const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
+    const githubIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
       ? getGithubSourceIntentHint(text, enabledSkillIds)
       : null;
-    const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+    const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
       ? await traceAsyncStep('intent_planner', () => planIntent({
           userText: text,
           historyMessages,
@@ -1714,7 +1752,9 @@ async function main() {
       startTide(sock, null);
       startTideNudge();
       startRetrospective();
-      startSystemPulse();
+      // Autonomy loops (mission engine + system pulse) are NOT started here.
+      // They are gated by lib/agent/autonomy-gate.js and come online only
+      // once a mission exists. See configureAutonomy() in main().
       const lastSentByJid = new Map();
       const ourSentMessageIds = new Set();
       const telegramRepliedIds = new Set();
@@ -1779,7 +1819,7 @@ async function main() {
       startTide(telegramSock, null);
       startTideNudge();
       startRetrospective();
-      startSystemPulse();
+      // System pulse is gated by autonomy-gate.js (missions presence).
     }
 
     sock.ev.on('connection.update', (u) => {
@@ -1796,7 +1836,7 @@ async function main() {
         startTide(sock, sid);
         startTideNudge();
         startRetrospective();
-        startSystemPulse();
+        // System pulse is gated by autonomy-gate.js (missions presence).
       }
       // Flush replies that failed to send while disconnected
       while (pendingReplies.length > 0) {

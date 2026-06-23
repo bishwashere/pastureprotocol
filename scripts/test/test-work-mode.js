@@ -192,6 +192,59 @@ async function main() {
   });
   assert(r5.toggled === false && r5.ack === null, 'empty input is a no-op');
 
+  // ── 14. Toggle takes effect on the NEXT turn (modeBefore semantics) ────────
+  //
+  // When the user enables work mode mid-conversation, the persisted mode flips
+  // to multi immediately so subsequent turns see it, but the CURRENT turn still
+  // runs as single-agent (toggle acknowledged, multi pipeline deferred). Index.js
+  // implements this by using wm.modeBefore for the operational gate. This test
+  // pins that contract so a future refactor can't quietly revert it.
+  const deferKey = 'defer-test';
+  startNewSession(deferKey, 'manual');
+  const t1 = await resolveWorkModeForTurn({
+    userText: 'enable work mode',
+    logKey: deferKey,
+    llmChat: async () => '{"toggle":"enable","reason":"explicit"}',
+  });
+  assert(t1.toggled === true, 'toggle must report true on the flip turn');
+  assert(t1.modeBefore === 'single', 'modeBefore is single on the flip turn');
+  assert(t1.modeAfter === 'multi', 'modeAfter is multi after persistence');
+  assert(getSessionWorkMode(deferKey) === 'multi', 'mode persisted as multi');
+  // The operational gate uses modeBefore — this is the contract index.js relies on.
+  const opModeFlipTurn = t1.modeBefore;
+  assert(opModeFlipTurn === 'single', 'operational mode on the flip turn must still be single');
+
+  // Next turn: no toggle requested. The pipeline now picks up multi from
+  // the persisted state (modeBefore is now 'multi' going into this turn).
+  const t2 = await resolveWorkModeForTurn({
+    userText: 'now help me ship the signup flow',
+    logKey: deferKey,
+    llmChat: async () => '{"toggle":"no_change","reason":"normal task"}',
+  });
+  assert(t2.toggled === false, 'no toggle on the next turn');
+  assert(t2.modeBefore === 'multi', 'modeBefore on the next turn reflects the prior flip');
+  const opModeNextTurn = t2.modeBefore;
+  assert(opModeNextTurn === 'multi', 'operational mode on the next turn is multi (work pipeline on)');
+
+  // Same logic in reverse: disabling defers too — flip turn still gets a
+  // multi-mode wind-down before single takes over next turn.
+  const t3 = await resolveWorkModeForTurn({
+    userText: 'okay, work mode off',
+    logKey: deferKey,
+    llmChat: async () => '{"toggle":"disable","reason":"asked to stop"}',
+  });
+  assert(t3.toggled === true && t3.modeBefore === 'multi' && t3.modeAfter === 'single',
+    'disable on the flip turn: before=multi, after=single');
+  const opModeDisableFlip = t3.modeBefore;
+  assert(opModeDisableFlip === 'multi', 'operational mode on the disable flip turn is still multi');
+
+  const t4 = await resolveWorkModeForTurn({
+    userText: 'thanks',
+    logKey: deferKey,
+    llmChat: async () => '{"toggle":"no_change","reason":"casual"}',
+  });
+  assert(t4.modeBefore === 'single', 'mode reverts to single for subsequent turns');
+
   console.log('Work-mode test passed.');
 }
 
