@@ -13,7 +13,7 @@ import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
 import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent/agent-avatar.js';
-import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/context/chat-log.js';
+import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText, CHAT_LOG_DAY_PREFIX } from '../lib/context/chat-log.js';
 import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/agent/team-activity.js';
 import { readAllAgentContext, clearMissionFromAgentContext } from '../lib/agent/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent/agent-metrics.js';
@@ -1715,7 +1715,6 @@ app.patch('/api/workspace-md/:key', (req, res) => {
 
 const CHAT_LOG_DIR_NAME = 'chat-log';
 const GROUP_CHAT_LOG_DIR_NAME = 'group-chat-log';
-const CHAT_LOG_DAY_PREFIX = `${CHAT_LOG_DIR_NAME}/day/`;
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function normalizeWorkspaceLogKey(key) {
@@ -1730,7 +1729,6 @@ function isAllowedWorkspaceLogKey(key) {
   if (!k.endsWith('.jsonl')) return false;
   if (k.startsWith(`${CHAT_LOG_DIR_NAME}/`)) {
     const rest = k.slice(CHAT_LOG_DIR_NAME.length + 1);
-    if (/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(rest)) return true;
     if (/^private\/[a-zA-Z0-9_.-]+\.jsonl$/.test(rest)) return true;
     return false;
   }

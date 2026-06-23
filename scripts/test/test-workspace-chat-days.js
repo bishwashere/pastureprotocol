@@ -1,5 +1,5 @@
 /**
- * Chat history by day: merge dated jsonl + private jsonl (not memory/YYYY-MM-DD.md)
+ * Chat history by day: aggregate chat-log/private/*.jsonl by calendar date
  */
 
 import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';

@@ -2,6 +2,9 @@
  * Unit tests for interactive CLI banner (setup / skills).
  */
 
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import {
   CLI_BANNER,
   shouldShowCliBanner,
@@ -10,6 +13,8 @@ import {
   endCliSession,
   isCliSessionActive,
 } from '../../lib/util/cli-banner.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 let passed = 0;
 let failed = 0;
@@ -67,6 +72,48 @@ test('session helpers track active state without printing when not TTY', () => {
   beginCliSession();
   endCliSession();
   if (isCliSessionActive()) throw new Error('expected inactive after endCliSession');
+});
+
+test('beginCliSession prints banner at most once per session', () => {
+  endCliSession();
+  let prints = 0;
+  const origLog = console.log;
+  console.log = (...args) => {
+    if (args[0] === CLI_BANNER) prints++;
+    origLog(...args);
+  };
+  const prevNoBanner = process.env.PASTURE_NO_BANNER;
+  const prevIsTTY = process.stdout.isTTY;
+  delete process.env.PASTURE_NO_BANNER;
+  process.stdout.isTTY = true;
+  try {
+    beginCliSession();
+    beginCliSession();
+    beginCliSession();
+    if (prints !== 1) throw new Error(`expected 1 banner print, got ${prints}`);
+    if (!isCliSessionActive()) throw new Error('expected active session after beginCliSession');
+  } finally {
+    console.log = origLog;
+    endCliSession();
+    if (prevNoBanner === undefined) delete process.env.PASTURE_NO_BANNER;
+    else process.env.PASTURE_NO_BANNER = prevNoBanner;
+    process.stdout.isTTY = prevIsTTY;
+  }
+});
+
+test('skills wizard does not refresh banner on each menu turn', () => {
+  const src = readFileSync(join(ROOT, 'lib/util/skill-install.js'), 'utf8');
+  const fn = src.slice(src.indexOf('export async function runSkillsWizard'));
+  const loopStart = fn.indexOf('while (true)');
+  const beforeLoop = fn.slice(0, loopStart);
+  const loopEnd = fn.indexOf('endCliSession();', loopStart);
+  const loopBody = fn.slice(loopStart, loopEnd);
+  if (!beforeLoop.includes('beginCliSession(deps)')) {
+    throw new Error('beginCliSession must run once before the menu loop');
+  }
+  if (/refreshCliBanner|beginCliSession|printCliBanner/.test(loopBody)) {
+    throw new Error('banner must not refresh inside the skills wizard menu loop');
+  }
 });
 
 console.log(`\nResults: ${passed} passed, ${failed} failed\n`);

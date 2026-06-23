@@ -68,6 +68,7 @@
     "test:session-bootstrap": "node scripts/test/test-session-bootstrap.js",
     "test:memory-index-files": "node scripts/test/test-memory-index-files.js",
     "test:workspace-chat-days": "node scripts/test/test-workspace-chat-days.js",
+    "test:legacy-chat-log-migration": "node scripts/test/test-legacy-chat-log-migration.js",
     "test:update-build": "node scripts/test/test-update-build.js",
     "test:install": "node scripts/test/test-install.js",
     "test:daemon-pm2": "node scripts/test/test-daemon-pm2.js",

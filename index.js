@@ -71,7 +71,7 @@ import {
   buildRetrospectiveContextBlock,
 } from './lib/agent/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges } from './lib/context/chat-log.js';
+import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs } from './lib/context/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from './lib/context/chat-session.js';
 import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
@@ -419,6 +419,12 @@ async function main() {
   migrateTideConfig();
   migrateRetrospectiveConfig();
   migrateSystemPulseConfig();
+  try {
+    const migrated = migrateLegacyDatedChatLogs(getWorkspaceDir());
+    if (migrated.files > 0) {
+      console.log(`[chat-log] Migrated ${migrated.lines} exchange(s) from ${migrated.files} legacy daily log file(s) to chat-log/private/`);
+    }
+  } catch (_) {}
   if (authOnly && existsSync(getAuthDir())) {
     rmSync(getAuthDir(), { recursive: true });
     mkdirSync(getAuthDir(), { recursive: true });
