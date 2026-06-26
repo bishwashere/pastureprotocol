@@ -2056,6 +2056,36 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
   return { corpus, stats };
 }
 
+const BRAIN_VERB_WORDS = new Set([
+  'am', 'are', 'aren', 'be', 'been', 'being', 'can', 'cannot', 'could', 'couldn', 'did', 'didn',
+  'do', 'does', 'doesn', 'doing', 'don', 'done', 'had', 'hadn', 'has', 'hasn', 'have', 'haven',
+  'having', 'is', 'isn', 'may', 'might', 'must', 'need', 'needed', 'needs', 'ought', 'shall',
+  'should', 'shouldn', 'was', 'wasn', 'were', 'weren', 'will', 'won', 'would', 'wouldn',
+  'add', 'added', 'adding', 'ask', 'asked', 'asking', 'build', 'building', 'built', 'call',
+  'called', 'calling', 'change', 'changed', 'changing', 'check', 'checked', 'checking', 'click',
+  'clicked', 'clicking', 'connect', 'connected', 'connecting', 'create', 'created', 'creates',
+  'creating', 'delete', 'deleted', 'deleting', 'doe', 'enable', 'enabled', 'enabling', 'exclude',
+  'excluded', 'excluding', 'fetch', 'fetched', 'fetching', 'find', 'finding', 'found', 'generate',
+  'generated', 'generating', 'get', 'gets', 'getting', 'give', 'given', 'giving', 'go', 'goes',
+  'going', 'got', 'help', 'helped', 'helping', 'include', 'included', 'including', 'install',
+  'installed', 'installing', 'keep', 'keeping', 'kept', 'know', 'knowing', 'known', 'let', 'lets',
+  'like', 'liked', 'load', 'loaded', 'loading', 'look', 'looked', 'looking', 'made', 'make',
+  'makes', 'making', 'move', 'moved', 'moving', 'open', 'opened', 'opening', 'post', 'posted',
+  'posting', 'read', 'reading', 'remove', 'removed', 'removing', 'rename', 'renamed', 'renaming',
+  'reply', 'replied', 'replying', 'respond', 'responded', 'responding', 'restart', 'restarted',
+  'restarting', 'run', 'running', 'ran', 'save', 'saved', 'saving', 'say', 'saying', 'see',
+  'seeing', 'seen', 'send', 'sending', 'sent', 'set', 'setting', 'show', 'showed', 'showing',
+  'shown', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'summarize',
+  'summarized', 'summarizing', 'take', 'taken', 'taking', 'tell', 'telling', 'told', 'try',
+  'tried', 'trying', 'turn', 'turned', 'turning', 'update', 'updated', 'updating', 'upload',
+  'uploaded', 'uploading', 'use', 'used', 'using', 'want', 'wanted', 'wants', 'work', 'worked',
+  'working', 'write', 'writing', 'written', 'wrote',
+]);
+
+function isBrainVerbWord(word) {
+  return BRAIN_VERB_WORDS.has(word);
+}
+
 function brainSegmentWords(text) {
   const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
   const counts = new Map();
@@ -2072,7 +2102,7 @@ function brainSegmentWords(text) {
       if ((cp >= 97 && cp <= 122) || cp > 127) hasLetter = true;
       if (cp >= 48 && cp <= 57) hasDigit = true;
     }
-    if (!hasLetter || hasDigit) continue;
+    if (!hasLetter || hasDigit || isBrainVerbWord(word)) continue;
     counts.set(word, (counts.get(word) || 0) + 1);
     if (!order.has(word)) order.set(word, idx++);
   }

@@ -2608,8 +2608,8 @@ function renderSystemCronVariant(row) {
         var seed = brainHash((term.text || '') + ':' + idx);
         var normalized = maxWeight === minWeight ? (weight <= 1 ? 0 : 1 - idx / Math.max(1, terms.length - 1)) : (Math.max(1, weight) - minWeight) / span;
         var tieBreak = weight <= 1 ? 0 : (brainSeededRandom(seed ^ 0xA511E9B3) - 0.5) * 0.9;
-        var font = weight <= 1 ? 10 : 10.2 + Math.pow(Math.max(0, Math.min(1, normalized)), 0.62) * 11.2 + tieBreak;
-        font = Math.max(10, Math.min(22, font));
+        var font = weight <= 1 ? 10 : 10.2 + Math.pow(Math.max(0, Math.min(1, normalized)), 0.58) * 17.8 + tieBreak;
+        font = Math.max(10, Math.min(29, font));
         var point = brainScatterPoint(seed, idx, w, h, 28, 18);
         return {
           term: term,
@@ -2678,6 +2678,18 @@ function renderSystemCronVariant(row) {
       positions.forEach(function (pos) { byText[pos.term.text] = pos; });
       canvas.setAttribute('data-brain-word-count', String(positions.length));
       var selectedLinks = brainRelationMap(selectedText, connections);
+      (connections || []).slice(0, 1600).forEach(function (c) {
+        var a = byText[c.from];
+        var b = byText[c.to];
+        if (!a || !b) return;
+        var strength = Math.max(1, Math.min(100, Number(c.strength) || 1));
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineWidth = 0.35 + (strength / 100) * 0.55;
+        ctx.strokeStyle = 'rgba(100,116,139,' + (0.055 + (strength / 100) * 0.075).toFixed(3) + ')';
+        ctx.stroke();
+      });
       if (selectedText) {
         (connections || []).forEach(function (c) {
           var fromRel = selectedLinks[c.from];
@@ -2692,8 +2704,8 @@ function renderSystemCronVariant(row) {
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.lineWidth = maxDepth === 1 ? (level === 'strong' ? 2.2 : level === 'medium' ? 1.4 : 0.9) : 0.7;
-            ctx.strokeStyle = maxDepth === 1 ? 'rgba(203,213,225,0.52)' : 'rgba(148,163,184,0.22)';
+            ctx.lineWidth = maxDepth === 1 ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1) : 0.8;
+            ctx.strokeStyle = maxDepth === 1 ? 'rgba(148,163,184,0.72)' : 'rgba(100,116,139,0.42)';
             ctx.stroke();
           }
         });
