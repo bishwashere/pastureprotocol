@@ -2179,12 +2179,14 @@ app.get('/api/brain/cloud', async (req, res) => {
   try {
     const range = normalizeBrainRange(req.query.range);
     const source = normalizeBrainSource(req.query.source);
-    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const cacheKey = `${range}:${source}`;
+    if (refresh) brainCloudCache.delete(cacheKey);
     const cached = brainCloudCache.get(cacheKey);
     const cachedHasTerms = Array.isArray(cached?.payload?.terms) && cached.payload.terms.length > 0;
     const cachedHadNoCorpus = Number(cached?.payload?.stats?.chars || 0) === 0;
     if (!refresh && cached && (cachedHasTerms || cachedHadNoCorpus) && Date.now() - cached.cachedAtMs < BRAIN_CACHE_MS) {
+      res.set('Cache-Control', 'no-store');
       res.json({ ...cached.payload, cached: true });
       return;
     }
@@ -2199,6 +2201,7 @@ app.get('/api/brain/cloud', async (req, res) => {
         stats,
       };
       brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+      res.set('Cache-Control', 'no-store');
       res.json({ ...payload, cached: false });
       return;
     }
@@ -2216,6 +2219,7 @@ app.get('/api/brain/cloud', async (req, res) => {
       stats,
     };
     brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+    res.set('Cache-Control', 'no-store');
     res.json({ ...payload, cached: false });
   } catch (err) {
     res.status(500).json({ error: err.message });

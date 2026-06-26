@@ -2680,6 +2680,24 @@ function renderSystemCronVariant(row) {
       return map;
     }
 
+    function brainHoverFont(pos, rel) {
+      if (!rel) return Math.max(8.5, Math.min(12, pos.font * 0.42));
+      var strength = Math.max(1, Math.min(100, Number(rel.strength) || 1));
+      if (rel.depth === 0) return 52;
+      if (rel.depth === 1) return 18 + Math.pow(strength / 100, 0.58) * 28;
+      if (rel.depth === 2) return 11 + Math.pow(strength / 100, 0.7) * 14;
+      return Math.max(8.5, Math.min(12, pos.font * 0.42));
+    }
+
+    function brainHoverAlpha(rel, selectedText) {
+      if (!selectedText) return 0.48;
+      if (!rel) return 0.08;
+      if (rel.depth === 0) return 1;
+      if (rel.depth === 1) return 0.96;
+      if (rel.depth === 2) return 0.58;
+      return 0.08;
+    }
+
     function drawBrainMeshCanvas(canvas, terms, connections, selectedText) {
       if (!canvas) return;
       var rect = canvas.getBoundingClientRect();
@@ -2737,19 +2755,25 @@ function renderSystemCronVariant(row) {
         });
       }
       positions.slice().sort(function (a, b) {
-        return a.font - b.font;
+        var aRel = selectedText && selectedLinks[String(a.term.text || '')];
+        var bRel = selectedText && selectedLinks[String(b.term.text || '')];
+        var aFont = selectedText ? brainHoverFont(a, aRel) : a.font;
+        var bFont = selectedText ? brainHoverFont(b, bRel) : b.font;
+        return aFont - bFont;
       }).forEach(function (pos) {
         var text = String(pos.term.text || '');
         var rel = selectedText && selectedLinks[text];
         var selected = rel && rel.depth === 0;
-        var alpha = selectedText ? (rel ? (rel.depth === 2 ? 0.56 : 0.96) : 0.11) : 0.48;
+        var displayFont = selectedText ? brainHoverFont(pos, rel) : pos.font;
+        var alpha = brainHoverAlpha(rel, selectedText);
         var hue = selected ? '255,255,255' : '219,234,254';
-        ctx.font = pos.font.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+        ctx.font = displayFont.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(' + hue + ',' + alpha + ')';
         var label = text.length > 16 ? text.slice(0, 15) + '…' : text;
-        ctx.fillText(label, pos.x, pos.y, pos.cellW - 8);
+        var maxWidth = Math.max(56, Math.min(220, String(label || '').length * displayFont * 0.62 + 12));
+        ctx.fillText(label, pos.x, pos.y, maxWidth);
       });
       canvas._brainMeshPositions = positions;
     }
@@ -2891,8 +2915,8 @@ function renderSystemCronVariant(row) {
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
         var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) + '&source=' + encodeURIComponent(source);
-        if (refresh) url += '&refresh=1';
-        var r = await fetch(url);
+        if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
+        var r = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
         renderBrainCloud(d);
