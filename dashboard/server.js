@@ -2082,8 +2082,31 @@ const BRAIN_VERB_WORDS = new Set([
   'working', 'write', 'writing', 'written', 'wrote',
 ]);
 
-function isBrainVerbWord(word) {
-  return BRAIN_VERB_WORDS.has(word);
+const BRAIN_FILLER_WORDS = new Set([
+  'able', 'about', 'above', 'across', 'after', 'again', 'against', 'ago', 'all', 'almost',
+  'alone', 'along', 'already', 'also', 'although', 'always', 'among', 'another', 'any',
+  'anyone', 'anything', 'around', 'away', 'back', 'based', 'basis', 'because', 'before',
+  'behind', 'below', 'beside', 'between', 'both', 'but', 'called', 'certain', 'course',
+  'current', 'currently', 'daily', 'days', 'default', 'different', 'down', 'each', 'either',
+  'else', 'enough', 'especially', 'etc', 'even', 'ever', 'every', 'everyone', 'everything',
+  'exactly', 'far', 'few', 'finally', 'first', 'five', 'following', 'for', 'from', 'front',
+  'general', 'here', 'however', 'inside', 'instead', 'into', 'its', 'itself', 'just', 'kind',
+  'last', 'latest', 'later', 'least', 'left', 'level', 'long', 'lot', 'many', 'maybe', 'mean',
+  'minutes', 'month', 'more', 'most', 'much', 'near', 'new', 'next', 'nothing', 'now',
+  'okay', 'once', 'only', 'other', 'otherwise', 'outside', 'over', 'own', 'particular',
+  'per', 'please', 'possible', 'probably', 'quite', 'rather', 'raw', 'really', 'recent',
+  'recently', 'regardless', 'remaining', 'same', 'second', 'seconds', 'several', 'short',
+  'side', 'simple', 'simply', 'since', 'single', 'sit', 'small', 'sometimes', 'specific',
+  'specifically', 'still', 'stuff', 'such', 'sure', 'than', 'that', 'the', 'their', 'them',
+  'then', 'there', 'these', 'they', 'thing', 'things', 'this', 'those', 'three', 'through',
+  'time', 'today', 'tomorrow', 'too', 'top', 'toward', 'true', 'two', 'unless', 'until',
+  'very', 'via', 'week', 'whatever', 'when', 'where', 'whether', 'which', 'while', 'who',
+  'why', 'with', 'within', 'without', 'word', 'words', 'yeah', 'year', 'yesterday', 'you',
+  'your', 'youre',
+]);
+
+function isBrainExcludedWord(word) {
+  return BRAIN_VERB_WORDS.has(word) || BRAIN_FILLER_WORDS.has(word);
 }
 
 function brainSegmentWords(text) {
@@ -2102,14 +2125,14 @@ function brainSegmentWords(text) {
       if ((cp >= 97 && cp <= 122) || cp > 127) hasLetter = true;
       if (cp >= 48 && cp <= 57) hasDigit = true;
     }
-    if (!hasLetter || hasDigit || isBrainVerbWord(word)) continue;
+    if (!hasLetter || hasDigit || isBrainExcludedWord(word)) continue;
     counts.set(word, (counts.get(word) || 0) + 1);
     if (!order.has(word)) order.set(word, idx++);
   }
   return { counts, order };
 }
 
-function buildDenseBrainGraph(corpus, maxTerms = 1000) {
+function buildDenseBrainGraph(corpus, maxTerms = 2600) {
   const joined = corpus.map((chunk) => chunk.text || '').join('\n\n');
   const { counts, order } = brainSegmentWords(joined);
   const maxCount = Math.max(1, ...counts.values());
@@ -2181,7 +2204,7 @@ app.get('/api/brain/cloud', async (req, res) => {
     }
 
     const denseCorpus = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS }).corpus;
-    const dense = buildDenseBrainGraph(denseCorpus, 1000);
+    const dense = buildDenseBrainGraph(denseCorpus, 2600);
     const payload = {
       range,
       source,

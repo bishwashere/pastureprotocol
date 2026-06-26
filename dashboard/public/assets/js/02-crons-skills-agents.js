@@ -2596,6 +2596,23 @@ function renderSystemCronVariant(row) {
       };
     }
 
+    function brainVisibleWordLimit(width, height, total) {
+      var w = Math.max(320, width || 900);
+      var h = Math.max(260, height || 520);
+      var area = w * h;
+      var density = w < 560 ? 4400 : w < 900 ? 3600 : 2300;
+      var limit = Math.round(area / density);
+      if (w > 1600) limit += Math.round((w - 1600) / 3.2);
+      if (w < 560) limit = Math.min(limit, 95);
+      else if (w < 900) limit = Math.min(limit, 180);
+      return Math.max(45, Math.min(total || 0, limit));
+    }
+
+    function brainVisibleTerms(terms, width, height) {
+      var list = Array.isArray(terms) ? terms : [];
+      return list.slice(0, brainVisibleWordLimit(width, height, list.length));
+    }
+
     function brainMeshPositions(terms, width, height) {
       var w = Math.max(320, width || 900);
       var h = Math.max(260, height || 520);
@@ -2608,9 +2625,11 @@ function renderSystemCronVariant(row) {
         var seed = brainHash((term.text || '') + ':' + idx);
         var normalized = maxWeight === minWeight ? (weight <= 1 ? 0 : 1 - idx / Math.max(1, terms.length - 1)) : (Math.max(1, weight) - minWeight) / span;
         var tieBreak = weight <= 1 ? 0 : (brainSeededRandom(seed ^ 0xA511E9B3) - 0.5) * 0.9;
-        var font = weight <= 1 ? 10 : 10.2 + Math.pow(Math.max(0, Math.min(1, normalized)), 0.58) * 17.8 + tieBreak;
-        font = Math.max(10, Math.min(29, font));
-        var point = brainScatterPoint(seed, idx, w, h, 28, 18);
+        var smallBoost = w < 560 ? 2.4 : w < 900 ? 1.2 : 0;
+        var maxFont = w < 560 ? 38 : w < 900 ? 42 : 46;
+        var font = weight <= 1 ? 10 + smallBoost : 10 + smallBoost + Math.pow(Math.max(0, Math.min(1, normalized)), 0.5) * (maxFont - 10 - smallBoost) + tieBreak;
+        font = Math.max(10 + smallBoost, Math.min(maxFont, font));
+        var point = brainScatterPoint(seed, idx, w, h, 32, 22);
         return {
           term: term,
           x: point.x,
@@ -2666,6 +2685,12 @@ function renderSystemCronVariant(row) {
       var rect = canvas.getBoundingClientRect();
       var width = Math.max(320, Math.floor(rect.width));
       var height = Math.max(260, Math.floor(rect.height));
+      var visibleTerms = brainVisibleTerms(terms || [], width, height);
+      var visibleText = {};
+      visibleTerms.forEach(function (term) { visibleText[term.text] = true; });
+      var visibleConnections = (connections || []).filter(function (c) {
+        return visibleText[c.from] && visibleText[c.to];
+      });
       var scale = window.devicePixelRatio || 1;
       canvas.width = Math.floor(width * scale);
       canvas.height = Math.floor(height * scale);
@@ -2673,12 +2698,13 @@ function renderSystemCronVariant(row) {
       if (!ctx) return;
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      var positions = brainMeshPositions(terms || [], width, height);
+      var positions = brainMeshPositions(visibleTerms, width, height);
       var byText = {};
       positions.forEach(function (pos) { byText[pos.term.text] = pos; });
       canvas.setAttribute('data-brain-word-count', String(positions.length));
-      var selectedLinks = brainRelationMap(selectedText, connections);
-      (connections || []).slice(0, 1600).forEach(function (c) {
+      var selectedLinks = brainRelationMap(selectedText, visibleConnections);
+      var baseLineLimit = Math.max(220, Math.min(2600, Math.round((width * height) / 850)));
+      visibleConnections.slice(0, baseLineLimit).forEach(function (c) {
         var a = byText[c.from];
         var b = byText[c.to];
         if (!a || !b) return;
@@ -2691,7 +2717,7 @@ function renderSystemCronVariant(row) {
         ctx.stroke();
       });
       if (selectedText) {
-        (connections || []).forEach(function (c) {
+        visibleConnections.forEach(function (c) {
           var fromRel = selectedLinks[c.from];
           var toRel = selectedLinks[c.to];
           var visible = fromRel && toRel && Math.max(fromRel.depth, toRel.depth) <= 2;
@@ -2710,7 +2736,9 @@ function renderSystemCronVariant(row) {
           }
         });
       }
-      positions.forEach(function (pos) {
+      positions.slice().sort(function (a, b) {
+        return a.font - b.font;
+      }).forEach(function (pos) {
         var text = String(pos.term.text || '');
         var rel = selectedText && selectedLinks[text];
         var selected = rel && rel.depth === 0;
@@ -2781,12 +2809,14 @@ function renderSystemCronVariant(row) {
       var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : [];
       var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
+      var cloudRect = cloud.getBoundingClientRect();
+      var visibleCount = brainVisibleWordLimit(cloudRect.width, cloudRect.height, terms.length);
       var sourceCount = [
         stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
         stats.noteFiles ? stats.noteFiles + ' notes' : '',
         stats.historyDays ? stats.historyDays + ' days' : '',
         stats.exchanges ? stats.exchanges + ' exchanges' : '',
-        terms.length ? terms.length + ' words' : '',
+        terms.length ? visibleCount + ' visible words' : '',
       ].filter(Boolean).join(' · ');
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
       if (!terms.length) {
