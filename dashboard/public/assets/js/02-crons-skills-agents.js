@@ -2568,6 +2568,7 @@ function renderSystemCronVariant(row) {
     };
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
+    var brainLoadingTimer = null;
 
     function clampBrainNumber(value, fallback, min, max) {
       var n = Number(value);
@@ -2597,6 +2598,32 @@ function renderSystemCronVariant(row) {
 
     function rerenderBrainCloud() {
       if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
+    }
+
+    function stopBrainLoadingProgress() {
+      if (brainLoadingTimer) {
+        clearInterval(brainLoadingTimer);
+        brainLoadingTimer = null;
+      }
+    }
+
+    function showBrainLoadingProgress(cloud, label) {
+      if (!cloud) return;
+      stopBrainLoadingProgress();
+      cloud.innerHTML =
+        '<div class="brain-loading" role="status" aria-live="polite">' +
+          '<div class="brain-loading-label">' + escapeHtml(label || 'Building brain map') + '</div>' +
+          '<div class="brain-loading-track" aria-hidden="true">' +
+            '<span class="brain-loading-bar" style="width: 12%"></span>' +
+          '</div>' +
+        '</div>';
+      var bar = cloud.querySelector('.brain-loading-bar');
+      var progress = 12;
+      brainLoadingTimer = setInterval(function () {
+        progress += Math.max(1, Math.round((92 - progress) * 0.12));
+        if (progress > 92) progress = 92;
+        if (bar) bar.style.width = progress + '%';
+      }, 180);
     }
 
     function brainEdgeLevel(strength) {
@@ -2989,6 +3016,7 @@ function renderSystemCronVariant(row) {
       var cloud = document.getElementById('brain-cloud');
       var meta = document.getElementById('brain-meta');
       if (!cloud) return;
+      stopBrainLoadingProgress();
       if (cloud._brainMeshCleanup) {
         cloud._brainMeshCleanup();
         cloud._brainMeshCleanup = null;
@@ -3007,6 +3035,7 @@ function renderSystemCronVariant(row) {
       ].filter(Boolean).join(' · ');
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
       if (!terms.length) {
+        stopBrainLoadingProgress();
         cloud.innerHTML = '<p class="empty">No brain cloud yet.</p>';
         renderBrainFocus('', []);
         return;
@@ -3117,7 +3146,7 @@ function renderSystemCronVariant(row) {
       var source = sourceEl ? sourceEl.value : 'all';
       var hasGraph = !!cloud.querySelector('.brain-mesh-canvas');
       if (!hasGraph || refresh) {
-        cloud.innerHTML = '<p class="empty">Loading brain map...</p>';
+        showBrainLoadingProgress(cloud, refresh ? 'Rebuilding brain map' : 'Building brain map');
       }
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
@@ -3127,8 +3156,10 @@ function renderSystemCronVariant(row) {
         var r = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
+        stopBrainLoadingProgress();
         renderBrainCloud(d);
       } catch (e) {
+        stopBrainLoadingProgress();
         cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
         var meta = document.getElementById('brain-meta');
         if (meta) meta.textContent = e && e.message ? e.message : 'Request failed';

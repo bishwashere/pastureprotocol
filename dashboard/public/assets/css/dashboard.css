@@ -2124,6 +2124,36 @@
       position: relative;
       text-align: center;
     }
+    .brain-loading {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(24rem, calc(100% - 3rem));
+      transform: translate(-50%, -50%);
+      display: grid;
+      gap: 0.65rem;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+    .brain-loading-label {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .brain-loading-track {
+      height: 0.42rem;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.14);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .brain-loading-bar {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #7dd3fc, #c4b5fd, #86efac);
+      box-shadow: 0 0 18px rgba(125, 211, 252, 0.28);
+      transition: width 180ms ease;
+    }
     .brain-mesh-canvas {
       position: absolute;
       inset: 0;
