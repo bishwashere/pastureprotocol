@@ -21,12 +21,13 @@ Your job is to identify the most salient words and short concepts that represent
 - Do not include secrets, tokens, credentials, phone numbers, email addresses, or exact private identifiers.
 - If a term appears in multiple source types, reflect that with `sources`.
 - Weight terms by salience, not just frequency. Use numbers from 1 to 100.
-- Return between 14 and 24 terms when enough material exists. Return fewer if the corpus is sparse.
+- Return between 30 and 45 terms when enough material exists. Return fewer if the corpus is sparse.
 - Return associations only between terms you included in `terms`.
 - Association strength means conceptual closeness in the corpus, not just visual similarity. Use numbers from 1 to 100.
-- Prefer a sparse graph: 1-2 strong connections per important term, not every possible pair.
-- Return at most 32 connections.
-- Keep `reason` empty unless it is essential.
+- Prefer a graph with useful local neighborhoods: 2-4 connections per important term.
+- Return at most 90 connections.
+- Omit `reason` unless it is essential.
+- Keep the JSON compact. Do not pretty-print large arrays.
 
 ## Input shape
 
@@ -61,8 +62,7 @@ Return ONLY valid JSON. No prose. No markdown fences. No extra keys.
     {
       "from": "project planning",
       "to": "Timeline project",
-      "strength": 88,
-      "reason": ""
+      "strength": 88
     }
   ]
 }

@@ -2559,13 +2559,6 @@ function renderSystemCronVariant(row) {
       }
     }
 
-    function brainSourceClass(term) {
-      var sources = Array.isArray(term.sources) ? term.sources : [];
-      if (sources.indexOf('history') >= 0) return 'history';
-      if (sources.indexOf('notes') >= 0) return 'notes';
-      return 'memory';
-    }
-
     function brainEdgeLevel(strength) {
       var n = Number(strength) || 0;
       if (n >= 78) return 'strong';
@@ -2573,21 +2566,169 @@ function renderSystemCronVariant(row) {
       return 'weak';
     }
 
-    function brainNodePositions(terms) {
-      var count = terms.length || 1;
+    function brainHash(text) {
+      var h = 2166136261;
+      var s = String(text || '');
+      for (var i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function brainSeededRandom(seed) {
+      var t = seed + 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    function brainScatterPoint(seed, idx, width, height, marginX, marginY) {
+      var angle = idx * 2.399963229728653 + brainSeededRandom(seed) * Math.PI * 2;
+      var radius = Math.sqrt(brainSeededRandom(seed ^ 0x9E3779B9));
+      var cx = width / 2;
+      var cy = height / 2;
+      var rx = Math.max(1, width / 2 - marginX);
+      var ry = Math.max(1, height / 2 - marginY);
+      return {
+        x: Math.max(marginX, Math.min(width - marginX, cx + Math.cos(angle) * radius * rx)),
+        y: Math.max(marginY, Math.min(height - marginY, cy + Math.sin(angle) * radius * ry)),
+      };
+    }
+
+    function brainMeshPositions(terms, width, height) {
+      var w = Math.max(320, width || 900);
+      var h = Math.max(260, height || 520);
+      var weights = (terms || []).map(function (term) { return Math.max(1, Number(term.weight) || 1); });
+      var minWeight = weights.reduce(function (min, weight) { return Math.min(min, weight); }, 100);
+      var maxWeight = weights.reduce(function (max, weight) { return Math.max(max, weight); }, 1);
+      var span = Math.max(1, maxWeight - minWeight);
       return terms.map(function (term, idx) {
         var weight = Number(term.weight) || 1;
-        var ring = idx < 5 ? 0.26 : idx < 16 ? 0.38 : 0.48;
-        var angle = (idx / count) * Math.PI * 2;
-        if (idx > 0) angle += (idx % 2 ? 0.22 : -0.18);
-        var jitter = ((weight % 17) - 8) / 120;
-        var radius = Math.max(0.08, ring + jitter);
+        var seed = brainHash((term.text || '') + ':' + idx);
+        var normalized = maxWeight === minWeight ? (weight <= 1 ? 0 : 1 - idx / Math.max(1, terms.length - 1)) : (Math.max(1, weight) - minWeight) / span;
+        var tieBreak = weight <= 1 ? 0 : (brainSeededRandom(seed ^ 0xA511E9B3) - 0.5) * 0.9;
+        var font = weight <= 1 ? 10 : 10.2 + Math.pow(Math.max(0, Math.min(1, normalized)), 0.62) * 11.2 + tieBreak;
+        font = Math.max(10, Math.min(22, font));
+        var point = brainScatterPoint(seed, idx, w, h, 28, 18);
         return {
           term: term,
-          x: 50 + Math.cos(angle) * radius * 86,
-          y: 50 + Math.sin(angle) * radius * 72,
+          x: point.x,
+          y: point.y,
+          font: font,
+          cellW: Math.max(56, Math.min(118, String(term.text || '').length * font * 0.58 + 10)),
+          cellH: font + 8,
         };
       });
+    }
+
+    function brainConnectionGraph(connections) {
+      var graph = {};
+      (connections || []).forEach(function (c) {
+        var from = String(c.from || '');
+        var to = String(c.to || '');
+        if (!from || !to) return;
+        var strength = Number(c.strength) || 1;
+        if (!graph[from]) graph[from] = [];
+        if (!graph[to]) graph[to] = [];
+        graph[from].push({ text: to, strength: strength });
+        graph[to].push({ text: from, strength: strength });
+      });
+      Object.keys(graph).forEach(function (key) {
+        graph[key].sort(function (a, b) { return b.strength - a.strength; });
+      });
+      return graph;
+    }
+
+    function brainRelationMap(selectedText, connections) {
+      var map = {};
+      if (!selectedText) return map;
+      map[selectedText] = { depth: 0, strength: 100 };
+      var graph = brainConnectionGraph(connections);
+      (graph[selectedText] || []).forEach(function (n) {
+        map[n.text] = { depth: 1, strength: Math.max(Number(map[n.text]?.strength) || 0, n.strength) };
+      });
+      (graph[selectedText] || []).forEach(function (n) {
+        (graph[n.text] || []).forEach(function (second) {
+          if (second.text === selectedText) return;
+          var strength = Math.round(Math.min(n.strength, second.strength) * 0.72);
+          var prev = map[second.text];
+          if (!prev || prev.depth > 2 || (prev.depth === 2 && strength > prev.strength)) {
+            map[second.text] = { depth: 2, strength: strength };
+          }
+        });
+      });
+      return map;
+    }
+
+    function drawBrainMeshCanvas(canvas, terms, connections, selectedText) {
+      if (!canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      var width = Math.max(320, Math.floor(rect.width));
+      var height = Math.max(260, Math.floor(rect.height));
+      var scale = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * scale);
+      canvas.height = Math.floor(height * scale);
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      var positions = brainMeshPositions(terms || [], width, height);
+      var byText = {};
+      positions.forEach(function (pos) { byText[pos.term.text] = pos; });
+      canvas.setAttribute('data-brain-word-count', String(positions.length));
+      var selectedLinks = brainRelationMap(selectedText, connections);
+      if (selectedText) {
+        (connections || []).forEach(function (c) {
+          var fromRel = selectedLinks[c.from];
+          var toRel = selectedLinks[c.to];
+          var visible = fromRel && toRel && Math.max(fromRel.depth, toRel.depth) <= 2;
+          if (visible) {
+            var a = byText[c.from];
+            var b = byText[c.to];
+            if (!a || !b) return;
+            var level = brainEdgeLevel(c.strength);
+            var maxDepth = Math.max(fromRel.depth, toRel.depth);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.lineWidth = maxDepth === 1 ? (level === 'strong' ? 2.2 : level === 'medium' ? 1.4 : 0.9) : 0.7;
+            ctx.strokeStyle = maxDepth === 1 ? 'rgba(203,213,225,0.52)' : 'rgba(148,163,184,0.22)';
+            ctx.stroke();
+          }
+        });
+      }
+      positions.forEach(function (pos) {
+        var text = String(pos.term.text || '');
+        var rel = selectedText && selectedLinks[text];
+        var selected = rel && rel.depth === 0;
+        var alpha = selectedText ? (rel ? (rel.depth === 2 ? 0.56 : 0.96) : 0.11) : 0.48;
+        var hue = selected ? '255,255,255' : '219,234,254';
+        ctx.font = pos.font.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(' + hue + ',' + alpha + ')';
+        var label = text.length > 16 ? text.slice(0, 15) + '…' : text;
+        ctx.fillText(label, pos.x, pos.y, pos.cellW - 8);
+      });
+      canvas._brainMeshPositions = positions;
+    }
+
+    function nearestBrainMeshTerm(canvas, x, y) {
+      var positions = canvas && canvas._brainMeshPositions ? canvas._brainMeshPositions : [];
+      var best = null;
+      var bestD = Infinity;
+      positions.forEach(function (pos) {
+        if (Math.abs(pos.x - x) > pos.cellW / 2 + 8 || Math.abs(pos.y - y) > pos.cellH / 2 + 8) return;
+        var dx = pos.x - x;
+        var dy = pos.y - y;
+        var d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = pos;
+        }
+      });
+      return best ? best.term.text : '';
     }
 
     function renderBrainFocus(selectedText, connections) {
@@ -2598,9 +2739,14 @@ function renderSystemCronVariant(row) {
         focus.innerHTML = '';
         return;
       }
-      var related = connections.filter(function (c) {
-        return c.from === selectedText || c.to === selectedText;
-      }).sort(function (a, b) { return (Number(b.strength) || 0) - (Number(a.strength) || 0); }).slice(0, 8);
+      var relationMap = brainRelationMap(selectedText, connections);
+      var related = Object.keys(relationMap)
+        .filter(function (text) { return text !== selectedText; })
+        .map(function (text) { return { text: text, rel: relationMap[text] }; })
+        .sort(function (a, b) {
+          return a.rel.depth - b.rel.depth || b.rel.strength - a.rel.strength || a.text.localeCompare(b.text);
+        })
+        .slice(0, 14);
       if (!related.length) {
         focus.hidden = false;
         focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong><span>No mapped connections yet.</span>';
@@ -2608,10 +2754,10 @@ function renderSystemCronVariant(row) {
       }
       focus.hidden = false;
       focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong>' +
-        related.map(function (c) {
-          var other = c.from === selectedText ? c.to : c.from;
-          return '<span class="brain-focus-link brain-focus-' + brainEdgeLevel(c.strength) + '">' +
-            escapeHtml(other) + ' · ' + escapeHtml(String(c.strength || '')) +
+        related.map(function (item) {
+          var depthLabel = item.rel.depth === 1 ? 'direct' : 'near';
+          return '<span class="brain-focus-link brain-focus-depth-' + item.rel.depth + ' brain-focus-' + brainEdgeLevel(item.rel.strength) + '">' +
+            escapeHtml(item.text) + ' · ' + depthLabel + ' · ' + escapeHtml(String(item.rel.strength || '')) +
             '</span>';
         }).join('');
     }
@@ -2620,14 +2766,15 @@ function renderSystemCronVariant(row) {
       var cloud = document.getElementById('brain-cloud');
       var meta = document.getElementById('brain-meta');
       if (!cloud) return;
-      var terms = Array.isArray(data && data.terms) ? data.terms : [];
-      var connections = Array.isArray(data && data.connections) ? data.connections : [];
+      var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : [];
+      var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
       var sourceCount = [
         stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
         stats.noteFiles ? stats.noteFiles + ' notes' : '',
         stats.historyDays ? stats.historyDays + ' days' : '',
         stats.exchanges ? stats.exchanges + ' exchanges' : '',
+        terms.length ? terms.length + ' words' : '',
       ].filter(Boolean).join(' · ');
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
       if (!terms.length) {
@@ -2635,48 +2782,56 @@ function renderSystemCronVariant(row) {
         renderBrainFocus('', []);
         return;
       }
-      var positioned = brainNodePositions(terms);
-      var byText = {};
-      positioned.forEach(function (node) { byText[node.term.text] = node; });
-      var edges = connections.filter(function (connection) {
-        return byText[connection.from] && byText[connection.to];
-      });
-      var edgeHtml = edges.map(function (connection, idx) {
-        var a = byText[connection.from];
-        var b = byText[connection.to];
-        var level = brainEdgeLevel(connection.strength);
-        return '<line class="brain-edge brain-edge-' + level + '" data-edge-idx="' + idx + '" data-from="' + escapeHtml(connection.from) + '" data-to="' + escapeHtml(connection.to) + '" x1="' + a.x.toFixed(2) + '%" y1="' + a.y.toFixed(2) + '%" x2="' + b.x.toFixed(2) + '%" y2="' + b.y.toFixed(2) + '%"><title>' + escapeHtml(connection.reason || String(connection.strength || '')) + '</title></line>';
-      }).join('');
-      var nodeHtml = positioned.map(function (node, idx) {
-        var term = node.term;
-        var weight = Number(term.weight) || 1;
-        var level = Math.max(1, Math.min(8, Math.ceil(weight / 12.5)));
-        var sourceClass = brainSourceClass(term);
-        var sources = Array.isArray(term.sources) ? term.sources.join(', ') : '';
-        return '<button type="button" class="brain-node brain-term brain-term-' + level + ' brain-term-source-' + sourceClass + '" data-term="' + escapeHtml(term.text || '') + '" data-node-idx="' + idx + '" style="left:' + node.x.toFixed(2) + '%; top:' + node.y.toFixed(2) + '%;" title="' + escapeHtml(sources) + '">' + escapeHtml(term.text || '') + '</button>';
-      }).join('');
-      cloud.innerHTML = '<svg class="brain-map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + edgeHtml + '</svg><div class="brain-map-nodes">' + nodeHtml + '</div>';
-      renderBrainFocus('', connections);
-      cloud.querySelectorAll('.brain-node').forEach(function (node) {
-        node.addEventListener('click', function () {
-          var term = node.getAttribute('data-term') || '';
-          cloud.querySelectorAll('.brain-node').forEach(function (el) {
-            var t = el.getAttribute('data-term') || '';
-            var linked = edges.some(function (c) { return (c.from === term && c.to === t) || (c.to === term && c.from === t); });
-            el.classList.toggle('active', t === term);
-            el.classList.toggle('linked', linked);
-            el.classList.toggle('dimmed', t !== term && !linked);
-          });
-          cloud.querySelectorAll('.brain-edge').forEach(function (edge) {
-            var from = edge.getAttribute('data-from') || '';
-            var to = edge.getAttribute('data-to') || '';
-            var active = from === term || to === term;
-            edge.classList.toggle('active', active);
-            edge.classList.toggle('dimmed', !active);
-          });
-          renderBrainFocus(term, connections);
+      var rect = cloud.getBoundingClientRect();
+      cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
+      cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
+      var meshCanvas = cloud.querySelector('.brain-mesh-canvas');
+      drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+      var hoverTimer = null;
+      var pendingHover = '';
+      var activeHover = '';
+
+      function clearBrainHover() {
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = null;
+        pendingHover = '';
+        activeHover = '';
+        drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+        renderBrainFocus('', connections);
+      }
+
+      function applyBrainHover(term) {
+        if (!term) {
+          clearBrainHover();
+          return;
+        }
+        activeHover = term;
+        drawBrainMeshCanvas(meshCanvas, terms, connections, term);
+        renderBrainFocus('', connections);
+      }
+
+      if (meshCanvas) {
+        meshCanvas.addEventListener('mousemove', function (event) {
+          var cr = meshCanvas.getBoundingClientRect();
+          var selected = nearestBrainMeshTerm(meshCanvas, event.clientX - cr.left, event.clientY - cr.top);
+          if (selected === activeHover || selected === pendingHover) return;
+          if (hoverTimer) clearTimeout(hoverTimer);
+          pendingHover = selected;
+          if (!selected) {
+            clearBrainHover();
+            return;
+          }
+          hoverTimer = setTimeout(function () {
+            if (pendingHover) applyBrainHover(pendingHover);
+            hoverTimer = null;
+            pendingHover = '';
+          }, 160);
         });
-      });
+        meshCanvas.addEventListener('mouseleave', function () {
+          clearBrainHover();
+        });
+      }
+      renderBrainFocus('', connections);
     }
 
     async function fetchBrainCloud(refresh) {
@@ -2686,7 +2841,7 @@ function renderSystemCronVariant(row) {
       var sourceEl = document.getElementById('brain-source');
       var range = rangeEl ? rangeEl.value : 'all';
       var source = sourceEl ? sourceEl.value : 'all';
-      var hasGraph = !!cloud.querySelector('.brain-map-lines, .brain-node');
+      var hasGraph = !!cloud.querySelector('.brain-mesh-canvas');
       if (!hasGraph || refresh) {
         cloud.innerHTML = '<p class="empty">Loading brain map...</p>';
       }
@@ -2706,9 +2861,76 @@ function renderSystemCronVariant(row) {
       }
     }
 
+    function setBrainImportStatus(text, isError) {
+      var el = document.getElementById('brain-meta');
+      if (!el) return;
+      el.textContent = text || 'Memory and history cloud';
+      el.classList.toggle('error', !!isError);
+    }
+
+    function guessBrainImportProvider(fileName) {
+      var name = String(fileName || '').toLowerCase();
+      if (name.indexOf('chatgpt') >= 0 || name.indexOf('openai') >= 0) return 'chatgpt';
+      if (name.indexOf('grok') >= 0 || name.indexOf('xai') >= 0) return 'grok';
+      if (name.indexOf('claude') >= 0 || name.indexOf('anthropic') >= 0) return 'claude';
+      if (name.indexOf('gemini') >= 0 || name.indexOf('google') >= 0) return 'gemini';
+      if (name.indexOf('perplexity') >= 0) return 'perplexity';
+      if (name.indexOf('copilot') >= 0 || name.indexOf('bing') >= 0) return 'copilot';
+      return 'other';
+    }
+
+    async function importBrainFiles(files) {
+      var submit = document.getElementById('brain-import-submit');
+      var input = document.getElementById('brain-import-file');
+      var list = Array.prototype.slice.call(files || []);
+      if (!list.length) {
+        return;
+      }
+      if (submit) submit.disabled = true;
+      setBrainImportStatus('Importing ' + list.length + ' file' + (list.length === 1 ? '' : 's') + '...');
+      var imported = 0;
+      var messages = 0;
+      try {
+        for (var i = 0; i < list.length; i++) {
+          var file = list[i];
+          setBrainImportStatus('Reading ' + (file.name || 'export') + '...');
+          var content = await file.text();
+          var r = await fetch(API + '/api/brain/import-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: guessBrainImportProvider(file.name),
+              filename: file.name || '',
+              content: content,
+            }),
+          });
+          var d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Import failed');
+          imported += Number(d.conversations || 0);
+          messages += Number(d.messages || 0);
+        }
+        var summary = 'Imported ' + imported + ' conversation' + (imported === 1 ? '' : 's') +
+          ' · ' + messages + ' messages';
+        setBrainImportStatus(summary);
+        fetchBrainCloud(true);
+      } catch (e) {
+        setBrainImportStatus(e && e.message ? e.message : 'Import failed', true);
+      } finally {
+        if (submit) submit.disabled = false;
+        if (input) input.value = '';
+      }
+    }
+
     wireEl('brain-refresh', 'click', function () { fetchBrainCloud(true); });
     wireEl('brain-range', 'change', function () { fetchBrainCloud(true); });
     wireEl('brain-source', 'change', function () { fetchBrainCloud(true); });
+    wireEl('brain-import-file', 'change', function (e) {
+      importBrainFiles(e && e.target && e.target.files ? e.target.files : []);
+    });
+    wireEl('brain-import-submit', 'click', function () {
+      var input = document.getElementById('brain-import-file');
+      if (input) input.click();
+    });
 
     async function fetchTests() {
       try {
