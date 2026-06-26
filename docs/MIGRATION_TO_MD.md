@@ -23,6 +23,7 @@ This is the live inventory of JavaScript code in `pastureprotocol` that currentl
 | System-pulse: self-edit safety critique | inlined prompt string in `lib/agent/system-pulse.js` | `lib/agent/templates/system-pulse-self-critique.md` | done |
 | Tide-checklist instruction block | inlined template literal in `lib/agent/tide-checklist.js` | `lib/agent/templates/tide-checklist-instruction.md` | done |
 | `parseWriteIntent` / `parseEditIntent` / `parseHomeAssistantListIntent` fast paths | regex parsers + bypass blocks in `lib/agent/agent.js` | **deleted** — intent-planner LLM call routes these via the normal tool loop | done |
+| Unified turn-intent classifier foundation | scattered pre-planner hint classifiers | `lib/agent/templates/turn-intent-classifier.md` + `lib/agent/turn-intent.js`; main/internal turn runners consume it for casual/project/GitHub hints with old JS fallbacks | done |
 
 ## Tier 1 — small, isolated classifiers (start here)
 
@@ -30,7 +31,7 @@ These are single-purpose regex/keyword classifiers. Each can be migrated in one 
 
 | Item | Current location | Notes |
 |---|---|---|
-| `isNonTaskMessage` (greeting / casual chat) | `lib/agent/evaluate-team-capability.js` | Used by `intent-planner.js` and others to skip the planner. New MD: `casual-message-classifier.md`. **Pending.** |
+| `isNonTaskMessage` (greeting / casual chat) | `lib/agent/evaluate-team-capability.js` | Unified `turn-intent-classifier.md` now feeds the main/internal pre-planner casual path; this JS helper remains as fallback and should be deleted after shadow confidence. **In progress.** |
 | `isNewSessionRequest` / `isNewSessionOnlyRequest` | `lib/context/chat-session.js` | "Start a new session" detection. New MD: `new-session-classifier.md`. **Pending.** |
 | `detectReplyModeSwitch` | `lib/context/chat-session.js` | Text-vs-voice reply mode toggle. New MD: `reply-mode-classifier.md`. Mirrors work-mode shape. **Pending.** |
 | `isYesReply` (and similar) | `lib/channels/telegram.js` | Yes/no confirmations. New MD: `yes-no-classifier.md`. **Pending.** |

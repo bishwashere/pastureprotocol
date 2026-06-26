@@ -30,6 +30,7 @@ import { runAgentTurn, stripThinking } from './lib/agent/agent.js';
 import { runInternalAgentTurn } from './lib/agent/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent/agent-context-state.js';
 import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/agent/intent-planner.js';
+import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from './lib/agent/turn-intent.js';
 import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
 import { buildDelegationContext } from './lib/agent/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from './lib/agent/delegation-routing-details.js';
@@ -1430,14 +1431,32 @@ async function main() {
     // make, no delegation to plan around, no durable work to preserve. Skipping
     // the planner in single mode saves one LLM call per turn and keeps the
     // default conversational path lean.
-    const casualIntentPlan = isMultiAgent && !presetDelegationPlan && isNonTaskMessage(text)
-      ? buildCasualChatIntentPlan()
+    const turnIntent = isMultiAgent && !presetDelegationPlan
+      ? await traceAsyncStep('turn_intent', () => classifyTurnIntent({
+          userText: text,
+          historyMessages,
+          availableSkillIds: enabledSkillIds,
+          availableSkillSummaries: enabledSkillSummaries,
+          currentWorkMode: workMode,
+          agentId,
+        }))
+      : null;
+    if (turnIntent) console.log('[turn-intent]', JSON.stringify(turnIntent));
+    const turnIntentIsConfident = turnIntent && turnIntent.confidence >= 0.65;
+    const casualIntentPlan = isMultiAgent && !presetDelegationPlan
+      ? (turnIntentIsConfident
+          ? buildCasualPlanFromTurnIntent(turnIntent)
+          : (isNonTaskMessage(text) ? buildCasualChatIntentPlan() : null))
       : null;
     const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
-      ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
+      ? (turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
+          ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId, { forceDiscovery: true })
+          : getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId))
       : null;
     const githubIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
-      ? getGithubSourceIntentHint(text, enabledSkillIds)
+      ? (turnIntentIsConfident && turnIntent.github_source_intent
+          ? getGithubSourceIntentHint(text, enabledSkillIds, { forceSource: true })
+          : getGithubSourceIntentHint(text, enabledSkillIds))
       : null;
     const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
       ? await traceAsyncStep('intent_planner', () => planIntent({
