@@ -2212,17 +2212,6 @@ function brainSegmentWords(text) {
     if (nounCandidate) addBrainCandidate(counts, order, occurrences, word, idxRef, 1, position);
   }
 
-  for (let i = 0; i < tokens.length; i++) {
-    if (!tokens[i].nounCandidate) continue;
-    const phrase = [tokens[i].word];
-    for (let j = i + 1; j < Math.min(tokens.length, i + 4); j++) {
-      if (!tokens[j].nounCandidate) break;
-      phrase.push(tokens[j].word);
-      if (phrase.length >= 2) {
-        addBrainCandidate(counts, order, occurrences, phrase.join(' '), idxRef, phrase.length, tokens[i].position + phrase.length / 10);
-      }
-    }
-  }
   const sequence = occurrences
     .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
     .map((item) => item.key);
@@ -2257,8 +2246,7 @@ function buildDenseBrainGraph(corpus, maxTerms = 2600) {
         const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
         const distance = j - i;
         const contextWeight = 1 / Math.sqrt(distance);
-        const phraseWeight = a.includes(' ') || b.includes(' ') ? 1.18 : 1;
-        const delta = contextWeight * phraseWeight * profile.multiplier;
+        const delta = contextWeight * profile.multiplier;
         const prev = links.get(key) || { score: 0, evidence: 0, decay: 0 };
         prev.evidence += delta;
         if (profile.decay > 0) {

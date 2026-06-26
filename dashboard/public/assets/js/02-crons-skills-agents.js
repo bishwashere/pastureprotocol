@@ -2569,6 +2569,7 @@ function renderSystemCronVariant(row) {
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
     var brainLoadingTimer = null;
+    var BRAIN_MIN_VISIBLE_CONNECTIONS = 5;
 
     function clampBrainNumber(value, fallback, min, max) {
       var n = Number(value);
@@ -2676,9 +2677,38 @@ function renderSystemCronVariant(row) {
       return Math.max(45, Math.min(total || 0, limit));
     }
 
-    function brainVisibleTerms(terms, width, height) {
+    function brainConnectionDegrees(connections) {
+      var degrees = {};
+      (connections || []).forEach(function (c) {
+        var from = String(c.from || '');
+        var to = String(c.to || '');
+        if (!from || !to || from === to) return;
+        degrees[from] = (degrees[from] || 0) + 1;
+        degrees[to] = (degrees[to] || 0) + 1;
+      });
+      return degrees;
+    }
+
+    function brainVisibleTerms(terms, width, height, connections) {
       var list = Array.isArray(terms) ? terms : [];
-      return list.slice(0, brainVisibleWordLimit(width, height, list.length));
+      var degrees = brainConnectionDegrees(connections || []);
+      var eligible = list.filter(function (term) {
+        return (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS;
+      });
+      var limit = brainVisibleWordLimit(width, height, eligible.length);
+      var candidateLimit = Math.min(eligible.length, Math.max(limit * 4, limit + 120));
+      var candidates = eligible.slice(0, candidateLimit);
+      var candidateText = {};
+      candidates.forEach(function (term) { candidateText[term.text] = true; });
+      var connectedText = {};
+      (connections || []).forEach(function (c) {
+        if (!candidateText[c.from] || !candidateText[c.to]) return;
+        connectedText[c.from] = true;
+        connectedText[c.to] = true;
+      });
+      return candidates
+        .filter(function (term) { return connectedText[term.text] && (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS; })
+        .slice(0, limit);
     }
 
     function brainMeshPositions(terms, width, height) {
@@ -2880,7 +2910,7 @@ function renderSystemCronVariant(row) {
       var rect = canvas.getBoundingClientRect();
       var width = Math.max(320, Math.floor(rect.width));
       var height = Math.max(260, Math.floor(rect.height));
-      var visibleTerms = brainVisibleTerms(terms || [], width, height);
+      var visibleTerms = brainVisibleTerms(terms || [], width, height, connections || []);
       var visibleText = {};
       visibleTerms.forEach(function (term) { visibleText[term.text] = true; });
       var visibleConnections = (connections || []).filter(function (c) {
@@ -3025,7 +3055,7 @@ function renderSystemCronVariant(row) {
       var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
       var cloudRect = cloud.getBoundingClientRect();
-      var visibleCount = brainVisibleWordLimit(cloudRect.width, cloudRect.height, terms.length);
+      var visibleCount = brainVisibleTerms(terms, cloudRect.width, cloudRect.height, connections).length;
       var sourceCount = [
         stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
         stats.noteFiles ? stats.noteFiles + ' notes' : '',
