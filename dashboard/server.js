@@ -1985,16 +1985,11 @@ function pushBrainCorpusChunk(out, chunk, remaining) {
   out.push({
     source: chunk.source,
     label: String(chunk.label || chunk.source || '').slice(0, 120),
+    role: chunk.role ? String(chunk.role).slice(0, 40) : '',
+    ts: Number(chunk.ts || 0) || 0,
     text: sliced,
   });
   remaining.value -= sliced.length;
-}
-
-function formatBrainHistoryExchanges(exchanges) {
-  return exchanges
-    .map((ex) => String(ex?.user || '').trim())
-    .filter(Boolean)
-    .join('\n\n');
 }
 
 function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }) {
@@ -2047,8 +2042,18 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
       if (!exchanges.length) continue;
       stats.historyDays += 1;
       stats.exchanges += exchanges.length;
-      const text = formatBrainHistoryExchanges(exchanges);
-      pushBrainCorpusChunk(corpus, { source: 'history', label: day.date, text }, remaining);
+      for (const ex of exchanges) {
+        if (remaining.value <= 0) break;
+        const text = String(ex?.user || '').trim();
+        if (!text) continue;
+        pushBrainCorpusChunk(corpus, {
+          source: 'history',
+          label: day.date,
+          role: 'user',
+          ts: ex.ts,
+          text,
+        }, remaining);
+      }
     }
   }
 
@@ -2074,7 +2079,7 @@ const BRAIN_VERB_WORDS = new Set([
   'posting', 'read', 'reading', 'remove', 'removed', 'removing', 'rename', 'renamed', 'renaming',
   'reply', 'replied', 'replying', 'respond', 'responded', 'responding', 'restart', 'restarted',
   'restarting', 'run', 'running', 'ran', 'save', 'saved', 'saving', 'say', 'saying', 'see',
-  'seeing', 'seen', 'send', 'sending', 'sent', 'set', 'setting', 'show', 'showed', 'showing',
+  'seeing', 'seen', 'feel', 'feels', 'felt', 'send', 'sending', 'sent', 'set', 'setting', 'show', 'showed', 'showing',
   'shown', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'summarize',
   'summarized', 'summarizing', 'take', 'taken', 'taking', 'tell', 'telling', 'told', 'try',
   'tried', 'trying', 'turn', 'turned', 'turning', 'update', 'updated', 'updating', 'upload',
@@ -2105,19 +2110,94 @@ const BRAIN_FILLER_WORDS = new Set([
   'your', 'youre',
 ]);
 
+const BRAIN_ADJECTIVE_ADVERB_WORDS = new Set([
+  'active', 'actual', 'additional', 'automatic', 'available', 'basic', 'best', 'better',
+  'big', 'bigger', 'blank', 'broad', 'broken', 'cached', 'clean', 'clear', 'close',
+  'complete', 'complex', 'correct', 'custom', 'deep', 'direct', 'early', 'easy', 'empty',
+  'existing', 'external', 'false', 'fast', 'final', 'free', 'fresh', 'full', 'generic',
+  'good', 'great', 'hard', 'healthy', 'high', 'higher', 'huge', 'immediate', 'important',
+  'internal', 'large', 'larger', 'light', 'likely', 'little', 'live', 'local', 'low',
+  'main', 'major', 'manual', 'missing', 'mobile', 'multiple', 'normal', 'offline', 'old',
+  'online', 'open', 'pending', 'private', 'proper', 'public', 'quick', 'random', 'ready',
+  'real', 'related', 'relevant', 'right', 'same', 'separate', 'shared', 'slow', 'smooth',
+  'special', 'strong', 'tiny', 'unclassified', 'unrelated', 'valid', 'visible', 'weak',
+  'white', 'wrong',
+]);
+
+const BRAIN_NOUNY_SUFFIXES = [
+  'age', 'ance', 'ence', 'er', 'or', 'ism', 'ist', 'ity', 'ment', 'ness', 'ship', 'tion',
+  'sion', 'ure',
+];
+
+const BRAIN_NEGATIVE_FEEDBACK_WORDS = new Set([
+  'bad', 'exclude', 'incorrect', 'never', 'no', 'not', 'remove', 'wrong',
+]);
+
 function isBrainExcludedWord(word) {
-  return BRAIN_VERB_WORDS.has(word) || BRAIN_FILLER_WORDS.has(word);
+  return BRAIN_VERB_WORDS.has(word) || BRAIN_FILLER_WORDS.has(word) || BRAIN_ADJECTIVE_ADVERB_WORDS.has(word);
+}
+
+function isBrainProperOrToolToken(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return false;
+  return /[A-Z]{2,}/.test(text) || /[a-z][A-Z]/.test(text) || /[A-Za-z]+\d+|\d+[A-Za-z]+/.test(text) || text.includes('-') || text.includes('_');
+}
+
+function isBrainLikelyNounToken(word, raw) {
+  if (!word || isBrainExcludedWord(word)) return false;
+  if (isBrainProperOrToolToken(raw)) return true;
+  if (word.length >= 4 && BRAIN_NOUNY_SUFFIXES.some((suffix) => word.endsWith(suffix))) return true;
+  if (word.length >= 4 && word.endsWith('ing') && !BRAIN_VERB_WORDS.has(word)) return true;
+  if (word.length >= 3 && !word.endsWith('ly') && !word.endsWith('ed')) return true;
+  return false;
+}
+
+function addBrainCandidate(counts, order, occurrences, text, idxRef, amount = 1, position = idxRef.value) {
+  const key = String(text || '').trim().toLowerCase();
+  if (!key) return '';
+  counts.set(key, (counts.get(key) || 0) + amount);
+  if (!order.has(key)) order.set(key, idxRef.value++);
+  if (occurrences) occurrences.push({ key, position });
+  return key;
+}
+
+function brainRawWords(text) {
+  const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
+  const words = [];
+  for (const part of segmenter.segment(String(text || ''))) {
+    if (!part.isWordLike) continue;
+    const word = String(part.segment || '').trim().toLowerCase();
+    if (word) words.push(word);
+  }
+  return words;
+}
+
+function brainChunkConnectionProfile(chunk) {
+  const source = String(chunk?.source || '');
+  const role = String(chunk?.role || '');
+  const words = brainRawWords(chunk?.text || '');
+  const hasNegativeFeedback = words.some((word) => BRAIN_NEGATIVE_FEEDBACK_WORDS.has(word));
+  const sourceWeight = source === 'memory' ? 1.35 : source === 'notes' ? 1.2 : 1;
+  const userAskedWeight = source === 'history' && role === 'user' ? 1.65 : 1;
+  return {
+    multiplier: sourceWeight * userAskedWeight,
+    decay: hasNegativeFeedback ? 0.68 : 0,
+  };
 }
 
 function brainSegmentWords(text) {
   const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
   const counts = new Map();
   const order = new Map();
-  let idx = 0;
+  const idxRef = { value: 0 };
+  const tokens = [];
+  const occurrences = [];
   for (const part of segmenter.segment(String(text || ''))) {
     if (!part.isWordLike) continue;
-    const word = String(part.segment || '').trim().toLowerCase();
-    if (word.length < 3 || word.length > 32) continue;
+    const raw = String(part.segment || '').trim();
+    const word = raw.toLowerCase();
+    const properOrTool = isBrainProperOrToolToken(raw);
+    if ((word.length < 3 && !properOrTool) || word.length > 32) continue;
     let hasLetter = false;
     let hasDigit = false;
     for (const ch of word) {
@@ -2125,11 +2205,28 @@ function brainSegmentWords(text) {
       if ((cp >= 97 && cp <= 122) || cp > 127) hasLetter = true;
       if (cp >= 48 && cp <= 57) hasDigit = true;
     }
-    if (!hasLetter || hasDigit || isBrainExcludedWord(word)) continue;
-    counts.set(word, (counts.get(word) || 0) + 1);
-    if (!order.has(word)) order.set(word, idx++);
+    if (!hasLetter || (hasDigit && !properOrTool)) continue;
+    const nounCandidate = isBrainLikelyNounToken(word, raw);
+    const position = tokens.length;
+    tokens.push({ word, raw, nounCandidate, position });
+    if (nounCandidate) addBrainCandidate(counts, order, occurrences, word, idxRef, 1, position);
   }
-  return { counts, order };
+
+  for (let i = 0; i < tokens.length; i++) {
+    if (!tokens[i].nounCandidate) continue;
+    const phrase = [tokens[i].word];
+    for (let j = i + 1; j < Math.min(tokens.length, i + 4); j++) {
+      if (!tokens[j].nounCandidate) break;
+      phrase.push(tokens[j].word);
+      if (phrase.length >= 2) {
+        addBrainCandidate(counts, order, occurrences, phrase.join(' '), idxRef, phrase.length, tokens[i].position + phrase.length / 10);
+      }
+    }
+  }
+  const sequence = occurrences
+    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
+    .map((item) => item.key);
+  return { counts, order, sequence };
 }
 
 function buildDenseBrainGraph(corpus, maxTerms = 2600) {
@@ -2149,27 +2246,47 @@ function buildDenseBrainGraph(corpus, maxTerms = 2600) {
   const termSet = new Set(terms.map((term) => term.text));
   const links = new Map();
   for (const chunk of corpus) {
-    const { counts: chunkCounts } = brainSegmentWords(chunk.text || '');
-    const words = [...chunkCounts.keys()].filter((word) => termSet.has(word)).slice(0, 40);
+    const { sequence } = brainSegmentWords(chunk.text || '');
+    const profile = brainChunkConnectionProfile(chunk);
+    const words = sequence.filter((word) => termSet.has(word)).slice(0, 90);
     for (let i = 0; i < words.length; i++) {
-      for (let j = i + 1; j < Math.min(words.length, i + 7); j++) {
+      for (let j = i + 1; j < Math.min(words.length, i + 9); j++) {
         const a = words[i];
         const b = words[j];
+        if (a === b) continue;
         const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
-        links.set(key, (links.get(key) || 0) + Math.min(chunkCounts.get(a) || 1, chunkCounts.get(b) || 1));
+        const distance = j - i;
+        const contextWeight = 1 / Math.sqrt(distance);
+        const phraseWeight = a.includes(' ') || b.includes(' ') ? 1.18 : 1;
+        const delta = contextWeight * phraseWeight * profile.multiplier;
+        const prev = links.get(key) || { score: 0, evidence: 0, decay: 0 };
+        prev.evidence += delta;
+        if (profile.decay > 0) {
+          const decay = delta * profile.decay;
+          prev.score -= decay;
+          prev.decay += decay;
+        } else {
+          prev.score += delta;
+        }
+        links.set(key, prev);
       }
     }
   }
-  const maxLink = Math.max(1, ...links.values());
+  const positiveLinks = [...links.entries()].filter(([, value]) => value.score > 0.05);
+  const maxLink = Math.max(1, ...positiveLinks.map(([, value]) => value.score));
   const connections = [...links.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .filter(([, value]) => value.score > 0.05)
+    .sort((a, b) => b[1].score - a[1].score)
     .slice(0, 2500)
-    .map(([key, count]) => {
+    .map(([key, value]) => {
       const [from, to] = key.split('\u0000');
       return {
         from,
         to,
-        strength: Math.max(8, Math.min(100, Math.round((count / maxLink) * 100))),
+        strength: Math.max(8, Math.min(100, Math.round((value.score / maxLink) * 100))),
+        weight: Number(value.score.toFixed(3)),
+        evidence: Number(value.evidence.toFixed(3)),
+        decay: Number(value.decay.toFixed(3)),
       };
     });
   return { terms, connections };

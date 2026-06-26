@@ -2559,6 +2559,46 @@ function renderSystemCronVariant(row) {
       }
     }
 
+    var BRAIN_SETTINGS_DEFAULTS = {
+      directRelations: 12,
+      secondRelations: 18,
+      visibleWords: 0,
+      minFont: 10,
+      maxFont: 46,
+    };
+    var brainSettings = loadBrainSettings();
+    var brainCloudLastData = null;
+
+    function clampBrainNumber(value, fallback, min, max) {
+      var n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, Math.round(n)));
+    }
+
+    function loadBrainSettings() {
+      var saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem('brainMeshSettings') || '{}') || {};
+      } catch (_) {}
+      return {
+        directRelations: clampBrainNumber(saved.directRelations, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
+        secondRelations: clampBrainNumber(saved.secondRelations, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
+        visibleWords: clampBrainNumber(saved.visibleWords, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
+        minFont: clampBrainNumber(saved.minFont, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
+        maxFont: clampBrainNumber(saved.maxFont, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
+      };
+    }
+
+    function saveBrainSettings() {
+      try {
+        localStorage.setItem('brainMeshSettings', JSON.stringify(brainSettings));
+      } catch (_) {}
+    }
+
+    function rerenderBrainCloud() {
+      if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
+    }
+
     function brainEdgeLevel(strength) {
       var n = Number(strength) || 0;
       if (n >= 78) return 'strong';
@@ -2597,6 +2637,7 @@ function renderSystemCronVariant(row) {
     }
 
     function brainVisibleWordLimit(width, height, total) {
+      if (brainSettings.visibleWords > 0) return Math.max(1, Math.min(total || 0, brainSettings.visibleWords));
       var w = Math.max(320, width || 900);
       var h = Math.max(260, height || 520);
       var area = w * h;
@@ -2625,10 +2666,12 @@ function renderSystemCronVariant(row) {
         var seed = brainHash((term.text || '') + ':' + idx);
         var normalized = maxWeight === minWeight ? (weight <= 1 ? 0 : 1 - idx / Math.max(1, terms.length - 1)) : (Math.max(1, weight) - minWeight) / span;
         var tieBreak = weight <= 1 ? 0 : (brainSeededRandom(seed ^ 0xA511E9B3) - 0.5) * 0.9;
+        var minFont = brainSettings.minFont;
         var smallBoost = w < 560 ? 2.4 : w < 900 ? 1.2 : 0;
-        var maxFont = w < 560 ? 38 : w < 900 ? 42 : 46;
-        var font = weight <= 1 ? 10 + smallBoost : 10 + smallBoost + Math.pow(Math.max(0, Math.min(1, normalized)), 0.5) * (maxFont - 10 - smallBoost) + tieBreak;
-        font = Math.max(10 + smallBoost, Math.min(maxFont, font));
+        var maxFont = Math.max(minFont + 4, brainSettings.maxFont);
+        var fontFloor = minFont + smallBoost;
+        var font = weight <= 1 ? fontFloor : fontFloor + Math.pow(Math.max(0, Math.min(1, normalized)), 0.5) * (maxFont - fontFloor) + tieBreak;
+        font = Math.max(fontFloor, Math.min(maxFont, font));
         var point = brainScatterPoint(seed, idx, w, h, 32, 22);
         return {
           term: term,
@@ -2650,8 +2693,14 @@ function renderSystemCronVariant(row) {
         var strength = Number(c.strength) || 1;
         if (!graph[from]) graph[from] = [];
         if (!graph[to]) graph[to] = [];
-        graph[from].push({ text: to, strength: strength });
-        graph[to].push({ text: from, strength: strength });
+        var edge = {
+          strength: strength,
+          weight: Number(c.weight) || 0,
+          evidence: Number(c.evidence) || 0,
+          decay: Number(c.decay) || 0,
+        };
+        graph[from].push(Object.assign({ text: to }, edge));
+        graph[to].push(Object.assign({ text: from }, edge));
       });
       Object.keys(graph).forEach(function (key) {
         graph[key].sort(function (a, b) { return b.strength - a.strength; });
@@ -2664,41 +2713,142 @@ function renderSystemCronVariant(row) {
       if (!selectedText) return map;
       map[selectedText] = { depth: 0, strength: 100 };
       var graph = brainConnectionGraph(connections);
-      (graph[selectedText] || []).forEach(function (n) {
-        map[n.text] = { depth: 1, strength: Math.max(Number(map[n.text]?.strength) || 0, n.strength) };
+      var directLimit = brainSettings.directRelations;
+      var secondLimit = brainSettings.secondRelations;
+      var direct = (graph[selectedText] || []).slice(0, directLimit);
+      direct.forEach(function (n) {
+        map[n.text] = {
+          depth: 1,
+          strength: Math.max(Number(map[n.text]?.strength) || 0, n.strength),
+          weight: Math.max(Number(map[n.text]?.weight) || 0, Number(n.weight) || 0),
+          evidence: Math.max(Number(map[n.text]?.evidence) || 0, Number(n.evidence) || 0),
+          decay: Math.max(Number(map[n.text]?.decay) || 0, Number(n.decay) || 0),
+        };
       });
-      (graph[selectedText] || []).forEach(function (n) {
-        (graph[n.text] || []).forEach(function (second) {
+      var secondCandidates = {};
+      direct.forEach(function (n) {
+        (graph[n.text] || []).slice(0, directLimit).forEach(function (second) {
           if (second.text === selectedText) return;
+          if (map[second.text]?.depth === 1) return;
           var strength = Math.round(Math.min(n.strength, second.strength) * 0.72);
-          var prev = map[second.text];
-          if (!prev || prev.depth > 2 || (prev.depth === 2 && strength > prev.strength)) {
-            map[second.text] = { depth: 2, strength: strength };
+          var prev = secondCandidates[second.text];
+          if (!prev || strength > prev.strength) {
+            secondCandidates[second.text] = {
+              depth: 2,
+              strength: strength,
+              weight: Math.min(Number(n.weight) || 0, Number(second.weight) || 0),
+              evidence: Math.min(Number(n.evidence) || 0, Number(second.evidence) || 0),
+              decay: Math.max(Number(n.decay) || 0, Number(second.decay) || 0),
+              via: n.text,
+            };
           }
         });
       });
+      Object.keys(secondCandidates)
+        .map(function (text) { return { text: text, rel: secondCandidates[text] }; })
+        .sort(function (a, b) {
+          return b.rel.strength - a.rel.strength || a.text.localeCompare(b.text);
+        })
+        .slice(0, secondLimit)
+        .forEach(function (item) {
+          map[item.text] = item.rel;
+        });
       return map;
+    }
+
+    function brainBlendRelation(fromRel, toRel, t) {
+      if (!fromRel && !toRel) return null;
+      var fromStrength = fromRel ? Number(fromRel.strength) || 0 : 0;
+      var toStrength = toRel ? Number(toRel.strength) || 0 : 0;
+      var fromPresence = fromRel ? (fromRel.presence == null ? 1 : Math.max(0, Math.min(1, Number(fromRel.presence) || 0))) : 0;
+      var toPresence = toRel ? (toRel.presence == null ? 1 : Math.max(0, Math.min(1, Number(toRel.presence) || 0))) : 0;
+      var presence = fromPresence + (toPresence - fromPresence) * t;
+      var depth = toRel ? toRel.depth : fromRel.depth;
+      return {
+        depth: depth,
+        strength: fromStrength + (toStrength - fromStrength) * t,
+        presence: presence,
+        via: toRel?.via || fromRel?.via,
+      };
     }
 
     function brainHoverFont(pos, rel) {
       if (!rel) return Math.max(8.5, Math.min(12, pos.font * 0.42));
       var strength = Math.max(1, Math.min(100, Number(rel.strength) || 1));
-      if (rel.depth === 0) return 52;
-      if (rel.depth === 1) return 18 + Math.pow(strength / 100, 0.58) * 28;
-      if (rel.depth === 2) return 11 + Math.pow(strength / 100, 0.7) * 14;
+      var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
+      var target;
+      if (rel.depth === 0) target = 52;
+      else if (rel.depth === 1) target = 18 + Math.pow(strength / 100, 0.58) * 28;
+      else if (rel.depth === 2) target = 11 + Math.pow(strength / 100, 0.7) * 14;
+      else target = Math.max(8.5, Math.min(12, pos.font * 0.42));
+      return pos.font + (target - pos.font) * presence;
+    }
+
+    function brainDisplaySelected(fromRel, toRel, t) {
+      var blended = brainBlendRelation(fromRel, toRel, t);
+      return !!(blended && blended.depth === 0 && (blended.presence == null || blended.presence > 0.35));
+    }
+
+    function brainLinePresence(relA, relB, selectedText) {
+      if (!selectedText || !relA || !relB) return { visible: false, primary: false, presence: 0 };
+      var aPresence = relA.presence == null ? 1 : Math.max(0, Math.min(1, Number(relA.presence) || 0));
+      var bPresence = relB.presence == null ? 1 : Math.max(0, Math.min(1, Number(relB.presence) || 0));
+      var presence = Math.min(aPresence, bPresence);
+      var primary = (relA.depth === 0 && relB.depth === 1) || (relB.depth === 0 && relA.depth === 1);
+      var secondary = (relA.depth === 1 && relB.depth === 2 && relB.via) || (relB.depth === 1 && relA.depth === 2 && relA.via);
+      return { visible: primary || secondary, primary: primary, presence: presence };
+    }
+
+    function brainEase(t) {
+      var n = Math.max(0, Math.min(1, t));
+      return n * n * (3 - 2 * n);
+    }
+
+    function brainDrawState(fromRelations, toRelations, progress) {
+      var t = brainEase(progress == null ? 1 : progress);
+      var selectedLinks = {};
+      var keys = {};
+      Object.keys(fromRelations || {}).forEach(function (key) { keys[key] = true; });
+      Object.keys(toRelations || {}).forEach(function (key) { keys[key] = true; });
+      Object.keys(keys).forEach(function (key) {
+        var blended = brainBlendRelation(fromRelations && fromRelations[key], toRelations && toRelations[key], t);
+        if (blended && blended.presence > 0.01) selectedLinks[key] = blended;
+      });
+      return selectedLinks;
+    }
+
+    function brainRelationPresence(relations) {
+      return Object.keys(relations || {}).reduce(function (max, key) {
+        var rel = relations[key] || {};
+        var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
+        return Math.max(max, presence);
+      }, 0);
+    }
+
+    function brainTransitionFocusPresence(fromRelations, toRelations, progress) {
+      var t = brainEase(progress == null ? 1 : progress);
+      var fromPresence = brainRelationPresence(fromRelations);
+      var toPresence = brainRelationPresence(toRelations);
+      return fromPresence + (toPresence - fromPresence) * t;
+    }
+
+    function brainInactiveFont(pos) {
       return Math.max(8.5, Math.min(12, pos.font * 0.42));
     }
 
     function brainHoverAlpha(rel, selectedText) {
       if (!selectedText) return 0.48;
       if (!rel) return 0.08;
-      if (rel.depth === 0) return 1;
-      if (rel.depth === 1) return 0.96;
-      if (rel.depth === 2) return 0.58;
-      return 0.08;
+      var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
+      var target;
+      if (rel.depth === 0) target = 1;
+      else if (rel.depth === 1) target = 0.96;
+      else if (rel.depth === 2) target = 0.58;
+      else target = 0.08;
+      return 0.08 + (target - 0.08) * presence;
     }
 
-    function drawBrainMeshCanvas(canvas, terms, connections, selectedText) {
+    function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition) {
       if (!canvas) return;
       var rect = canvas.getBoundingClientRect();
       var width = Math.max(320, Math.floor(rect.width));
@@ -2720,7 +2870,14 @@ function renderSystemCronVariant(row) {
       var byText = {};
       positions.forEach(function (pos) { byText[pos.term.text] = pos; });
       canvas.setAttribute('data-brain-word-count', String(positions.length));
-      var selectedLinks = brainRelationMap(selectedText, visibleConnections);
+      var hasFocus = !!selectedText || !!transition;
+      var relationSelectedText = selectedText || transition?.selectedText || '';
+      var focusPresence = transition
+        ? brainTransitionFocusPresence(transition.fromRelations, transition.toRelations, transition.progress)
+        : (hasFocus ? 1 : 0);
+      var selectedLinks = transition
+        ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
+        : brainRelationMap(relationSelectedText, visibleConnections);
       var baseLineLimit = Math.max(220, Math.min(2600, Math.round((width * height) / 850)));
       visibleConnections.slice(0, baseLineLimit).forEach(function (c) {
         var a = byText[c.from];
@@ -2734,38 +2891,41 @@ function renderSystemCronVariant(row) {
         ctx.strokeStyle = 'rgba(100,116,139,' + (0.055 + (strength / 100) * 0.075).toFixed(3) + ')';
         ctx.stroke();
       });
-      if (selectedText) {
+      if (relationSelectedText) {
         visibleConnections.forEach(function (c) {
           var fromRel = selectedLinks[c.from];
           var toRel = selectedLinks[c.to];
-          var visible = fromRel && toRel && Math.max(fromRel.depth, toRel.depth) <= 2;
+          var lineState = brainLinePresence(fromRel, toRel, relationSelectedText);
+          var isPrimary = lineState.primary;
+          var visible = lineState.visible && lineState.presence > 0.02;
           if (visible) {
             var a = byText[c.from];
             var b = byText[c.to];
             if (!a || !b) return;
             var level = brainEdgeLevel(c.strength);
-            var maxDepth = Math.max(fromRel.depth, toRel.depth);
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.lineWidth = maxDepth === 1 ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1) : 0.8;
-            ctx.strokeStyle = maxDepth === 1 ? 'rgba(148,163,184,0.72)' : 'rgba(100,116,139,0.42)';
+            var alpha = (isPrimary ? 0.72 : 0.42) * lineState.presence;
+            ctx.lineWidth = (isPrimary ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1) : 0.8) * Math.max(0.35, lineState.presence);
+            ctx.strokeStyle = isPrimary ? 'rgba(148,163,184,' + alpha.toFixed(3) + ')' : 'rgba(100,116,139,' + alpha.toFixed(3) + ')';
             ctx.stroke();
           }
         });
       }
       positions.slice().sort(function (a, b) {
-        var aRel = selectedText && selectedLinks[String(a.term.text || '')];
-        var bRel = selectedText && selectedLinks[String(b.term.text || '')];
-        var aFont = selectedText ? brainHoverFont(a, aRel) : a.font;
-        var bFont = selectedText ? brainHoverFont(b, bRel) : b.font;
+        var aRel = hasFocus && selectedLinks[String(a.term.text || '')];
+        var bRel = hasFocus && selectedLinks[String(b.term.text || '')];
+        var aFont = hasFocus ? (aRel ? brainHoverFont(a, aRel) : a.font + (brainInactiveFont(a) - a.font) * focusPresence) : a.font;
+        var bFont = hasFocus ? (bRel ? brainHoverFont(b, bRel) : b.font + (brainInactiveFont(b) - b.font) * focusPresence) : b.font;
         return aFont - bFont;
       }).forEach(function (pos) {
         var text = String(pos.term.text || '');
-        var rel = selectedText && selectedLinks[text];
-        var selected = rel && rel.depth === 0;
-        var displayFont = selectedText ? brainHoverFont(pos, rel) : pos.font;
-        var alpha = brainHoverAlpha(rel, selectedText);
+        var rel = hasFocus && selectedLinks[text];
+        var selected = brainDisplaySelected(null, rel, 1);
+        var displayFont = hasFocus ? (rel ? brainHoverFont(pos, rel) : pos.font + (brainInactiveFont(pos) - pos.font) * focusPresence) : pos.font;
+        var inactiveAlpha = 0.48 + (0.08 - 0.48) * focusPresence;
+        var alpha = hasFocus ? (rel ? brainHoverAlpha(rel, relationSelectedText) : inactiveAlpha) : 0.48;
         var hue = selected ? '255,255,255' : '219,234,254';
         ctx.font = displayFont.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
@@ -2809,8 +2969,7 @@ function renderSystemCronVariant(row) {
         .map(function (text) { return { text: text, rel: relationMap[text] }; })
         .sort(function (a, b) {
           return a.rel.depth - b.rel.depth || b.rel.strength - a.rel.strength || a.text.localeCompare(b.text);
-        })
-        .slice(0, 14);
+        });
       if (!related.length) {
         focus.hidden = false;
         focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong><span>No mapped connections yet.</span>';
@@ -2821,7 +2980,7 @@ function renderSystemCronVariant(row) {
         related.map(function (item) {
           var depthLabel = item.rel.depth === 1 ? 'direct' : 'near';
           return '<span class="brain-focus-link brain-focus-depth-' + item.rel.depth + ' brain-focus-' + brainEdgeLevel(item.rel.strength) + '">' +
-            escapeHtml(item.text) + ' · ' + depthLabel + ' · ' + escapeHtml(String(item.rel.strength || '')) +
+            escapeHtml(item.text) + ' · ' + depthLabel + ' · weight ' + escapeHtml(String(item.rel.strength || '')) +
             '</span>';
         }).join('');
     }
@@ -2830,6 +2989,10 @@ function renderSystemCronVariant(row) {
       var cloud = document.getElementById('brain-cloud');
       var meta = document.getElementById('brain-meta');
       if (!cloud) return;
+      if (cloud._brainMeshCleanup) {
+        cloud._brainMeshCleanup();
+        cloud._brainMeshCleanup = null;
+      }
       var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : [];
       var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
@@ -2856,13 +3019,54 @@ function renderSystemCronVariant(row) {
       var hoverTimer = null;
       var pendingHover = '';
       var activeHover = '';
+      var currentFocus = '';
+      var currentRelations = {};
+      var hoverFrame = null;
+
+      function stopBrainHoverAnimation() {
+        if (hoverFrame) {
+          cancelAnimationFrame(hoverFrame);
+          hoverFrame = null;
+        }
+      }
+
+      function animateBrainHover(nextTerm) {
+        stopBrainHoverAnimation();
+        var fromRelations = currentRelations || {};
+        var toRelations = nextTerm ? brainRelationMap(nextTerm, connections) : {};
+        var transitionFocus = nextTerm || currentFocus || '';
+        var startedAt = performance.now();
+        var duration = 240;
+        activeHover = nextTerm || '';
+
+        function step(now) {
+          var progress = Math.min(1, (now - startedAt) / duration);
+          currentRelations = brainDrawState(fromRelations, toRelations, progress);
+          drawBrainMeshCanvas(meshCanvas, terms, connections, nextTerm || '', {
+            fromRelations: fromRelations,
+            toRelations: toRelations,
+            progress: progress,
+            selectedText: transitionFocus,
+          });
+          if (progress < 1) {
+            hoverFrame = requestAnimationFrame(step);
+            return;
+          }
+          hoverFrame = null;
+          currentFocus = nextTerm || '';
+          currentRelations = toRelations;
+          activeHover = currentFocus;
+          if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+        }
+
+        hoverFrame = requestAnimationFrame(step);
+      }
 
       function clearBrainHover() {
         if (hoverTimer) clearTimeout(hoverTimer);
         hoverTimer = null;
         pendingHover = '';
-        activeHover = '';
-        drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+        animateBrainHover('');
         renderBrainFocus('', connections);
       }
 
@@ -2871,8 +3075,7 @@ function renderSystemCronVariant(row) {
           clearBrainHover();
           return;
         }
-        activeHover = term;
-        drawBrainMeshCanvas(meshCanvas, terms, connections, term);
+        animateBrainHover(term);
         renderBrainFocus('', connections);
       }
 
@@ -2897,6 +3100,11 @@ function renderSystemCronVariant(row) {
           clearBrainHover();
         });
       }
+      cloud._brainMeshCleanup = function () {
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = null;
+        stopBrainHoverAnimation();
+      };
       renderBrainFocus('', connections);
     }
 
@@ -2987,9 +3195,80 @@ function renderSystemCronVariant(row) {
       }
     }
 
+    function setBrainSettingsInputs() {
+      var pairs = [
+        ['brain-setting-direct', brainSettings.directRelations],
+        ['brain-setting-second', brainSettings.secondRelations],
+        ['brain-setting-words', brainSettings.visibleWords],
+        ['brain-setting-min-font', brainSettings.minFont],
+        ['brain-setting-max-font', brainSettings.maxFont],
+      ];
+      pairs.forEach(function (pair) {
+        var el = document.getElementById(pair[0]);
+        if (el) el.value = String(pair[1]);
+      });
+    }
+
+    function readBrainSettingsInputs() {
+      var direct = document.getElementById('brain-setting-direct');
+      var second = document.getElementById('brain-setting-second');
+      var words = document.getElementById('brain-setting-words');
+      var minFont = document.getElementById('brain-setting-min-font');
+      var maxFont = document.getElementById('brain-setting-max-font');
+      brainSettings = {
+        directRelations: clampBrainNumber(direct && direct.value, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
+        secondRelations: clampBrainNumber(second && second.value, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
+        visibleWords: clampBrainNumber(words && words.value, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
+        minFont: clampBrainNumber(minFont && minFont.value, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
+        maxFont: clampBrainNumber(maxFont && maxFont.value, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
+      };
+      if (brainSettings.maxFont <= brainSettings.minFont) brainSettings.maxFont = brainSettings.minFont + 4;
+      saveBrainSettings();
+      setBrainSettingsInputs();
+      rerenderBrainCloud();
+    }
+
+    function toggleBrainSettingsPanel(forceOpen) {
+      var panel = document.getElementById('brain-settings-panel');
+      if (!panel) return;
+      var open = forceOpen != null ? !!forceOpen : panel.hidden;
+      panel.hidden = !open;
+      if (open) setBrainSettingsInputs();
+    }
+
     wireEl('brain-refresh', 'click', function () { fetchBrainCloud(true); });
     wireEl('brain-range', 'change', function () { fetchBrainCloud(true); });
     wireEl('brain-source', 'change', function () { fetchBrainCloud(true); });
+    setBrainSettingsInputs();
+    wireEl('brain-settings-toggle', 'click', function (e) {
+      if (e) e.stopPropagation();
+      toggleBrainSettingsPanel();
+    });
+    wireEl('brain-settings-panel', 'click', function (e) {
+      if (e) e.stopPropagation();
+    });
+    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
+      wireEl(id, 'change', readBrainSettingsInputs);
+      wireEl(id, 'input', readBrainSettingsInputs);
+    });
+    wireEl('brain-settings-reset', 'click', function () {
+      brainSettings = {
+        directRelations: BRAIN_SETTINGS_DEFAULTS.directRelations,
+        secondRelations: BRAIN_SETTINGS_DEFAULTS.secondRelations,
+        visibleWords: BRAIN_SETTINGS_DEFAULTS.visibleWords,
+        minFont: BRAIN_SETTINGS_DEFAULTS.minFont,
+        maxFont: BRAIN_SETTINGS_DEFAULTS.maxFont,
+      };
+      saveBrainSettings();
+      setBrainSettingsInputs();
+      rerenderBrainCloud();
+    });
+    document.addEventListener('click', function (event) {
+      var panel = document.getElementById('brain-settings-panel');
+      var wrap = document.querySelector('.brain-settings');
+      if (!panel || panel.hidden || !wrap) return;
+      if (!wrap.contains(event.target)) panel.hidden = true;
+    });
     wireEl('brain-import-file', 'change', function (e) {
       importBrainFiles(e && e.target && e.target.files ? e.target.files : []);
     });

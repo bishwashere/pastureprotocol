@@ -10,6 +10,32 @@
         </div>
       </div>
       <div class="brain-controls">
+        <div class="brain-settings">
+          <button id="brain-settings-toggle" type="button">Settings</button>
+          <div id="brain-settings-panel" class="brain-settings-panel" hidden>
+            <label>
+              <span>Direct links</span>
+              <input id="brain-setting-direct" type="number" min="1" max="40" step="1">
+            </label>
+            <label>
+              <span>Next links</span>
+              <input id="brain-setting-second" type="number" min="0" max="80" step="1">
+            </label>
+            <label>
+              <span>Visible words</span>
+              <input id="brain-setting-words" type="number" min="0" max="2600" step="10">
+            </label>
+            <label>
+              <span>Min font</span>
+              <input id="brain-setting-min-font" type="number" min="6" max="30" step="1">
+            </label>
+            <label>
+              <span>Max font</span>
+              <input id="brain-setting-max-font" type="number" min="12" max="80" step="1">
+            </label>
+            <button id="brain-settings-reset" type="button">Reset</button>
+          </div>
+        </div>
         <label class="brain-control">
           <span>Range</span>
           <select id="brain-range">

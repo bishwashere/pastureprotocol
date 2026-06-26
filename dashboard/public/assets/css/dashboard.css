@@ -2035,6 +2035,48 @@
       gap: 0.65rem;
       flex-wrap: wrap;
     }
+    .brain-settings {
+      position: relative;
+      display: flex;
+      align-items: end;
+    }
+    .brain-settings-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 0.45rem);
+      z-index: 20;
+      width: 15rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.55rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--card) 96%, black);
+      box-shadow: 0 1rem 2.4rem rgba(0, 0, 0, 0.35);
+    }
+    .brain-settings-panel[hidden] {
+      display: none;
+    }
+    .brain-settings-panel label {
+      display: grid;
+      grid-template-columns: 1fr 5rem;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .brain-settings-panel input {
+      width: 100%;
+      min-width: 0;
+      font-family: inherit;
+      font-size: 0.75rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.25rem 0.35rem;
+    }
     .brain-control {
       display: flex;
       flex-direction: column;
@@ -2164,8 +2206,17 @@
       }
       .brain-control,
       .brain-control select,
-      #brain-refresh {
+      #brain-refresh,
+      #brain-settings-toggle {
         width: 100%;
+      }
+      .brain-settings {
+        width: 100%;
+      }
+      .brain-settings-panel {
+        left: 0;
+        right: auto;
+        width: min(100%, 17rem);
       }
       .brain-stage {
         padding: 1rem;
