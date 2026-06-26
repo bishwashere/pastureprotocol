@@ -80,7 +80,7 @@ import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
 } from './lib/context/projects-context.js';
-import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from './lib/context/missions-context.js';
+import { buildMissionsContextBlock, buildMissionIntentPlan, resolveMissionForUserTurn } from './lib/context/missions-context.js';
 import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/context/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
@@ -89,7 +89,7 @@ import {
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
 } from './lib/context/work-durability.js';
-import { getGithubSourceIntentHint } from './lib/context/github-context.js';
+import { buildGithubSourceIntentPlan } from './lib/context/github-context.js';
 import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/agent/user-facing-reply.js';
 import { toLogJid, getOwnerLogJid } from './lib/util/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/channels/telegram-private-handler.js';
@@ -1448,15 +1448,21 @@ async function main() {
           ? buildCasualPlanFromTurnIntent(turnIntent)
           : (isNonTaskMessage(text) ? buildCasualChatIntentPlan() : null))
       : null;
-    const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
-      ? (turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
-          ? getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId, { forceDiscovery: true })
-          : getMissionsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId))
+    const missionForIntent = isMultiAgent && !presetDelegationPlan && !casualIntentPlan && turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
+      ? resolveMissionForUserTurn({
+          userText: text,
+          historyMessages,
+          agentId,
+          projectOrMissionIntent: turnIntent.project_or_mission_intent,
+        })
+      : null;
+    const missionsIntentHint = missionForIntent
+      ? buildMissionIntentPlan(missionForIntent, enabledSkillIds)
       : null;
     const githubIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
       ? (turnIntentIsConfident && turnIntent.github_source_intent
-          ? getGithubSourceIntentHint(text, enabledSkillIds, { forceSource: true })
-          : getGithubSourceIntentHint(text, enabledSkillIds))
+          ? buildGithubSourceIntentPlan(enabledSkillIds)
+          : null)
       : null;
     const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
       ? await traceAsyncStep('intent_planner', () => planIntent({
@@ -1511,7 +1517,12 @@ async function main() {
       // Multi-agent mode adds mission / project / workflow context. Single-agent
       // mode keeps the system prompt focused on direct tool execution.
       if (isMultiAgent && !isNonTaskMessage(text)) {
-        const missionsBlock = buildMissionsContextBlock({ userText: text, historyMessages, agentId });
+        const missionsBlock = buildMissionsContextBlock({
+          userText: text,
+          historyMessages,
+          agentId,
+          projectOrMissionIntent: turnIntentIsConfident ? turnIntent.project_or_mission_intent : 'none',
+        });
         if (missionsBlock) systemPromptWithPlan += missionsBlock;
         const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
         if (projectsBlock) systemPromptWithPlan += projectsBlock;

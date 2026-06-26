@@ -16,12 +16,9 @@ async function main() {
     const {
       resolveMissionForUserTurn,
       buildMissionsContextBlock,
-      getMissionsDiscoveryIntentHint,
-      isWorkOrDiscoveryRequest,
+      buildMissionIntentPlan,
       missionLabelForAgentContext,
     } = await import('../../lib/context/missions-context.js');
-
-    assert(isWorkOrDiscoveryRequest('find out what this project is about'), 'work request');
 
     createProject({
       name: 'nextpostai',
@@ -38,6 +35,7 @@ async function main() {
       userText: 'what is this project all about find out',
       historyMessages: [],
       agentId: 'developer',
+      projectOrMissionIntent: 'discover',
     });
     assert(resolved && resolved.id === mission.id, 'mission resolved via project name');
 
@@ -45,18 +43,14 @@ async function main() {
       userText: 'what is this project all about find out',
       historyMessages: [],
       agentId: 'developer',
+      projectOrMissionIntent: 'discover',
     });
     assert(block.includes('Mission:') && block.includes('Research nextpostai'), 'mission block header');
     assert(block.includes('nextpostai'), 'related project in block');
-    assert(block.includes('tools') && block.includes('confirm'), 'work instructions');
+    assert(block.includes('tools') && block.includes('How to handle this message'), 'work instructions');
     assert(block.includes('Research nextpostai'), 'mission title');
 
-    const hint = getMissionsDiscoveryIntentHint(
-      'find out what this is about',
-      [],
-      ['browse', 'github', 'memory', 'search'],
-      'developer',
-    );
+    const hint = buildMissionIntentPlan(resolved, ['browse', 'github', 'memory', 'search']);
     assert(hint && hint.skills.includes('browse'), 'intent includes browse');
     assert(hint.plan.includes('mission'), 'intent references mission');
 
@@ -71,6 +65,7 @@ async function main() {
         userText: 'what are the pending tasks for nextpostai',
         historyMessages: [],
         agentId: 'developer',
+        projectOrMissionIntent: 'status',
       });
       assert(
         resolved2 && resolved2.id === mission.id,
@@ -85,6 +80,7 @@ async function main() {
       userText: 'continue working on the current task',
       historyMessages: [],
       agentId: 'developer',
+      projectOrMissionIntent: 'continue',
     });
     assert(!resolved3, 'completed mission must NOT resolve for vague work requests');
 

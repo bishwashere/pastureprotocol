@@ -16,6 +16,7 @@ import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '.
 import { runAgentTurn } from '../lib/agent/agent.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/agent/intent-planner.js';
+import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from '../lib/agent/turn-intent.js';
 import { isNonTaskMessage } from '../lib/agent/evaluate-team-capability.js';
 import { buildDelegationContext } from '../lib/agent/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from '../lib/agent/delegation-routing-details.js';
@@ -38,7 +39,7 @@ import {
   buildProjectsContextBlock,
   enrichMessageWithProjectContext,
 } from '../lib/context/projects-context.js';
-import { buildMissionsContextBlock, getMissionsDiscoveryIntentHint } from '../lib/context/missions-context.js';
+import { buildMissionsContextBlock, buildMissionIntentPlan, resolveMissionForUserTurn } from '../lib/context/missions-context.js';
 import { buildProjectWorkflowContextBlock } from '../lib/context/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
@@ -47,7 +48,7 @@ import {
   delegationRoutingTextFromDurability,
   prepareWorkDurabilityWithAi,
 } from '../lib/context/work-durability.js';
-import { getGithubSourceIntentHint } from '../lib/context/github-context.js';
+import { buildGithubSourceIntentPlan } from '../lib/context/github-context.js';
 import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/agent/user-facing-reply.js';
 import { getPendingHealthFlags } from '../lib/agent/system-pulse.js';
 
@@ -250,14 +251,38 @@ async function main() {
     });
   }
   // Step 4: intent planner — one small LLM call before loading any tool schemas.
-  const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
-    ? buildCasualChatIntentPlan()
+  const turnIntent = isMultiAgent && !presetDelegationPlan
+    ? await classifyTurnIntent({
+        userText: message,
+        historyMessages,
+        availableSkillIds: enabledSkillIds,
+        availableSkillSummaries: enabledSkillSummaries,
+        currentWorkMode: workMode,
+        agentId,
+      })
     : null;
-  const missionsIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
-    ? getMissionsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
+  if (turnIntent) process.stderr.write('[turn-intent] ' + JSON.stringify(turnIntent) + '\n');
+  const turnIntentIsConfident = turnIntent && turnIntent.confidence >= 0.65;
+  const casualIntentPlan = !presetDelegationPlan
+    ? (turnIntentIsConfident
+        ? buildCasualPlanFromTurnIntent(turnIntent)
+        : (isNonTaskMessage(message) ? buildCasualChatIntentPlan() : null))
+    : null;
+  const missionForIntent = isMultiAgent && !presetDelegationPlan && !casualIntentPlan && turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
+    ? resolveMissionForUserTurn({
+        userText: message,
+        historyMessages,
+        agentId,
+        projectOrMissionIntent: turnIntent.project_or_mission_intent,
+      })
+    : null;
+  const missionsIntentHint = missionForIntent
+    ? buildMissionIntentPlan(missionForIntent, enabledSkillIds)
     : null;
   const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
-    ? getGithubSourceIntentHint(message, enabledSkillIds)
+    ? (turnIntentIsConfident && turnIntent.github_source_intent
+        ? buildGithubSourceIntentPlan(enabledSkillIds)
+        : null)
     : null;
   const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
     ? await planIntent({
@@ -294,7 +319,12 @@ async function main() {
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
   if (isMultiAgent && !isNonTaskMessage(message)) {
-    const missionsBlock = buildMissionsContextBlock({ userText: message, historyMessages, agentId });
+    const missionsBlock = buildMissionsContextBlock({
+      userText: message,
+      historyMessages,
+      agentId,
+      projectOrMissionIntent: turnIntentIsConfident ? turnIntent.project_or_mission_intent : 'none',
+    });
     if (missionsBlock) systemPrompt += missionsBlock;
     const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
     if (projectsBlock) systemPrompt += projectsBlock;

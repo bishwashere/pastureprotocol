@@ -20,15 +20,12 @@ async function main() {
   try {
     const {
       hasGithubToken,
-      isSourceCodeAccessQuestion,
-      getGithubSourceIntentHint,
+      buildGithubSourceIntentPlan,
       getGithubSystemPromptBlock,
     } = await import('../../lib/context/github-context.js');
     const { getEnabledSkillIds } = await import('../../skills/loader.js');
 
     assert(hasGithubToken(), 'token detected');
-    assert(isSourceCodeAccessQuestion('do you have access to its source code?'), 'source code Q');
-    assert(!isSourceCodeAccessQuestion('hi'), 'not hi');
 
     const block = getGithubSystemPromptBlock();
     assert(block.includes('Never tell the user you lack GitHub'), 'prompt forbids denying github');
@@ -36,7 +33,7 @@ async function main() {
     const devSkills = getEnabledSkillIds({ agentId: 'developer' });
     assert(devSkills.includes('github'), `developer gets github: ${devSkills.join(',')}`);
 
-    const hint = getGithubSourceIntentHint('do you have access to its source code?', devSkills);
+    const hint = buildGithubSourceIntentPlan(devSkills);
     assert(hint && hint.skills.includes('github'), 'github intent hint');
 
     console.log('| Test | Input | Output | Status |');

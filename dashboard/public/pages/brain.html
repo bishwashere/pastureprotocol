@@ -1,0 +1,35 @@
+<div id="page-brain" class="page">
+  <div class="brain-shell">
+    <div class="brain-toolbar card">
+      <div>
+        <h2 class="brain-title">Brain</h2>
+        <p class="skill-meta" id="brain-meta">Memory and history cloud</p>
+      </div>
+      <div class="brain-controls">
+        <label class="brain-control">
+          <span>Range</span>
+          <select id="brain-range">
+            <option value="all">All</option>
+            <option value="30d">30 days</option>
+            <option value="7d">7 days</option>
+          </select>
+        </label>
+        <label class="brain-control">
+          <span>Source</span>
+          <select id="brain-source">
+            <option value="all">All</option>
+            <option value="memory">Long-term</option>
+            <option value="notes">Notes</option>
+            <option value="history">History</option>
+          </select>
+        </label>
+        <button id="brain-refresh" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="brain-stage card">
+      <div id="brain-cloud" class="brain-cloud" aria-live="polite"></div>
+      <div id="brain-focus" class="brain-focus" hidden></div>
+    </div>
+  </div>
+</div>

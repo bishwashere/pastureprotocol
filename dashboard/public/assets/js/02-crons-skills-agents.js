@@ -2559,6 +2559,157 @@ function renderSystemCronVariant(row) {
       }
     }
 
+    function brainSourceClass(term) {
+      var sources = Array.isArray(term.sources) ? term.sources : [];
+      if (sources.indexOf('history') >= 0) return 'history';
+      if (sources.indexOf('notes') >= 0) return 'notes';
+      return 'memory';
+    }
+
+    function brainEdgeLevel(strength) {
+      var n = Number(strength) || 0;
+      if (n >= 78) return 'strong';
+      if (n >= 52) return 'medium';
+      return 'weak';
+    }
+
+    function brainNodePositions(terms) {
+      var count = terms.length || 1;
+      return terms.map(function (term, idx) {
+        var weight = Number(term.weight) || 1;
+        var ring = idx < 5 ? 0.26 : idx < 16 ? 0.38 : 0.48;
+        var angle = (idx / count) * Math.PI * 2;
+        if (idx > 0) angle += (idx % 2 ? 0.22 : -0.18);
+        var jitter = ((weight % 17) - 8) / 120;
+        var radius = Math.max(0.08, ring + jitter);
+        return {
+          term: term,
+          x: 50 + Math.cos(angle) * radius * 86,
+          y: 50 + Math.sin(angle) * radius * 72,
+        };
+      });
+    }
+
+    function renderBrainFocus(selectedText, connections) {
+      var focus = document.getElementById('brain-focus');
+      if (!focus) return;
+      if (!selectedText) {
+        focus.hidden = true;
+        focus.innerHTML = '';
+        return;
+      }
+      var related = connections.filter(function (c) {
+        return c.from === selectedText || c.to === selectedText;
+      }).sort(function (a, b) { return (Number(b.strength) || 0) - (Number(a.strength) || 0); }).slice(0, 8);
+      if (!related.length) {
+        focus.hidden = false;
+        focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong><span>No mapped connections yet.</span>';
+        return;
+      }
+      focus.hidden = false;
+      focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong>' +
+        related.map(function (c) {
+          var other = c.from === selectedText ? c.to : c.from;
+          return '<span class="brain-focus-link brain-focus-' + brainEdgeLevel(c.strength) + '">' +
+            escapeHtml(other) + ' · ' + escapeHtml(String(c.strength || '')) +
+            '</span>';
+        }).join('');
+    }
+
+    function renderBrainCloud(data) {
+      var cloud = document.getElementById('brain-cloud');
+      var meta = document.getElementById('brain-meta');
+      if (!cloud) return;
+      var terms = Array.isArray(data && data.terms) ? data.terms : [];
+      var connections = Array.isArray(data && data.connections) ? data.connections : [];
+      var stats = data && data.stats ? data.stats : {};
+      var sourceCount = [
+        stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
+        stats.noteFiles ? stats.noteFiles + ' notes' : '',
+        stats.historyDays ? stats.historyDays + ' days' : '',
+        stats.exchanges ? stats.exchanges + ' exchanges' : '',
+      ].filter(Boolean).join(' · ');
+      if (meta) meta.textContent = sourceCount || 'No memory or history found';
+      if (!terms.length) {
+        cloud.innerHTML = '<p class="empty">No brain cloud yet.</p>';
+        renderBrainFocus('', []);
+        return;
+      }
+      var positioned = brainNodePositions(terms);
+      var byText = {};
+      positioned.forEach(function (node) { byText[node.term.text] = node; });
+      var edges = connections.filter(function (connection) {
+        return byText[connection.from] && byText[connection.to];
+      });
+      var edgeHtml = edges.map(function (connection, idx) {
+        var a = byText[connection.from];
+        var b = byText[connection.to];
+        var level = brainEdgeLevel(connection.strength);
+        return '<line class="brain-edge brain-edge-' + level + '" data-edge-idx="' + idx + '" data-from="' + escapeHtml(connection.from) + '" data-to="' + escapeHtml(connection.to) + '" x1="' + a.x.toFixed(2) + '%" y1="' + a.y.toFixed(2) + '%" x2="' + b.x.toFixed(2) + '%" y2="' + b.y.toFixed(2) + '%"><title>' + escapeHtml(connection.reason || String(connection.strength || '')) + '</title></line>';
+      }).join('');
+      var nodeHtml = positioned.map(function (node, idx) {
+        var term = node.term;
+        var weight = Number(term.weight) || 1;
+        var level = Math.max(1, Math.min(8, Math.ceil(weight / 12.5)));
+        var sourceClass = brainSourceClass(term);
+        var sources = Array.isArray(term.sources) ? term.sources.join(', ') : '';
+        return '<button type="button" class="brain-node brain-term brain-term-' + level + ' brain-term-source-' + sourceClass + '" data-term="' + escapeHtml(term.text || '') + '" data-node-idx="' + idx + '" style="left:' + node.x.toFixed(2) + '%; top:' + node.y.toFixed(2) + '%;" title="' + escapeHtml(sources) + '">' + escapeHtml(term.text || '') + '</button>';
+      }).join('');
+      cloud.innerHTML = '<svg class="brain-map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + edgeHtml + '</svg><div class="brain-map-nodes">' + nodeHtml + '</div>';
+      renderBrainFocus('', connections);
+      cloud.querySelectorAll('.brain-node').forEach(function (node) {
+        node.addEventListener('click', function () {
+          var term = node.getAttribute('data-term') || '';
+          cloud.querySelectorAll('.brain-node').forEach(function (el) {
+            var t = el.getAttribute('data-term') || '';
+            var linked = edges.some(function (c) { return (c.from === term && c.to === t) || (c.to === term && c.from === t); });
+            el.classList.toggle('active', t === term);
+            el.classList.toggle('linked', linked);
+            el.classList.toggle('dimmed', t !== term && !linked);
+          });
+          cloud.querySelectorAll('.brain-edge').forEach(function (edge) {
+            var from = edge.getAttribute('data-from') || '';
+            var to = edge.getAttribute('data-to') || '';
+            var active = from === term || to === term;
+            edge.classList.toggle('active', active);
+            edge.classList.toggle('dimmed', !active);
+          });
+          renderBrainFocus(term, connections);
+        });
+      });
+    }
+
+    async function fetchBrainCloud(refresh) {
+      var cloud = document.getElementById('brain-cloud');
+      if (!cloud) return;
+      var rangeEl = document.getElementById('brain-range');
+      var sourceEl = document.getElementById('brain-source');
+      var range = rangeEl ? rangeEl.value : 'all';
+      var source = sourceEl ? sourceEl.value : 'all';
+      var hasGraph = !!cloud.querySelector('.brain-map-lines, .brain-node');
+      if (!hasGraph || refresh) {
+        cloud.innerHTML = '<p class="empty">Loading brain map...</p>';
+      }
+      var meta = document.getElementById('brain-meta');
+      if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
+      try {
+        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) + '&source=' + encodeURIComponent(source);
+        if (refresh) url += '&refresh=1';
+        var r = await fetch(url);
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
+        renderBrainCloud(d);
+      } catch (e) {
+        cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
+        var meta = document.getElementById('brain-meta');
+        if (meta) meta.textContent = e && e.message ? e.message : 'Request failed';
+      }
+    }
+
+    wireEl('brain-refresh', 'click', function () { fetchBrainCloud(true); });
+    wireEl('brain-range', 'change', function () { fetchBrainCloud(true); });
+    wireEl('brain-source', 'change', function () { fetchBrainCloud(true); });
+
     async function fetchTests() {
       try {
         var r = await fetch(API + '/api/tests');
@@ -2974,4 +3125,3 @@ function renderSystemCronVariant(row) {
     if (identityEditorCard) {
       identityEditorCard.addEventListener('click', function (e) { e.stopPropagation(); });
     }
-

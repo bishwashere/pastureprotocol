@@ -49,7 +49,6 @@ function assertNoTools(skillsCalled) {
 async function runUnitTests() {
   const { isNonTaskMessage } = await import('../../lib/agent/evaluate-team-capability.js');
   const { buildCasualChatIntentPlan, planIntent } = await import('../../lib/agent/intent-planner.js');
-  const { getMissionsDiscoveryIntentHint, isWorkOrDiscoveryRequest } = await import('../../lib/context/missions-context.js');
 
   const rows = [];
 
@@ -92,15 +91,6 @@ async function runUnitTests() {
     name: 'planIntent("hi") fast path',
     input: 'hi',
     output: `mode=${hiPlan.mode} skills=[${hiPlan.skills.join(', ')}]`,
-    status: 'pass',
-  });
-
-  assert(!isWorkOrDiscoveryRequest('hi'), 'hi is not work request');
-  assert(!getMissionsDiscoveryIntentHint('hi', [], ['search', 'browse'], 'main'), 'no missions hint for hi');
-  rows.push({
-    name: 'no missions discovery for hi',
-    input: 'hi',
-    output: 'no hint',
     status: 'pass',
   });
 

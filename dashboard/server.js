@@ -22,6 +22,7 @@ import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSugge
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
 import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
+import { generateBrainWordCloud } from '../lib/agent/brain-word-cloud.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -1800,6 +1801,163 @@ app.get('/api/workspace-logs/:key', (req, res) => {
     const path = getWorkspaceLogPath(key);
     const raw = existsSync(path) ? readFileSync(path, 'utf8') : '';
     res.json({ id: key, label: key, content: formatChatLogForDisplay(raw), readOnly: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Brain (word cloud over memory + history) ----
+
+const BRAIN_CACHE_MS = 5 * 60 * 1000;
+const BRAIN_CORPUS_MAX_CHARS = 32_000;
+const brainCloudCache = new Map();
+
+function normalizeBrainRange(value) {
+  const v = String(value || 'all').trim();
+  return v === '7d' || v === '30d' || v === 'all' ? v : 'all';
+}
+
+function normalizeBrainSource(value) {
+  const v = String(value || 'all').trim();
+  return v === 'memory' || v === 'notes' || v === 'history' || v === 'all' ? v : 'all';
+}
+
+function brainRangeCutoffMs(range) {
+  if (range === '7d') return Date.now() - 7 * 86400000;
+  if (range === '30d') return Date.now() - 30 * 86400000;
+  return 0;
+}
+
+function pushBrainCorpusChunk(out, chunk, remaining) {
+  if (!chunk || remaining.value <= 0) return;
+  const text = String(chunk.text || '').trim();
+  if (!text) return;
+  const sliced = text.length > remaining.value ? text.slice(0, remaining.value) : text;
+  out.push({
+    source: chunk.source,
+    label: String(chunk.label || chunk.source || '').slice(0, 120),
+    text: sliced,
+  });
+  remaining.value -= sliced.length;
+}
+
+function formatBrainHistoryExchanges(exchanges) {
+  return exchanges
+    .map((ex) => String(ex?.user || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function collectBrainCorpus({ range, source }) {
+  const workspaceDir = getWorkspaceDir();
+  const includeMemory = source === 'all' || source === 'memory';
+  const includeNotes = source === 'all' || source === 'notes';
+  const includeHistory = source === 'all' || source === 'history';
+  const cutoffMs = brainRangeCutoffMs(range);
+  const corpus = [];
+  const remaining = { value: BRAIN_CORPUS_MAX_CHARS };
+  const stats = { memoryFiles: 0, noteFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
+
+  if (includeMemory) {
+    for (const name of ['MEMORY.md', 'memory.md']) {
+      const full = join(workspaceDir, name);
+      try {
+        if (existsSync(full) && statSync(full).isFile()) {
+          const text = readFileSync(full, 'utf8');
+          stats.memoryFiles += 1;
+          pushBrainCorpusChunk(corpus, { source: 'memory', label: name, text }, remaining);
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (includeNotes) {
+    const memoryDir = join(workspaceDir, 'memory');
+    try {
+      if (existsSync(memoryDir) && statSync(memoryDir).isDirectory()) {
+        for (const name of readdirSync(memoryDir).sort()) {
+          if (!name.endsWith('.md')) continue;
+          if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) continue;
+          const full = join(memoryDir, name);
+          if (!statSync(full).isFile()) continue;
+          const text = readFileSync(full, 'utf8');
+          stats.noteFiles += 1;
+          pushBrainCorpusChunk(corpus, { source: 'notes', label: `memory/${name}`, text }, remaining);
+          if (remaining.value <= 0) break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (includeHistory && remaining.value > 0) {
+    const days = collectChatLogDateEntries(workspaceDir)
+      .filter((d) => !cutoffMs || Number(d.lastActivityMs || 0) >= cutoffMs);
+    for (const day of days) {
+      if (remaining.value <= 0) break;
+      const exchanges = readChatLogDayExchanges(workspaceDir, day.date);
+      if (!exchanges.length) continue;
+      stats.historyDays += 1;
+      stats.exchanges += exchanges.length;
+      const text = formatBrainHistoryExchanges(exchanges);
+      pushBrainCorpusChunk(corpus, { source: 'history', label: day.date, text }, remaining);
+    }
+  }
+
+  stats.chars = BRAIN_CORPUS_MAX_CHARS - remaining.value;
+  return { corpus, stats };
+}
+
+app.get('/api/brain/cloud', async (req, res) => {
+  try {
+    const range = normalizeBrainRange(req.query.range);
+    const source = normalizeBrainSource(req.query.source);
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    const cacheKey = `${range}:${source}`;
+    const cached = brainCloudCache.get(cacheKey);
+    const cachedHasTerms = Array.isArray(cached?.payload?.terms) && cached.payload.terms.length > 0;
+    const cachedHadNoCorpus = Number(cached?.payload?.stats?.chars || 0) === 0;
+    if (!refresh && cached && (cachedHasTerms || cachedHadNoCorpus) && Date.now() - cached.cachedAtMs < BRAIN_CACHE_MS) {
+      res.json({ ...cached.payload, cached: true });
+      return;
+    }
+
+    const { corpus, stats } = collectBrainCorpus({ range, source });
+    if (!corpus.length) {
+      const payload = {
+        range,
+        source,
+        updatedAtMs: Date.now(),
+        terms: [],
+        stats,
+      };
+      brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+      res.json({ ...payload, cached: false });
+      return;
+    }
+
+    const graph = await generateBrainWordCloud({ range, source, corpus });
+    if (!Array.isArray(graph?.terms) || graph.terms.length === 0) {
+      res.status(502).json({
+        error: 'Brain generation returned no terms. Try Refresh.',
+        range,
+        source,
+        updatedAtMs: Date.now(),
+        terms: [],
+        connections: [],
+        stats,
+      });
+      return;
+    }
+    const payload = {
+      range,
+      source,
+      updatedAtMs: Date.now(),
+      terms: Array.isArray(graph?.terms) ? graph.terms : [],
+      connections: Array.isArray(graph?.connections) ? graph.connections : [],
+      stats,
+    };
+    brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+    res.json({ ...payload, cached: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
