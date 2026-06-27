@@ -3120,7 +3120,7 @@ function renderSystemCronVariant(row) {
       var focusPresence = transition
         ? brainTransitionFocusPresence(transition.fromRelations, transition.toRelations, transition.progress)
         : (hasFocus ? 1 : 0);
-      var dimPresence = focusMode === 'path' ? focusPresence * 0.32 : focusPresence;
+      var dimPresence = focusMode === 'path' ? focusPresence * 0.32 : focusPresence * 0.62;
       var selectedLinks = transition
         ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
         : brainRelationMap(relationSelectedText, visibleConnections);
