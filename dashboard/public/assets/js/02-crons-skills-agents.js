@@ -3241,7 +3241,7 @@ function renderSystemCronVariant(row) {
           meshPointer.active = true;
           scheduleBrainPointerDraw();
           var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
-          if (selected === activeHover || selected === pendingHover) return;
+          if (selected === activeHover || (pendingHover && selected === pendingHover)) return;
           if (hoverTimer) clearTimeout(hoverTimer);
           pendingHover = selected;
           if (!selected) {
