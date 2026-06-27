@@ -2046,6 +2046,38 @@
     .brain-meta-row .skill-meta {
       margin: 0;
     }
+    .brain-import-progress {
+      display: grid;
+      grid-template-columns: minmax(8rem, 13rem) auto;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+    .brain-import-progress[hidden] {
+      display: none;
+    }
+    .brain-import-progress-track {
+      width: 100%;
+      height: 0.42rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--bg) 80%, black);
+    }
+    .brain-import-progress-bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #48bb78);
+      transition: width 160ms ease;
+    }
+    .brain-import-progress-label {
+      min-width: 2.5rem;
+      color: var(--muted);
+      font-size: 0.68rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
     .brain-controls {
       display: flex;
       align-items: end;

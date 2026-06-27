@@ -3661,6 +3661,33 @@ function renderSystemCronVariant(row) {
       el.classList.toggle('error', !!isError);
     }
 
+    function setBrainImportProgress(percent, label, options) {
+      var wrap = document.getElementById('brain-import-progress');
+      var bar = document.getElementById('brain-import-progress-bar');
+      var labelEl = document.getElementById('brain-import-progress-label');
+      if (!wrap || !bar || !labelEl) return;
+      var opts = options || {};
+      var visible = opts.visible !== false;
+      wrap.hidden = !visible;
+      if (!visible) {
+        wrap.classList.remove('is-indeterminate');
+        wrap.setAttribute('aria-valuenow', '0');
+        bar.style.width = '0%';
+        labelEl.textContent = '';
+        return;
+      }
+      var value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+      wrap.setAttribute('aria-valuenow', String(value));
+      bar.style.width = value + '%';
+      labelEl.textContent = label || (value + '%');
+    }
+
+    function hideBrainImportProgressSoon() {
+      setTimeout(function () {
+        setBrainImportProgress(0, '', { visible: false });
+      }, 1400);
+    }
+
     function guessBrainImportProvider(fileName) {
       var name = String(fileName || '').toLowerCase();
       if (name.indexOf('chatgpt') >= 0 || name.indexOf('openai') >= 0) return 'chatgpt';
@@ -3696,6 +3723,46 @@ function renderSystemCronVariant(row) {
       return data;
     }
 
+    function parseBrainImportResponseText(text, ok) {
+      var data = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
+        var clean = String(text || '')
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        data = { error: clean || 'Import failed' };
+      }
+      if (!ok) throw new Error(data.error || 'Import failed');
+      return data;
+    }
+
+    function uploadBrainImportFile(file, uploadUrl, onProgress) {
+      return new Promise(function (resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.upload.onprogress = function (event) {
+          if (!event.lengthComputable) return;
+          var pct = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          if (onProgress) onProgress(pct);
+        };
+        xhr.onload = function () {
+          try {
+            resolve(parseBrainImportResponseText(xhr.responseText || '', xhr.status >= 200 && xhr.status < 300));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        xhr.onerror = function () { reject(new Error('Import upload failed')); };
+        xhr.onabort = function () { reject(new Error('Import upload canceled')); };
+        xhr.send(file);
+      });
+    }
+
     async function importBrainFiles(files) {
       var submit = document.getElementById('brain-import-submit');
       var input = document.getElementById('brain-import-file');
@@ -3705,13 +3772,16 @@ function renderSystemCronVariant(row) {
       }
       if (submit) submit.disabled = true;
       setBrainImportStatus('Importing ' + list.length + ' file' + (list.length === 1 ? '' : 's') + '...');
+      setBrainImportProgress(0, '0%', { visible: true });
       var imported = 0;
       var messages = 0;
       var reused = 0;
       try {
         for (var i = 0; i < list.length; i++) {
           var file = list[i];
+          var fileBaseProgress = Math.round((i / list.length) * 100);
           setBrainImportStatus('Reading ' + (file.name || 'export') + '...');
+          setBrainImportProgress(fileBaseProgress, (i + 1) + '/' + list.length, { visible: true });
           var provider = guessBrainImportProvider(file.name);
           var r;
           if (isBrainZipImportFile(file)) {
@@ -3720,10 +3790,9 @@ function renderSystemCronVariant(row) {
               '?provider=' + encodeURIComponent(provider) +
               '&filename=' + encodeURIComponent(file.name || '') +
               '&contentType=' + encodeURIComponent(file.type || 'application/zip');
-            r = await fetch(uploadUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/octet-stream' },
-              body: file,
+            r = await uploadBrainImportFile(file, uploadUrl, function (pct) {
+              var overall = Math.round(((i + (pct / 100)) / list.length) * 100);
+              setBrainImportProgress(overall, overall + '%', { visible: true });
             });
           } else {
             var body = {
@@ -3737,19 +3806,26 @@ function renderSystemCronVariant(row) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(body),
             });
+            r = await readBrainImportResponse(r);
           }
-          var d = await readBrainImportResponse(r);
+          var d = r;
           if (d.reused) reused += 1;
           imported += Number(d.conversations || 0);
           messages += Number(d.messages || 0);
+          setBrainImportProgress(Math.round(((i + 1) / list.length) * 100), Math.round(((i + 1) / list.length) * 100) + '%', { visible: true });
         }
         var summary = 'Imported ' + imported + ' conversation' + (imported === 1 ? '' : 's') +
           ' · ' + messages + ' messages' +
           (reused ? ' · ' + reused + ' reused' : '') +
-          ' · refresh to include';
+          ' · rebuilding brain map';
         setBrainImportStatus(summary);
+        setBrainImportProgress(100, 'Imported', { visible: true });
+        setBrainImportProgress(0, '', { visible: false });
+        await fetchBrainCloud(true);
       } catch (e) {
         setBrainImportStatus(e && e.message ? e.message : 'Import failed', true);
+        setBrainImportProgress(0, 'Failed', { visible: true });
+        hideBrainImportProgressSoon();
       } finally {
         if (submit) submit.disabled = false;
         if (input) input.value = '';

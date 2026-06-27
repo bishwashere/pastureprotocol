@@ -891,6 +891,11 @@
       return raw && typeof raw === 'object' ? raw : null;
     }
 
+    function getTaskBlockerHistory(task) {
+      var raw = task && task.blockerHistory;
+      return raw && typeof raw === 'object' ? raw : null;
+    }
+
     function hasAppliedTaskAssumption(task) {
       var record = getTaskAssumptionRecord(task);
       return String(record && record.status || '').toLowerCase() === 'applied';
