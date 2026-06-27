@@ -2462,7 +2462,7 @@ function mergeBrainSources(target, sources) {
   }
 }
 
-async function buildLlmBrainGraph(corpus, { range, source, onProgress } = {}) {
+async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = false } = {}) {
   const chunks = splitBrainCorpusForLlm(corpus);
   const termMap = new Map();
   const edgeMap = new Map();
@@ -2494,7 +2494,7 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress } = {}) {
     const chunk = chunks[chunkIndex];
     const cacheKey = brainLlmChunkCacheKey(chunk);
     const fileKey = `${chunk.source || ''}:${chunk.label || ''}`;
-    let graph = readBrainLlmChunkCache(cacheKey);
+    let graph = force ? null : readBrainLlmChunkCache(cacheKey);
     if (graph) {
       stats.cacheHits += 1;
       markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'cached');
@@ -2630,7 +2630,7 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress } = {}) {
   return { terms, connections, llmStats: stats };
 }
 
-async function refineLlmBrainGraphQuality(graph, { range, source, stats, onProgress } = {}) {
+async function refineLlmBrainGraphQuality(graph, { range, source, stats, onProgress, force = false } = {}) {
   const qualityInput = {
     version: BRAIN_QUALITY_CACHE_VERSION,
     range,
@@ -2646,7 +2646,7 @@ async function refineLlmBrainGraphQuality(graph, { range, source, stats, onProgr
     connections: (graph.connections || []).slice(0, 900),
   };
   const cacheKey = brainHashText(JSON.stringify(qualityInput));
-  const cached = readBrainQualityCache(cacheKey);
+  const cached = force ? null : readBrainQualityCache(cacheKey);
   if (cached) {
     return {
       terms: cached.terms,
@@ -2756,6 +2756,7 @@ app.get('/api/brain/cloud', async (req, res) => {
       range,
       source,
       qualityEnabled,
+      qualityMode: qualityEnabled ? 'quality' : 'raw',
       updatedAtMs: Date.now(),
       terms: finalGraph.terms,
       connections: finalGraph.connections,
@@ -2767,6 +2768,10 @@ app.get('/api/brain/cloud', async (req, res) => {
         llmCacheHits: dense.llmStats?.cacheHits || 0,
         llmGenerated: dense.llmStats?.generated || 0,
         llmFailed: dense.llmStats?.failed || 0,
+        rawTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
+        rawConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
+        finalTerms: Array.isArray(finalGraph.terms) ? finalGraph.terms.length : 0,
+        finalConnections: Array.isArray(finalGraph.connections) ? finalGraph.connections.length : 0,
         qualityDisabled: finalGraph.qualityStats?.disabled ? 1 : 0,
         qualityCached: finalGraph.qualityStats?.cached ? 1 : 0,
         qualityGenerated: finalGraph.qualityStats?.generated ? 1 : 0,
