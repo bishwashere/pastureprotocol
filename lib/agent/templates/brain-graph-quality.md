@@ -25,11 +25,11 @@ Make the graph feel like a durable personal/project knowledge graph, not a recen
 
 ## Canonicalization
 
-- Merge casing variants: `cron`, `Cron`, `Crons` should become the best canonical single word, usually `cron` or `crontab` depending on meaning.
+- Merge casing variants: `cron`, `Cron`, `Crons` should become the best canonical label, usually `cron` or `crontab` depending on meaning.
 - Merge singular/plural variants when they mean the same thing: `reminder` and `reminders` should become `reminder`.
 - Merge obvious aliases only when they are genuinely the same thing.
 - Keep distinct related concepts separate when useful: `cron`, `crontab`, and `scheduler` may all remain if they represent different things.
-- Return only single-word labels. Compact identifiers with punctuation are allowed if they are already names, such as `RevenueCat`, `Cloudflare`, `R2`, `S3`, `task-tracker`, `main-projects`, or `nytimes.com`.
+- Return compact labels. Prefer single words when they work, but allow short noun phrases (max 3-4 words) when they are the natural concept, such as `Home Assistant`, `knowledge graph`, `Dairy Queen`, `psoriasis treatment`, or `fried rice`. Compact identifiers with punctuation are allowed if they are already names, such as `RevenueCat`, `Cloudflare`, `R2`, `S3`, `task-tracker`, `main-projects`, or `nytimes.com`.
 
 ## Weighting
 

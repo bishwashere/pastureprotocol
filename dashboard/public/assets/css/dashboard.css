@@ -2045,7 +2045,7 @@
       right: 0;
       top: calc(100% + 0.45rem);
       z-index: 20;
-      width: 15rem;
+      width: 17rem;
       display: grid;
       grid-template-columns: 1fr;
       gap: 0.55rem;
@@ -2066,7 +2066,8 @@
       color: var(--muted);
       font-size: 0.72rem;
     }
-    .brain-settings-panel input {
+    .brain-settings-panel input,
+    .brain-settings-panel select {
       width: 100%;
       min-width: 0;
       font-family: inherit;
@@ -2082,6 +2083,9 @@
       width: 1rem;
       height: 1rem;
       accent-color: var(--accent);
+    }
+    .brain-settings-panel button {
+      width: 100%;
     }
     .brain-control {
       display: flex;

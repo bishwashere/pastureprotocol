@@ -2704,7 +2704,7 @@ function renderSystemCronVariant(row) {
       };
     }
 
-    function brainVisibleWordLimit(width, height, total) {
+    function brainVisibleWordLimit(width, height, total, opts) {
       if (brainSettings.visibleWords > 0) return Math.max(1, Math.min(total || 0, brainSettings.visibleWords));
       var w = Math.max(320, width || 900);
       var h = Math.max(260, height || 520);
@@ -2712,6 +2712,7 @@ function renderSystemCronVariant(row) {
       var density = w < 560 ? 4400 : w < 900 ? 3600 : 2300;
       var limit = Math.round(area / density);
       if (w > 1600) limit += Math.round((w - 1600) / 3.2);
+      if (opts && opts.qualityOff) limit = Math.round(limit * 1.65);
       if (w < 560) limit = Math.min(limit, 95);
       else if (w < 900) limit = Math.min(limit, 180);
       return Math.max(45, Math.min(total || 0, limit));
@@ -2729,13 +2730,14 @@ function renderSystemCronVariant(row) {
       return degrees;
     }
 
-    function brainVisibleTerms(terms, width, height, connections) {
+    function brainVisibleTerms(terms, width, height, connections, opts) {
       var list = Array.isArray(terms) ? terms : [];
       var degrees = brainConnectionDegrees(connections || []);
+      var minConnections = BRAIN_MIN_VISIBLE_CONNECTIONS;
       var eligible = list.filter(function (term) {
-        return (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS;
+        return (degrees[String(term.text || '')] || 0) >= minConnections;
       });
-      var limit = brainVisibleWordLimit(width, height, eligible.length);
+      var limit = brainVisibleWordLimit(width, height, eligible.length, opts);
       var candidateLimit = Math.min(eligible.length, Math.max(limit * 4, limit + 120));
       var candidates = eligible.slice(0, candidateLimit);
       var candidateText = {};
@@ -2747,7 +2749,7 @@ function renderSystemCronVariant(row) {
         connectedText[c.to] = true;
       });
       return candidates
-        .filter(function (term) { return connectedText[term.text] && (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS; })
+        .filter(function (term) { return connectedText[term.text] && (degrees[String(term.text || '')] || 0) >= minConnections; })
         .slice(0, limit);
     }
 
@@ -2945,12 +2947,12 @@ function renderSystemCronVariant(row) {
       return 0.08 + (target - 0.08) * presence;
     }
 
-    function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition) {
+    function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition, opts) {
       if (!canvas) return;
       var rect = canvas.getBoundingClientRect();
       var width = Math.max(320, Math.floor(rect.width));
       var height = Math.max(260, Math.floor(rect.height));
-      var visibleTerms = brainVisibleTerms(terms || [], width, height, connections || []);
+      var visibleTerms = brainVisibleTerms(terms || [], width, height, connections || [], opts);
       var visibleText = {};
       visibleTerms.forEach(function (term) { visibleText[term.text] = true; });
       var visibleConnections = (connections || []).filter(function (c) {
@@ -3094,8 +3096,9 @@ function renderSystemCronVariant(row) {
       var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : [];
       var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
+      var drawOpts = { qualityOff: !!(stats && stats.qualityDisabled) };
       var cloudRect = cloud.getBoundingClientRect();
-      var visibleCount = brainVisibleTerms(terms, cloudRect.width, cloudRect.height, connections).length;
+      var visibleCount = brainVisibleTerms(terms, cloudRect.width, cloudRect.height, connections, drawOpts).length;
       var sourceCount = [
         stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
         stats.noteFiles ? stats.noteFiles + ' notes' : '',
@@ -3121,7 +3124,7 @@ function renderSystemCronVariant(row) {
       cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
       cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
       var meshCanvas = cloud.querySelector('.brain-mesh-canvas');
-      drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+      drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, drawOpts);
       var hoverTimer = null;
       var pendingHover = '';
       var activeHover = '';
@@ -3153,7 +3156,7 @@ function renderSystemCronVariant(row) {
             toRelations: toRelations,
             progress: progress,
             selectedText: transitionFocus,
-          });
+          }, drawOpts);
           if (progress < 1) {
             hoverFrame = requestAnimationFrame(step);
             return;
@@ -3162,7 +3165,7 @@ function renderSystemCronVariant(row) {
           currentFocus = nextTerm || '';
           currentRelations = toRelations;
           activeHover = currentFocus;
-          if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+          if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, drawOpts);
         }
 
         hoverFrame = requestAnimationFrame(step);

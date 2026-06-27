@@ -5,14 +5,29 @@
         <h2 class="brain-title">Brain</h2>
         <div class="brain-meta-row">
           <p class="skill-meta" id="brain-meta">Memory and history cloud</p>
-          <button id="brain-import-submit" class="brain-import-button" type="button">Import</button>
-          <input id="brain-import-file" type="file" accept=".zip,.json,.txt,.md,.csv,.html,application/zip,application/x-zip-compressed,text/plain,application/json" multiple hidden>
         </div>
       </div>
       <div class="brain-controls">
         <div class="brain-settings">
           <button id="brain-settings-toggle" type="button">Settings</button>
           <div id="brain-settings-panel" class="brain-settings-panel" hidden>
+            <label>
+              <span>Range</span>
+              <select id="brain-range">
+                <option value="all">All</option>
+                <option value="30d">30 days</option>
+                <option value="7d">7 days</option>
+              </select>
+            </label>
+            <label>
+              <span>Source</span>
+              <select id="brain-source">
+                <option value="all">All</option>
+                <option value="memory">Long-term</option>
+                <option value="notes">Notes</option>
+                <option value="history">History</option>
+              </select>
+            </label>
             <label>
               <span>Direct links</span>
               <input id="brain-setting-direct" type="number" min="1" max="40" step="1">
@@ -37,26 +52,11 @@
               <span>Quality layer</span>
               <input id="brain-setting-quality" type="checkbox">
             </label>
+            <button id="brain-import-submit" class="brain-import-button" type="button">Import</button>
+            <input id="brain-import-file" type="file" accept=".zip,.json,.txt,.md,.csv,.html,application/zip,application/x-zip-compressed,text/plain,application/json" multiple hidden>
             <button id="brain-settings-reset" type="button">Reset</button>
           </div>
         </div>
-        <label class="brain-control">
-          <span>Range</span>
-          <select id="brain-range">
-            <option value="all">All</option>
-            <option value="30d">30 days</option>
-            <option value="7d">7 days</option>
-          </select>
-        </label>
-        <label class="brain-control">
-          <span>Source</span>
-          <select id="brain-source">
-            <option value="all">All</option>
-            <option value="memory">Long-term</option>
-            <option value="notes">Notes</option>
-            <option value="history">History</option>
-          </select>
-        </label>
         <button id="brain-refresh" type="button">Refresh</button>
       </div>
     </div>
