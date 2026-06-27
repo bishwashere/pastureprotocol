@@ -2632,9 +2632,11 @@ function renderSystemCronVariant(row) {
       var pct = totalChunks > 0 ? Math.max(4, Math.min(100, Math.round((doneChunks / totalChunks) * 100))) : 6;
       if (bar) bar.style.width = pct + '%';
       if (labelEl) {
-        labelEl.textContent = totalFiles
-          ? 'Processing ' + doneFiles + '/' + totalFiles + ' files'
-          : (fallbackLabel || 'Building brain map');
+        labelEl.textContent = progress && progress.phase === 'error'
+          ? 'Brain map failed'
+          : totalFiles
+            ? 'Processing ' + doneFiles + '/' + totalFiles + ' files'
+            : (fallbackLabel || 'Building brain map');
       }
       if (detailEl) {
         var parts = [];
@@ -2642,8 +2644,15 @@ function renderSystemCronVariant(row) {
         if (totalFiles) parts.push(remainingFiles + ' files remaining');
         if (progress && Number(progress.cacheHits)) parts.push(Number(progress.cacheHits) + ' cached');
         if (progress && Number(progress.generated)) parts.push(Number(progress.generated) + ' generated');
+        if (progress && Number(progress.failed)) parts.push(Number(progress.failed) + ' failed');
         if (progress && progress.currentFile) parts.push(String(progress.currentFile).slice(0, 48));
-        detailEl.textContent = parts.join(' · ') || 'Preparing sources';
+        if (progress && progress.error) parts.push(String(progress.error).slice(0, 96));
+        detailEl.textContent = parts.join(' · ') || (
+          progress && progress.phase === 'collecting' ? 'Collecting memory and history' :
+          progress && progress.phase === 'quality' ? 'Refining graph quality' :
+          progress && progress.phase === 'error' ? 'Request failed' :
+          'Preparing sources'
+        );
       }
     }
 
@@ -2781,6 +2790,129 @@ function renderSystemCronVariant(row) {
           cellH: font + 8,
         };
       });
+    }
+
+    function brainClusterClouds(positions, width, height) {
+      var list = Array.isArray(positions) ? positions : [];
+      if (list.length < 8) return [];
+      var radius = width < 560 ? 88 : width < 900 ? 106 : 132;
+      var radiusSq = radius * radius;
+      var cell = radius;
+      var parent = list.map(function (_, idx) { return idx; });
+      var rank = list.map(function () { return 0; });
+      var grid = {};
+
+      function find(idx) {
+        while (parent[idx] !== idx) {
+          parent[idx] = parent[parent[idx]];
+          idx = parent[idx];
+        }
+        return idx;
+      }
+
+      function unite(a, b) {
+        var rootA = find(a);
+        var rootB = find(b);
+        if (rootA === rootB) return;
+        if (rank[rootA] < rank[rootB]) {
+          parent[rootA] = rootB;
+          return;
+        }
+        parent[rootB] = rootA;
+        if (rank[rootA] === rank[rootB]) rank[rootA] += 1;
+      }
+
+      list.forEach(function (pos, idx) {
+        var gx = Math.floor(pos.x / cell);
+        var gy = Math.floor(pos.y / cell);
+        for (var ox = -1; ox <= 1; ox++) {
+          for (var oy = -1; oy <= 1; oy++) {
+            (grid[(gx + ox) + ':' + (gy + oy)] || []).forEach(function (otherIdx) {
+              var other = list[otherIdx];
+              var dx = pos.x - other.x;
+              var dy = pos.y - other.y;
+              if (dx * dx + dy * dy <= radiusSq) unite(idx, otherIdx);
+            });
+          }
+        }
+        var key = gx + ':' + gy;
+        if (!grid[key]) grid[key] = [];
+        grid[key].push(idx);
+      });
+
+      var groups = {};
+      list.forEach(function (pos, idx) {
+        var root = find(idx);
+        if (!groups[root]) {
+          groups[root] = { positions: [], x: 0, y: 0, weight: 0, minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        }
+        var group = groups[root];
+        var weight = Math.max(1, Number(pos.term && pos.term.weight) || 1);
+        group.positions.push(pos);
+        group.x += pos.x * weight;
+        group.y += pos.y * weight;
+        group.weight += weight;
+        group.minX = Math.min(group.minX, pos.x);
+        group.maxX = Math.max(group.maxX, pos.x);
+        group.minY = Math.min(group.minY, pos.y);
+        group.maxY = Math.max(group.maxY, pos.y);
+      });
+
+      return Object.keys(groups).map(function (key) {
+        var group = groups[key];
+        group.x = group.weight ? group.x / group.weight : (group.minX + group.maxX) / 2;
+        group.y = group.weight ? group.y / group.weight : (group.minY + group.maxY) / 2;
+        group.size = group.positions.length;
+        group.radiusX = Math.max(72, Math.min(width * 0.28, (group.maxX - group.minX) * 0.62 + radius * 0.9));
+        group.radiusY = Math.max(58, Math.min(height * 0.28, (group.maxY - group.minY) * 0.62 + radius * 0.76));
+        return group;
+      }).filter(function (group) {
+        return group.size >= (width < 560 ? 3 : 4);
+      }).sort(function (a, b) {
+        return b.size - a.size || b.weight - a.weight;
+      }).slice(0, 14);
+    }
+
+    function brainDrawClusterClouds(ctx, positions, width, height) {
+      var clusters = brainClusterClouds(positions, width, height);
+      if (!clusters.length) return;
+      var palette = [
+        { edge: '125,211,252', core: '56,189,248' },
+        { edge: '167,139,250', core: '139,92,246' },
+        { edge: '110,231,183', core: '34,197,94' },
+        { edge: '226,232,240', core: '148,163,184' },
+      ];
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      clusters.forEach(function (cluster, idx) {
+        var color = palette[idx % palette.length];
+        var alpha = Math.min(0.105, 0.038 + cluster.size * 0.0045);
+        var outer = Math.max(cluster.radiusX, cluster.radiusY);
+        var radial = ctx.createRadialGradient(cluster.x, cluster.y, Math.max(18, outer * 0.12), cluster.x, cluster.y, outer);
+        radial.addColorStop(0, 'rgba(' + color.core + ',' + (alpha * 0.7).toFixed(3) + ')');
+        radial.addColorStop(0.48, 'rgba(' + color.edge + ',' + alpha.toFixed(3) + ')');
+        radial.addColorStop(1, 'rgba(' + color.edge + ',0)');
+        ctx.fillStyle = radial;
+        ctx.beginPath();
+        ctx.ellipse(cluster.x, cluster.y, cluster.radiusX, cluster.radiusY, (idx % 5 - 2) * 0.13, 0, Math.PI * 2);
+        ctx.fill();
+
+        cluster.positions.slice(0, 10).forEach(function (pos, pIdx) {
+          if (pIdx % 2 && cluster.positions.length > 8) return;
+          var seed = brainHash(String(pos.term && pos.term.text || '') + ':cloud');
+          var jitterX = (brainSeededRandom(seed) - 0.5) * 18;
+          var jitterY = (brainSeededRandom(seed ^ 0xC10D) - 0.5) * 18;
+          var spotRadius = Math.max(38, Math.min(82, pos.font * 4.3));
+          var spot = ctx.createRadialGradient(pos.x + jitterX, pos.y + jitterY, 0, pos.x + jitterX, pos.y + jitterY, spotRadius);
+          spot.addColorStop(0, 'rgba(' + color.edge + ',' + (alpha * 0.72).toFixed(3) + ')');
+          spot.addColorStop(1, 'rgba(' + color.edge + ',0)');
+          ctx.fillStyle = spot;
+          ctx.beginPath();
+          ctx.arc(pos.x + jitterX, pos.y + jitterY, spotRadius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+      ctx.restore();
     }
 
     function brainConnectionGraph(connections) {
@@ -2945,10 +3077,11 @@ function renderSystemCronVariant(row) {
       var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
       var target;
       var pathFocus = focusMode === 'path';
-      if (rel.depth === 0) target = pathFocus ? 30 : 52;
-      else if (rel.depth === 1) target = (pathFocus ? 14 : 18) + Math.pow(strength / 100, 0.58) * (pathFocus ? 18 : 28);
-      else if (rel.depth === 2) target = (pathFocus ? 10 : 11) + Math.pow(strength / 100, 0.7) * (pathFocus ? 9 : 14);
-      else if (rel.depth === 3) target = (pathFocus ? 8.5 : 9) + Math.pow(strength / 100, 0.72) * (pathFocus ? 5 : 9);
+      if (pathFocus) return pos.font;
+      if (rel.depth === 0) target = 52;
+      else if (rel.depth === 1) target = 18 + Math.pow(strength / 100, 0.58) * 28;
+      else if (rel.depth === 2) target = 11 + Math.pow(strength / 100, 0.7) * 14;
+      else if (rel.depth === 3) target = 9 + Math.pow(strength / 100, 0.72) * 9;
       else target = Math.max(8.5, Math.min(12, pos.font * 0.42));
       return pos.font + (target - pos.font) * presence;
     }
@@ -3121,6 +3254,7 @@ function renderSystemCronVariant(row) {
         ? brainTransitionFocusPresence(transition.fromRelations, transition.toRelations, transition.progress)
         : (hasFocus ? 1 : 0);
       var dimPresence = focusMode === 'path' ? focusPresence * 0.32 : focusPresence * 0.62;
+      brainDrawClusterClouds(ctx, positions, width, height);
       var selectedLinks = transition
         ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
         : brainRelationMap(relationSelectedText, visibleConnections);
@@ -3188,7 +3322,7 @@ function renderSystemCronVariant(row) {
         var displayFont = hasFocus ? (rel ? brainHoverFont(pos, rel, focusMode) : pos.font + (brainInactiveFont(pos) - pos.font) * dimPresence) : pos.font;
         var inactiveAlpha = 0.48 + (0.08 - 0.48) * dimPresence;
         var alpha = hasFocus ? (rel ? brainHoverAlpha(rel, relationSelectedText, focusMode) : inactiveAlpha) : 0.48;
-        var hue = selected ? '255,255,255' : '219,234,254';
+        var hue = selected || (focusMode === 'path' && rel) ? '255,255,255' : '219,234,254';
         ctx.font = displayFont.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -3511,17 +3645,23 @@ function renderSystemCronVariant(row) {
           '&quality=' + (qualityEnabled ? '1' : '0') +
           '&progressId=' + encodeURIComponent(progressId);
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
+        var timeoutId = null;
+        if (brainCloudAbortController) {
+          timeoutId = setTimeout(function () {
+            try { brainCloudAbortController.abort(); } catch (_) {}
+          }, 90000);
+        }
         var r = await fetch(url, {
           cache: refresh ? 'no-store' : 'default',
           signal: brainCloudAbortController ? brainCloudAbortController.signal : undefined,
         });
+        if (timeoutId) clearTimeout(timeoutId);
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
         renderBrainCloud(d);
       } catch (e) {
-        if (e && e.name === 'AbortError') return;
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
         if (brainCloudLastData) {
@@ -3530,7 +3670,7 @@ function renderSystemCronVariant(row) {
           cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
         }
         var meta = document.getElementById('brain-meta');
-        if (meta) meta.textContent = e && e.message ? e.message : 'Request failed';
+        if (meta) meta.textContent = e && e.name === 'AbortError' ? 'Brain map request timed out' : (e && e.message ? e.message : 'Request failed');
       } finally {
         if (requestSeq === brainCloudRequestSeq) brainCloudAbortController = null;
       }

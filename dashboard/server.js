@@ -2947,6 +2947,19 @@ app.get('/api/brain/cloud', async (req, res) => {
     setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
     const { corpus, stats } = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS });
     const chunks = splitBrainCorpusForLlm(corpus);
+    const totalFiles = new Set((chunks || []).map((chunk) => `${chunk.source || ''}:${chunk.label || ''}`)).size;
+    setBrainBuildProgress(progressId, {
+      phase: chunks.length ? 'processing' : 'complete',
+      done: false,
+      doneChunks: 0,
+      totalChunks: chunks.length,
+      doneFiles: 0,
+      totalFiles,
+      remainingFiles: totalFiles,
+      cacheHits: 0,
+      generated: 0,
+      failed: 0,
+    });
     const rawResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: false, chunks });
     const qualityResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: true, chunks });
     const responseCacheKey = qualityEnabled ? qualityResponseCacheKey : rawResponseCacheKey;
