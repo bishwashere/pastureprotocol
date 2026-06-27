@@ -3115,7 +3115,11 @@ function renderSystemCronVariant(row) {
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
       if (!terms.length) {
         stopBrainLoadingProgress();
-        cloud.innerHTML = '<p class="empty">No brain cloud yet.</p>';
+        var hadSources = Number(stats && stats.chars) > 0 || Number(stats && stats.llmChunks) > 0;
+        var emptyText = hadSources
+          ? 'No extracted brain terms yet. Check LLM availability, then refresh.'
+          : 'No brain cloud yet.';
+        cloud.innerHTML = '<p class="empty">' + escapeHtml(emptyText) + '</p>';
         renderBrainFocus('', []);
         return;
       }
