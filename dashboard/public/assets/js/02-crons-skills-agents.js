@@ -2947,21 +2947,60 @@ function renderSystemCronVariant(row) {
       return 0.08 + (target - 0.08) * presence;
     }
 
-    function brainLinePointerInfluence(a, b, pointer) {
-      if (!pointer || !pointer.active || !a || !b) return 0;
+    function brainConnectionCurve(a, b, key) {
       var dx = b.x - a.x;
       var dy = b.y - a.y;
+      var distance = Math.sqrt(dx * dx + dy * dy) || 1;
+      var bendSeed = brainSeededRandom(brainHash(key || '') ^ 0xB41A11);
+      var bend = (bendSeed - 0.5) * Math.min(58, Math.max(10, distance * 0.18));
+      return {
+        cx: (a.x + b.x) / 2 - (dy / distance) * bend,
+        cy: (a.y + b.y) / 2 + (dx / distance) * bend,
+      };
+    }
+
+    function brainDrawConnectionPath(ctx, a, b, key) {
+      var curve = brainConnectionCurve(a, b, key);
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(curve.cx, curve.cy, b.x, b.y);
+    }
+
+    function brainDistanceToSegment(px, py, ax, ay, bx, by) {
+      var dx = bx - ax;
+      var dy = by - ay;
       var lenSq = dx * dx + dy * dy;
-      if (!lenSq) return 0;
-      var t = ((pointer.x - a.x) * dx + (pointer.y - a.y) * dy) / lenSq;
-      if (t < 0 || t > 1) return 0;
-      var px = a.x + dx * t;
-      var py = a.y + dy * t;
-      var dist = Math.sqrt(Math.pow(pointer.x - px, 2) + Math.pow(pointer.y - py, 2));
+      if (!lenSq) return Math.sqrt(Math.pow(px - ax, 2) + Math.pow(py - ay, 2));
+      var t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+      var x = ax + dx * t;
+      var y = ay + dy * t;
+      return Math.sqrt(Math.pow(px - x, 2) + Math.pow(py - y, 2));
+    }
+
+    function brainLinePointerInfluence(a, b, pointer, key) {
+      if (!pointer || !pointer.active || pointer.onTerm || !a || !b) return 0;
+      var curve = brainConnectionCurve(a, b, key);
+      var prev = { x: a.x, y: a.y };
+      var closest = Infinity;
+      for (var i = 1; i <= 14; i++) {
+        var t = i / 14;
+        var mt = 1 - t;
+        var point = {
+          x: mt * mt * a.x + 2 * mt * t * curve.cx + t * t * b.x,
+          y: mt * mt * a.y + 2 * mt * t * curve.cy + t * t * b.y,
+        };
+        closest = Math.min(closest, brainDistanceToSegment(pointer.x, pointer.y, prev.x, prev.y, point.x, point.y));
+        prev = point;
+      }
       var radius = 46;
-      if (dist >= radius) return 0;
-      var closeness = 1 - dist / radius;
+      if (closest >= radius) return 0;
+      var closeness = 1 - closest / radius;
       return closeness * closeness;
+    }
+
+    function brainConnectionKey(c) {
+      return String(c.from || '') < String(c.to || '')
+        ? String(c.from || '') + '->' + String(c.to || '')
+        : String(c.to || '') + '->' + String(c.from || '');
     }
 
     function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition, pointer) {
@@ -2982,6 +3021,8 @@ function renderSystemCronVariant(row) {
       if (!ctx) return;
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       var positions = brainMeshPositions(visibleTerms, width, height);
       var byText = {};
       positions.forEach(function (pos) { byText[pos.term.text] = pos; });
@@ -3000,17 +3041,16 @@ function renderSystemCronVariant(row) {
         var b = byText[c.to];
         if (!a || !b) return;
         var strength = Math.max(1, Math.min(100, Number(c.strength) || 1));
+        var connectionKey = brainConnectionKey(c);
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        brainDrawConnectionPath(ctx, a, b, connectionKey);
         ctx.lineWidth = 0.35 + (strength / 100) * 0.55;
         ctx.strokeStyle = 'rgba(100,116,139,' + (0.055 + (strength / 100) * 0.075).toFixed(3) + ')';
         ctx.stroke();
-        var influence = brainLinePointerInfluence(a, b, pointer);
+        var influence = brainLinePointerInfluence(a, b, pointer, connectionKey);
         if (influence > 0) {
           ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
+          brainDrawConnectionPath(ctx, a, b, connectionKey);
           ctx.lineWidth = 0.9 + influence * 1.8;
           ctx.strokeStyle = 'rgba(125,211,252,' + (0.05 + influence * 0.22).toFixed(3) + ')';
           ctx.stroke();
@@ -3029,8 +3069,7 @@ function renderSystemCronVariant(row) {
             if (!a || !b) return;
             var level = brainEdgeLevel(c.strength);
             ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
+            brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
             var alpha = (isPrimary ? 0.72 : 0.42) * lineState.presence;
             ctx.lineWidth = (isPrimary ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1) : 0.8) * Math.max(0.35, lineState.presence);
             ctx.strokeStyle = isPrimary ? 'rgba(148,163,184,' + alpha.toFixed(3) + ')' : 'rgba(100,116,139,' + alpha.toFixed(3) + ')';
@@ -3163,7 +3202,7 @@ function renderSystemCronVariant(row) {
       var currentRelations = {};
       var hoverFrame = null;
       var pointerFrame = null;
-      var meshPointer = { x: 0, y: 0, active: false };
+      var meshPointer = { x: 0, y: 0, active: false, onTerm: false };
 
       function stopBrainHoverAnimation() {
         if (hoverFrame) {
@@ -3190,7 +3229,7 @@ function renderSystemCronVariant(row) {
         var toRelations = nextTerm ? brainRelationMap(nextTerm, connections) : {};
         var transitionFocus = nextTerm || currentFocus || '';
         var startedAt = performance.now();
-        var duration = 240;
+        var duration = 420;
         activeHover = nextTerm || '';
 
         function step(now) {
@@ -3239,8 +3278,9 @@ function renderSystemCronVariant(row) {
           meshPointer.x = event.clientX - cr.left;
           meshPointer.y = event.clientY - cr.top;
           meshPointer.active = true;
-          scheduleBrainPointerDraw();
           var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
+          meshPointer.onTerm = !!selected;
+          scheduleBrainPointerDraw();
           if (selected === activeHover || (pendingHover && selected === pendingHover)) return;
           if (hoverTimer) clearTimeout(hoverTimer);
           pendingHover = selected;
@@ -3256,6 +3296,7 @@ function renderSystemCronVariant(row) {
         });
         meshCanvas.addEventListener('mouseleave', function () {
           meshPointer.active = false;
+          meshPointer.onTerm = false;
           scheduleBrainPointerDraw();
           clearBrainHover();
         });
