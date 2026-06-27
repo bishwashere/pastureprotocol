@@ -24,6 +24,23 @@
       min-height: 100vh;
     }
     h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--accent); }
+    .dashboard-ascii-logo {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 0 1.35rem 0;
+      color: var(--accent);
+      font-size: clamp(0.24rem, 0.86vw, 0.62rem);
+      font-weight: 600;
+      line-height: 1.05;
+      letter-spacing: 0;
+      white-space: pre;
+      overflow: hidden;
+      text-shadow: 0 0 18px rgba(167,139,250,0.22);
+    }
+    .dashboard-ascii-logo span {
+      display: block;
+    }
     nav {
       display: flex;
       gap: 0.5rem;
