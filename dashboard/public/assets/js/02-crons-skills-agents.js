@@ -2572,7 +2572,7 @@ function renderSystemCronVariant(row) {
     var brainLoadingTimer = null;
     var brainCloudAbortController = null;
     var brainCloudRequestSeq = 0;
-    var BRAIN_MIN_VISIBLE_CONNECTIONS = 5;
+    var BRAIN_MIN_VISIBLE_CONNECTIONS = 1;
 
     function clampBrainNumber(value, fallback, min, max) {
       var n = Number(value);

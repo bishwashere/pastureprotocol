@@ -7,11 +7,12 @@
  * like "I can't reach localhost from here, the browser tool can't make
  * requests to local addresses from this environment". The daemon literally
  * runs on the user's machine — localhost is reachable. The grounding block
- * tells the model that, and instructs it to prefer http_get for plain URLs.
+ * tells the model that, instructs it to prefer http_get for plain URLs, and
+ * grounds Pasture/CowCode self-inspection in ~/.pasture.
  *
  * This is a unit-level prompt contract test. If the wording is removed or
- * changes such that "localhost" / "http_get" / "daemon" no longer appear,
- * the regression slips back in. So we pin the exact phrases.
+ * changes such that "localhost" / "http_get" / "daemon" / "~/.pasture" no
+ * longer appear, the regression slips back in. So we pin the exact phrases.
  */
 
 import { buildOneOnOneSystemPrompt, RUNTIME_GROUNDING_BLOCK } from '../../lib/agent/system-prompt.js';
@@ -38,8 +39,13 @@ const REQUIRED_PHRASES = [
   'browse',
 ];
 
+const CHAT_SELF_INSPECTION_PHRASES = [
+  '~/.pasture',
+  'check your code',
+];
+
 // 1. RUNTIME_GROUNDING_BLOCK contains the required phrases
-for (const phrase of REQUIRED_PHRASES) {
+for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES]) {
   check(
     `RUNTIME_GROUNDING_BLOCK contains "${phrase}"`,
     RUNTIME_GROUNDING_BLOCK.toLowerCase().includes(phrase.toLowerCase()),
@@ -57,7 +63,7 @@ check(
 // 3. Main one-on-one system prompt embeds the grounding
 {
   const prompt = buildOneOnOneSystemPrompt();
-  for (const phrase of REQUIRED_PHRASES) {
+  for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES]) {
     check(
       `buildOneOnOneSystemPrompt() contains "${phrase}"`,
       prompt.toLowerCase().includes(phrase.toLowerCase()),
