@@ -2794,61 +2794,57 @@ function renderSystemCronVariant(row) {
 
     function brainClusterClouds(positions, width, height) {
       var list = Array.isArray(positions) ? positions : [];
-      if (list.length < 8) return [];
-      var radius = width < 560 ? 70 : width < 900 ? 82 : 96;
-      var radiusSq = radius * radius;
-      var cell = radius * 0.78;
-      var densityRadius = radius * 1.25;
-      var densityRadiusSq = densityRadius * densityRadius;
-      var cells = {};
-      var clouds = [];
+      if (list.length < 2) return [];
+      var proximity = width < 560 ? 78 : width < 900 ? 92 : 112;
+      var candidates = [];
 
-      list.forEach(function (pos, idx) {
-        var gx = Math.floor(pos.x / cell);
-        var gy = Math.floor(pos.y / cell);
-        var key = gx + ':' + gy;
-        if (!cells[key]) cells[key] = { positions: [], x: 0, y: 0, weight: 0, gx, gy };
-        var weight = Math.max(1, Number(pos.term && pos.term.weight) || 1);
-        cells[key].positions.push(pos);
-        cells[key].x += pos.x * weight;
-        cells[key].y += pos.y * weight;
-        cells[key].weight += weight;
-      });
-
-      Object.keys(cells).forEach(function (key) {
-        var cellInfo = cells[key];
-        var cx = cellInfo.weight ? cellInfo.x / cellInfo.weight : 0;
-        var cy = cellInfo.weight ? cellInfo.y / cellInfo.weight : 0;
+      list.forEach(function (center) {
         var near = [];
-        var localWeight = 0;
+        var distanceSum = 0;
+        var minX = Infinity;
+        var maxX = -Infinity;
+        var minY = Infinity;
+        var maxY = -Infinity;
         list.forEach(function (pos) {
-          var dx = pos.x - cx;
-          var dy = pos.y - cy;
-          if (dx * dx + dy * dy > densityRadiusSq) return;
+          var dx = pos.x - center.x;
+          var dy = pos.y - center.y;
+          var rx = proximity + ((center.cellW || 56) + (pos.cellW || 56)) * 0.16;
+          var ry = proximity * 0.62 + ((center.cellH || 18) + (pos.cellH || 18)) * 0.2;
+          if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) > 1) return;
           near.push(pos);
-          localWeight += Math.max(1, Number(pos.term && pos.term.weight) || 1);
+          distanceSum += Math.sqrt(dx * dx + dy * dy);
+          minX = Math.min(minX, pos.x - (pos.cellW || 56) * 0.5);
+          maxX = Math.max(maxX, pos.x + (pos.cellW || 56) * 0.5);
+          minY = Math.min(minY, pos.y - (pos.cellH || 18) * 0.5);
+          maxY = Math.max(maxY, pos.y + (pos.cellH || 18) * 0.5);
         });
-        if (near.length < (width < 560 ? 3 : 4)) return;
-        var seed = brainHash(key + ':' + near.length);
-        clouds.push({
+        if (near.length < 2) return;
+        var x = near.reduce(function (sum, pos) { return sum + pos.x; }, 0) / near.length;
+        var y = near.reduce(function (sum, pos) { return sum + pos.y; }, 0) / near.length;
+        var seed = brainHash(String(center.term && center.term.text || '') + ':' + near.length);
+        candidates.push({
           positions: near,
-          x: cx + (brainSeededRandom(seed) - 0.5) * 18,
-          y: cy + (brainSeededRandom(seed ^ 0xA17C) - 0.5) * 18,
+          x: x + (brainSeededRandom(seed) - 0.5) * 12,
+          y: y + (brainSeededRandom(seed ^ 0xA17C) - 0.5) * 12,
           size: near.length,
-          weight: localWeight,
-          radius: Math.max(44, Math.min(width < 560 ? 86 : 118, radius * 0.56 + near.length * 4.2)),
+          compactness: distanceSum / near.length,
+          radius: Math.max(36, Math.min(width < 560 ? 88 : 116, Math.max(maxX - minX, maxY - minY) * 0.48 + 34)),
         });
       });
 
-      return clouds.filter(function (cloud, idx) {
-        return !clouds.slice(0, idx).some(function (prev) {
+      var selected = [];
+      candidates.sort(function (a, b) {
+        return b.size - a.size || a.compactness - b.compactness;
+      }).forEach(function (cloud) {
+        var overlaps = selected.some(function (prev) {
           var dx = cloud.x - prev.x;
           var dy = cloud.y - prev.y;
-          return dx * dx + dy * dy < radiusSq * 0.36;
+          var minDistance = Math.min(cloud.radius, prev.radius) * 0.58;
+          return dx * dx + dy * dy < minDistance * minDistance;
         });
-      }).sort(function (a, b) {
-        return b.size - a.size || b.weight - a.weight;
-      }).slice(0, 24);
+        if (!overlaps) selected.push(cloud);
+      });
+      return selected.slice(0, 30);
     }
 
     function brainDrawClusterClouds(ctx, positions, width, height) {
@@ -2865,11 +2861,12 @@ function renderSystemCronVariant(row) {
       clusters.forEach(function (cluster, idx) {
         var color = palette[idx % palette.length];
         var alpha = Math.min(0.074, 0.024 + cluster.size * 0.0036);
-        var outer = cluster.radius;
+        var outer = cluster.radius * 1.38;
         var radial = ctx.createRadialGradient(cluster.x, cluster.y, 0, cluster.x, cluster.y, outer);
         radial.addColorStop(0, 'rgba(' + color.core + ',' + (alpha * 0.74).toFixed(3) + ')');
-        radial.addColorStop(0.34, 'rgba(' + color.edge + ',' + alpha.toFixed(3) + ')');
-        radial.addColorStop(0.72, 'rgba(' + color.edge + ',' + (alpha * 0.22).toFixed(3) + ')');
+        radial.addColorStop(0.28, 'rgba(' + color.edge + ',' + alpha.toFixed(3) + ')');
+        radial.addColorStop(0.58, 'rgba(' + color.edge + ',' + (alpha * 0.28).toFixed(3) + ')');
+        radial.addColorStop(0.82, 'rgba(' + color.edge + ',' + (alpha * 0.07).toFixed(3) + ')');
         radial.addColorStop(1, 'rgba(' + color.edge + ',0)');
         ctx.fillStyle = radial;
         ctx.beginPath();
@@ -2881,10 +2878,11 @@ function renderSystemCronVariant(row) {
           var seed = brainHash(String(pos.term && pos.term.text || '') + ':cloud');
           var jitterX = (brainSeededRandom(seed) - 0.5) * 14;
           var jitterY = (brainSeededRandom(seed ^ 0xC10D) - 0.5) * 14;
-          var spotRadius = Math.max(28, Math.min(62, pos.font * 3.2));
+          var spotRadius = Math.max(32, Math.min(72, pos.font * 3.7));
           var spot = ctx.createRadialGradient(pos.x + jitterX, pos.y + jitterY, 0, pos.x + jitterX, pos.y + jitterY, spotRadius);
           spot.addColorStop(0, 'rgba(' + color.edge + ',' + (alpha * 0.52).toFixed(3) + ')');
-          spot.addColorStop(0.68, 'rgba(' + color.edge + ',' + (alpha * 0.12).toFixed(3) + ')');
+          spot.addColorStop(0.56, 'rgba(' + color.edge + ',' + (alpha * 0.13).toFixed(3) + ')');
+          spot.addColorStop(0.82, 'rgba(' + color.edge + ',' + (alpha * 0.04).toFixed(3) + ')');
           spot.addColorStop(1, 'rgba(' + color.edge + ',0)');
           ctx.fillStyle = spot;
           ctx.beginPath();
