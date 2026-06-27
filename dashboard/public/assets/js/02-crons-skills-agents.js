@@ -2563,6 +2563,7 @@ function renderSystemCronVariant(row) {
       directRelations: 12,
       secondRelations: 18,
       visibleWords: 0,
+      minVisibleConnections: 1,
       minFont: 10,
       maxFont: 46,
       qualityLayer: true,
@@ -2572,7 +2573,6 @@ function renderSystemCronVariant(row) {
     var brainLoadingTimer = null;
     var brainCloudAbortController = null;
     var brainCloudRequestSeq = 0;
-    var BRAIN_MIN_VISIBLE_CONNECTIONS = 1;
 
     function clampBrainNumber(value, fallback, min, max) {
       var n = Number(value);
@@ -2589,6 +2589,7 @@ function renderSystemCronVariant(row) {
         directRelations: clampBrainNumber(saved.directRelations, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
         secondRelations: clampBrainNumber(saved.secondRelations, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
         visibleWords: clampBrainNumber(saved.visibleWords, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
+        minVisibleConnections: clampBrainNumber(saved.minVisibleConnections, BRAIN_SETTINGS_DEFAULTS.minVisibleConnections, 1, 20),
         minFont: clampBrainNumber(saved.minFont, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(saved.maxFont, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
         qualityLayer: saved.qualityLayer !== false,
@@ -2732,8 +2733,9 @@ function renderSystemCronVariant(row) {
     function brainVisibleTerms(terms, width, height, connections) {
       var list = Array.isArray(terms) ? terms : [];
       var degrees = brainConnectionDegrees(connections || []);
+      var minConnections = clampBrainNumber(brainSettings.minVisibleConnections, BRAIN_SETTINGS_DEFAULTS.minVisibleConnections, 1, 20);
       var eligible = list.filter(function (term) {
-        return (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS;
+        return (degrees[String(term.text || '')] || 0) >= minConnections;
       });
       var limit = brainVisibleWordLimit(width, height, eligible.length);
       var candidateLimit = Math.min(eligible.length, Math.max(limit * 4, limit + 120));
@@ -2747,7 +2749,7 @@ function renderSystemCronVariant(row) {
         connectedText[c.to] = true;
       });
       return candidates
-        .filter(function (term) { return connectedText[term.text] && (degrees[String(term.text || '')] || 0) >= BRAIN_MIN_VISIBLE_CONNECTIONS; })
+        .filter(function (term) { return connectedText[term.text] && (degrees[String(term.text || '')] || 0) >= minConnections; })
         .slice(0, limit);
     }
 
@@ -3376,6 +3378,7 @@ function renderSystemCronVariant(row) {
         ['brain-setting-direct', brainSettings.directRelations],
         ['brain-setting-second', brainSettings.secondRelations],
         ['brain-setting-words', brainSettings.visibleWords],
+        ['brain-setting-min-links', brainSettings.minVisibleConnections],
         ['brain-setting-min-font', brainSettings.minFont],
         ['brain-setting-max-font', brainSettings.maxFont],
       ];
@@ -3392,6 +3395,7 @@ function renderSystemCronVariant(row) {
       var direct = document.getElementById('brain-setting-direct');
       var second = document.getElementById('brain-setting-second');
       var words = document.getElementById('brain-setting-words');
+      var minLinks = document.getElementById('brain-setting-min-links');
       var minFont = document.getElementById('brain-setting-min-font');
       var maxFont = document.getElementById('brain-setting-max-font');
       var quality = document.getElementById('brain-setting-quality');
@@ -3399,6 +3403,7 @@ function renderSystemCronVariant(row) {
         directRelations: clampBrainNumber(direct && direct.value, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
         secondRelations: clampBrainNumber(second && second.value, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
         visibleWords: clampBrainNumber(words && words.value, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
+        minVisibleConnections: clampBrainNumber(minLinks && minLinks.value, BRAIN_SETTINGS_DEFAULTS.minVisibleConnections, 1, 20),
         minFont: clampBrainNumber(minFont && minFont.value, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(maxFont && maxFont.value, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
         qualityLayer: quality ? !!quality.checked : BRAIN_SETTINGS_DEFAULTS.qualityLayer,
@@ -3432,7 +3437,7 @@ function renderSystemCronVariant(row) {
     wireEl('brain-settings-panel', 'click', function (e) {
       if (e) e.stopPropagation();
     });
-    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
+    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-links', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
       wireEl(id, 'change', readBrainSettingsInputs);
       wireEl(id, 'input', readBrainSettingsInputs);
     });
@@ -3442,6 +3447,7 @@ function renderSystemCronVariant(row) {
         directRelations: BRAIN_SETTINGS_DEFAULTS.directRelations,
         secondRelations: BRAIN_SETTINGS_DEFAULTS.secondRelations,
         visibleWords: BRAIN_SETTINGS_DEFAULTS.visibleWords,
+        minVisibleConnections: BRAIN_SETTINGS_DEFAULTS.minVisibleConnections,
         minFont: BRAIN_SETTINGS_DEFAULTS.minFont,
         maxFont: BRAIN_SETTINGS_DEFAULTS.maxFont,
         qualityLayer: BRAIN_SETTINGS_DEFAULTS.qualityLayer,
