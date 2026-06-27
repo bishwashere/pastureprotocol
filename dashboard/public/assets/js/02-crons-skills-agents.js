@@ -3599,7 +3599,9 @@ function renderSystemCronVariant(row) {
       var cloud = document.getElementById('brain-cloud');
       if (!cloud) return;
       if (brainCloudAbortController) {
-        try { brainCloudAbortController.abort(); } catch (_) {}
+        var metaBusy = document.getElementById('brain-meta');
+        if (metaBusy) metaBusy.textContent = 'Brain map rebuild already running...';
+        return;
       }
       var requestSeq = ++brainCloudRequestSeq;
       brainCloudAbortController = window.AbortController ? new AbortController() : null;

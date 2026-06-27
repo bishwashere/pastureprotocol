@@ -3171,14 +3171,26 @@ function importBrainPayload(payload) {
   const requestedProvider = provider;
   const originalName = payload.filename;
   const workspaceDir = getWorkspaceDir();
+  let text = null;
+
+  if (payload.rawKind === 'zip' && provider === 'other') {
+    text = buildBrainImportTextFromPayload(payload);
+    if (payload.detectedProvider && BRAIN_IMPORT_PROVIDERS.has(payload.detectedProvider)) {
+      provider = payload.detectedProvider;
+    }
+  }
+
   let safeProvider = safeBrainPathPart(provider);
   let importId = brainImportPayloadSignature(provider, payload.contentHash);
   const importsRoot = brainImportsDir(workspaceDir);
   let importRoot = join(importsRoot, safeProvider, importId);
-  const requestedImportRoot = importRoot;
+  const requestedImportRoot = join(importsRoot, safeBrainPathPart(requestedProvider), brainImportPayloadSignature(requestedProvider, payload.contentHash));
   let existingManifest = readValidBrainImportManifest(importRoot);
   if (existingManifest) {
     const files = Array.isArray(existingManifest.files) ? existingManifest.files : [];
+    if (requestedImportRoot !== importRoot) {
+      markBrainImportSuperseded(requestedImportRoot, `brain-imports/${safeProvider}/${importId}`);
+    }
     brainDebugLog('import_reused', { provider, importId, files: files.length });
     return {
       ok: true,
@@ -3202,10 +3214,9 @@ function importBrainPayload(payload) {
     filename: originalName || '',
     bytes: payload.rawBuffer ? payload.rawBuffer.length : 0,
   });
-  let text;
   let conversations;
   try {
-    text = buildBrainImportTextFromPayload(payload);
+    text = text || buildBrainImportTextFromPayload(payload);
     if (payload.detectedProvider && BRAIN_IMPORT_PROVIDERS.has(payload.detectedProvider) && payload.detectedProvider !== provider) {
       provider = payload.detectedProvider;
       safeProvider = safeBrainPathPart(provider);
