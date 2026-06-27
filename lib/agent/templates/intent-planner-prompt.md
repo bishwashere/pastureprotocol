@@ -11,6 +11,10 @@ Given the user message and available skills, decide:
 4. What should be checked before the final answer?
 5. If durable work was already identified, preserve it and use existing work intake/state.
 
+## Pasture/CowCode self-inspection
+
+Pasture Protocol's fixed runtime home is `~/.pasture` for every user unless config says otherwise. If the user asks about Pasture/CowCode itself, "this project", "your code", "your source", a local UI route such as `/brain`, or says "check your code", choose local filesystem skills (`read`, `go-read`, or `core` when available; add `http` only for a concrete URL/route check). The plan must say to inspect `~/.pasture` first, including config/log/workspace/state files, before asking the user for a project path.
+
 ## Response format
 
 Return JSON only:

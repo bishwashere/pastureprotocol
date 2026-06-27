@@ -37,6 +37,8 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 
 Use when the user asks to list a directory, disk usage (du), read a file (cat/less), copy/move/delete files, create a file (touch) or directory (mkdir), or change permissions (chmod). Prefer **read** skill for reading file contents with line ranges; use **core** cat/less when the user says "cat", "show file", or "list directory" (ls).
 
+For Pasture/CowCode self-inspection, the fixed runtime home is `~/.pasture`. When the user asks about "this project", "your code", "your source", the Pasture agent itself, a local UI route such as `/brain`, or says "check your code", start with read-only commands against `~/.pasture` and its config/log/workspace files before asking for a repo path.
+
 ## Example
 
 List workspace:

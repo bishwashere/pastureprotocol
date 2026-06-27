@@ -29,6 +29,8 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 
 Use when the user asks to list a directory, show disk usage (du), show file contents (cat/less), or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "what's in Downloads", "cat this file", "how big is this folder", etc.
 
+For Pasture/CowCode self-inspection, the fixed runtime home is `~/.pasture`. When the user asks about "this project", "your code", "your source", a Pasture UI route such as `/brain`, or tells you to "check your code", list/read `~/.pasture` first. Check `~/.pasture/config.json`, `~/.pasture/workspace`, relevant logs, caches, and agent workspaces before asking the user for a path.
+
 ## Example
 
 List Downloads:

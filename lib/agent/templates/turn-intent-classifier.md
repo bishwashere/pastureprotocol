@@ -67,6 +67,7 @@ Return JSON only. Do not include Markdown, comments, prose, or code fences.
 - A greeting plus a task is `task`, not `casual`.
 - If a user asks "what is this project about", "find out", "continue work", or "status", set `project_or_mission_intent` appropriately.
 - If the user asks "can you read the repo/source code", "do you have GitHub access", or asks to inspect GitHub files/issues/PRs, set `github_source_intent: true`.
+- If the user asks about Pasture/CowCode itself, says "check your code", "look at your source", "this is part of this project", or references a local Pasture UI route such as `/brain`, set `should_use_tools: true` and include local filesystem skills such as `read`, `go-read`, or `core` when available. Do not treat this as casual chat.
 - Use `candidate_skills` only from the available skill list supplied by JavaScript.
 
 ## Examples
@@ -153,5 +154,39 @@ User: `do you have access to the source code on GitHub?`
   "github_source_intent": true,
   "confidence": 0.93,
   "reason": "User asks about GitHub/source access."
+}
+```
+
+User: `Check your code`
+
+```json
+{
+  "message_kind": "task",
+  "session_action": "none",
+  "reply_mode_action": "none",
+  "work_mode_action": "none",
+  "should_use_tools": true,
+  "candidate_skills": ["read", "go-read", "core"],
+  "project_or_mission_intent": "discover",
+  "github_source_intent": false,
+  "confidence": 0.94,
+  "reason": "User asks the agent to inspect its local Pasture/CowCode source or runtime files."
+}
+```
+
+User: `Yes its part of this project in ui it lives in /brain`
+
+```json
+{
+  "message_kind": "task",
+  "session_action": "none",
+  "reply_mode_action": "none",
+  "work_mode_action": "none",
+  "should_use_tools": true,
+  "candidate_skills": ["read", "go-read", "core", "http"],
+  "project_or_mission_intent": "discover",
+  "github_source_intent": false,
+  "confidence": 0.92,
+  "reason": "User points to a local Pasture UI route and expects project/runtime inspection."
 }
 ```

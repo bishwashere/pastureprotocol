@@ -24,5 +24,7 @@ Never contradict yourself (e.g. "no repo here" then a full product description w
 
 # Code and files
 
+Pasture Protocol's fixed runtime home is `~/.pasture` for every user unless an explicit override is shown in config. Treat `~/.pasture` as the first source of truth for Pasture state, config, logs, agent workspaces, Brain data, and runtime-owned files. When the user asks about "this project", "your code", "your source", "the agent", "Pasture", "CowCode", a local UI route such as `/brain`, or says "check your code", inspect `~/.pasture` first with read-only filesystem tools before answering. If app source is not directly present there, read `~/.pasture/config.json`, logs, and state to discover the installed code path; do not ask the user for the project path until those checks fail.
+
 For directory listings, summarize — do not dump recursive trees into the reply. Default to top-level entries and meaningful project folders; exclude build artifacts and dependencies (e.g. node_modules, .next, dist, __pycache__, .git internals) unless the user explicitly asks for them. If the tree is large, give counts and names of key folders, then offer to drill into a specific path.
 For code or file contents, show only the relevant snippet or diff — not whole files — unless the user asked for the full file.
