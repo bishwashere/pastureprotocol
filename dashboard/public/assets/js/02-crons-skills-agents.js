@@ -2795,82 +2795,60 @@ function renderSystemCronVariant(row) {
     function brainClusterClouds(positions, width, height) {
       var list = Array.isArray(positions) ? positions : [];
       if (list.length < 8) return [];
-      var radius = width < 560 ? 88 : width < 900 ? 106 : 132;
+      var radius = width < 560 ? 70 : width < 900 ? 82 : 96;
       var radiusSq = radius * radius;
-      var cell = radius;
-      var parent = list.map(function (_, idx) { return idx; });
-      var rank = list.map(function () { return 0; });
-      var grid = {};
-
-      function find(idx) {
-        while (parent[idx] !== idx) {
-          parent[idx] = parent[parent[idx]];
-          idx = parent[idx];
-        }
-        return idx;
-      }
-
-      function unite(a, b) {
-        var rootA = find(a);
-        var rootB = find(b);
-        if (rootA === rootB) return;
-        if (rank[rootA] < rank[rootB]) {
-          parent[rootA] = rootB;
-          return;
-        }
-        parent[rootB] = rootA;
-        if (rank[rootA] === rank[rootB]) rank[rootA] += 1;
-      }
+      var cell = radius * 0.78;
+      var densityRadius = radius * 1.25;
+      var densityRadiusSq = densityRadius * densityRadius;
+      var cells = {};
+      var clouds = [];
 
       list.forEach(function (pos, idx) {
         var gx = Math.floor(pos.x / cell);
         var gy = Math.floor(pos.y / cell);
-        for (var ox = -1; ox <= 1; ox++) {
-          for (var oy = -1; oy <= 1; oy++) {
-            (grid[(gx + ox) + ':' + (gy + oy)] || []).forEach(function (otherIdx) {
-              var other = list[otherIdx];
-              var dx = pos.x - other.x;
-              var dy = pos.y - other.y;
-              if (dx * dx + dy * dy <= radiusSq) unite(idx, otherIdx);
-            });
-          }
-        }
         var key = gx + ':' + gy;
-        if (!grid[key]) grid[key] = [];
-        grid[key].push(idx);
-      });
-
-      var groups = {};
-      list.forEach(function (pos, idx) {
-        var root = find(idx);
-        if (!groups[root]) {
-          groups[root] = { positions: [], x: 0, y: 0, weight: 0, minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-        }
-        var group = groups[root];
+        if (!cells[key]) cells[key] = { positions: [], x: 0, y: 0, weight: 0, gx, gy };
         var weight = Math.max(1, Number(pos.term && pos.term.weight) || 1);
-        group.positions.push(pos);
-        group.x += pos.x * weight;
-        group.y += pos.y * weight;
-        group.weight += weight;
-        group.minX = Math.min(group.minX, pos.x);
-        group.maxX = Math.max(group.maxX, pos.x);
-        group.minY = Math.min(group.minY, pos.y);
-        group.maxY = Math.max(group.maxY, pos.y);
+        cells[key].positions.push(pos);
+        cells[key].x += pos.x * weight;
+        cells[key].y += pos.y * weight;
+        cells[key].weight += weight;
       });
 
-      return Object.keys(groups).map(function (key) {
-        var group = groups[key];
-        group.x = group.weight ? group.x / group.weight : (group.minX + group.maxX) / 2;
-        group.y = group.weight ? group.y / group.weight : (group.minY + group.maxY) / 2;
-        group.size = group.positions.length;
-        group.radiusX = Math.max(72, Math.min(width * 0.28, (group.maxX - group.minX) * 0.62 + radius * 0.9));
-        group.radiusY = Math.max(58, Math.min(height * 0.28, (group.maxY - group.minY) * 0.62 + radius * 0.76));
-        return group;
-      }).filter(function (group) {
-        return group.size >= (width < 560 ? 3 : 4);
+      Object.keys(cells).forEach(function (key) {
+        var cellInfo = cells[key];
+        var cx = cellInfo.weight ? cellInfo.x / cellInfo.weight : 0;
+        var cy = cellInfo.weight ? cellInfo.y / cellInfo.weight : 0;
+        var near = [];
+        var localWeight = 0;
+        list.forEach(function (pos) {
+          var dx = pos.x - cx;
+          var dy = pos.y - cy;
+          if (dx * dx + dy * dy > densityRadiusSq) return;
+          near.push(pos);
+          localWeight += Math.max(1, Number(pos.term && pos.term.weight) || 1);
+        });
+        if (near.length < (width < 560 ? 3 : 4)) return;
+        var seed = brainHash(key + ':' + near.length);
+        clouds.push({
+          positions: near,
+          x: cx + (brainSeededRandom(seed) - 0.5) * 18,
+          y: cy + (brainSeededRandom(seed ^ 0xA17C) - 0.5) * 18,
+          size: near.length,
+          weight: localWeight,
+          radius: Math.max(44, Math.min(width < 560 ? 86 : 118, radius * 0.56 + near.length * 4.2)),
+        });
+      });
+
+      return clouds.filter(function (cloud, idx) {
+        return !clouds.slice(0, idx).some(function (prev) {
+          var dx = cloud.x - prev.x;
+          var dy = cloud.y - prev.y;
+          return dx * dx + dy * dy < radiusSq * 0.36;
+        });
       }).sort(function (a, b) {
         return b.size - a.size || b.weight - a.weight;
-      }).slice(0, 14);
+      }).slice(0, 24);
     }
 
     function brainDrawClusterClouds(ctx, positions, width, height) {
@@ -2886,25 +2864,27 @@ function renderSystemCronVariant(row) {
       ctx.globalCompositeOperation = 'screen';
       clusters.forEach(function (cluster, idx) {
         var color = palette[idx % palette.length];
-        var alpha = Math.min(0.105, 0.038 + cluster.size * 0.0045);
-        var outer = Math.max(cluster.radiusX, cluster.radiusY);
-        var radial = ctx.createRadialGradient(cluster.x, cluster.y, Math.max(18, outer * 0.12), cluster.x, cluster.y, outer);
-        radial.addColorStop(0, 'rgba(' + color.core + ',' + (alpha * 0.7).toFixed(3) + ')');
-        radial.addColorStop(0.48, 'rgba(' + color.edge + ',' + alpha.toFixed(3) + ')');
+        var alpha = Math.min(0.074, 0.024 + cluster.size * 0.0036);
+        var outer = cluster.radius;
+        var radial = ctx.createRadialGradient(cluster.x, cluster.y, 0, cluster.x, cluster.y, outer);
+        radial.addColorStop(0, 'rgba(' + color.core + ',' + (alpha * 0.74).toFixed(3) + ')');
+        radial.addColorStop(0.34, 'rgba(' + color.edge + ',' + alpha.toFixed(3) + ')');
+        radial.addColorStop(0.72, 'rgba(' + color.edge + ',' + (alpha * 0.22).toFixed(3) + ')');
         radial.addColorStop(1, 'rgba(' + color.edge + ',0)');
         ctx.fillStyle = radial;
         ctx.beginPath();
-        ctx.ellipse(cluster.x, cluster.y, cluster.radiusX, cluster.radiusY, (idx % 5 - 2) * 0.13, 0, Math.PI * 2);
+        ctx.arc(cluster.x, cluster.y, outer, 0, Math.PI * 2);
         ctx.fill();
 
-        cluster.positions.slice(0, 10).forEach(function (pos, pIdx) {
-          if (pIdx % 2 && cluster.positions.length > 8) return;
+        cluster.positions.slice(0, 8).forEach(function (pos, pIdx) {
+          if (pIdx % 2 && cluster.positions.length > 7) return;
           var seed = brainHash(String(pos.term && pos.term.text || '') + ':cloud');
-          var jitterX = (brainSeededRandom(seed) - 0.5) * 18;
-          var jitterY = (brainSeededRandom(seed ^ 0xC10D) - 0.5) * 18;
-          var spotRadius = Math.max(38, Math.min(82, pos.font * 4.3));
+          var jitterX = (brainSeededRandom(seed) - 0.5) * 14;
+          var jitterY = (brainSeededRandom(seed ^ 0xC10D) - 0.5) * 14;
+          var spotRadius = Math.max(28, Math.min(62, pos.font * 3.2));
           var spot = ctx.createRadialGradient(pos.x + jitterX, pos.y + jitterY, 0, pos.x + jitterX, pos.y + jitterY, spotRadius);
-          spot.addColorStop(0, 'rgba(' + color.edge + ',' + (alpha * 0.72).toFixed(3) + ')');
+          spot.addColorStop(0, 'rgba(' + color.edge + ',' + (alpha * 0.52).toFixed(3) + ')');
+          spot.addColorStop(0.68, 'rgba(' + color.edge + ',' + (alpha * 0.12).toFixed(3) + ')');
           spot.addColorStop(1, 'rgba(' + color.edge + ',0)');
           ctx.fillStyle = spot;
           ctx.beginPath();
