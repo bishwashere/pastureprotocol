@@ -1816,6 +1816,7 @@ const BRAIN_LLM_CHUNK_CHARS = 9_000;
 const BRAIN_LLM_MAX_CHUNKS = 160;
 const BRAIN_LLM_CACHE_VERSION = 3;
 const BRAIN_QUALITY_CACHE_VERSION = 2;
+const BRAIN_RESPONSE_CACHE_VERSION = 1;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
@@ -1896,6 +1897,38 @@ function brainQualityCacheDir() {
 
 function brainQualityCachePath(key) {
   return join(brainQualityCacheDir(), key.slice(0, 2), `${key}.json`);
+}
+
+function brainResponseCacheDir() {
+  return join(getStateDir(), 'brain-response-cache', `v${BRAIN_RESPONSE_CACHE_VERSION}`);
+}
+
+function brainResponseCachePath(key) {
+  return join(brainResponseCacheDir(), key.slice(0, 2), `${key}.json`);
+}
+
+function readBrainResponseCache(key) {
+  const path = brainResponseCachePath(key);
+  try {
+    if (!existsSync(path)) return null;
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    const payload = parsed && parsed.payload;
+    if (!payload || !Array.isArray(payload.terms) || !Array.isArray(payload.connections)) return null;
+    return payload;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeBrainResponseCache(key, payload) {
+  if (!payload || !Array.isArray(payload.terms) || !Array.isArray(payload.connections)) return;
+  const path = brainResponseCachePath(key);
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(path, JSON.stringify({
+    cachedAtMs: Date.now(),
+    payload,
+  }, null, 2), 'utf8');
 }
 
 function readBrainQualityCache(key) {
@@ -2475,6 +2508,18 @@ function brainLlmChunkCacheKey(chunk) {
   }));
 }
 
+function brainResponseCacheKey({ range, source, qualityEnabled, chunks }) {
+  return brainHashText(JSON.stringify({
+    version: BRAIN_RESPONSE_CACHE_VERSION,
+    llmVersion: BRAIN_LLM_CACHE_VERSION,
+    qualityVersion: qualityEnabled ? BRAIN_QUALITY_CACHE_VERSION : 0,
+    range,
+    source,
+    qualityEnabled: !!qualityEnabled,
+    chunkKeys: (chunks || []).map((chunk) => brainLlmChunkCacheKey(chunk)),
+  }));
+}
+
 function normalizeBrainDisplayKey(text) {
   return String(text || '').trim().toLowerCase();
 }
@@ -2486,8 +2531,8 @@ function mergeBrainSources(target, sources) {
   }
 }
 
-async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = false } = {}) {
-  const chunks = splitBrainCorpusForLlm(corpus);
+async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = false, chunks: providedChunks = null } = {}) {
+  const chunks = Array.isArray(providedChunks) ? providedChunks : splitBrainCorpusForLlm(corpus);
   const termMap = new Map();
   const edgeMap = new Map();
   const stats = { chunks: chunks.length, cacheHits: 0, generated: 0, empty: 0, failed: 0 };
