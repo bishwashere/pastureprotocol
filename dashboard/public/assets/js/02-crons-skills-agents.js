@@ -2947,7 +2947,24 @@ function renderSystemCronVariant(row) {
       return 0.08 + (target - 0.08) * presence;
     }
 
-    function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition) {
+    function brainLinePointerInfluence(a, b, pointer) {
+      if (!pointer || !pointer.active || !a || !b) return 0;
+      var dx = b.x - a.x;
+      var dy = b.y - a.y;
+      var lenSq = dx * dx + dy * dy;
+      if (!lenSq) return 0;
+      var t = ((pointer.x - a.x) * dx + (pointer.y - a.y) * dy) / lenSq;
+      if (t < 0 || t > 1) return 0;
+      var px = a.x + dx * t;
+      var py = a.y + dy * t;
+      var dist = Math.sqrt(Math.pow(pointer.x - px, 2) + Math.pow(pointer.y - py, 2));
+      var radius = 46;
+      if (dist >= radius) return 0;
+      var closeness = 1 - dist / radius;
+      return closeness * closeness;
+    }
+
+    function drawBrainMeshCanvas(canvas, terms, connections, selectedText, transition, pointer) {
       if (!canvas) return;
       var rect = canvas.getBoundingClientRect();
       var width = Math.max(320, Math.floor(rect.width));
@@ -2989,6 +3006,15 @@ function renderSystemCronVariant(row) {
         ctx.lineWidth = 0.35 + (strength / 100) * 0.55;
         ctx.strokeStyle = 'rgba(100,116,139,' + (0.055 + (strength / 100) * 0.075).toFixed(3) + ')';
         ctx.stroke();
+        var influence = brainLinePointerInfluence(a, b, pointer);
+        if (influence > 0) {
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.lineWidth = 0.9 + influence * 1.8;
+          ctx.strokeStyle = 'rgba(125,211,252,' + (0.05 + influence * 0.22).toFixed(3) + ')';
+          ctx.stroke();
+        }
       });
       if (relationSelectedText) {
         visibleConnections.forEach(function (c) {
@@ -3136,12 +3162,26 @@ function renderSystemCronVariant(row) {
       var currentFocus = '';
       var currentRelations = {};
       var hoverFrame = null;
+      var pointerFrame = null;
+      var meshPointer = { x: 0, y: 0, active: false };
 
       function stopBrainHoverAnimation() {
         if (hoverFrame) {
           cancelAnimationFrame(hoverFrame);
           hoverFrame = null;
         }
+      }
+
+      function drawBrainMeshCurrent() {
+        drawBrainMeshCanvas(meshCanvas, terms, connections, currentFocus, null, meshPointer);
+      }
+
+      function scheduleBrainPointerDraw() {
+        if (hoverFrame || pointerFrame) return;
+        pointerFrame = requestAnimationFrame(function () {
+          pointerFrame = null;
+          drawBrainMeshCurrent();
+        });
       }
 
       function animateBrainHover(nextTerm) {
@@ -3161,7 +3201,7 @@ function renderSystemCronVariant(row) {
             toRelations: toRelations,
             progress: progress,
             selectedText: transitionFocus,
-          });
+          }, meshPointer);
           if (progress < 1) {
             hoverFrame = requestAnimationFrame(step);
             return;
@@ -3170,7 +3210,7 @@ function renderSystemCronVariant(row) {
           currentFocus = nextTerm || '';
           currentRelations = toRelations;
           activeHover = currentFocus;
-          if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '');
+          if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, meshPointer);
         }
 
         hoverFrame = requestAnimationFrame(step);
@@ -3196,7 +3236,11 @@ function renderSystemCronVariant(row) {
       if (meshCanvas) {
         meshCanvas.addEventListener('mousemove', function (event) {
           var cr = meshCanvas.getBoundingClientRect();
-          var selected = nearestBrainMeshTerm(meshCanvas, event.clientX - cr.left, event.clientY - cr.top);
+          meshPointer.x = event.clientX - cr.left;
+          meshPointer.y = event.clientY - cr.top;
+          meshPointer.active = true;
+          scheduleBrainPointerDraw();
+          var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
           if (selected === activeHover || selected === pendingHover) return;
           if (hoverTimer) clearTimeout(hoverTimer);
           pendingHover = selected;
@@ -3211,6 +3255,8 @@ function renderSystemCronVariant(row) {
           }, 160);
         });
         meshCanvas.addEventListener('mouseleave', function () {
+          meshPointer.active = false;
+          scheduleBrainPointerDraw();
           clearBrainHover();
         });
       }
@@ -3218,6 +3264,8 @@ function renderSystemCronVariant(row) {
         if (hoverTimer) clearTimeout(hoverTimer);
         hoverTimer = null;
         stopBrainHoverAnimation();
+        if (pointerFrame) cancelAnimationFrame(pointerFrame);
+        pointerFrame = null;
       };
       renderBrainFocus('', connections);
     }
@@ -3437,12 +3485,9 @@ function renderSystemCronVariant(row) {
     wireEl('brain-settings-panel', 'click', function (e) {
       if (e) e.stopPropagation();
     });
-    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-links', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
-      wireEl(id, 'change', readBrainSettingsInputs);
-      wireEl(id, 'input', readBrainSettingsInputs);
-    });
-    wireEl('brain-setting-quality', 'change', readBrainSettingsInputs);
+    wireEl('brain-settings-apply', 'click', readBrainSettingsInputs);
     wireEl('brain-settings-reset', 'click', function () {
+      var previousQuality = brainSettings.qualityLayer !== false;
       brainSettings = {
         directRelations: BRAIN_SETTINGS_DEFAULTS.directRelations,
         secondRelations: BRAIN_SETTINGS_DEFAULTS.secondRelations,
@@ -3454,7 +3499,11 @@ function renderSystemCronVariant(row) {
       };
       saveBrainSettings();
       setBrainSettingsInputs();
-      fetchBrainCloud(true);
+      if ((brainSettings.qualityLayer !== false) !== previousQuality) {
+        fetchBrainCloud(true);
+      } else {
+        rerenderBrainCloud();
+      }
     });
     document.addEventListener('click', function (event) {
       var panel = document.getElementById('brain-settings-panel');
