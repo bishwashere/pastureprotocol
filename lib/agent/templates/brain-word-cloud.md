@@ -1,51 +1,58 @@
-# Brain Word Cloud
+# Brain Chunk Graph
 
-You create a word cloud for Pasture Protocol's Brain dashboard.
+You extract a knowledge graph chunk for Pasture Protocol's Brain dashboard.
 
-The input is a JSON payload containing text excerpts gathered mechanically from:
+The input is one chunk of memory, notes, imported chat, or local user chat history. Your job is to decide which single-word concept nodes matter and how strongly they relate.
 
-- long-term memory files such as `MEMORY.md`
-- custom memory notes under `memory/*.md`
-- private chat history grouped by day
+## Node Rules
 
-Your job is to identify the most salient words and short concepts that represent the recurring shape of the corpus, plus the strongest associations between those concepts.
+- Return only meaningful single-word nodes.
+- Prefer nouns, proper nouns, project names, product names, tools, people, places, APIs, services, durable topics, and domain concepts.
+- A node may be a single compact identifier such as `Cloudflare`, `RevenueCat`, `R2`, `S3`, `Taskmentor`, `cowcode`, `OpenAI`, `NextJS`, or `ReceiptVault`.
+- Do not return phrases. For example, return `Cloudflare` and `R2`, not `Cloudflare R2`.
+- Do not return verbs, verb-like action words, helper verbs, conversational filler, pronouns, generic adjectives, adverbs, timestamps, markdown syntax, JSON keys, command fragments, stack traces, local URLs, ports, secrets, phone numbers, or email addresses.
+- Do not include words merely because they are frequent. Include words because they represent knowledge, projects, tools, recurring topics, or durable user intent.
+- If a term is ambiguous but appears to be a named project/tool/topic in this chunk, you may include it.
 
-## Selection rules
+## Weight Rules
 
-- Prefer concrete nouns, named entities, projects, tools, people, places, recurring goals, recurring concerns, and durable topics.
-- Prefer terms that would help the user visually understand what the agent's memory/history has been centered on.
-- Include short phrases when a phrase is more meaningful than one isolated word.
-- Do not include generic conversational filler, function words, timestamps, JSON field names, markdown syntax, or transport/channel noise.
-- Do not include log artifacts, command output, process output, stack traces, local development URLs, localhost ports, API port notes, file paths, or system-generated status lines unless the memory explicitly says the user cares about that as a durable topic.
-- Do not treat one-off implementation details as brain topics. For example, a temporary localhost API, a printed server URL, or a command result is not a Brain term.
-- Do not include secrets, tokens, credentials, phone numbers, email addresses, or exact private identifiers.
-- If a term appears in multiple source types, reflect that with `sources`.
-- Weight terms by salience, not just frequency. Use numbers from 1 to 100.
-- Return between 30 and 45 terms when enough material exists. Return fewer if the corpus is sparse.
-- Return associations only between terms you included in `terms`.
-- Association strength means conceptual closeness in the corpus, not just visual similarity. Use numbers from 1 to 100.
-- Prefer a graph with useful local neighborhoods: 2-4 connections per important term.
-- Return at most 90 connections.
-- Omit `reason` unless it is essential.
-- Keep the JSON compact. Do not pretty-print large arrays.
+- `term.weight` is this chunk's salience for that node from 1 to 100.
+- Boost a term if the user explicitly asks about it, corrects it, requests it, names it as important, or repeats it as a durable concern.
+- Lower a term if it is incidental context.
+- `connection.strength` is conceptual closeness from 1 to 100.
+- `connection.weight` is the local relation weight from 1 to 100. It may equal `strength` unless there is a reason to differ.
+- `connection.evidence` is how much positive support the chunk gives the relation from 0 to 100.
+- `connection.decay` is how much negative/corrective feedback should reduce the relation from 0 to 100.
+- If the user says something like "no", "not this", "remove", "wrong", "don't connect these", or rejects an association, put that reduction in `decay` for the affected relation.
+- User-requested relations should generally have higher `evidence` than passive co-mentions.
 
-## Input shape
+## Graph Shape
+
+- Return 8 to 40 nodes when enough material exists.
+- Return fewer for sparse chunks.
+- Return only connections between terms you included.
+- Prefer useful local neighborhoods over a dense hairball.
+- Usually return 1 to 5 connections per important node.
+- Omit isolated generic nodes.
+- Keep labels stable across chunks when possible, using the clearest canonical single-word name.
+
+## Input Shape
 
 ```json
 {
   "range": "all | 30d | 7d",
   "source": "all | memory | notes | history",
-  "corpus": [
-    {
-      "source": "memory | notes | history",
-      "label": "MEMORY.md or date",
-      "text": "excerpt"
-    }
-  ]
+  "chunk": {
+    "source": "memory | notes | history",
+    "label": "source label",
+    "role": "user | assistant | empty",
+    "chunkIndex": 0,
+    "text": "chunk text"
+  }
 }
 ```
 
-## Output shape
+## Output Shape
 
 Return ONLY valid JSON. No prose. No markdown fences. No extra keys.
 
@@ -53,24 +60,23 @@ Return ONLY valid JSON. No prose. No markdown fences. No extra keys.
 {
   "terms": [
     {
-      "text": "project planning",
+      "text": "Cloudflare",
       "weight": 92,
-      "sources": ["memory", "history"]
+      "kind": "tool",
+      "sources": ["history"]
     }
   ],
   "connections": [
     {
-      "from": "project planning",
-      "to": "Timeline project",
-      "strength": 88
+      "from": "Cloudflare",
+      "to": "R2",
+      "strength": 88,
+      "weight": 88,
+      "evidence": 92,
+      "decay": 0
     }
   ]
 }
 ```
 
-`text` must be a display-ready word or short phrase.
-`weight` must be an integer from 1 to 100.
-`sources` must contain one or more of: `memory`, `notes`, `history`.
-`from` and `to` must exactly match term `text` values.
-`strength` must be an integer from 1 to 100.
-`reason` should be short and can be empty if there is no useful concise reason.
+`text`, `from`, and `to` must be display-ready single words. `from` and `to` must exactly match included `terms[].text`.

@@ -2608,23 +2608,53 @@ function renderSystemCronVariant(row) {
       }
     }
 
-    function showBrainLoadingProgress(cloud, label) {
+    function updateBrainLoadingProgress(cloud, progress, fallbackLabel) {
+      if (!cloud) return;
+      var labelEl = cloud.querySelector('.brain-loading-label');
+      var detailEl = cloud.querySelector('.brain-loading-detail');
+      var bar = cloud.querySelector('.brain-loading-bar');
+      var totalChunks = Number(progress && progress.totalChunks) || 0;
+      var doneChunks = Number(progress && progress.doneChunks) || 0;
+      var totalFiles = Number(progress && progress.totalFiles) || 0;
+      var doneFiles = Number(progress && progress.doneFiles) || 0;
+      var remainingFiles = Math.max(0, Number(progress && progress.remainingFiles) || Math.max(0, totalFiles - doneFiles));
+      var pct = totalChunks > 0 ? Math.max(4, Math.min(100, Math.round((doneChunks / totalChunks) * 100))) : 6;
+      if (bar) bar.style.width = pct + '%';
+      if (labelEl) {
+        labelEl.textContent = totalFiles
+          ? 'Processing ' + doneFiles + '/' + totalFiles + ' files'
+          : (fallbackLabel || 'Building brain map');
+      }
+      if (detailEl) {
+        var parts = [];
+        if (totalChunks) parts.push(doneChunks + '/' + totalChunks + ' chunks');
+        if (totalFiles) parts.push(remainingFiles + ' files remaining');
+        if (progress && Number(progress.cacheHits)) parts.push(Number(progress.cacheHits) + ' cached');
+        if (progress && Number(progress.generated)) parts.push(Number(progress.generated) + ' generated');
+        if (progress && progress.currentFile) parts.push(String(progress.currentFile).slice(0, 48));
+        detailEl.textContent = parts.join(' · ') || 'Preparing sources';
+      }
+    }
+
+    function showBrainLoadingProgress(cloud, label, progressId) {
       if (!cloud) return;
       stopBrainLoadingProgress();
       cloud.innerHTML =
         '<div class="brain-loading" role="status" aria-live="polite">' +
           '<div class="brain-loading-label">' + escapeHtml(label || 'Building brain map') + '</div>' +
           '<div class="brain-loading-track" aria-hidden="true">' +
-            '<span class="brain-loading-bar" style="width: 12%"></span>' +
+            '<span class="brain-loading-bar" style="width: 6%"></span>' +
           '</div>' +
+          '<div class="brain-loading-detail">Preparing sources</div>' +
         '</div>';
-      var bar = cloud.querySelector('.brain-loading-bar');
-      var progress = 12;
-      brainLoadingTimer = setInterval(function () {
-        progress += Math.max(1, Math.round((92 - progress) * 0.12));
-        if (progress > 92) progress = 92;
-        if (bar) bar.style.width = progress + '%';
-      }, 180);
+      if (!progressId) return;
+      brainLoadingTimer = setInterval(async function () {
+        try {
+          var r = await fetch(API + '/api/brain/progress?id=' + encodeURIComponent(progressId), { cache: 'no-store' });
+          var d = await r.json();
+          if (r.ok) updateBrainLoadingProgress(cloud, d, label);
+        } catch (_) {}
+      }, 350);
     }
 
     function brainEdgeLevel(strength) {
@@ -3059,8 +3089,12 @@ function renderSystemCronVariant(row) {
       var sourceCount = [
         stats.memoryFiles ? stats.memoryFiles + ' memory' : '',
         stats.noteFiles ? stats.noteFiles + ' notes' : '',
+        stats.importFiles ? stats.importFiles + ' imports' : '',
         stats.historyDays ? stats.historyDays + ' days' : '',
         stats.exchanges ? stats.exchanges + ' exchanges' : '',
+        stats.llmChunks ? stats.llmChunks + ' chunks' : '',
+        stats.llmCacheHits ? stats.llmCacheHits + ' cached' : '',
+        stats.llmGenerated ? stats.llmGenerated + ' generated' : '',
         terms.length ? visibleCount + ' visible words' : '',
       ].filter(Boolean).join(' · ');
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
@@ -3175,13 +3209,14 @@ function renderSystemCronVariant(row) {
       var range = rangeEl ? rangeEl.value : 'all';
       var source = sourceEl ? sourceEl.value : 'all';
       var hasGraph = !!cloud.querySelector('.brain-mesh-canvas');
+      var progressId = 'brain_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
       if (!hasGraph || refresh) {
-        showBrainLoadingProgress(cloud, refresh ? 'Rebuilding brain map' : 'Building brain map');
+        showBrainLoadingProgress(cloud, refresh ? 'Rebuilding brain map' : 'Building brain map', progressId);
       }
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
-        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) + '&source=' + encodeURIComponent(source);
+        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) + '&source=' + encodeURIComponent(source) + '&progressId=' + encodeURIComponent(progressId);
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
         var r = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
         var d = await r.json();
@@ -3225,6 +3260,7 @@ function renderSystemCronVariant(row) {
       setBrainImportStatus('Importing ' + list.length + ' file' + (list.length === 1 ? '' : 's') + '...');
       var imported = 0;
       var messages = 0;
+      var reused = 0;
       try {
         for (var i = 0; i < list.length; i++) {
           var file = list[i];
@@ -3241,11 +3277,13 @@ function renderSystemCronVariant(row) {
           });
           var d = await r.json();
           if (!r.ok) throw new Error(d.error || 'Import failed');
+          if (d.reused) reused += 1;
           imported += Number(d.conversations || 0);
           messages += Number(d.messages || 0);
         }
         var summary = 'Imported ' + imported + ' conversation' + (imported === 1 ? '' : 's') +
-          ' · ' + messages + ' messages';
+          ' · ' + messages + ' messages' +
+          (reused ? ' · ' + reused + ' reused' : '');
         setBrainImportStatus(summary);
         fetchBrainCloud(true);
       } catch (e) {

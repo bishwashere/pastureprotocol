@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
@@ -46,6 +47,7 @@ import {
   approvePendingProposal,
   rejectPendingProposal,
 } from '../lib/context/project-workflow-pending.js';
+import { generateBrainChunkGraph } from '../lib/agent/brain-word-cloud.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -1805,15 +1807,114 @@ app.get('/api/workspace-logs/:key', (req, res) => {
   }
 });
 
-// ---- Brain (word cloud over memory + history) ----
+// ---- Brain (LLM knowledge graph over memory + history) ----
 
 const BRAIN_CACHE_MS = 5 * 60 * 1000;
 const BRAIN_CORPUS_MAX_CHARS = 32_000;
 const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
+const BRAIN_LLM_CHUNK_CHARS = 9_000;
+const BRAIN_LLM_MAX_CHUNKS = 160;
+const BRAIN_LLM_CACHE_VERSION = 1;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 20 * 1024 * 1024;
-const BRAIN_IMPORT_MAX_NOTE_CHARS = 1_500_000;
 const BRAIN_IMPORT_PROVIDERS = new Set(['chatgpt', 'grok', 'claude', 'gemini', 'perplexity', 'copilot', 'other']);
 const brainCloudCache = new Map();
+const brainBuildProgress = new Map();
+
+function brainHashText(value) {
+  return createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function brainCurrentLocalDate() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: getResolvedTimezone(),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function normalizeBrainProgressId(value) {
+  const id = String(value || '').trim();
+  return /^[a-zA-Z0-9_-]{8,80}$/.test(id) ? id : '';
+}
+
+function setBrainBuildProgress(id, patch) {
+  if (!id) return;
+  const prev = brainBuildProgress.get(id) || {};
+  brainBuildProgress.set(id, {
+    ...prev,
+    ...patch,
+    updatedAtMs: Date.now(),
+  });
+}
+
+function finishBrainBuildProgress(id, patch = {}) {
+  if (!id) return;
+  setBrainBuildProgress(id, { ...patch, done: true });
+  setTimeout(() => brainBuildProgress.delete(id), 5 * 60 * 1000).unref?.();
+}
+
+function brainLlmCacheDir() {
+  return join(getStateDir(), 'brain-llm-cache', `v${BRAIN_LLM_CACHE_VERSION}`);
+}
+
+function brainLlmChunkCachePath(key) {
+  return join(brainLlmCacheDir(), key.slice(0, 2), `${key}.json`);
+}
+
+function readBrainLlmChunkCache(key) {
+  const path = brainLlmChunkCachePath(key);
+  try {
+    if (!existsSync(path)) return null;
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Array.isArray(parsed?.terms) || !Array.isArray(parsed?.connections)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeBrainLlmChunkCache(key, payload) {
+  const path = brainLlmChunkCachePath(key);
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(path, JSON.stringify({
+    cachedAtMs: Date.now(),
+    ...payload,
+  }, null, 2), 'utf8');
+}
+
+function markBrainImportChunkProcessed(label, chunkIndex, cacheKey, status = 'processed') {
+  const parts = String(label || '').split('/');
+  if (parts.length < 5 || parts[0] !== 'brain-imports' || parts[3] !== 'conversations') return;
+  const [, provider, importId, , fileName] = parts;
+  const manifestPath = join(brainImportsDir(), provider, importId, 'manifest.json');
+  try {
+    if (!existsSync(manifestPath)) return;
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    manifest.processing = manifest.processing && typeof manifest.processing === 'object' ? manifest.processing : {};
+    const fileKey = `conversations/${fileName}`;
+    const fileState = manifest.processing[fileKey] && typeof manifest.processing[fileKey] === 'object'
+      ? manifest.processing[fileKey]
+      : { chunks: {} };
+    fileState.chunks = fileState.chunks && typeof fileState.chunks === 'object' ? fileState.chunks : {};
+    fileState.chunks[String(chunkIndex || 0)] = {
+      status,
+      cacheKey,
+      processedAt: new Date().toISOString(),
+    };
+    fileState.status = Object.values(fileState.chunks).some((chunk) => chunk.status === 'failed') ? 'partial' : 'processed';
+    fileState.updatedAt = new Date().toISOString();
+    manifest.processing[fileKey] = fileState;
+    manifest.status = 'processed';
+    manifest.updatedAt = new Date().toISOString();
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  } catch (_) {}
+}
 
 function normalizeBrainRange(value) {
   const v = String(value || 'all').trim();
@@ -1842,9 +1943,21 @@ function brainImportProviderLabel(provider) {
   }[provider] || 'Other chat service';
 }
 
-function safeBrainImportFilename(provider) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `imported-${provider}-${stamp}.md`;
+function safeBrainPathPart(value, fallback = 'item') {
+  const safe = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return safe || fallback;
+}
+
+function brainImportsDir(workspaceDir = getWorkspaceDir()) {
+  return join(workspaceDir, 'brain-imports');
+}
+
+function brainImportId(provider, text) {
+  return brainHashText(`${provider}\n${text}`).slice(0, 24);
 }
 
 function stringifyChatContent(value) {
@@ -1942,33 +2055,27 @@ function extractBrainImportConversations(provider, text) {
   }];
 }
 
-function renderBrainImportMarkdown({ provider, originalName, conversations }) {
+function renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId }) {
   const label = brainImportProviderLabel(provider);
-  const importedAt = new Date().toISOString();
-  const totalMessages = conversations.reduce((sum, conv) => sum + conv.messages.length, 0);
+  const title = normalizeConversationTitle(conversation?.title, `Conversation ${index + 1}`);
   const lines = [
-    `# Imported ${label} Conversations`,
+    `# ${title}`,
     '',
-    `Imported: ${importedAt}`,
+    `Import: ${importId}`,
     `Source: ${label}`,
     originalName ? `Original file: ${originalName}` : '',
-    `Conversations: ${conversations.length}`,
-    `Messages: ${totalMessages}`,
+    `Conversation index: ${index + 1}`,
+    `Messages: ${conversation.messages.length}`,
     '',
   ].filter((line) => line !== '');
 
-  for (const conv of conversations) {
-    lines.push(`## ${conv.title}`, '');
-    for (const msg of conv.messages) {
-      lines.push(`**${msg.role}:**`);
-      lines.push(String(msg.text || '').trim());
-      lines.push('');
-    }
+  for (const msg of conversation.messages) {
+    lines.push(`**${msg.role}:**`);
+    lines.push(String(msg.text || '').trim());
+    lines.push('');
   }
 
-  const md = lines.join('\n').trim() + '\n';
-  if (md.length <= BRAIN_IMPORT_MAX_NOTE_CHARS) return md;
-  return md.slice(0, BRAIN_IMPORT_MAX_NOTE_CHARS).trimEnd() + '\n\n[Import truncated to fit the dashboard note limit.]\n';
+  return lines.join('\n').trim() + '\n';
 }
 
 function brainRangeCutoffMs(range) {
@@ -2000,7 +2107,7 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
   const cutoffMs = brainRangeCutoffMs(range);
   const corpus = [];
   const remaining = { value: maxChars };
-  const stats = { memoryFiles: 0, noteFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
+  const stats = { memoryFiles: 0, noteFiles: 0, importFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
 
   if (includeMemory) {
     for (const name of ['MEMORY.md', 'memory.md']) {
@@ -2027,6 +2134,35 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
           const text = readFileSync(full, 'utf8');
           stats.noteFiles += 1;
           pushBrainCorpusChunk(corpus, { source: 'notes', label: `memory/${name}`, text }, remaining);
+          if (remaining.value <= 0) break;
+        }
+      }
+    } catch (_) {}
+
+    const importsDir = brainImportsDir(workspaceDir);
+    try {
+      if (existsSync(importsDir) && statSync(importsDir).isDirectory()) {
+        for (const providerName of readdirSync(importsDir).sort()) {
+          const providerDir = join(importsDir, providerName);
+          if (!statSync(providerDir).isDirectory()) continue;
+          for (const importName of readdirSync(providerDir).sort()) {
+            const conversationsDir = join(providerDir, importName, 'conversations');
+            if (!existsSync(conversationsDir) || !statSync(conversationsDir).isDirectory()) continue;
+            for (const name of readdirSync(conversationsDir).sort()) {
+              if (!name.endsWith('.md')) continue;
+              const full = join(conversationsDir, name);
+              if (!statSync(full).isFile()) continue;
+              const text = readFileSync(full, 'utf8');
+              stats.importFiles += 1;
+              pushBrainCorpusChunk(corpus, {
+                source: 'notes',
+                label: `brain-imports/${providerName}/${importName}/conversations/${name}`,
+                text,
+              }, remaining);
+              if (remaining.value <= 0) break;
+            }
+            if (remaining.value <= 0) break;
+          }
           if (remaining.value <= 0) break;
         }
       }
@@ -2061,223 +2197,224 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
   return { corpus, stats };
 }
 
-const BRAIN_VERB_WORDS = new Set([
-  'am', 'are', 'aren', 'be', 'been', 'being', 'can', 'cannot', 'could', 'couldn', 'did', 'didn',
-  'do', 'does', 'doesn', 'doing', 'don', 'done', 'had', 'hadn', 'has', 'hasn', 'have', 'haven',
-  'having', 'is', 'isn', 'may', 'might', 'must', 'need', 'needed', 'needs', 'ought', 'shall',
-  'should', 'shouldn', 'was', 'wasn', 'were', 'weren', 'will', 'won', 'would', 'wouldn',
-  'add', 'added', 'adding', 'ask', 'asked', 'asking', 'build', 'building', 'built', 'call',
-  'called', 'calling', 'change', 'changed', 'changing', 'check', 'checked', 'checking', 'click',
-  'clicked', 'clicking', 'connect', 'connected', 'connecting', 'create', 'created', 'creates',
-  'creating', 'delete', 'deleted', 'deleting', 'doe', 'enable', 'enabled', 'enabling', 'exclude',
-  'excluded', 'excluding', 'fetch', 'fetched', 'fetching', 'find', 'finding', 'found', 'generate',
-  'generated', 'generating', 'get', 'gets', 'getting', 'give', 'given', 'giving', 'go', 'goes',
-  'going', 'got', 'help', 'helped', 'helping', 'include', 'included', 'including', 'install',
-  'installed', 'installing', 'keep', 'keeping', 'kept', 'know', 'knowing', 'known', 'let', 'lets',
-  'like', 'liked', 'load', 'loaded', 'loading', 'look', 'looked', 'looking', 'made', 'make',
-  'makes', 'making', 'move', 'moved', 'moving', 'open', 'opened', 'opening', 'post', 'posted',
-  'posting', 'read', 'reading', 'remove', 'removed', 'removing', 'rename', 'renamed', 'renaming',
-  'reply', 'replied', 'replying', 'respond', 'responded', 'responding', 'restart', 'restarted',
-  'restarting', 'run', 'running', 'ran', 'save', 'saved', 'saving', 'say', 'saying', 'see',
-  'seeing', 'seen', 'feel', 'feels', 'felt', 'send', 'sending', 'sent', 'set', 'setting', 'show', 'showed', 'showing',
-  'shown', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'summarize',
-  'summarized', 'summarizing', 'take', 'taken', 'taking', 'tell', 'telling', 'told', 'try',
-  'tried', 'trying', 'turn', 'turned', 'turning', 'update', 'updated', 'updating', 'upload',
-  'uploaded', 'uploading', 'use', 'used', 'using', 'want', 'wanted', 'wants', 'work', 'worked',
-  'working', 'write', 'writing', 'written', 'wrote',
-]);
-
-const BRAIN_FILLER_WORDS = new Set([
-  'able', 'about', 'above', 'across', 'after', 'again', 'against', 'ago', 'all', 'almost',
-  'alone', 'along', 'already', 'also', 'although', 'always', 'among', 'another', 'any',
-  'anyone', 'anything', 'around', 'away', 'back', 'based', 'basis', 'because', 'before',
-  'behind', 'below', 'beside', 'between', 'both', 'but', 'called', 'certain', 'course',
-  'current', 'currently', 'daily', 'days', 'default', 'different', 'down', 'each', 'either',
-  'else', 'enough', 'especially', 'etc', 'even', 'ever', 'every', 'everyone', 'everything',
-  'exactly', 'far', 'few', 'finally', 'first', 'five', 'following', 'for', 'from', 'front',
-  'general', 'here', 'however', 'inside', 'instead', 'into', 'its', 'itself', 'just', 'kind',
-  'last', 'latest', 'later', 'least', 'left', 'level', 'long', 'lot', 'many', 'maybe', 'mean',
-  'minutes', 'month', 'more', 'most', 'much', 'near', 'new', 'next', 'nothing', 'now',
-  'okay', 'once', 'only', 'other', 'otherwise', 'outside', 'over', 'own', 'particular',
-  'per', 'please', 'possible', 'probably', 'quite', 'rather', 'raw', 'really', 'recent',
-  'recently', 'regardless', 'remaining', 'same', 'second', 'seconds', 'several', 'short',
-  'side', 'simple', 'simply', 'since', 'single', 'sit', 'small', 'sometimes', 'specific',
-  'specifically', 'still', 'stuff', 'such', 'sure', 'than', 'that', 'the', 'their', 'them',
-  'then', 'there', 'these', 'they', 'thing', 'things', 'this', 'those', 'three', 'through',
-  'time', 'today', 'tomorrow', 'too', 'top', 'toward', 'true', 'two', 'unless', 'until',
-  'very', 'via', 'week', 'whatever', 'when', 'where', 'whether', 'which', 'while', 'who',
-  'why', 'with', 'within', 'without', 'word', 'words', 'yeah', 'year', 'yesterday', 'you',
-  'your', 'youre',
-]);
-
-const BRAIN_ADJECTIVE_ADVERB_WORDS = new Set([
-  'active', 'actual', 'additional', 'automatic', 'available', 'basic', 'best', 'better',
-  'big', 'bigger', 'blank', 'broad', 'broken', 'cached', 'clean', 'clear', 'close',
-  'complete', 'complex', 'correct', 'custom', 'deep', 'direct', 'early', 'easy', 'empty',
-  'existing', 'external', 'false', 'fast', 'final', 'free', 'fresh', 'full', 'generic',
-  'good', 'great', 'hard', 'healthy', 'high', 'higher', 'huge', 'immediate', 'important',
-  'internal', 'large', 'larger', 'light', 'likely', 'little', 'live', 'local', 'low',
-  'main', 'major', 'manual', 'missing', 'mobile', 'multiple', 'normal', 'offline', 'old',
-  'online', 'open', 'pending', 'private', 'proper', 'public', 'quick', 'random', 'ready',
-  'real', 'related', 'relevant', 'right', 'same', 'separate', 'shared', 'slow', 'smooth',
-  'special', 'strong', 'tiny', 'unclassified', 'unrelated', 'valid', 'visible', 'weak',
-  'white', 'wrong',
-]);
-
-const BRAIN_NOUNY_SUFFIXES = [
-  'age', 'ance', 'ence', 'er', 'or', 'ism', 'ist', 'ity', 'ment', 'ness', 'ship', 'tion',
-  'sion', 'ure',
-];
-
-const BRAIN_NEGATIVE_FEEDBACK_WORDS = new Set([
-  'bad', 'exclude', 'incorrect', 'never', 'no', 'not', 'remove', 'wrong',
-]);
-
-function isBrainExcludedWord(word) {
-  return BRAIN_VERB_WORDS.has(word) || BRAIN_FILLER_WORDS.has(word) || BRAIN_ADJECTIVE_ADVERB_WORDS.has(word);
-}
-
-function isBrainProperOrToolToken(raw) {
-  const text = String(raw || '').trim();
-  if (!text) return false;
-  return /[A-Z]{2,}/.test(text) || /[a-z][A-Z]/.test(text) || /[A-Za-z]+\d+|\d+[A-Za-z]+/.test(text) || text.includes('-') || text.includes('_');
-}
-
-function isBrainLikelyNounToken(word, raw) {
-  if (!word || isBrainExcludedWord(word)) return false;
-  if (isBrainProperOrToolToken(raw)) return true;
-  if (word.length >= 4 && BRAIN_NOUNY_SUFFIXES.some((suffix) => word.endsWith(suffix))) return true;
-  if (word.length >= 4 && word.endsWith('ing') && !BRAIN_VERB_WORDS.has(word)) return true;
-  if (word.length >= 3 && !word.endsWith('ly') && !word.endsWith('ed')) return true;
-  return false;
-}
-
-function addBrainCandidate(counts, order, occurrences, text, idxRef, amount = 1, position = idxRef.value) {
-  const key = String(text || '').trim().toLowerCase();
-  if (!key) return '';
-  counts.set(key, (counts.get(key) || 0) + amount);
-  if (!order.has(key)) order.set(key, idxRef.value++);
-  if (occurrences) occurrences.push({ key, position });
-  return key;
-}
-
-function brainRawWords(text) {
-  const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
-  const words = [];
-  for (const part of segmenter.segment(String(text || ''))) {
-    if (!part.isWordLike) continue;
-    const word = String(part.segment || '').trim().toLowerCase();
-    if (word) words.push(word);
-  }
-  return words;
-}
-
-function brainChunkConnectionProfile(chunk) {
-  const source = String(chunk?.source || '');
-  const role = String(chunk?.role || '');
-  const words = brainRawWords(chunk?.text || '');
-  const hasNegativeFeedback = words.some((word) => BRAIN_NEGATIVE_FEEDBACK_WORDS.has(word));
-  const sourceWeight = source === 'memory' ? 1.35 : source === 'notes' ? 1.2 : 1;
-  const userAskedWeight = source === 'history' && role === 'user' ? 1.65 : 1;
-  return {
-    multiplier: sourceWeight * userAskedWeight,
-    decay: hasNegativeFeedback ? 0.68 : 0,
-  };
-}
-
-function brainSegmentWords(text) {
-  const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
-  const counts = new Map();
-  const order = new Map();
-  const idxRef = { value: 0 };
-  const tokens = [];
-  const occurrences = [];
-  for (const part of segmenter.segment(String(text || ''))) {
-    if (!part.isWordLike) continue;
-    const raw = String(part.segment || '').trim();
-    const word = raw.toLowerCase();
-    const properOrTool = isBrainProperOrToolToken(raw);
-    if ((word.length < 3 && !properOrTool) || word.length > 32) continue;
-    let hasLetter = false;
-    let hasDigit = false;
-    for (const ch of word) {
-      const cp = ch.codePointAt(0);
-      if ((cp >= 97 && cp <= 122) || cp > 127) hasLetter = true;
-      if (cp >= 48 && cp <= 57) hasDigit = true;
+function splitBrainCorpusForLlm(corpus) {
+  const chunks = [];
+  for (const item of corpus || []) {
+    const text = String(item?.text || '').trim();
+    if (!text) continue;
+    for (let start = 0, index = 0; start < text.length; start += BRAIN_LLM_CHUNK_CHARS, index++) {
+      const slice = text.slice(start, start + BRAIN_LLM_CHUNK_CHARS).trim();
+      if (!slice) continue;
+      chunks.push({
+        source: item.source,
+        label: item.label,
+        role: item.role || '',
+        ts: item.ts || 0,
+        chunkIndex: index,
+        text: slice,
+      });
+      if (chunks.length >= BRAIN_LLM_MAX_CHUNKS) return chunks;
     }
-    if (!hasLetter || (hasDigit && !properOrTool)) continue;
-    const nounCandidate = isBrainLikelyNounToken(word, raw);
-    const position = tokens.length;
-    tokens.push({ word, raw, nounCandidate, position });
-    if (nounCandidate) addBrainCandidate(counts, order, occurrences, word, idxRef, 1, position);
   }
-
-  const sequence = occurrences
-    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
-    .map((item) => item.key);
-  return { counts, order, sequence };
+  return chunks;
 }
 
-function buildDenseBrainGraph(corpus, maxTerms = 2600) {
-  const joined = corpus.map((chunk) => chunk.text || '').join('\n\n');
-  const { counts, order } = brainSegmentWords(joined);
-  const maxCount = Math.max(1, ...counts.values());
-  const terms = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || (order.get(a[0]) || 0) - (order.get(b[0]) || 0))
-    .slice(0, maxTerms)
-    .map(([text, count], index) => ({
-      text,
-      count,
-      weight: Math.max(6, Math.min(100, Math.round((count / maxCount) * 100))),
-      rank: index + 1,
-      sources: ['dense'],
-    }));
-  const termSet = new Set(terms.map((term) => term.text));
-  const links = new Map();
-  for (const chunk of corpus) {
-    const { sequence } = brainSegmentWords(chunk.text || '');
-    const profile = brainChunkConnectionProfile(chunk);
-    const words = sequence.filter((word) => termSet.has(word)).slice(0, 90);
-    for (let i = 0; i < words.length; i++) {
-      for (let j = i + 1; j < Math.min(words.length, i + 9); j++) {
-        const a = words[i];
-        const b = words[j];
-        if (a === b) continue;
-        const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
-        const distance = j - i;
-        const contextWeight = 1 / Math.sqrt(distance);
-        const delta = contextWeight * profile.multiplier;
-        const prev = links.get(key) || { score: 0, evidence: 0, decay: 0 };
-        prev.evidence += delta;
-        if (profile.decay > 0) {
-          const decay = delta * profile.decay;
-          prev.score -= decay;
-          prev.decay += decay;
-        } else {
-          prev.score += delta;
-        }
-        links.set(key, prev);
+function brainLlmChunkCacheKey(chunk) {
+  const historyDate = String(chunk.source || '') === 'history' && /^\d{4}-\d{2}-\d{2}$/.test(String(chunk.label || ''))
+    ? String(chunk.label || '')
+    : '';
+  const historyLifecycle = historyDate
+    ? (historyDate === brainCurrentLocalDate() ? 'open' : 'final')
+    : '';
+  return brainHashText(JSON.stringify({
+    version: BRAIN_LLM_CACHE_VERSION,
+    source: chunk.source || '',
+    label: chunk.label || '',
+    role: chunk.role || '',
+    historyLifecycle,
+    ts: chunk.ts || 0,
+    chunkIndex: chunk.chunkIndex || 0,
+    textHash: brainHashText(chunk.text || ''),
+  }));
+}
+
+function normalizeBrainDisplayKey(text) {
+  return String(text || '').trim().toLowerCase();
+}
+
+function mergeBrainSources(target, sources) {
+  for (const source of sources || []) {
+    const s = String(source || '').trim();
+    if (s) target.add(s);
+  }
+}
+
+async function buildLlmBrainGraph(corpus, { range, source, onProgress } = {}) {
+  const chunks = splitBrainCorpusForLlm(corpus);
+  const termMap = new Map();
+  const edgeMap = new Map();
+  const stats = { chunks: chunks.length, cacheHits: 0, generated: 0, failed: 0 };
+  const fileChunkTotals = new Map();
+  const fileChunkDone = new Map();
+  let doneFiles = 0;
+
+  for (const chunk of chunks) {
+    const fileKey = `${chunk.source || ''}:${chunk.label || ''}`;
+    fileChunkTotals.set(fileKey, (fileChunkTotals.get(fileKey) || 0) + 1);
+  }
+
+  if (onProgress) {
+    onProgress({
+      phase: 'processing',
+      doneChunks: 0,
+      totalChunks: chunks.length,
+      doneFiles: 0,
+      totalFiles: fileChunkTotals.size,
+      remainingFiles: fileChunkTotals.size,
+      cacheHits: 0,
+      generated: 0,
+      failed: 0,
+    });
+  }
+
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+    const chunk = chunks[chunkIndex];
+    const cacheKey = brainLlmChunkCacheKey(chunk);
+    const fileKey = `${chunk.source || ''}:${chunk.label || ''}`;
+    let graph = readBrainLlmChunkCache(cacheKey);
+    if (graph) {
+      stats.cacheHits += 1;
+      markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'cached');
+    } else {
+      graph = await generateBrainChunkGraph({ range, source, chunk });
+      if (!graph) {
+        stats.failed += 1;
+        graph = { terms: [], connections: [] };
+        markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'failed');
+      } else {
+        writeBrainLlmChunkCache(cacheKey, {
+          source: chunk.source,
+          label: chunk.label,
+          role: chunk.role,
+          chunkIndex: chunk.chunkIndex,
+          textHash: brainHashText(chunk.text || ''),
+          terms: graph.terms,
+          connections: graph.connections,
+        });
+        stats.generated += 1;
+        markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'processed');
       }
     }
-  }
-  const positiveLinks = [...links.entries()].filter(([, value]) => value.score > 0.05);
-  const maxLink = Math.max(1, ...positiveLinks.map(([, value]) => value.score));
-  const connections = [...links.entries()]
-    .filter(([, value]) => value.score > 0.05)
-    .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, 2500)
-    .map(([key, value]) => {
-      const [from, to] = key.split('\u0000');
-      return {
-        from,
-        to,
-        strength: Math.max(8, Math.min(100, Math.round((value.score / maxLink) * 100))),
-        weight: Number(value.score.toFixed(3)),
-        evidence: Number(value.evidence.toFixed(3)),
-        decay: Number(value.decay.toFixed(3)),
+
+    const fileDone = (fileChunkDone.get(fileKey) || 0) + 1;
+    fileChunkDone.set(fileKey, fileDone);
+    if (fileDone === fileChunkTotals.get(fileKey)) doneFiles += 1;
+
+    if (onProgress) {
+      onProgress({
+        phase: 'processing',
+        currentFile: chunk.label || chunk.source || '',
+        doneChunks: chunkIndex + 1,
+        totalChunks: chunks.length,
+        doneFiles,
+        totalFiles: fileChunkTotals.size,
+        remainingFiles: Math.max(0, fileChunkTotals.size - doneFiles),
+        cacheHits: stats.cacheHits,
+        generated: stats.generated,
+        failed: stats.failed,
+      });
+    }
+
+    for (const term of graph.terms || []) {
+      const key = normalizeBrainDisplayKey(term.text);
+      if (!key) continue;
+      const weight = Math.max(1, Math.min(100, Number(term.weight) || 1));
+      const prev = termMap.get(key) || {
+        text: term.text,
+        score: 0,
+        maxWeight: 0,
+        mentions: 0,
+        sources: new Set(),
       };
+      if (weight > prev.maxWeight) {
+        prev.text = term.text;
+        prev.maxWeight = weight;
+      }
+      prev.score += weight;
+      prev.mentions += 1;
+      mergeBrainSources(prev.sources, term.sources && term.sources.length ? term.sources : [chunk.source]);
+      termMap.set(key, prev);
+    }
+
+    for (const connection of graph.connections || []) {
+      const fromKey = normalizeBrainDisplayKey(connection.from);
+      const toKey = normalizeBrainDisplayKey(connection.to);
+      if (!fromKey || !toKey || fromKey === toKey) continue;
+      const ordered = fromKey < toKey ? [fromKey, toKey] : [toKey, fromKey];
+      const edgeKey = `${ordered[0]}\u0000${ordered[1]}`;
+      const strength = Math.max(1, Math.min(100, Number(connection.strength) || 1));
+      const evidence = Math.max(0, Number(connection.evidence) || Number(connection.weight) || strength);
+      const decay = Math.max(0, Number(connection.decay) || 0);
+      const score = Math.max(0, evidence - decay);
+      const prev = edgeMap.get(edgeKey) || {
+        fromKey: ordered[0],
+        toKey: ordered[1],
+        score: 0,
+        evidence: 0,
+        decay: 0,
+        maxStrength: 0,
+      };
+      prev.score += score;
+      prev.evidence += evidence;
+      prev.decay += decay;
+      prev.maxStrength = Math.max(prev.maxStrength, strength);
+      edgeMap.set(edgeKey, prev);
+    }
+  }
+
+  const maxTermScore = Math.max(1, ...[...termMap.values()].map((term) => term.score));
+  const terms = [...termMap.values()]
+    .sort((a, b) => b.score - a.score || a.text.localeCompare(b.text))
+    .slice(0, 2600)
+    .map((term, index) => ({
+      text: term.text,
+      count: term.mentions,
+      weight: Math.max(6, Math.min(100, Math.round((term.score / maxTermScore) * 100))),
+      rank: index + 1,
+      sources: [...term.sources],
+    }));
+
+  const termKeys = new Set(terms.map((term) => normalizeBrainDisplayKey(term.text)));
+  const displayByKey = new Map(terms.map((term) => [normalizeBrainDisplayKey(term.text), term.text]));
+  const positiveEdges = [...edgeMap.values()].filter((edge) => edge.score > 0 && termKeys.has(edge.fromKey) && termKeys.has(edge.toKey));
+  const maxEdgeScore = Math.max(1, ...positiveEdges.map((edge) => edge.score));
+  const connections = positiveEdges
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3000)
+    .map((edge) => ({
+      from: displayByKey.get(edge.fromKey),
+      to: displayByKey.get(edge.toKey),
+      strength: Math.max(8, Math.min(100, Math.round((edge.score / maxEdgeScore) * 100))),
+      weight: Number(edge.score.toFixed(3)),
+      evidence: Number(edge.evidence.toFixed(3)),
+      decay: Number(edge.decay.toFixed(3)),
+    }));
+
+  if (onProgress) {
+    onProgress({
+      phase: 'complete',
+      doneChunks: chunks.length,
+      totalChunks: chunks.length,
+      doneFiles: fileChunkTotals.size,
+      totalFiles: fileChunkTotals.size,
+      remainingFiles: 0,
+      cacheHits: stats.cacheHits,
+      generated: stats.generated,
+      failed: stats.failed,
     });
-  return { terms, connections };
+  }
+
+  return { terms, connections, llmStats: stats };
 }
 
 app.get('/api/brain/cloud', async (req, res) => {
@@ -2285,6 +2422,7 @@ app.get('/api/brain/cloud', async (req, res) => {
     const range = normalizeBrainRange(req.query.range);
     const source = normalizeBrainSource(req.query.source);
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
+    const progressId = normalizeBrainProgressId(req.query.progressId);
     const cacheKey = `${range}:${source}`;
     if (refresh) brainCloudCache.delete(cacheKey);
     const cached = brainCloudCache.get(cacheKey);
@@ -2296,7 +2434,8 @@ app.get('/api/brain/cloud', async (req, res) => {
       return;
     }
 
-    const { corpus, stats } = collectBrainCorpus({ range, source });
+    setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
+    const { corpus, stats } = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS });
     if (!corpus.length) {
       const payload = {
         range,
@@ -2306,13 +2445,27 @@ app.get('/api/brain/cloud', async (req, res) => {
         stats,
       };
       brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+      finishBrainBuildProgress(progressId, {
+        phase: 'complete',
+        doneChunks: 0,
+        totalChunks: 0,
+        doneFiles: 0,
+        totalFiles: 0,
+        remainingFiles: 0,
+      });
       res.set('Cache-Control', 'no-store');
       res.json({ ...payload, cached: false });
       return;
     }
 
-    const denseCorpus = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS }).corpus;
-    const dense = buildDenseBrainGraph(denseCorpus, 2600);
+    const dense = await buildLlmBrainGraph(corpus, {
+      range,
+      source,
+      onProgress: (progress) => setBrainBuildProgress(progressId, {
+        ...progress,
+        done: false,
+      }),
+    });
     const payload = {
       range,
       source,
@@ -2321,14 +2474,40 @@ app.get('/api/brain/cloud', async (req, res) => {
       connections: dense.connections,
       denseTerms: dense.terms,
       denseConnections: dense.connections,
-      stats,
+      stats: {
+        ...stats,
+        llmChunks: dense.llmStats?.chunks || 0,
+        llmCacheHits: dense.llmStats?.cacheHits || 0,
+        llmGenerated: dense.llmStats?.generated || 0,
+        llmFailed: dense.llmStats?.failed || 0,
+      },
     };
     brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
+    finishBrainBuildProgress(progressId, {
+      phase: 'complete',
+      doneChunks: dense.llmStats?.chunks || 0,
+      totalChunks: dense.llmStats?.chunks || 0,
+      remainingFiles: 0,
+      cacheHits: dense.llmStats?.cacheHits || 0,
+      generated: dense.llmStats?.generated || 0,
+      failed: dense.llmStats?.failed || 0,
+    });
     res.set('Cache-Control', 'no-store');
     res.json({ ...payload, cached: false });
   } catch (err) {
+    finishBrainBuildProgress(normalizeBrainProgressId(req.query.progressId), {
+      phase: 'error',
+      error: err.message,
+    });
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/brain/progress', (req, res) => {
+  const id = normalizeBrainProgressId(req.query.id);
+  const progress = id ? brainBuildProgress.get(id) : null;
+  res.set('Cache-Control', 'no-store');
+  res.json(progress || { phase: 'idle', done: true });
 });
 
 app.post('/api/brain/import-chat', (req, res) => {
@@ -2352,23 +2531,77 @@ app.post('/api/brain/import-chat', (req, res) => {
     }
 
     const workspaceDir = getWorkspaceDir();
-    const memoryDir = join(workspaceDir, 'memory');
-    if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
-    const fileName = safeBrainImportFilename(provider);
-    const relPath = `memory/${fileName}`;
-    const fullPath = join(memoryDir, fileName);
-    const markdown = renderBrainImportMarkdown({ provider, originalName, conversations });
-    writeFileSync(fullPath, markdown, 'utf8');
+    const importId = brainImportId(provider, text);
+    const importRoot = join(brainImportsDir(workspaceDir), safeBrainPathPart(provider), importId);
+    const rawDir = join(importRoot, 'raw');
+    const conversationsDir = join(importRoot, 'conversations');
+    const manifestPath = join(importRoot, 'manifest.json');
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+        const files = Array.isArray(manifest.files) ? manifest.files : [];
+        const filesExist = files.length > 0 && files.every((rel) => existsSync(join(importRoot, rel)));
+        if (filesExist) {
+          res.json({
+            ok: true,
+            reused: true,
+            importId,
+            provider,
+            providerLabel: brainImportProviderLabel(provider),
+            path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
+            conversations: Number(manifest.conversations) || conversations.length,
+            messages: Number(manifest.messages) || conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
+            files: files.length,
+            chars: Number(manifest.extractedChars) || 0,
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+    if (!existsSync(rawDir)) mkdirSync(rawDir, { recursive: true });
+    if (!existsSync(conversationsDir)) mkdirSync(conversationsDir, { recursive: true });
+
+    const rawName = safeBrainPathPart(originalName || `${provider}-export`, 'export') + '.raw.txt';
+    writeFileSync(join(rawDir, rawName), text, 'utf8');
+
+    let extractedChars = 0;
+    const files = [];
+    conversations.forEach((conversation, index) => {
+      const titlePart = safeBrainPathPart(conversation.title, `conversation-${index + 1}`);
+      const fileName = `${String(index + 1).padStart(4, '0')}-${titlePart}.md`;
+      const markdown = renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId });
+      writeFileSync(join(conversationsDir, fileName), markdown, 'utf8');
+      extractedChars += markdown.length;
+      files.push(`conversations/${fileName}`);
+    });
+
+    const manifest = {
+      importId,
+      provider,
+      providerLabel: brainImportProviderLabel(provider),
+      originalName,
+      contentHash: brainHashText(text),
+      importedAt: new Date().toISOString(),
+      raw: `raw/${rawName}`,
+      status: 'extracted',
+      conversations: conversations.length,
+      messages: conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
+      extractedChars,
+      files,
+    };
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     brainCloudCache.clear();
 
     res.json({
       ok: true,
+      importId,
       provider,
       providerLabel: brainImportProviderLabel(provider),
-      path: relPath,
+      path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
       conversations: conversations.length,
       messages: conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
-      chars: markdown.length,
+      files: files.length,
+      chars: extractedChars,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

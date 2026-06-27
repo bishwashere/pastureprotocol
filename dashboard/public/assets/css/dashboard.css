@@ -2139,6 +2139,14 @@
       color: var(--text);
       font-weight: 600;
     }
+    .brain-loading-detail {
+      min-height: 1rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
     .brain-loading-track {
       height: 0.42rem;
       overflow: hidden;
