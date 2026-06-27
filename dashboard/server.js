@@ -1809,7 +1809,6 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 
 // ---- Brain (LLM knowledge graph over memory + history) ----
 
-const BRAIN_CACHE_MS = 5 * 60 * 1000;
 const BRAIN_CORPUS_MAX_CHARS = 32_000;
 const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
 const BRAIN_LLM_CHUNK_CHARS = 9_000;
@@ -2817,9 +2816,6 @@ app.get('/api/brain/cloud', async (req, res) => {
     const qualityEnabled = normalizeBrainQualityEnabled(req.query.quality);
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const progressId = normalizeBrainProgressId(req.query.progressId);
-    const rawCacheKey = `${range}:${source}:raw`;
-    const qualityCacheKey = `${range}:${source}:quality`;
-    const responseCacheKey = qualityEnabled ? qualityCacheKey : rawCacheKey;
     brainDebugLog('cloud_request', {
       range,
       source,
@@ -2827,28 +2823,44 @@ app.get('/api/brain/cloud', async (req, res) => {
       refresh,
       progressId,
     });
-    if (refresh) {
-      brainCloudCache.delete(rawCacheKey);
-      if (qualityEnabled) brainCloudCache.delete(qualityCacheKey);
-    }
-    const cached = brainCloudCache.get(responseCacheKey);
-    const cachedHasTerms = Array.isArray(cached?.payload?.terms) && cached.payload.terms.length > 0;
-    const cachedHadNoCorpus = Number(cached?.payload?.stats?.chars || 0) === 0;
-    if (!refresh && cached && (cachedHasTerms || cachedHadNoCorpus) && Date.now() - cached.cachedAtMs < BRAIN_CACHE_MS) {
-      brainDebugLog('cloud_response_cache_hit', {
-        range,
-        source,
-        qualityMode: cached.payload?.qualityMode,
-        terms: Array.isArray(cached.payload?.terms) ? cached.payload.terms.length : 0,
-        connections: Array.isArray(cached.payload?.connections) ? cached.payload.connections.length : 0,
-      });
-      res.set('Cache-Control', 'no-store');
-      res.json({ ...cached.payload, cached: true });
-      return;
-    }
 
     setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
     const { corpus, stats } = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS });
+    const chunks = splitBrainCorpusForLlm(corpus);
+    const rawResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: false, chunks });
+    const qualityResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: true, chunks });
+    const responseCacheKey = qualityEnabled ? qualityResponseCacheKey : rawResponseCacheKey;
+    if (refresh) {
+      brainCloudCache.delete(rawResponseCacheKey);
+      brainCloudCache.delete(qualityResponseCacheKey);
+    }
+    const cachedMemory = refresh ? null : brainCloudCache.get(responseCacheKey)?.payload;
+    const cachedDisk = refresh || cachedMemory ? null : readBrainResponseCache(responseCacheKey);
+    const cachedPayload = cachedMemory || cachedDisk;
+    const cachedHasTerms = Array.isArray(cachedPayload?.terms) && cachedPayload.terms.length > 0;
+    const cachedHadNoCorpus = Number(cachedPayload?.stats?.chars || 0) === 0;
+    if (!refresh && cachedPayload && (cachedHasTerms || cachedHadNoCorpus)) {
+      brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload: cachedPayload });
+      brainDebugLog('cloud_response_cache_hit', {
+        range,
+        source,
+        qualityMode: cachedPayload?.qualityMode,
+        cache: cachedMemory ? 'memory' : 'disk',
+        terms: Array.isArray(cachedPayload?.terms) ? cachedPayload.terms.length : 0,
+        connections: Array.isArray(cachedPayload?.connections) ? cachedPayload.connections.length : 0,
+      });
+      finishBrainBuildProgress(progressId, {
+        phase: 'complete',
+        doneChunks: chunks.length,
+        totalChunks: chunks.length,
+        doneFiles: 0,
+        totalFiles: 0,
+        remainingFiles: 0,
+      });
+      res.set('Cache-Control', 'no-store');
+      res.json({ ...cachedPayload, cached: true });
+      return;
+    }
     if (!corpus.length) {
       const rawPayload = {
         range,
@@ -2866,7 +2878,8 @@ app.get('/api/brain/cloud', async (req, res) => {
           qualityDisabled: 1,
         },
       };
-      brainCloudCache.set(rawCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
+      brainCloudCache.set(rawResponseCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
+      writeBrainResponseCache(rawResponseCacheKey, rawPayload);
       const payload = qualityEnabled
         ? {
             ...rawPayload,
@@ -2879,6 +2892,7 @@ app.get('/api/brain/cloud', async (req, res) => {
           }
         : rawPayload;
       brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload });
+      writeBrainResponseCache(responseCacheKey, payload);
       brainDebugLog('cloud_response_empty_corpus', {
         range,
         source,
@@ -2901,6 +2915,7 @@ app.get('/api/brain/cloud', async (req, res) => {
       range,
       source,
       force: refresh,
+      chunks,
       onProgress: (progress) => setBrainBuildProgress(progressId, {
         ...progress,
         done: false,
@@ -2934,7 +2949,8 @@ app.get('/api/brain/cloud', async (req, res) => {
         qualityFailed: 0,
       },
     };
-    brainCloudCache.set(rawCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
+    brainCloudCache.set(rawResponseCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
+    writeBrainResponseCache(rawResponseCacheKey, rawPayload);
     let payload = rawPayload;
     if (qualityEnabled) {
       const finalGraph = await refineLlmBrainGraphQuality(dense, {
@@ -2965,7 +2981,8 @@ app.get('/api/brain/cloud', async (req, res) => {
           qualityFailed: finalGraph.qualityStats?.failed ? 1 : 0,
         },
       };
-      brainCloudCache.set(qualityCacheKey, { cachedAtMs: Date.now(), payload });
+      brainCloudCache.set(qualityResponseCacheKey, { cachedAtMs: Date.now(), payload });
+      writeBrainResponseCache(qualityResponseCacheKey, payload);
     } else {
       brainDebugLog('quality_skipped', {
         range,
