@@ -2800,94 +2800,124 @@ app.get('/api/brain/progress', (req, res) => {
   res.json(progress || { phase: 'idle', done: true });
 });
 
-app.post('/api/brain/import-chat', (req, res) => {
-  try {
-    const payload = decodeBrainImportPayload(req.body || {});
-    const provider = payload.provider;
-    const originalName = payload.filename;
-    const workspaceDir = getWorkspaceDir();
-    const importId = brainImportPayloadSignature(provider, payload.contentHash);
-    const importRoot = join(brainImportsDir(workspaceDir), safeBrainPathPart(provider), importId);
-    const rawDir = join(importRoot, 'raw');
-    const conversationsDir = join(importRoot, 'conversations');
-    const manifestPath = join(importRoot, 'manifest.json');
-    if (existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-        const files = Array.isArray(manifest.files) ? manifest.files : [];
-        const filesExist = files.length > 0 && files.every((rel) => existsSync(join(importRoot, rel)));
-        if (filesExist) {
-          res.json({
-            ok: true,
-            reused: true,
-            importId,
-            provider,
-            providerLabel: brainImportProviderLabel(provider),
-            path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
-            conversations: Number(manifest.conversations) || conversations.length,
-            messages: Number(manifest.messages) || conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
-            files: files.length,
-            chars: Number(manifest.extractedChars) || 0,
-          });
-          return;
-        }
-      } catch (_) {}
-    }
+function importBrainPayload(payload) {
+  const provider = payload.provider;
+  const originalName = payload.filename;
+  const workspaceDir = getWorkspaceDir();
+  const importId = brainImportPayloadSignature(provider, payload.contentHash);
+  const importRoot = join(brainImportsDir(workspaceDir), safeBrainPathPart(provider), importId);
+  const rawDir = join(importRoot, 'raw');
+  const conversationsDir = join(importRoot, 'conversations');
+  const manifestPath = join(importRoot, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const files = Array.isArray(manifest.files) ? manifest.files : [];
+      const filesExist = files.length > 0 && files.every((rel) => existsSync(join(importRoot, rel)));
+      if (filesExist) {
+        return {
+          ok: true,
+          reused: true,
+          importId,
+          provider,
+          providerLabel: brainImportProviderLabel(provider),
+          path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
+          conversations: Number(manifest.conversations) || files.length,
+          messages: Number(manifest.messages) || 0,
+          files: files.length,
+          chars: Number(manifest.extractedChars) || 0,
+        };
+      }
+    } catch (_) {}
+  }
 
-    const text = buildBrainImportTextFromPayload(payload);
-    const conversations = extractBrainImportConversations(provider, text);
-    if (!conversations.length) {
-      res.status(400).json({ error: 'No conversations were found in that import.' });
+  const text = buildBrainImportTextFromPayload(payload);
+  const conversations = extractBrainImportConversations(provider, text);
+  if (!conversations.length) {
+    const err = new Error('No conversations were found in that import.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!existsSync(rawDir)) mkdirSync(rawDir, { recursive: true });
+  if (!existsSync(conversationsDir)) mkdirSync(conversationsDir, { recursive: true });
+
+  const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
+  const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
+  writeFileSync(join(rawDir, rawName), payload.rawBuffer);
+
+  let extractedChars = 0;
+  const files = [];
+  conversations.forEach((conversation, index) => {
+    const titlePart = safeBrainPathPart(conversation.title, `conversation-${index + 1}`);
+    const fileName = `${String(index + 1).padStart(4, '0')}-${titlePart}.md`;
+    const markdown = renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId });
+    writeFileSync(join(conversationsDir, fileName), markdown, 'utf8');
+    extractedChars += markdown.length;
+    files.push(`conversations/${fileName}`);
+  });
+
+  const messages = conversations.reduce((sum, conv) => sum + conv.messages.length, 0);
+  const manifest = {
+    importId,
+    provider,
+    providerLabel: brainImportProviderLabel(provider),
+    originalName,
+    contentHash: payload.contentHash,
+    rawKind: payload.rawKind,
+    importedAt: new Date().toISOString(),
+    raw: `raw/${rawName}`,
+    status: 'extracted',
+    conversations: conversations.length,
+    messages,
+    extractedChars,
+    files,
+  };
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  brainCloudCache.clear();
+
+  return {
+    ok: true,
+    importId,
+    provider,
+    providerLabel: brainImportProviderLabel(provider),
+    path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
+    conversations: conversations.length,
+    messages,
+    files: files.length,
+    chars: extractedChars,
+  };
+}
+
+app.post('/api/brain/import-chat-file', express.raw({ type: 'application/octet-stream', limit: '180mb' }), (req, res) => {
+  try {
+    const filename = String(req.query.filename || '').trim().slice(0, 180);
+    const provider = normalizeBrainImportProvider(req.query.provider);
+    const contentType = String(req.query.contentType || '');
+    const rawBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!rawBuffer.length) {
+      res.status(400).json({ error: 'Choose an export file or paste a transcript first.' });
       return;
     }
-
-    if (!existsSync(rawDir)) mkdirSync(rawDir, { recursive: true });
-    if (!existsSync(conversationsDir)) mkdirSync(conversationsDir, { recursive: true });
-
-    const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
-    const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
-    writeFileSync(join(rawDir, rawName), payload.rawBuffer);
-
-    let extractedChars = 0;
-    const files = [];
-    conversations.forEach((conversation, index) => {
-      const titlePart = safeBrainPathPart(conversation.title, `conversation-${index + 1}`);
-      const fileName = `${String(index + 1).padStart(4, '0')}-${titlePart}.md`;
-      const markdown = renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId });
-      writeFileSync(join(conversationsDir, fileName), markdown, 'utf8');
-      extractedChars += markdown.length;
-      files.push(`conversations/${fileName}`);
-    });
-
-    const manifest = {
-      importId,
+    if (rawBuffer.length > BRAIN_IMPORT_MAX_INPUT_BYTES) {
+      res.status(413).json({ error: 'Import is too large for the dashboard. Try a smaller export file.' });
+      return;
+    }
+    res.json(importBrainPayload({
       provider,
-      providerLabel: brainImportProviderLabel(provider),
-      originalName,
-      contentHash: payload.contentHash,
-      rawKind: payload.rawKind,
-      importedAt: new Date().toISOString(),
-      raw: `raw/${rawName}`,
-      status: 'extracted',
-      conversations: conversations.length,
-      messages: conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
-      extractedChars,
-      files,
-    };
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-    brainCloudCache.clear();
+      filename,
+      rawBuffer,
+      rawKind: isBrainZipFileName(filename) || contentType.includes('zip') ? 'zip' : 'binary',
+      contentHash: brainHashBuffer(rawBuffer),
+    }));
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
 
-    res.json({
-      ok: true,
-      importId,
-      provider,
-      providerLabel: brainImportProviderLabel(provider),
-      path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
-      conversations: conversations.length,
-      messages: conversations.reduce((sum, conv) => sum + conv.messages.length, 0),
-      files: files.length,
-      chars: extractedChars,
-    });
+app.post('/api/brain/import-chat', (req, res) => {
+  try {
+    res.json(importBrainPayload(decodeBrainImportPayload(req.body || {})));
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
   }

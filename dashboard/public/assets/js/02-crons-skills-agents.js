@@ -3263,16 +3263,6 @@ function renderSystemCronVariant(row) {
       return name.endsWith('.zip') || type.indexOf('zip') >= 0;
     }
 
-    function arrayBufferToBase64(buffer) {
-      var bytes = new Uint8Array(buffer || new ArrayBuffer(0));
-      var chunkSize = 0x8000;
-      var out = '';
-      for (var i = 0; i < bytes.length; i += chunkSize) {
-        out += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-      }
-      return btoa(out);
-    }
-
     async function readBrainImportResponse(response) {
       var text = await response.text();
       var data = null;
@@ -3307,21 +3297,32 @@ function renderSystemCronVariant(row) {
         for (var i = 0; i < list.length; i++) {
           var file = list[i];
           setBrainImportStatus('Reading ' + (file.name || 'export') + '...');
-          var body = {
-            provider: guessBrainImportProvider(file.name),
-            filename: file.name || '',
-            contentType: file.type || '',
-          };
+          var provider = guessBrainImportProvider(file.name);
+          var r;
           if (isBrainZipImportFile(file)) {
-            body.contentBase64 = arrayBufferToBase64(await file.arrayBuffer());
+            setBrainImportStatus('Uploading ' + (file.name || 'export') + '...');
+            var uploadUrl = API + '/api/brain/import-chat-file' +
+              '?provider=' + encodeURIComponent(provider) +
+              '&filename=' + encodeURIComponent(file.name || '') +
+              '&contentType=' + encodeURIComponent(file.type || 'application/zip');
+            r = await fetch(uploadUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/octet-stream' },
+              body: file,
+            });
           } else {
-            body.content = await file.text();
+            var body = {
+              provider: provider,
+              filename: file.name || '',
+              contentType: file.type || '',
+              content: await file.text(),
+            };
+            r = await fetch(API + '/api/brain/import-chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
           }
-          var r = await fetch(API + '/api/brain/import-chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
           var d = await readBrainImportResponse(r);
           if (d.reused) reused += 1;
           imported += Number(d.conversations || 0);
