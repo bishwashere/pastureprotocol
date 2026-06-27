@@ -10,8 +10,8 @@ import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
-import { spawn, execSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
+import { spawn, execSync, execFileSync } from 'child_process';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
 import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent/agent-avatar.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText, CHAT_LOG_DAY_PREFIX } from '../lib/context/chat-log.js';
@@ -47,7 +47,7 @@ import {
   approvePendingProposal,
   rejectPendingProposal,
 } from '../lib/context/project-workflow-pending.js';
-import { generateBrainChunkGraph } from '../lib/agent/brain-word-cloud.js';
+import { generateBrainChunkGraph, refineBrainGraphQuality } from '../lib/agent/brain-word-cloud.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -56,7 +56,7 @@ const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || 3847;
 const HOST = process.env.PASTURE_DASHBOARD_HOST || '127.0.0.1';
 
 const app = express();
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '260mb' }));
 ensureMainAgentInitialized();
 
 // Block dashboard UI when accessed via Tailscale (*.ts.net) — API only over Tailscale.
@@ -1815,13 +1815,21 @@ const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
 const BRAIN_LLM_CHUNK_CHARS = 9_000;
 const BRAIN_LLM_MAX_CHUNKS = 160;
 const BRAIN_LLM_CACHE_VERSION = 1;
-const BRAIN_IMPORT_MAX_INPUT_CHARS = 20 * 1024 * 1024;
+const BRAIN_QUALITY_CACHE_VERSION = 1;
+const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
+const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
+const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
+const BRAIN_IMPORT_TEXT_EXTENSIONS = new Set(['.json', '.txt', '.md', '.csv', '.html', '.htm']);
 const BRAIN_IMPORT_PROVIDERS = new Set(['chatgpt', 'grok', 'claude', 'gemini', 'perplexity', 'copilot', 'other']);
 const brainCloudCache = new Map();
 const brainBuildProgress = new Map();
 
 function brainHashText(value) {
   return createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function brainHashBuffer(value) {
+  return createHash('sha256').update(value || Buffer.alloc(0)).digest('hex');
 }
 
 function brainCurrentLocalDate() {
@@ -1864,6 +1872,36 @@ function brainLlmCacheDir() {
 
 function brainLlmChunkCachePath(key) {
   return join(brainLlmCacheDir(), key.slice(0, 2), `${key}.json`);
+}
+
+function brainQualityCacheDir() {
+  return join(getStateDir(), 'brain-quality-cache', `v${BRAIN_QUALITY_CACHE_VERSION}`);
+}
+
+function brainQualityCachePath(key) {
+  return join(brainQualityCacheDir(), key.slice(0, 2), `${key}.json`);
+}
+
+function readBrainQualityCache(key) {
+  const path = brainQualityCachePath(key);
+  try {
+    if (!existsSync(path)) return null;
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Array.isArray(parsed?.terms) || !Array.isArray(parsed?.connections)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeBrainQualityCache(key, payload) {
+  const path = brainQualityCachePath(key);
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(path, JSON.stringify({
+    cachedAtMs: Date.now(),
+    ...payload,
+  }, null, 2), 'utf8');
 }
 
 function readBrainLlmChunkCache(key) {
@@ -1926,6 +1964,11 @@ function normalizeBrainSource(value) {
   return v === 'memory' || v === 'notes' || v === 'history' || v === 'all' ? v : 'all';
 }
 
+function normalizeBrainQualityEnabled(value) {
+  const v = String(value ?? '1').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'off' || v === 'no');
+}
+
 function normalizeBrainImportProvider(value) {
   const v = String(value || 'other').trim().toLowerCase();
   return BRAIN_IMPORT_PROVIDERS.has(v) ? v : 'other';
@@ -1958,6 +2001,130 @@ function brainImportsDir(workspaceDir = getWorkspaceDir()) {
 
 function brainImportId(provider, text) {
   return brainHashText(`${provider}\n${text}`).slice(0, 24);
+}
+
+function brainImportPayloadSignature(provider, contentHash) {
+  return brainImportId(provider, contentHash);
+}
+
+function isBrainZipFileName(name) {
+  return /\.zip$/i.test(String(name || '').trim());
+}
+
+function isReadableBrainImportEntry(name) {
+  const lower = String(name || '').toLowerCase();
+  if (!lower || lower.endsWith('/')) return false;
+  if (lower.includes('__macosx/') || lower.includes('/.')) return false;
+  return Array.from(BRAIN_IMPORT_TEXT_EXTENSIONS).some((ext) => lower.endsWith(ext));
+}
+
+function stripHtmlForBrainImport(text) {
+  return String(text || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function decodeBrainImportPayload(body) {
+  const filename = String(body?.filename || '').trim().slice(0, 180);
+  const provider = normalizeBrainImportProvider(body?.provider);
+  const contentBase64 = String(body?.contentBase64 || '');
+  if (contentBase64) {
+    const rawBuffer = Buffer.from(contentBase64, 'base64');
+    if (!rawBuffer.length) throw new Error('Choose an export file or paste a transcript first.');
+    if (rawBuffer.length > BRAIN_IMPORT_MAX_INPUT_BYTES) {
+      const sizeMb = Math.round(BRAIN_IMPORT_MAX_INPUT_BYTES / 1024 / 1024);
+      const err = new Error(`Import is too large for the dashboard. Try an export under ${sizeMb} MB.`);
+      err.statusCode = 413;
+      throw err;
+    }
+    return {
+      provider,
+      filename,
+      rawBuffer,
+      rawKind: isBrainZipFileName(filename) || String(body?.contentType || '').includes('zip') ? 'zip' : 'binary',
+      contentHash: brainHashBuffer(rawBuffer),
+    };
+  }
+
+  const text = String(body?.content || '');
+  if (!text.trim()) throw new Error('Choose an export file or paste a transcript first.');
+  if (text.length > BRAIN_IMPORT_MAX_INPUT_CHARS) {
+    const err = new Error('Import is too large for the dashboard. Try a smaller export file.');
+    err.statusCode = 413;
+    throw err;
+  }
+  return {
+    provider,
+    filename,
+    rawText: text,
+    rawBuffer: Buffer.from(text, 'utf8'),
+    rawKind: 'text',
+    contentHash: brainHashText(text),
+  };
+}
+
+function extractBrainZipTextEntries(zipBuffer) {
+  const tmpRoot = join(getStateDir(), 'tmp');
+  if (!existsSync(tmpRoot)) mkdirSync(tmpRoot, { recursive: true });
+  const tmpDir = mkdtempSync(join(tmpRoot, 'brain-import-'));
+  const zipPath = join(tmpDir, 'import.zip');
+  try {
+    writeFileSync(zipPath, zipBuffer);
+    const listing = execFileSync('unzip', ['-Z1', zipPath], {
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    const names = listing.split(/\r?\n/).map((name) => name.trim()).filter(isReadableBrainImportEntry);
+    const ordered = names.sort((a, b) => {
+      const aConversations = /(^|\/)conversations\.json$/i.test(a) ? 0 : 1;
+      const bConversations = /(^|\/)conversations\.json$/i.test(b) ? 0 : 1;
+      return aConversations - bConversations || a.localeCompare(b);
+    });
+    const entries = [];
+    let remaining = BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS;
+    for (const name of ordered) {
+      if (remaining <= 0) break;
+      const buf = execFileSync('unzip', ['-p', zipPath, name], {
+        encoding: 'buffer',
+        maxBuffer: Math.min(BRAIN_IMPORT_MAX_INPUT_BYTES, remaining + 1024 * 1024),
+      });
+      let text = buf.toString('utf8').replace(/\u0000/g, '').trim();
+      if (!text) continue;
+      if (/\.html?$/i.test(name)) text = stripHtmlForBrainImport(text);
+      if (!text) continue;
+      if (text.length > remaining) text = text.slice(0, remaining);
+      entries.push({ name, text });
+      remaining -= text.length;
+    }
+    return entries;
+  } finally {
+    try {
+      rmSync(tmpDir, { recursive: true, force: true });
+    } catch (_) {}
+  }
+}
+
+function buildBrainImportTextFromPayload(payload) {
+  if (payload.rawKind !== 'zip') return payload.rawText || payload.rawBuffer.toString('utf8');
+  const entries = extractBrainZipTextEntries(payload.rawBuffer);
+  if (!entries.length) {
+    const err = new Error('No readable chat export files were found inside that ZIP.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const grokBackend = entries.find((entry) => /(^|\/)prod-grok-backend\.json$/i.test(entry.name));
+  if (grokBackend) return grokBackend.text;
+  const conversationsJson = entries.find((entry) => /(^|\/)conversations\.json$/i.test(entry.name));
+  if (conversationsJson) return conversationsJson.text;
+  return entries.map((entry) => `# File: ${entry.name}\n\n${entry.text}`).join('\n\n');
 }
 
 function stringifyChatContent(value) {
@@ -2009,6 +2176,47 @@ function extractChatGptConversation(conv, index) {
   return { title, messages: rows.map(({ role, text }) => ({ role, text })) };
 }
 
+function grokDateMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  const longValue = value?.$date?.$numberLong ?? value?.$numberLong;
+  if (longValue != null) {
+    const n = Number(longValue);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function extractGrokConversation(item, index) {
+  const conv = item?.conversation && typeof item.conversation === 'object' ? item.conversation : item;
+  const title = normalizeConversationTitle(conv?.title || conv?.summary, `Grok conversation ${index + 1}`);
+  const responseList = Array.isArray(item?.responses)
+    ? item.responses
+    : Array.isArray(conv?.responses)
+      ? conv.responses
+      : Array.isArray(conv?.messages)
+        ? conv.messages
+        : [];
+  const rows = responseList
+    .map((wrapper) => {
+      const response = wrapper?.response && typeof wrapper.response === 'object' ? wrapper.response : wrapper;
+      const text = stringifyChatContent(response?.message ?? response?.content ?? response?.text);
+      if (!text) return null;
+      return {
+        role: normalizeChatRole(response?.sender || response?.role || response?.author),
+        text,
+        ts: grokDateMs(response?.create_time || response?.created_at || response?.timestamp),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  return { title, messages: rows.map(({ role, text }) => ({ role, text })) };
+}
+
 function extractGenericConversation(conv, index) {
   const title = normalizeConversationTitle(conv?.title || conv?.name || conv?.conversation_title, `Conversation ${index + 1}`);
   const messageList = Array.isArray(conv?.messages)
@@ -2040,10 +2248,15 @@ function extractBrainImportConversations(provider, text) {
     const root = Array.isArray(parsed) ? parsed : Array.isArray(parsed.conversations) ? parsed.conversations : null;
     if (root) {
       const conversations = root.map((conv, index) => {
+        if (provider === 'grok' && (conv?.conversation || Array.isArray(conv?.responses))) return extractGrokConversation(conv, index);
         if (conv?.mapping) return extractChatGptConversation(conv, index);
         return extractGenericConversation(conv, index);
       }).filter((conv) => conv.messages.length > 0);
       if (conversations.length) return conversations;
+    }
+    if (provider === 'grok' && (parsed.conversation || Array.isArray(parsed.responses))) {
+      const grokSingle = extractGrokConversation(parsed, 0);
+      if (grokSingle.messages.length) return [grokSingle];
     }
     const single = extractGenericConversation(parsed, 0);
     if (single.messages.length) return [single];
@@ -2417,13 +2630,69 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress } = {}) {
   return { terms, connections, llmStats: stats };
 }
 
+async function refineLlmBrainGraphQuality(graph, { range, source, stats, onProgress } = {}) {
+  const qualityInput = {
+    version: BRAIN_QUALITY_CACHE_VERSION,
+    range,
+    source,
+    stats: {
+      memoryFiles: stats?.memoryFiles || 0,
+      noteFiles: stats?.noteFiles || 0,
+      importFiles: stats?.importFiles || 0,
+      historyDays: stats?.historyDays || 0,
+      exchanges: stats?.exchanges || 0,
+    },
+    terms: (graph.terms || []).slice(0, 260),
+    connections: (graph.connections || []).slice(0, 900),
+  };
+  const cacheKey = brainHashText(JSON.stringify(qualityInput));
+  const cached = readBrainQualityCache(cacheKey);
+  if (cached) {
+    return {
+      terms: cached.terms,
+      connections: cached.connections,
+      qualityStats: { cached: true, generated: false },
+    };
+  }
+
+  if (onProgress) onProgress({ phase: 'quality' });
+  const refined = await refineBrainGraphQuality({
+    range,
+    source,
+    stats,
+    graph: {
+      terms: qualityInput.terms,
+      connections: qualityInput.connections,
+    },
+  });
+
+  if (refined?.terms?.length) {
+    writeBrainQualityCache(cacheKey, {
+      terms: refined.terms,
+      connections: refined.connections || [],
+    });
+    return {
+      terms: refined.terms,
+      connections: refined.connections || [],
+      qualityStats: { cached: false, generated: true },
+    };
+  }
+
+  return {
+    terms: graph.terms || [],
+    connections: graph.connections || [],
+    qualityStats: { cached: false, generated: false, failed: true },
+  };
+}
+
 app.get('/api/brain/cloud', async (req, res) => {
   try {
     const range = normalizeBrainRange(req.query.range);
     const source = normalizeBrainSource(req.query.source);
+    const qualityEnabled = normalizeBrainQualityEnabled(req.query.quality);
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const progressId = normalizeBrainProgressId(req.query.progressId);
-    const cacheKey = `${range}:${source}`;
+    const cacheKey = `${range}:${source}:quality-${qualityEnabled ? 'on' : 'off'}`;
     if (refresh) brainCloudCache.delete(cacheKey);
     const cached = brainCloudCache.get(cacheKey);
     const cachedHasTerms = Array.isArray(cached?.payload?.terms) && cached.payload.terms.length > 0;
@@ -2440,6 +2709,7 @@ app.get('/api/brain/cloud', async (req, res) => {
       const payload = {
         range,
         source,
+        qualityEnabled,
         updatedAtMs: Date.now(),
         terms: [],
         stats,
@@ -2466,20 +2736,40 @@ app.get('/api/brain/cloud', async (req, res) => {
         done: false,
       }),
     });
+    const finalGraph = qualityEnabled
+      ? await refineLlmBrainGraphQuality(dense, {
+          range,
+          source,
+          stats,
+          onProgress: (progress) => setBrainBuildProgress(progressId, {
+            ...progress,
+            done: false,
+          }),
+        })
+      : {
+          terms: dense.terms || [],
+          connections: dense.connections || [],
+          qualityStats: { disabled: true },
+        };
     const payload = {
       range,
       source,
+      qualityEnabled,
       updatedAtMs: Date.now(),
-      terms: dense.terms,
-      connections: dense.connections,
-      denseTerms: dense.terms,
-      denseConnections: dense.connections,
+      terms: finalGraph.terms,
+      connections: finalGraph.connections,
+      denseTerms: finalGraph.terms,
+      denseConnections: finalGraph.connections,
       stats: {
         ...stats,
         llmChunks: dense.llmStats?.chunks || 0,
         llmCacheHits: dense.llmStats?.cacheHits || 0,
         llmGenerated: dense.llmStats?.generated || 0,
         llmFailed: dense.llmStats?.failed || 0,
+        qualityDisabled: finalGraph.qualityStats?.disabled ? 1 : 0,
+        qualityCached: finalGraph.qualityStats?.cached ? 1 : 0,
+        qualityGenerated: finalGraph.qualityStats?.generated ? 1 : 0,
+        qualityFailed: finalGraph.qualityStats?.failed ? 1 : 0,
       },
     };
     brainCloudCache.set(cacheKey, { cachedAtMs: Date.now(), payload });
@@ -2512,26 +2802,11 @@ app.get('/api/brain/progress', (req, res) => {
 
 app.post('/api/brain/import-chat', (req, res) => {
   try {
-    const provider = normalizeBrainImportProvider(req.body?.provider);
-    const text = String(req.body?.content || '');
-    const originalName = String(req.body?.filename || '').trim().slice(0, 180);
-    if (!text.trim()) {
-      res.status(400).json({ error: 'Choose an export file or paste a transcript first.' });
-      return;
-    }
-    if (text.length > BRAIN_IMPORT_MAX_INPUT_CHARS) {
-      res.status(413).json({ error: 'Import is too large for the dashboard. Try a smaller export file.' });
-      return;
-    }
-
-    const conversations = extractBrainImportConversations(provider, text);
-    if (!conversations.length) {
-      res.status(400).json({ error: 'No conversations were found in that import.' });
-      return;
-    }
-
+    const payload = decodeBrainImportPayload(req.body || {});
+    const provider = payload.provider;
+    const originalName = payload.filename;
     const workspaceDir = getWorkspaceDir();
-    const importId = brainImportId(provider, text);
+    const importId = brainImportPayloadSignature(provider, payload.contentHash);
     const importRoot = join(brainImportsDir(workspaceDir), safeBrainPathPart(provider), importId);
     const rawDir = join(importRoot, 'raw');
     const conversationsDir = join(importRoot, 'conversations');
@@ -2558,11 +2833,20 @@ app.post('/api/brain/import-chat', (req, res) => {
         }
       } catch (_) {}
     }
+
+    const text = buildBrainImportTextFromPayload(payload);
+    const conversations = extractBrainImportConversations(provider, text);
+    if (!conversations.length) {
+      res.status(400).json({ error: 'No conversations were found in that import.' });
+      return;
+    }
+
     if (!existsSync(rawDir)) mkdirSync(rawDir, { recursive: true });
     if (!existsSync(conversationsDir)) mkdirSync(conversationsDir, { recursive: true });
 
-    const rawName = safeBrainPathPart(originalName || `${provider}-export`, 'export') + '.raw.txt';
-    writeFileSync(join(rawDir, rawName), text, 'utf8');
+    const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
+    const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
+    writeFileSync(join(rawDir, rawName), payload.rawBuffer);
 
     let extractedChars = 0;
     const files = [];
@@ -2580,7 +2864,8 @@ app.post('/api/brain/import-chat', (req, res) => {
       provider,
       providerLabel: brainImportProviderLabel(provider),
       originalName,
-      contentHash: brainHashText(text),
+      contentHash: payload.contentHash,
+      rawKind: payload.rawKind,
       importedAt: new Date().toISOString(),
       raw: `raw/${rawName}`,
       status: 'extracted',
@@ -2604,7 +2889,7 @@ app.post('/api/brain/import-chat', (req, res) => {
       chars: extractedChars,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 

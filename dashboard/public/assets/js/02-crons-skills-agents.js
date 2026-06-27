@@ -2565,6 +2565,7 @@ function renderSystemCronVariant(row) {
       visibleWords: 0,
       minFont: 10,
       maxFont: 46,
+      qualityLayer: true,
     };
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
@@ -2588,6 +2589,7 @@ function renderSystemCronVariant(row) {
         visibleWords: clampBrainNumber(saved.visibleWords, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
         minFont: clampBrainNumber(saved.minFont, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(saved.maxFont, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
+        qualityLayer: saved.qualityLayer !== false,
       };
     }
 
@@ -3095,6 +3097,9 @@ function renderSystemCronVariant(row) {
         stats.llmChunks ? stats.llmChunks + ' chunks' : '',
         stats.llmCacheHits ? stats.llmCacheHits + ' cached' : '',
         stats.llmGenerated ? stats.llmGenerated + ' generated' : '',
+        stats.qualityDisabled ? 'quality off' : '',
+        stats.qualityCached ? 'quality cached' : '',
+        stats.qualityGenerated ? 'quality refined' : '',
         terms.length ? visibleCount + ' visible words' : '',
       ].filter(Boolean).join(' · ');
       if (meta) meta.textContent = sourceCount || 'No memory or history found';
@@ -3216,7 +3221,10 @@ function renderSystemCronVariant(row) {
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
-        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) + '&source=' + encodeURIComponent(source) + '&progressId=' + encodeURIComponent(progressId);
+        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) +
+          '&source=' + encodeURIComponent(source) +
+          '&quality=' + (brainSettings.qualityLayer ? '1' : '0') +
+          '&progressId=' + encodeURIComponent(progressId);
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
         var r = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
         var d = await r.json();
@@ -3249,6 +3257,40 @@ function renderSystemCronVariant(row) {
       return 'other';
     }
 
+    function isBrainZipImportFile(file) {
+      var name = String(file && file.name || '').toLowerCase();
+      var type = String(file && file.type || '').toLowerCase();
+      return name.endsWith('.zip') || type.indexOf('zip') >= 0;
+    }
+
+    function arrayBufferToBase64(buffer) {
+      var bytes = new Uint8Array(buffer || new ArrayBuffer(0));
+      var chunkSize = 0x8000;
+      var out = '';
+      for (var i = 0; i < bytes.length; i += chunkSize) {
+        out += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(out);
+    }
+
+    async function readBrainImportResponse(response) {
+      var text = await response.text();
+      var data = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
+        var clean = text
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        data = { error: clean || 'Import failed' };
+      }
+      if (!response.ok) throw new Error(data.error || 'Import failed');
+      return data;
+    }
+
     async function importBrainFiles(files) {
       var submit = document.getElementById('brain-import-submit');
       var input = document.getElementById('brain-import-file');
@@ -3265,18 +3307,22 @@ function renderSystemCronVariant(row) {
         for (var i = 0; i < list.length; i++) {
           var file = list[i];
           setBrainImportStatus('Reading ' + (file.name || 'export') + '...');
-          var content = await file.text();
+          var body = {
+            provider: guessBrainImportProvider(file.name),
+            filename: file.name || '',
+            contentType: file.type || '',
+          };
+          if (isBrainZipImportFile(file)) {
+            body.contentBase64 = arrayBufferToBase64(await file.arrayBuffer());
+          } else {
+            body.content = await file.text();
+          }
           var r = await fetch(API + '/api/brain/import-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              provider: guessBrainImportProvider(file.name),
-              filename: file.name || '',
-              content: content,
-            }),
+            body: JSON.stringify(body),
           });
-          var d = await r.json();
-          if (!r.ok) throw new Error(d.error || 'Import failed');
+          var d = await readBrainImportResponse(r);
           if (d.reused) reused += 1;
           imported += Number(d.conversations || 0);
           messages += Number(d.messages || 0);
@@ -3306,25 +3352,34 @@ function renderSystemCronVariant(row) {
         var el = document.getElementById(pair[0]);
         if (el) el.value = String(pair[1]);
       });
+      var quality = document.getElementById('brain-setting-quality');
+      if (quality) quality.checked = brainSettings.qualityLayer !== false;
     }
 
     function readBrainSettingsInputs() {
+      var previousQuality = brainSettings.qualityLayer !== false;
       var direct = document.getElementById('brain-setting-direct');
       var second = document.getElementById('brain-setting-second');
       var words = document.getElementById('brain-setting-words');
       var minFont = document.getElementById('brain-setting-min-font');
       var maxFont = document.getElementById('brain-setting-max-font');
+      var quality = document.getElementById('brain-setting-quality');
       brainSettings = {
         directRelations: clampBrainNumber(direct && direct.value, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
         secondRelations: clampBrainNumber(second && second.value, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
         visibleWords: clampBrainNumber(words && words.value, BRAIN_SETTINGS_DEFAULTS.visibleWords, 0, 2600),
         minFont: clampBrainNumber(minFont && minFont.value, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(maxFont && maxFont.value, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
+        qualityLayer: quality ? !!quality.checked : BRAIN_SETTINGS_DEFAULTS.qualityLayer,
       };
       if (brainSettings.maxFont <= brainSettings.minFont) brainSettings.maxFont = brainSettings.minFont + 4;
       saveBrainSettings();
       setBrainSettingsInputs();
-      rerenderBrainCloud();
+      if ((brainSettings.qualityLayer !== false) !== previousQuality) {
+        fetchBrainCloud(true);
+      } else {
+        rerenderBrainCloud();
+      }
     }
 
     function toggleBrainSettingsPanel(forceOpen) {
@@ -3346,7 +3401,7 @@ function renderSystemCronVariant(row) {
     wireEl('brain-settings-panel', 'click', function (e) {
       if (e) e.stopPropagation();
     });
-    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
+    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font', 'brain-setting-quality'].forEach(function (id) {
       wireEl(id, 'change', readBrainSettingsInputs);
       wireEl(id, 'input', readBrainSettingsInputs);
     });
@@ -3357,10 +3412,11 @@ function renderSystemCronVariant(row) {
         visibleWords: BRAIN_SETTINGS_DEFAULTS.visibleWords,
         minFont: BRAIN_SETTINGS_DEFAULTS.minFont,
         maxFont: BRAIN_SETTINGS_DEFAULTS.maxFont,
+        qualityLayer: BRAIN_SETTINGS_DEFAULTS.qualityLayer,
       };
       saveBrainSettings();
       setBrainSettingsInputs();
-      rerenderBrainCloud();
+      fetchBrainCloud(true);
     });
     document.addEventListener('click', function (event) {
       var panel = document.getElementById('brain-settings-panel');
