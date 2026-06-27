@@ -2570,6 +2570,8 @@ function renderSystemCronVariant(row) {
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
     var brainLoadingTimer = null;
+    var brainCloudAbortController = null;
+    var brainCloudRequestSeq = 0;
     var BRAIN_MIN_VISIBLE_CONNECTIONS = 5;
 
     function clampBrainNumber(value, fallback, min, max) {
@@ -2597,6 +2599,12 @@ function renderSystemCronVariant(row) {
       try {
         localStorage.setItem('brainMeshSettings', JSON.stringify(brainSettings));
       } catch (_) {}
+    }
+
+    function getBrainQualityEnabled() {
+      var quality = document.getElementById('brain-setting-quality');
+      if (quality) return !!quality.checked;
+      return brainSettings.qualityLayer !== false;
     }
 
     function rerenderBrainCloud() {
@@ -3209,6 +3217,11 @@ function renderSystemCronVariant(row) {
     async function fetchBrainCloud(refresh) {
       var cloud = document.getElementById('brain-cloud');
       if (!cloud) return;
+      if (brainCloudAbortController) {
+        try { brainCloudAbortController.abort(); } catch (_) {}
+      }
+      var requestSeq = ++brainCloudRequestSeq;
+      brainCloudAbortController = window.AbortController ? new AbortController() : null;
       var rangeEl = document.getElementById('brain-range');
       var sourceEl = document.getElementById('brain-source');
       var range = rangeEl ? rangeEl.value : 'all';
@@ -3221,21 +3234,32 @@ function renderSystemCronVariant(row) {
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
+        var qualityEnabled = getBrainQualityEnabled();
+        brainSettings.qualityLayer = qualityEnabled;
+        saveBrainSettings();
         var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) +
           '&source=' + encodeURIComponent(source) +
-          '&quality=' + (brainSettings.qualityLayer ? '1' : '0') +
+          '&quality=' + (qualityEnabled ? '1' : '0') +
           '&progressId=' + encodeURIComponent(progressId);
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
-        var r = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
+        var r = await fetch(url, {
+          cache: refresh ? 'no-store' : 'default',
+          signal: brainCloudAbortController ? brainCloudAbortController.signal : undefined,
+        });
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
+        if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
         renderBrainCloud(d);
       } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
         cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
         var meta = document.getElementById('brain-meta');
         if (meta) meta.textContent = e && e.message ? e.message : 'Request failed';
+      } finally {
+        if (requestSeq === brainCloudRequestSeq) brainCloudAbortController = null;
       }
     }
 
@@ -3402,10 +3426,11 @@ function renderSystemCronVariant(row) {
     wireEl('brain-settings-panel', 'click', function (e) {
       if (e) e.stopPropagation();
     });
-    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font', 'brain-setting-quality'].forEach(function (id) {
+    ['brain-setting-direct', 'brain-setting-second', 'brain-setting-words', 'brain-setting-min-font', 'brain-setting-max-font'].forEach(function (id) {
       wireEl(id, 'change', readBrainSettingsInputs);
       wireEl(id, 'input', readBrainSettingsInputs);
     });
+    wireEl('brain-setting-quality', 'change', readBrainSettingsInputs);
     wireEl('brain-settings-reset', 'click', function () {
       brainSettings = {
         directRelations: BRAIN_SETTINGS_DEFAULTS.directRelations,

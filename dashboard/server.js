@@ -2736,6 +2736,7 @@ app.get('/api/brain/cloud', async (req, res) => {
         done: false,
       }),
     });
+    if (req.aborted || req.destroyed || res.destroyed) return;
     const finalGraph = qualityEnabled
       ? await refineLlmBrainGraphQuality(dense, {
           range,
