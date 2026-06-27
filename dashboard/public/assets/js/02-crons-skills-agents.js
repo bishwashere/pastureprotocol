@@ -2814,6 +2814,7 @@ function renderSystemCronVariant(row) {
       var graph = brainConnectionGraph(connections);
       var directLimit = brainSettings.directRelations;
       var secondLimit = brainSettings.secondRelations;
+      var thirdLimit = Math.max(8, Math.min(60, brainSettings.secondRelations || 18));
       var direct = (graph[selectedText] || []).slice(0, directLimit);
       direct.forEach(function (n) {
         map[n.text] = {
@@ -2839,6 +2840,7 @@ function renderSystemCronVariant(row) {
               evidence: Math.min(Number(n.evidence) || 0, Number(second.evidence) || 0),
               decay: Math.max(Number(n.decay) || 0, Number(second.decay) || 0),
               via: n.text,
+              routeKey: n.text,
             };
           }
         });
@@ -2849,6 +2851,37 @@ function renderSystemCronVariant(row) {
           return b.rel.strength - a.rel.strength || a.text.localeCompare(b.text);
         })
         .slice(0, secondLimit)
+        .forEach(function (item) {
+          map[item.text] = item.rel;
+        });
+      var thirdCandidates = {};
+      Object.keys(secondCandidates).forEach(function (secondText) {
+        var secondRel = secondCandidates[secondText];
+        if (!map[secondText] || map[secondText].depth !== 2) return;
+        (graph[secondText] || []).slice(0, Math.max(4, Math.min(18, directLimit))).forEach(function (third) {
+          if (third.text === selectedText) return;
+          if (map[third.text] && map[third.text].depth <= 2) return;
+          var strength = Math.round(Math.min(secondRel.strength, third.strength) * 0.62);
+          var prev = thirdCandidates[third.text];
+          if (!prev || strength > prev.strength) {
+            thirdCandidates[third.text] = {
+              depth: 3,
+              strength: strength,
+              weight: Math.min(Number(secondRel.weight) || 0, Number(third.weight) || 0),
+              evidence: Math.min(Number(secondRel.evidence) || 0, Number(third.evidence) || 0),
+              decay: Math.max(Number(secondRel.decay) || 0, Number(third.decay) || 0),
+              via: secondText,
+              routeKey: secondRel.routeKey || secondRel.via || secondText,
+            };
+          }
+        });
+      });
+      Object.keys(thirdCandidates)
+        .map(function (text) { return { text: text, rel: thirdCandidates[text] }; })
+        .sort(function (a, b) {
+          return b.rel.strength - a.rel.strength || a.text.localeCompare(b.text);
+        })
+        .slice(0, thirdLimit)
         .forEach(function (item) {
           map[item.text] = item.rel;
         });
@@ -2906,14 +2939,16 @@ function renderSystemCronVariant(row) {
       };
     }
 
-    function brainHoverFont(pos, rel) {
+    function brainHoverFont(pos, rel, focusMode) {
       if (!rel) return Math.max(8.5, Math.min(12, pos.font * 0.42));
       var strength = Math.max(1, Math.min(100, Number(rel.strength) || 1));
       var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
       var target;
-      if (rel.depth === 0) target = 52;
-      else if (rel.depth === 1) target = 18 + Math.pow(strength / 100, 0.58) * 28;
-      else if (rel.depth === 2) target = 11 + Math.pow(strength / 100, 0.7) * 14;
+      var pathFocus = focusMode === 'path';
+      if (rel.depth === 0) target = pathFocus ? 30 : 52;
+      else if (rel.depth === 1) target = (pathFocus ? 14 : 18) + Math.pow(strength / 100, 0.58) * (pathFocus ? 18 : 28);
+      else if (rel.depth === 2) target = (pathFocus ? 10 : 11) + Math.pow(strength / 100, 0.7) * (pathFocus ? 9 : 14);
+      else if (rel.depth === 3) target = (pathFocus ? 8.5 : 9) + Math.pow(strength / 100, 0.72) * (pathFocus ? 5 : 9);
       else target = Math.max(8.5, Math.min(12, pos.font * 0.42));
       return pos.font + (target - pos.font) * presence;
     }
@@ -2923,7 +2958,7 @@ function renderSystemCronVariant(row) {
       return !!(blended && blended.depth === 0 && (blended.presence == null || blended.presence > 0.35));
     }
 
-    function brainLinePresence(relA, relB, selectedText) {
+    function brainLinePresence(relA, relB, selectedText, textA, textB) {
       if (!selectedText || !relA || !relB) return { visible: false, primary: false, presence: 0 };
       var aPresence = relA.presence == null ? 1 : Math.max(0, Math.min(1, Number(relA.presence) || 0));
       var bPresence = relB.presence == null ? 1 : Math.max(0, Math.min(1, Number(relB.presence) || 0));
@@ -2931,8 +2966,13 @@ function renderSystemCronVariant(row) {
       var primary = (relA.depth === 0 && relB.depth === 0)
         || (relA.depth === 0 && relB.depth === 1)
         || (relB.depth === 0 && relA.depth === 1);
-      var secondary = (relA.depth === 1 && relB.depth === 2 && relB.via) || (relB.depth === 1 && relA.depth === 2 && relA.via);
-      return { visible: primary || secondary, primary: primary, presence: presence };
+      var secondary = (relA.depth === 1 && relB.depth === 2 && relB.via === textA)
+        || (relB.depth === 1 && relA.depth === 2 && relA.via === textB);
+      var tertiary = (relA.depth === 2 && relB.depth === 3 && relB.via === textA)
+        || (relB.depth === 2 && relA.depth === 3 && relA.via === textB);
+      var sharedRoute = !!(relA.routeKey && relB.routeKey && relA.routeKey === relB.routeKey);
+      var tier = primary ? 1 : secondary ? 2 : tertiary ? 3 : 0;
+      return { visible: !!tier, primary: primary, tier: tier, sharedRoute: sharedRoute, presence: presence };
     }
 
     function brainEase(t) {
@@ -2972,14 +3012,16 @@ function renderSystemCronVariant(row) {
       return Math.max(8.5, Math.min(12, pos.font * 0.42));
     }
 
-    function brainHoverAlpha(rel, selectedText) {
+    function brainHoverAlpha(rel, selectedText, focusMode) {
       if (!selectedText) return 0.48;
       if (!rel) return 0.08;
       var presence = rel.presence == null ? 1 : Math.max(0, Math.min(1, Number(rel.presence) || 0));
       var target;
-      if (rel.depth === 0) target = 1;
-      else if (rel.depth === 1) target = 0.96;
-      else if (rel.depth === 2) target = 0.58;
+      var pathFocus = focusMode === 'path';
+      if (rel.depth === 0) target = pathFocus ? 0.82 : 1;
+      else if (rel.depth === 1) target = pathFocus ? 0.68 : 0.96;
+      else if (rel.depth === 2) target = pathFocus ? 0.4 : 0.58;
+      else if (rel.depth === 3) target = pathFocus ? 0.22 : 0.3;
       else target = 0.08;
       return 0.08 + (target - 0.08) * presence;
     }
@@ -3074,9 +3116,11 @@ function renderSystemCronVariant(row) {
       canvas._brainMeshPositionByText = byText;
       var hasFocus = !!selectedText || !!transition;
       var relationSelectedText = selectedText || transition?.selectedText || '';
+      var focusMode = transition?.focusMode || 'word';
       var focusPresence = transition
         ? brainTransitionFocusPresence(transition.fromRelations, transition.toRelations, transition.progress)
         : (hasFocus ? 1 : 0);
+      var dimPresence = focusMode === 'path' ? focusPresence * 0.32 : focusPresence;
       var selectedLinks = transition
         ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
         : brainRelationMap(relationSelectedText, visibleConnections);
@@ -3105,7 +3149,7 @@ function renderSystemCronVariant(row) {
         visibleConnections.forEach(function (c) {
           var fromRel = selectedLinks[c.from];
           var toRel = selectedLinks[c.to];
-          var lineState = brainLinePresence(fromRel, toRel, relationSelectedText);
+          var lineState = brainLinePresence(fromRel, toRel, relationSelectedText, c.from, c.to);
           var isPrimary = lineState.primary;
           var visible = lineState.visible && lineState.presence > 0.02;
           if (visible) {
@@ -3115,9 +3159,18 @@ function renderSystemCronVariant(row) {
             var level = brainEdgeLevel(c.strength);
             ctx.beginPath();
             brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
-            var alpha = (isPrimary ? 0.72 : 0.42) * lineState.presence;
-            ctx.lineWidth = (isPrimary ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1) : 0.8) * Math.max(0.35, lineState.presence);
-            ctx.strokeStyle = isPrimary ? 'rgba(148,163,184,' + alpha.toFixed(3) + ')' : 'rgba(100,116,139,' + alpha.toFixed(3) + ')';
+            var tierAlpha = lineState.tier === 1 ? 0.76 : lineState.tier === 2 ? 0.42 : 0.2;
+            if (focusMode === 'path') tierAlpha *= lineState.tier === 1 ? 0.72 : 0.64;
+            if (lineState.sharedRoute && lineState.tier > 1) tierAlpha += 0.08;
+            var alpha = tierAlpha * lineState.presence;
+            var baseWidth = lineState.tier === 1
+              ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1)
+              : lineState.tier === 2
+                ? 0.9
+                : 0.55;
+            if (lineState.sharedRoute && lineState.tier > 1) baseWidth += 0.25;
+            ctx.lineWidth = baseWidth * Math.max(0.35, lineState.presence);
+            ctx.strokeStyle = lineState.tier === 1 ? 'rgba(148,163,184,' + alpha.toFixed(3) + ')' : 'rgba(100,116,139,' + alpha.toFixed(3) + ')';
             ctx.stroke();
           }
         });
@@ -3125,16 +3178,16 @@ function renderSystemCronVariant(row) {
       positions.slice().sort(function (a, b) {
         var aRel = hasFocus && selectedLinks[String(a.term.text || '')];
         var bRel = hasFocus && selectedLinks[String(b.term.text || '')];
-        var aFont = hasFocus ? (aRel ? brainHoverFont(a, aRel) : a.font + (brainInactiveFont(a) - a.font) * focusPresence) : a.font;
-        var bFont = hasFocus ? (bRel ? brainHoverFont(b, bRel) : b.font + (brainInactiveFont(b) - b.font) * focusPresence) : b.font;
+        var aFont = hasFocus ? (aRel ? brainHoverFont(a, aRel, focusMode) : a.font + (brainInactiveFont(a) - a.font) * dimPresence) : a.font;
+        var bFont = hasFocus ? (bRel ? brainHoverFont(b, bRel, focusMode) : b.font + (brainInactiveFont(b) - b.font) * dimPresence) : b.font;
         return aFont - bFont;
       }).forEach(function (pos) {
         var text = String(pos.term.text || '');
         var rel = hasFocus && selectedLinks[text];
         var selected = brainDisplaySelected(null, rel, 1);
-        var displayFont = hasFocus ? (rel ? brainHoverFont(pos, rel) : pos.font + (brainInactiveFont(pos) - pos.font) * focusPresence) : pos.font;
-        var inactiveAlpha = 0.48 + (0.08 - 0.48) * focusPresence;
-        var alpha = hasFocus ? (rel ? brainHoverAlpha(rel, relationSelectedText) : inactiveAlpha) : 0.48;
+        var displayFont = hasFocus ? (rel ? brainHoverFont(pos, rel, focusMode) : pos.font + (brainInactiveFont(pos) - pos.font) * dimPresence) : pos.font;
+        var inactiveAlpha = 0.48 + (0.08 - 0.48) * dimPresence;
+        var alpha = hasFocus ? (rel ? brainHoverAlpha(rel, relationSelectedText, focusMode) : inactiveAlpha) : 0.48;
         var hue = selected ? '255,255,255' : '219,234,254';
         ctx.font = displayFont.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
@@ -3204,7 +3257,7 @@ function renderSystemCronVariant(row) {
       focus.hidden = false;
       focus.innerHTML = '<strong>' + escapeHtml(selectedText) + '</strong>' +
         related.map(function (item) {
-          var depthLabel = item.rel.depth === 1 ? 'direct' : 'near';
+          var depthLabel = item.rel.depth === 1 ? 'direct' : item.rel.depth === 2 ? 'near' : 'faint';
           return '<span class="brain-focus-link brain-focus-depth-' + item.rel.depth + ' brain-focus-' + brainEdgeLevel(item.rel.strength) + '">' +
             escapeHtml(item.text) + ' · ' + depthLabel + ' · weight ' + escapeHtml(String(item.rel.strength || '')) +
             '</span>';
@@ -3265,6 +3318,8 @@ function renderSystemCronVariant(row) {
       var hoverFrame = null;
       var pointerFrame = null;
       var meshPointer = { x: 0, y: 0, active: false, onTerm: false };
+      var lockedFocus = null;
+      var currentFocusMode = 'word';
 
       function stopBrainHoverAnimation() {
         if (hoverFrame) {
@@ -3275,7 +3330,7 @@ function renderSystemCronVariant(row) {
 
       function drawBrainMeshCurrent() {
         var transition = currentFocus
-          ? { fromRelations: currentRelations, toRelations: currentRelations, progress: 1, selectedText: currentFocus }
+          ? { fromRelations: currentRelations, toRelations: currentRelations, progress: 1, selectedText: currentFocus, focusMode: currentFocusMode }
           : null;
         drawBrainMeshCanvas(meshCanvas, terms, connections, currentFocus, transition, meshPointer);
       }
@@ -3305,6 +3360,7 @@ function renderSystemCronVariant(row) {
             toRelations: toRelations,
             progress: progress,
             selectedText: transitionFocus,
+            focusMode: nextFocus ? nextFocus.mode : currentFocusMode,
           }, meshPointer);
           if (progress < 1) {
             hoverFrame = requestAnimationFrame(step);
@@ -3312,6 +3368,7 @@ function renderSystemCronVariant(row) {
           }
           hoverFrame = null;
           currentFocus = nextFocus ? nextFocus.label : '';
+          currentFocusMode = nextFocus ? nextFocus.mode : 'word';
           currentRelations = toRelations;
           activeHover = nextFocus ? nextFocus.id : '';
           if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, meshPointer);
@@ -3337,9 +3394,17 @@ function renderSystemCronVariant(row) {
         renderBrainFocus(focusTarget.label, connections, focusTarget.relations);
       }
 
+      function focusTargetAtPointer() {
+        var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
+        meshPointer.onTerm = !!selected;
+        return selected
+          ? brainTermFocus(selected)
+          : brainConnectionFocus(nearestBrainMeshConnection(meshCanvas, meshPointer.x, meshPointer.y));
+      }
+
       function brainTermFocus(term) {
         var text = String(term || '');
-        return text ? { id: 'term:' + text, label: text, relations: brainRelationMap(text, connections) } : null;
+        return text ? { id: 'term:' + text, label: text, mode: 'word', relations: brainRelationMap(text, connections) } : null;
       }
 
       function brainConnectionFocus(connection) {
@@ -3350,6 +3415,7 @@ function renderSystemCronVariant(row) {
         return {
           id: 'edge:' + brainConnectionKey(connection),
           label: from + ' ↔ ' + to,
+          mode: 'path',
           relations: brainConnectionRelationMap(connection, connections),
         };
       }
@@ -3360,13 +3426,10 @@ function renderSystemCronVariant(row) {
           meshPointer.x = event.clientX - cr.left;
           meshPointer.y = event.clientY - cr.top;
           meshPointer.active = true;
-          var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
-          var focusTarget = selected
-            ? brainTermFocus(selected)
-            : brainConnectionFocus(nearestBrainMeshConnection(meshCanvas, meshPointer.x, meshPointer.y));
+          var focusTarget = focusTargetAtPointer();
           var focusId = focusTarget ? focusTarget.id : '';
-          meshPointer.onTerm = !!selected;
           scheduleBrainPointerDraw();
+          if (lockedFocus) return;
           if (focusId === activeHover || (pendingHover && focusId === pendingHover.id)) return;
           if (hoverTimer) clearTimeout(hoverTimer);
           pendingHover = focusTarget;
@@ -3377,14 +3440,36 @@ function renderSystemCronVariant(row) {
           hoverTimer = setTimeout(function () {
             if (pendingHover) applyBrainHover(pendingHover);
             hoverTimer = null;
-            pendingHover = '';
+            pendingHover = null;
           }, 160);
+        });
+        meshCanvas.addEventListener('click', function (event) {
+          var cr = meshCanvas.getBoundingClientRect();
+          meshPointer.x = event.clientX - cr.left;
+          meshPointer.y = event.clientY - cr.top;
+          meshPointer.active = true;
+          var focusTarget = focusTargetAtPointer();
+          if (!focusTarget) {
+            lockedFocus = null;
+            clearBrainHover();
+            return;
+          }
+          if (lockedFocus && lockedFocus.id === focusTarget.id) {
+            lockedFocus = null;
+            clearBrainHover();
+            return;
+          }
+          lockedFocus = focusTarget;
+          if (hoverTimer) clearTimeout(hoverTimer);
+          hoverTimer = null;
+          pendingHover = null;
+          applyBrainHover(focusTarget);
         });
         meshCanvas.addEventListener('mouseleave', function () {
           meshPointer.active = false;
           meshPointer.onTerm = false;
           scheduleBrainPointerDraw();
-          clearBrainHover();
+          if (!lockedFocus) clearBrainHover();
         });
       }
       cloud._brainMeshCleanup = function () {
