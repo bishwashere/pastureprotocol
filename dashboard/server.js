@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 import { spawn, execSync, execFileSync } from 'child_process';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, renameSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
 import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent/agent-avatar.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText, CHAT_LOG_DAY_PREFIX } from '../lib/context/chat-log.js';
@@ -2055,6 +2055,33 @@ function brainImportsDir(workspaceDir = getWorkspaceDir()) {
   return join(workspaceDir, 'brain-imports');
 }
 
+function readValidBrainImportManifest(importRoot) {
+  const manifestPath = join(importRoot, 'manifest.json');
+  try {
+    if (!existsSync(manifestPath)) return null;
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const status = String(manifest.status || '');
+    if (status !== 'extracted' && status !== 'processed') return null;
+    const files = Array.isArray(manifest.files) ? manifest.files : [];
+    const filesExist = files.length > 0 && files.every((rel) => existsSync(join(importRoot, rel)));
+    return filesExist ? manifest : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function markBrainImportSuperseded(importRoot, supersededBy) {
+  const manifestPath = join(importRoot, 'manifest.json');
+  try {
+    if (!existsSync(manifestPath)) return;
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    manifest.status = 'superseded';
+    manifest.supersededBy = supersededBy;
+    manifest.supersededAt = new Date().toISOString();
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  } catch (_) {}
+}
+
 function brainImportId(provider, text) {
   return brainHashText(`${provider}\n${text}`).slice(0, 24);
 }
@@ -2177,7 +2204,10 @@ function buildBrainImportTextFromPayload(payload) {
     throw err;
   }
   const grokBackend = entries.find((entry) => /(^|\/)prod-grok-backend\.json$/i.test(entry.name));
-  if (grokBackend) return grokBackend.text;
+  if (grokBackend) {
+    payload.detectedProvider = 'grok';
+    return grokBackend.text;
+  }
   const conversationsJson = entries.find((entry) => /(^|\/)conversations\.json$/i.test(entry.name));
   if (conversationsJson) return conversationsJson.text;
   return entries.map((entry) => `# File: ${entry.name}\n\n${entry.text}`).join('\n\n');
@@ -2273,6 +2303,11 @@ function extractGrokConversation(item, index) {
   return { title, messages: rows.map(({ role, text }) => ({ role, text })) };
 }
 
+function isGrokConversationExportItem(item) {
+  const conv = item?.conversation && typeof item.conversation === 'object' ? item.conversation : item;
+  return !!(conv && typeof conv === 'object' && (Array.isArray(item?.responses) || Array.isArray(conv?.responses)));
+}
+
 function extractGenericConversation(conv, index) {
   const title = normalizeConversationTitle(conv?.title || conv?.name || conv?.conversation_title, `Conversation ${index + 1}`);
   const messageList = Array.isArray(conv?.messages)
@@ -2304,13 +2339,13 @@ function extractBrainImportConversations(provider, text) {
     const root = Array.isArray(parsed) ? parsed : Array.isArray(parsed.conversations) ? parsed.conversations : null;
     if (root) {
       const conversations = root.map((conv, index) => {
-        if (provider === 'grok' && (conv?.conversation || Array.isArray(conv?.responses))) return extractGrokConversation(conv, index);
+        if (provider === 'grok' || isGrokConversationExportItem(conv)) return extractGrokConversation(conv, index);
         if (conv?.mapping) return extractChatGptConversation(conv, index);
         return extractGenericConversation(conv, index);
       }).filter((conv) => conv.messages.length > 0);
       if (conversations.length) return conversations;
     }
-    if (provider === 'grok' && (parsed.conversation || Array.isArray(parsed.responses))) {
+    if (provider === 'grok' || isGrokConversationExportItem(parsed)) {
       const grokSingle = extractGrokConversation(parsed, 0);
       if (grokSingle.messages.length) return [grokSingle];
     }
@@ -2368,14 +2403,95 @@ function pushBrainCorpusChunk(out, chunk, remaining) {
   remaining.value -= sliced.length;
 }
 
+function brainCorpusChunkText(chunk) {
+  return String(chunk?.text || '').trim();
+}
+
+function brainCorpusBucketHasRemaining(bucket) {
+  return bucket.cursor < bucket.items.length;
+}
+
+function takeBrainCorpusBucket(out, bucket, maxChars) {
+  let remaining = Math.max(0, Math.floor(Number(maxChars) || 0));
+  const before = remaining;
+  while (remaining > 0 && brainCorpusBucketHasRemaining(bucket)) {
+    const chunk = bucket.items[bucket.cursor];
+    const text = brainCorpusChunkText(chunk);
+    if (!text) {
+      bucket.cursor += 1;
+      bucket.offset = 0;
+      continue;
+    }
+    const start = Math.max(0, bucket.offset || 0);
+    const rawSlice = text.slice(start, start + remaining);
+    const slice = rawSlice.trim();
+    if (slice) {
+      out.push({
+        source: chunk.source,
+        label: String(chunk.label || chunk.source || '').slice(0, 120),
+        role: chunk.role ? String(chunk.role).slice(0, 40) : '',
+        ts: Number(chunk.ts || 0) || 0,
+        text: slice,
+      });
+    }
+    remaining -= rawSlice.length;
+    if (start + rawSlice.length >= text.length) {
+      bucket.cursor += 1;
+      bucket.offset = 0;
+    } else {
+      bucket.offset = start + rawSlice.length;
+      break;
+    }
+  }
+  return before - remaining;
+}
+
+function mergeBrainCorpusBuckets(bucketInputs, maxChars) {
+  const out = [];
+  const buckets = bucketInputs
+    .filter((bucket) => bucket && Array.isArray(bucket.items) && bucket.items.length)
+    .map((bucket) => ({
+      ...bucket,
+      cursor: 0,
+      offset: 0,
+      weight: Math.max(1, Number(bucket.weight) || 1),
+    }));
+  if (!buckets.length) return out;
+
+  let remaining = Math.max(0, Math.floor(Number(maxChars) || 0));
+  const totalWeight = buckets.reduce((sum, bucket) => sum + bucket.weight, 0);
+  for (const bucket of buckets) {
+    if (remaining <= 0) break;
+    const quota = Math.max(1, Math.floor(maxChars * (bucket.weight / totalWeight)));
+    remaining -= takeBrainCorpusBucket(out, bucket, Math.min(quota, remaining));
+  }
+
+  while (remaining > 0 && buckets.some(brainCorpusBucketHasRemaining)) {
+    const active = buckets.filter(brainCorpusBucketHasRemaining);
+    const perBucket = Math.max(1, Math.ceil(remaining / active.length));
+    let usedThisRound = 0;
+    for (const bucket of active) {
+      if (remaining <= 0) break;
+      const used = takeBrainCorpusBucket(out, bucket, Math.min(perBucket, remaining));
+      usedThisRound += used;
+      remaining -= used;
+    }
+    if (usedThisRound <= 0) break;
+  }
+
+  return out;
+}
+
 function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }) {
   const workspaceDir = getWorkspaceDir();
   const includeMemory = source === 'all' || source === 'memory';
   const includeNotes = source === 'all' || source === 'notes';
   const includeHistory = source === 'all' || source === 'history';
   const cutoffMs = brainRangeCutoffMs(range);
-  const corpus = [];
-  const remaining = { value: maxChars };
+  const memoryCorpus = [];
+  const notesCorpus = [];
+  const importCorpus = [];
+  const historyCorpus = [];
   const stats = { memoryFiles: 0, noteFiles: 0, importFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
 
   if (includeMemory) {
@@ -2385,7 +2501,7 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
         if (existsSync(full) && statSync(full).isFile()) {
           const text = readFileSync(full, 'utf8');
           stats.memoryFiles += 1;
-          pushBrainCorpusChunk(corpus, { source: 'memory', label: name, text }, remaining);
+          memoryCorpus.push({ source: 'memory', label: name, text });
         }
       } catch (_) {}
     }
@@ -2402,8 +2518,7 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
           if (!statSync(full).isFile()) continue;
           const text = readFileSync(full, 'utf8');
           stats.noteFiles += 1;
-          pushBrainCorpusChunk(corpus, { source: 'notes', label: `memory/${name}`, text }, remaining);
-          if (remaining.value <= 0) break;
+          notesCorpus.push({ source: 'notes', label: `memory/${name}`, text });
         }
       }
     } catch (_) {}
@@ -2412,10 +2527,14 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
     try {
       if (existsSync(importsDir) && statSync(importsDir).isDirectory()) {
         for (const providerName of readdirSync(importsDir).sort()) {
+          if (providerName.startsWith('.')) continue;
           const providerDir = join(importsDir, providerName);
           if (!statSync(providerDir).isDirectory()) continue;
           for (const importName of readdirSync(providerDir).sort()) {
-            const conversationsDir = join(providerDir, importName, 'conversations');
+            if (importName.startsWith('.')) continue;
+            const importRoot = join(providerDir, importName);
+            if (!readValidBrainImportManifest(importRoot)) continue;
+            const conversationsDir = join(importRoot, 'conversations');
             if (!existsSync(conversationsDir) || !statSync(conversationsDir).isDirectory()) continue;
             for (const name of readdirSync(conversationsDir).sort()) {
               if (!name.endsWith('.md')) continue;
@@ -2423,46 +2542,47 @@ function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }
               if (!statSync(full).isFile()) continue;
               const text = readFileSync(full, 'utf8');
               stats.importFiles += 1;
-              pushBrainCorpusChunk(corpus, {
+              importCorpus.push({
                 source: 'notes',
                 label: `brain-imports/${providerName}/${importName}/conversations/${name}`,
                 text,
-              }, remaining);
-              if (remaining.value <= 0) break;
+              });
             }
-            if (remaining.value <= 0) break;
           }
-          if (remaining.value <= 0) break;
         }
       }
     } catch (_) {}
   }
 
-  if (includeHistory && remaining.value > 0) {
+  if (includeHistory) {
     const days = collectChatLogDateEntries(workspaceDir)
       .filter((d) => !cutoffMs || Number(d.lastActivityMs || 0) >= cutoffMs);
     for (const day of days) {
-      if (remaining.value <= 0) break;
       const exchanges = readChatLogDayExchanges(workspaceDir, day.date);
       if (!exchanges.length) continue;
       stats.historyDays += 1;
       stats.exchanges += exchanges.length;
       for (const ex of exchanges) {
-        if (remaining.value <= 0) break;
         const text = String(ex?.user || '').trim();
         if (!text) continue;
-        pushBrainCorpusChunk(corpus, {
+        historyCorpus.push({
           source: 'history',
           label: day.date,
           role: 'user',
           ts: ex.ts,
           text,
-        }, remaining);
+        });
       }
     }
   }
 
-  stats.chars = maxChars - remaining.value;
+  const corpus = mergeBrainCorpusBuckets([
+    includeMemory ? { key: 'memory', weight: 2, items: memoryCorpus } : null,
+    includeNotes ? { key: 'notes', weight: 2, items: notesCorpus } : null,
+    includeNotes ? { key: 'imports', weight: source === 'notes' ? 2 : 3, items: importCorpus } : null,
+    includeHistory ? { key: 'history', weight: 3, items: historyCorpus } : null,
+  ], maxChars);
+  stats.chars = corpus.reduce((sum, chunk) => sum + brainCorpusChunkText(chunk).length, 0);
   return { corpus, stats };
 }
 
@@ -3034,92 +3154,209 @@ app.get('/api/brain/progress', (req, res) => {
 });
 
 function importBrainPayload(payload) {
-  const provider = payload.provider;
+  let provider = payload.provider;
+  const requestedProvider = provider;
   const originalName = payload.filename;
   const workspaceDir = getWorkspaceDir();
-  const importId = brainImportPayloadSignature(provider, payload.contentHash);
-  const importRoot = join(brainImportsDir(workspaceDir), safeBrainPathPart(provider), importId);
-  const rawDir = join(importRoot, 'raw');
-  const conversationsDir = join(importRoot, 'conversations');
-  const manifestPath = join(importRoot, 'manifest.json');
-  if (existsSync(manifestPath)) {
-    try {
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      const files = Array.isArray(manifest.files) ? manifest.files : [];
-      const filesExist = files.length > 0 && files.every((rel) => existsSync(join(importRoot, rel)));
-      if (filesExist) {
+  let safeProvider = safeBrainPathPart(provider);
+  let importId = brainImportPayloadSignature(provider, payload.contentHash);
+  const importsRoot = brainImportsDir(workspaceDir);
+  let importRoot = join(importsRoot, safeProvider, importId);
+  const requestedImportRoot = importRoot;
+  let existingManifest = readValidBrainImportManifest(importRoot);
+  if (existingManifest) {
+    const files = Array.isArray(existingManifest.files) ? existingManifest.files : [];
+    brainDebugLog('import_reused', { provider, importId, files: files.length });
+    return {
+      ok: true,
+      reused: true,
+      importId,
+      provider,
+      providerLabel: brainImportProviderLabel(provider),
+      path: `brain-imports/${safeProvider}/${importId}`,
+      conversations: Number(existingManifest.conversations) || files.length,
+      messages: Number(existingManifest.messages) || 0,
+      files: files.length,
+      chars: Number(existingManifest.extractedChars) || 0,
+    };
+  }
+
+  brainDebugLog('import_extract_start', {
+    provider,
+    requestedProvider,
+    importId,
+    rawKind: payload.rawKind,
+    filename: originalName || '',
+    bytes: payload.rawBuffer ? payload.rawBuffer.length : 0,
+  });
+  let text;
+  let conversations;
+  try {
+    text = buildBrainImportTextFromPayload(payload);
+    if (payload.detectedProvider && BRAIN_IMPORT_PROVIDERS.has(payload.detectedProvider) && payload.detectedProvider !== provider) {
+      provider = payload.detectedProvider;
+      safeProvider = safeBrainPathPart(provider);
+      importId = brainImportPayloadSignature(provider, payload.contentHash);
+      importRoot = join(importsRoot, safeProvider, importId);
+      existingManifest = readValidBrainImportManifest(importRoot);
+      brainDebugLog('import_provider_detected', {
+        requestedProvider,
+        provider,
+        importId,
+        filename: originalName || '',
+      });
+      if (existingManifest) {
+        const files = Array.isArray(existingManifest.files) ? existingManifest.files : [];
+        if (requestedImportRoot !== importRoot) {
+          markBrainImportSuperseded(requestedImportRoot, `brain-imports/${safeProvider}/${importId}`);
+        }
+        brainDebugLog('import_reused_detected_provider', { provider, importId, files: files.length });
         return {
           ok: true,
           reused: true,
           importId,
           provider,
           providerLabel: brainImportProviderLabel(provider),
-          path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
-          conversations: Number(manifest.conversations) || files.length,
-          messages: Number(manifest.messages) || 0,
+          path: `brain-imports/${safeProvider}/${importId}`,
+          conversations: Number(existingManifest.conversations) || files.length,
+          messages: Number(existingManifest.messages) || 0,
           files: files.length,
-          chars: Number(manifest.extractedChars) || 0,
+          chars: Number(existingManifest.extractedChars) || 0,
         };
       }
-    } catch (_) {}
+    }
+    conversations = extractBrainImportConversations(provider, text);
+  } catch (err) {
+    brainDebugLog('import_extract_failed', {
+      provider,
+      importId,
+      filename: originalName || '',
+      stage: 'read_payload',
+      error: err.message,
+    });
+    throw err;
   }
-
-  const text = buildBrainImportTextFromPayload(payload);
-  const conversations = extractBrainImportConversations(provider, text);
   if (!conversations.length) {
+    brainDebugLog('import_extract_failed', {
+      provider,
+      importId,
+      filename: originalName || '',
+      stage: 'conversation_extract',
+      error: 'No conversations were found in that import.',
+    });
     const err = new Error('No conversations were found in that import.');
     err.statusCode = 400;
     throw err;
   }
 
+  const stagingParent = join(importsRoot, '.staging');
+  if (!existsSync(stagingParent)) mkdirSync(stagingParent, { recursive: true });
+  const stagingRoot = mkdtempSync(join(stagingParent, `${safeProvider}-${importId}-`));
+  const rawDir = join(stagingRoot, 'raw');
+  const conversationsDir = join(stagingRoot, 'conversations');
   if (!existsSync(rawDir)) mkdirSync(rawDir, { recursive: true });
   if (!existsSync(conversationsDir)) mkdirSync(conversationsDir, { recursive: true });
 
-  const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
-  const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
-  writeFileSync(join(rawDir, rawName), payload.rawBuffer);
+  try {
+    const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
+    const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
+    writeFileSync(join(rawDir, rawName), payload.rawBuffer);
 
-  let extractedChars = 0;
-  const files = [];
-  conversations.forEach((conversation, index) => {
-    const titlePart = safeBrainPathPart(conversation.title, `conversation-${index + 1}`);
-    const fileName = `${String(index + 1).padStart(4, '0')}-${titlePart}.md`;
-    const markdown = renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId });
-    writeFileSync(join(conversationsDir, fileName), markdown, 'utf8');
-    extractedChars += markdown.length;
-    files.push(`conversations/${fileName}`);
-  });
+    let extractedChars = 0;
+    const files = [];
+    conversations.forEach((conversation, index) => {
+      const titlePart = safeBrainPathPart(conversation.title, `conversation-${index + 1}`);
+      const fileName = `${String(index + 1).padStart(4, '0')}-${titlePart}.md`;
+      const markdown = renderBrainConversationMarkdown({ provider, originalName, conversation, index, importId });
+      writeFileSync(join(conversationsDir, fileName), markdown, 'utf8');
+      extractedChars += markdown.length;
+      files.push(`conversations/${fileName}`);
+    });
 
-  const messages = conversations.reduce((sum, conv) => sum + conv.messages.length, 0);
-  const manifest = {
-    importId,
-    provider,
-    providerLabel: brainImportProviderLabel(provider),
-    originalName,
-    contentHash: payload.contentHash,
-    rawKind: payload.rawKind,
-    importedAt: new Date().toISOString(),
-    raw: `raw/${rawName}`,
-    status: 'extracted',
-    conversations: conversations.length,
-    messages,
-    extractedChars,
-    files,
-  };
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-  brainCloudCache.clear();
+    const messages = conversations.reduce((sum, conv) => sum + conv.messages.length, 0);
+    const manifest = {
+      importId,
+      provider,
+      providerLabel: brainImportProviderLabel(provider),
+      originalName,
+      contentHash: payload.contentHash,
+      rawKind: payload.rawKind,
+      importedAt: new Date().toISOString(),
+      raw: `raw/${rawName}`,
+      status: 'extracted',
+      conversations: conversations.length,
+      messages,
+      extractedChars,
+      files,
+    };
+    writeFileSync(join(stagingRoot, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    const stagedManifest = readValidBrainImportManifest(stagingRoot);
+    if (!stagedManifest) {
+      const err = new Error('Import extraction did not produce a complete brain manifest.');
+      err.statusCode = 500;
+      throw err;
+    }
 
-  return {
-    ok: true,
-    importId,
-    provider,
-    providerLabel: brainImportProviderLabel(provider),
-    path: `brain-imports/${safeBrainPathPart(provider)}/${importId}`,
-    conversations: conversations.length,
-    messages,
-    files: files.length,
-    chars: extractedChars,
-  };
+    const latestExistingManifest = readValidBrainImportManifest(importRoot);
+    if (latestExistingManifest) {
+      rmSync(stagingRoot, { recursive: true, force: true });
+      const existingFiles = Array.isArray(latestExistingManifest.files) ? latestExistingManifest.files : [];
+      brainDebugLog('import_reused_after_extract', { provider, importId, files: existingFiles.length });
+      return {
+        ok: true,
+        reused: true,
+        importId,
+        provider,
+        providerLabel: brainImportProviderLabel(provider),
+        path: `brain-imports/${safeProvider}/${importId}`,
+        conversations: Number(latestExistingManifest.conversations) || existingFiles.length,
+        messages: Number(latestExistingManifest.messages) || 0,
+        files: existingFiles.length,
+        chars: Number(latestExistingManifest.extractedChars) || 0,
+      };
+    }
+    if (existsSync(importRoot)) {
+      brainDebugLog('import_replace_incomplete', { provider, importId });
+      rmSync(importRoot, { recursive: true, force: true });
+    }
+    mkdirSync(dirname(importRoot), { recursive: true });
+    renameSync(stagingRoot, importRoot);
+    if (requestedImportRoot !== importRoot) {
+      markBrainImportSuperseded(requestedImportRoot, `brain-imports/${safeProvider}/${importId}`);
+    }
+    brainCloudCache.clear();
+    brainDebugLog('import_extract_complete', {
+      provider,
+      importId,
+      conversations: conversations.length,
+      messages,
+      files: files.length,
+      chars: extractedChars,
+    });
+
+    return {
+      ok: true,
+      importId,
+      provider,
+      providerLabel: brainImportProviderLabel(provider),
+      path: `brain-imports/${safeProvider}/${importId}`,
+      conversations: conversations.length,
+      messages,
+      files: files.length,
+      chars: extractedChars,
+    };
+  } catch (err) {
+    try {
+      rmSync(stagingRoot, { recursive: true, force: true });
+    } catch (_) {}
+    brainDebugLog('import_extract_failed', {
+      provider,
+      importId,
+      filename: originalName || '',
+      error: err.message,
+    });
+    throw err;
+  }
 }
 
 app.post('/api/brain/import-chat-file', express.raw({ type: 'application/octet-stream', limit: '180mb' }), (req, res) => {

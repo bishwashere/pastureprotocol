@@ -3305,6 +3305,7 @@ function renderSystemCronVariant(row) {
         renderBrainFocus('', []);
         return;
       }
+      brainCloudLastData = data;
       var rect = cloud.getBoundingClientRect();
       cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
       cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
@@ -3523,7 +3524,11 @@ function renderSystemCronVariant(row) {
         if (e && e.name === 'AbortError') return;
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
-        cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
+        if (brainCloudLastData) {
+          renderBrainCloud(brainCloudLastData);
+        } else {
+          cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
+        }
         var meta = document.getElementById('brain-meta');
         if (meta) meta.textContent = e && e.message ? e.message : 'Request failed';
       } finally {
@@ -3622,9 +3627,9 @@ function renderSystemCronVariant(row) {
         }
         var summary = 'Imported ' + imported + ' conversation' + (imported === 1 ? '' : 's') +
           ' · ' + messages + ' messages' +
-          (reused ? ' · ' + reused + ' reused' : '');
+          (reused ? ' · ' + reused + ' reused' : '') +
+          ' · refresh to include';
         setBrainImportStatus(summary);
-        fetchBrainCloud(true);
       } catch (e) {
         setBrainImportStatus(e && e.message ? e.message : 'Import failed', true);
       } finally {
