@@ -94,7 +94,7 @@ check(
 // 5. Shared final reply policy is injected independent of mutable SOUL.md files
 {
   const prompt = buildOneOnOneSystemPrompt();
-  for (const phrase of ['If the user asked for a count', 'Do not include database paths', 'Use tool results as private evidence']) {
+  for (const phrase of ['If the user asked for a count', 'Do not add breakdowns', 'Use tool results as private evidence']) {
     check(
       `FINAL_REPLY_POLICY_BLOCK contains "${phrase}"`,
       FINAL_REPLY_POLICY_BLOCK.includes(phrase),

@@ -1816,9 +1816,9 @@ const BRAIN_CORPUS_MAX_CHARS = 32_000;
 const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
 const BRAIN_LLM_CHUNK_CHARS = 9_000;
 const BRAIN_LLM_MAX_CHUNKS = 160;
-const BRAIN_LLM_CACHE_VERSION = 3;
-const BRAIN_QUALITY_CACHE_VERSION = 2;
-const BRAIN_RESPONSE_CACHE_VERSION = 1;
+const BRAIN_LLM_CACHE_VERSION = 4;
+const BRAIN_QUALITY_CACHE_VERSION = 3;
+const BRAIN_RESPONSE_CACHE_VERSION = 2;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
@@ -2642,8 +2642,25 @@ function brainResponseCacheKey({ range, source, qualityEnabled, chunks }) {
   }));
 }
 
+const BRAIN_BLOCKED_TERM_TEXT = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'from',
+  'has', 'have', 'he', 'her', 'his', 'i', 'if', 'in', 'is', 'it', 'its',
+  'me', 'my', 'of', 'on', 'or', 'our', 'she', 'so', 'that', 'the', 'their',
+  'them', 'then', 'there', 'they', 'this', 'to', 'was', 'we', 'were', 'what',
+  'when', 'where', 'who', 'why', 'will', 'with', 'you', 'your',
+  'user', 'assistant', 'system', 'human', 'message', 'messages', 'chat',
+  'conversation', 'reply', 'response',
+]);
+
 function normalizeBrainDisplayKey(text) {
-  return String(text || '').trim().toLowerCase();
+  const normalized = String(text || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  const words = normalized.split(' ').filter(Boolean);
+  const lower = normalized.toLowerCase();
+  if (words.length > 4) return '';
+  if (BRAIN_BLOCKED_TERM_TEXT.has(lower)) return '';
+  if (words.every((word) => BRAIN_BLOCKED_TERM_TEXT.has(word.toLowerCase()))) return '';
+  return lower;
 }
 
 function mergeBrainSources(target, sources) {
