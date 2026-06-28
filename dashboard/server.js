@@ -1928,6 +1928,79 @@ function readBrainResponseCache(key) {
   }
 }
 
+function brainPayloadHasTerms(payload) {
+  return Array.isArray(payload?.terms) && payload.terms.length > 0;
+}
+
+function brainPayloadHadNoCorpus(payload) {
+  return Number(payload?.stats?.chars || 0) === 0;
+}
+
+function brainPayloadIsReusable(payload) {
+  return !!payload && (brainPayloadHasTerms(payload) || brainPayloadHadNoCorpus(payload));
+}
+
+function readLatestBrainResponseCache({ range, source, qualityEnabled, requireTerms = false } = {}) {
+  const root = brainResponseCacheDir();
+  let best = null;
+  function visit(dir) {
+    let entries = [];
+    try {
+      entries = readdirSync(dir);
+    } catch (_) {
+      return;
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry);
+      let st;
+      try {
+        st = statSync(path);
+      } catch (_) {
+        continue;
+      }
+      if (st.isDirectory()) {
+        visit(path);
+        continue;
+      }
+      if (!entry.endsWith('.json')) continue;
+      try {
+        const parsed = JSON.parse(readFileSync(path, 'utf8'));
+        const payload = parsed?.payload;
+        if (!brainPayloadIsReusable(payload)) continue;
+        if (requireTerms && !brainPayloadHasTerms(payload)) continue;
+        if (payload.range !== range || payload.source !== source) continue;
+        if (!!payload.qualityEnabled !== !!qualityEnabled) continue;
+        const cachedAtMs = Number(parsed?.cachedAtMs || payload?.updatedAtMs || st.mtimeMs) || st.mtimeMs;
+        if (!best || cachedAtMs > best.cachedAtMs) {
+          best = { payload, cachedAtMs, path };
+        }
+      } catch (_) {}
+    }
+  }
+  visit(root);
+  return best;
+}
+
+function readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled } = {}) {
+  return readLatestBrainResponseCache({ range, source, qualityEnabled, requireTerms: true }) ||
+    (qualityEnabled ? readLatestBrainResponseCache({ range, source, qualityEnabled: false, requireTerms: true }) : null);
+}
+
+function brainFallbackPayloadForResponse(fallback, qualityEnabled) {
+  if (!fallback?.payload) return null;
+  if (!qualityEnabled || fallback.payload.qualityEnabled) return fallback.payload;
+  return {
+    ...fallback.payload,
+    qualityEnabled: true,
+    qualityMode: fallback.payload.qualityMode || 'raw',
+    stats: {
+      ...(fallback.payload.stats || {}),
+      qualityDisabled: 1,
+      qualityFailed: 1,
+    },
+  };
+}
+
 function writeBrainResponseCache(key, payload) {
   if (!payload || !Array.isArray(payload.terms) || !Array.isArray(payload.connections)) return;
   const path = brainResponseCachePath(key);
@@ -2996,9 +3069,7 @@ app.get('/api/brain/cloud', async (req, res) => {
     const cachedMemory = refresh ? null : brainCloudCache.get(responseCacheKey)?.payload;
     const cachedDisk = refresh || cachedMemory ? null : readBrainResponseCache(responseCacheKey);
     const cachedPayload = cachedMemory || cachedDisk;
-    const cachedHasTerms = Array.isArray(cachedPayload?.terms) && cachedPayload.terms.length > 0;
-    const cachedHadNoCorpus = Number(cachedPayload?.stats?.chars || 0) === 0;
-    if (!refresh && cachedPayload && (cachedHasTerms || cachedHadNoCorpus)) {
+    if (!refresh && brainPayloadIsReusable(cachedPayload)) {
       brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload: cachedPayload });
       brainDebugLog('cloud_response_cache_hit', {
         range,
@@ -3097,6 +3168,34 @@ app.get('/api/brain/cloud', async (req, res) => {
     }
     const dense = await denseBuild;
     if (req.aborted || req.destroyed || res.destroyed) return;
+    const denseHasTerms = Array.isArray(dense?.terms) && dense.terms.length > 0;
+    if (!refresh && !denseHasTerms) {
+      const fallback = readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled });
+      const fallbackPayload = brainFallbackPayloadForResponse(fallback, qualityEnabled);
+      if (fallbackPayload) {
+        brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload: fallbackPayload });
+        brainDebugLog('cloud_response_fallback', {
+          range,
+          source,
+          qualityMode: fallbackPayload?.qualityMode,
+          reason: 'raw_build_empty',
+          terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,
+          connections: Array.isArray(fallbackPayload?.connections) ? fallbackPayload.connections.length : 0,
+        });
+        finishBrainBuildProgress(progressId, {
+          phase: 'complete',
+          doneChunks: dense.llmStats?.chunks || 0,
+          totalChunks: dense.llmStats?.chunks || 0,
+          remainingFiles: 0,
+          cacheHits: dense.llmStats?.cacheHits || 0,
+          generated: dense.llmStats?.generated || 0,
+          failed: dense.llmStats?.failed || 0,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.json({ ...fallbackPayload, cached: true, stale: true, staleReason: 'raw_build_empty' });
+        return;
+      }
+    }
     const rawPayload = {
       range,
       source,
@@ -3193,7 +3292,34 @@ app.get('/api/brain/cloud', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ ...payload, cached: false });
   } catch (err) {
-    finishBrainBuildProgress(normalizeBrainProgressId(req.query.progressId), {
+    const range = normalizeBrainRange(req.query.range);
+    const source = normalizeBrainSource(req.query.source);
+    const qualityEnabled = normalizeBrainQualityEnabled(req.query.quality);
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
+    const progressId = normalizeBrainProgressId(req.query.progressId);
+    if (!refresh) {
+      const fallback = readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled });
+      const fallbackPayload = brainFallbackPayloadForResponse(fallback, qualityEnabled);
+      if (fallbackPayload) {
+        brainDebugLog('cloud_response_fallback', {
+          range,
+          source,
+          qualityMode: fallbackPayload?.qualityMode,
+          reason: 'error',
+          error: err.message,
+          terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,
+          connections: Array.isArray(fallbackPayload?.connections) ? fallbackPayload.connections.length : 0,
+        });
+        finishBrainBuildProgress(progressId, {
+          phase: 'complete',
+          error: err.message,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.json({ ...fallbackPayload, cached: true, stale: true, staleReason: 'error' });
+        return;
+      }
+    }
+    finishBrainBuildProgress(progressId, {
       phase: 'error',
       error: err.message,
     });

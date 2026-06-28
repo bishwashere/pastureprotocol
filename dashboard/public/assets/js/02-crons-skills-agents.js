@@ -2612,6 +2612,36 @@ function renderSystemCronVariant(row) {
       if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
     }
 
+    function brainLastGoodKey(range, source, qualityEnabled) {
+      return 'brainMeshLastGood:' + String(range || 'all') + ':' + String(source || 'all') + ':' + (qualityEnabled ? 'quality' : 'raw');
+    }
+
+    function saveBrainLastGood(data, range, source, qualityEnabled) {
+      var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : (Array.isArray(data && data.terms) ? data.terms : []);
+      if (!terms.length) return;
+      try {
+        localStorage.setItem(brainLastGoodKey(range || data.range, source || data.source, qualityEnabled != null ? qualityEnabled : data.qualityEnabled), JSON.stringify(data));
+      } catch (_) {}
+    }
+
+    function loadBrainLastGood(range, source, qualityEnabled) {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(brainLastGoodKey(range, source, qualityEnabled)) || 'null');
+        var terms = Array.isArray(parsed && parsed.denseTerms) ? parsed.denseTerms : (Array.isArray(parsed && parsed.terms) ? parsed.terms : []);
+        if (terms.length) return parsed;
+      } catch (_) {
+        parsed = null;
+      }
+      if (!qualityEnabled) return null;
+      try {
+        var raw = JSON.parse(localStorage.getItem(brainLastGoodKey(range, source, false)) || 'null');
+        var rawTerms = Array.isArray(raw && raw.denseTerms) ? raw.denseTerms : (Array.isArray(raw && raw.terms) ? raw.terms : []);
+        return rawTerms.length ? raw : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
     function stopBrainLoadingProgress() {
       if (brainLoadingTimer) {
         clearInterval(brainLoadingTimer);
@@ -3422,6 +3452,7 @@ function renderSystemCronVariant(row) {
         return;
       }
       brainCloudLastData = data;
+      saveBrainLastGood(data, data.range, data.source, data.qualityEnabled);
       var rect = cloud.getBoundingClientRect();
       cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
       cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
@@ -3613,7 +3644,15 @@ function renderSystemCronVariant(row) {
       var sourceEl = document.getElementById('brain-source');
       var range = rangeEl ? rangeEl.value : 'all';
       var source = sourceEl ? sourceEl.value : 'all';
+      var qualityEnabled = getBrainQualityEnabled();
       var hasGraph = !!cloud.querySelector('.brain-mesh-canvas');
+      if (!hasGraph) {
+        var storedBrain = loadBrainLastGood(range, source, qualityEnabled);
+        if (storedBrain) {
+          renderBrainCloud(storedBrain);
+          hasGraph = true;
+        }
+      }
       var progressId = 'brain_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
       if (!hasGraph || refresh) {
         showBrainLoadingProgress(cloud, refresh ? 'Rebuilding brain map' : 'Building brain map', progressId);
@@ -3621,7 +3660,6 @@ function renderSystemCronVariant(row) {
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
-        var qualityEnabled = getBrainQualityEnabled();
         brainSettings.qualityLayer = qualityEnabled;
         saveBrainSettings();
         var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) +
@@ -3651,7 +3689,12 @@ function renderSystemCronVariant(row) {
         if (brainCloudLastData) {
           renderBrainCloud(brainCloudLastData);
         } else {
-          cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
+          var fallbackBrain = loadBrainLastGood(range, source, qualityEnabled);
+          if (fallbackBrain) {
+            renderBrainCloud(fallbackBrain);
+          } else {
+            cloud.innerHTML = '<p class="empty">Could not load brain cloud.</p>';
+          }
         }
         var meta = document.getElementById('brain-meta');
         if (meta) meta.textContent = e && e.name === 'AbortError' ? 'Brain map request timed out' : (e && e.message ? e.message : 'Request failed');
