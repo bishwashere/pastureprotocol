@@ -21,6 +21,7 @@ const { planIntent } = await import('../../lib/agent/intent-planner.js');
 const { getEnabledSkillSummaries } = await import('../../skills/loader.js');
 
 const TIMEOUT_MS = 30_000;
+const RUN_LIVE_LLM = process.env.PASTURE_RUN_LIVE_LLM_TESTS === '1';
 
 const SKILL_SUMMARIES = getEnabledSkillSummaries();
 
@@ -96,6 +97,40 @@ async function runCase(tc) {
 async function main() {
   console.log('Intent planner routing tests (with skill summaries)\n');
 
+  const weatherPhrasings = [
+    'Hows the weather today',
+    'Is it going to rain today?',
+    'What should I wear outside this morning?',
+    'weather please',
+    'Do I need an umbrella today?',
+  ];
+  for (const userText of weatherPhrasings) {
+    const weatherPlan = await planIntent({
+      userText,
+      availableSkillIds: ['search', 'memory', 'me'],
+      availableSkillSummaries: [
+        { id: 'search', description: 'Search the web for current, live, or recent information including weather.' },
+        { id: 'memory', description: 'Read or write saved memory.' },
+        { id: 'me', description: 'Read the user profile.' },
+      ],
+      llmChat: async () => JSON.stringify({
+        mode: 'tool',
+        skills: ['search'],
+        executionMode: 'tool_use',
+        usesExistingWorkIntake: false,
+        plan: 'Search weather for the best known default location and answer compactly before asking any correction follow-up.',
+        answer_style: 'short',
+      }),
+    });
+    if (weatherPlan.mode !== 'tool') throw new Error(`${userText}: expected weather mode=tool: ${JSON.stringify(weatherPlan)}`);
+    if (!weatherPlan.skills.includes('search')) throw new Error(`${userText}: expected search skill: ${JSON.stringify(weatherPlan)}`);
+    if (weatherPlan.answer_style !== 'short') throw new Error(`${userText}: expected short answer style: ${JSON.stringify(weatherPlan)}`);
+    if (!/answer compactly before asking/i.test(weatherPlan.plan)) {
+      throw new Error(`${userText}: expected answer-first compact weather plan: ${JSON.stringify(weatherPlan)}`);
+    }
+  }
+  console.log('  Weather phrasings → ✅  route to search, short answer, answer-first default-location plan');
+
   const durablePlan = await planIntent({
     userText: 'I need the launch ready — messaging, socials, maybe the page, and whatever else is missing.',
     availableSkillIds: ['project-workflow', 'agent-send', 'memory'],
@@ -136,29 +171,37 @@ async function main() {
   const rows = [];
   let failed = 0;
 
-  for (const tc of CASES) {
-    process.stdout.write(`  ${tc.label} … `);
-    try {
-      const plan = await runCase(tc);
-      console.log(`✅  mode=${plan.mode} skills=[${plan.skills.join(', ')}]`);
-      rows.push({ test: tc.label, result: '✅ Pass', detail: `mode=${plan.mode} skills=[${plan.skills.join(', ')}]` });
-    } catch (err) {
-      console.log(`❌  ${err.message}`);
-      rows.push({ test: tc.label, result: '❌ Fail', detail: err.message });
-      failed++;
+  if (!RUN_LIVE_LLM) {
+    console.log('  Live LLM planner cases → skipped (set PASTURE_RUN_LIVE_LLM_TESTS=1 to run)');
+  } else {
+    for (const tc of CASES) {
+      process.stdout.write(`  ${tc.label} … `);
+      try {
+        const plan = await runCase(tc);
+        console.log(`✅  mode=${plan.mode} skills=[${plan.skills.join(', ')}]`);
+        rows.push({ test: tc.label, result: '✅ Pass', detail: `mode=${plan.mode} skills=[${plan.skills.join(', ')}]` });
+      } catch (err) {
+        console.log(`❌  ${err.message}`);
+        rows.push({ test: tc.label, result: '❌ Fail', detail: err.message });
+        failed++;
+      }
     }
   }
 
   console.log('\n--- Results ---');
-  console.log(
-    `${'Test'.padEnd(50)} ${'Result'.padEnd(10)} Detail`
-  );
-  console.log('-'.repeat(120));
-  for (const r of rows) {
-    console.log(`${r.test.padEnd(50)} ${r.result.padEnd(10)} ${r.detail}`);
+  if (rows.length) {
+    console.log(
+      `${'Test'.padEnd(50)} ${'Result'.padEnd(10)} Detail`
+    );
+    console.log('-'.repeat(120));
+    for (const r of rows) {
+      console.log(`${r.test.padEnd(50)} ${r.result.padEnd(10)} ${r.detail}`);
+    }
+    console.log();
+    console.log(`${CASES.length - failed}/${CASES.length} passed.`);
+  } else {
+    console.log('No live LLM rows were run.');
   }
-  console.log();
-  console.log(`${CASES.length - failed}/${CASES.length} passed.`);
 
   process.exit(failed > 0 ? 1 : 0);
 }

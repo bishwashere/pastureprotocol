@@ -45,6 +45,10 @@ async function main() {
       expect: 'Hi Bishwas.',
     },
     {
+      input: '{"recipient_name":"functions.go_read_run","parameters":{"command":"sql"}}\nNodes: 2,875',
+      expect: 'Nodes: 2,875',
+    },
+    {
       input: 'No tags here.',
       expect: 'No tags here.',
     },

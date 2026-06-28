@@ -38,7 +38,7 @@ Use when the user asks to list a directory, show disk usage (du), show file cont
 
 For Pasture/CowCode self-inspection, the fixed runtime home is `~/.pasture`. When the user asks about "this project", "your code", "your source", or tells you to "check your code", list/read `~/.pasture` first. Check `~/.pasture/config.json`, `~/.pasture/workspace`, relevant logs, caches, and agent workspaces before asking the user for a path.
 
-When the user asks how many Brain items/nodes/phrases exist, use **sql** against the default memory DB with `select count(*) as chunks from chunks`. For source/type breakdowns, use follow-up SQL such as `select source, count(*) as count from chunks group by source order by count desc`.
+When the user asks how many Brain items/nodes/phrases exist, use **sql** against the default memory DB with `select count(*) as chunks from chunks`. In the final reply, provide only the count and counted thing (for example, "You have 2,875 brain nodes."). Do not mention the database path, SQL query, row count, or steps unless the user explicitly asks for those details. For source/type breakdowns, use follow-up SQL such as `select source, count(*) as count from chunks group by source order by count desc`.
 
 When the user asks about a SQLite database schema, use **sql** with `select name, type from sqlite_master where type in ('table','view') order by type, name`.
 
