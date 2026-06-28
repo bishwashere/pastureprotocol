@@ -23,6 +23,7 @@ import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSugge
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
 import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
+import { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } from '../lib/util/dashboard-url.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -52,8 +53,8 @@ import { generateBrainChunkGraph, refineBrainGraphQuality } from '../lib/agent/b
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR || ROOT;
-const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || 3847;
-const HOST = process.env.PASTURE_DASHBOARD_HOST || '127.0.0.1';
+const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || DEFAULT_DASHBOARD_PORT;
+const HOST = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
 
 const app = express();
 app.use(express.json({ limit: '260mb' }));

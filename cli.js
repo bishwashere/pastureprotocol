@@ -214,8 +214,9 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       console.error('pasture: dashboard not found. Re-run the installer or run from repo.');
       process.exit(1);
     }
-    const port = process.env.PASTURE_DASHBOARD_PORT || '3847';
-    const host = process.env.PASTURE_DASHBOARD_HOST || '127.0.0.1';
+    const { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } = await import('./lib/util/dashboard-url.js');
+    const port = process.env.PASTURE_DASHBOARD_PORT || String(DEFAULT_DASHBOARD_PORT);
+    const host = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
     const url = `http://${host}:${port}`;
     try {
       const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });

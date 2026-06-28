@@ -114,6 +114,8 @@
     "test:workspace-path": "node scripts/test/test-workspace-path.js",
     "test:work-durability": "node scripts/test/test-work-durability.js",
     "test:work-mode": "node scripts/test/test-work-mode.js",
+    "test:self-inspection": "node scripts/test/test-self-inspection.js",
+    "test:dashboard-url": "node scripts/test/test-dashboard-url.js",
     "test:turn-intent": "node scripts/test/test-turn-intent.js",
     "test:autonomy-gating": "node scripts/test/test-autonomy-gating.js",
     "test:state-migration": "node scripts/test/test-state-migration.js",

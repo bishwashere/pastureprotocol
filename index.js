@@ -31,6 +31,7 @@ import { runInternalAgentTurn } from './lib/agent/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent/agent-context-state.js';
 import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/agent/intent-planner.js';
 import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from './lib/agent/turn-intent.js';
+import { classifySelfInspection, buildSelfInspectionIntentPlan } from './lib/agent/self-inspection.js';
 import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
 import { buildDelegationContext } from './lib/agent/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from './lib/agent/delegation-routing-details.js';
@@ -1464,7 +1465,20 @@ async function main() {
           ? buildGithubSourceIntentPlan(enabledSkillIds)
           : null)
       : null;
-    const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
+    const selfInspection = !presetDelegationPlan && enabledSkillIds.length > 0
+      ? await traceAsyncStep('self_inspection', () => classifySelfInspection({
+          userText: text,
+          historyMessages,
+          agentId,
+        }))
+      : null;
+    const selfInspectionPlan = buildSelfInspectionIntentPlan(selfInspection, enabledSkillIds);
+    if (selfInspection) console.log('[self-inspection]', JSON.stringify(selfInspection));
+    if (selfInspectionPlan) console.log('[self-inspection-plan]', JSON.stringify({
+      skills: selfInspectionPlan.skills,
+      target: selfInspection?.target || '',
+    }));
+    const intentPlan = presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
       ? await traceAsyncStep('intent_planner', () => planIntent({
           userText: text,
           historyMessages,
@@ -1585,6 +1599,27 @@ async function main() {
         userText: text,
         ctx,
         systemPrompt: systemPromptWithPlan,
+        tools: toolsForRequest,
+        historyMessages,
+        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+        resolveToolName: skillContext?.resolveToolName ?? (() => null),
+      }), { agentId, toolsCount: toolsForRequest.length });
+    }
+    if (
+      selfInspectionPlan
+      && Array.isArray(toolsForRequest)
+      && toolsForRequest.length > 0
+      && (!Array.isArray(turnResult?.skillsCalled) || turnResult.skillsCalled.length === 0)
+    ) {
+      console.log('[self-inspection] retrying because the first agent turn used no tools');
+      const retryPrompt = systemPromptWithPlan +
+        '\n\n--- Self-Inspection Tool Requirement ---\n' +
+        'This turn was classified as Pasture/CowCode self-inspection. Before final answering, call at least one available local inspection tool and ground the answer in what it returns.\n' +
+        '---';
+      turnResult = await traceAsyncStep('self_inspection_retry', () => runAgentTurn({
+        userText: text,
+        ctx,
+        systemPrompt: retryPrompt,
         tools: toolsForRequest,
         historyMessages,
         getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
