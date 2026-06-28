@@ -1619,7 +1619,7 @@ function renderSystemCronVariant(row) {
         configTileCard('Overview',
           '<p class="skill-meta" style="margin:0;">Project-wide settings live in the other tabs. Agent roster and per-agent display settings are under <strong>Agents</strong>.</p>') +
         configTileCard('Tips',
-          '<p class="skill-meta" style="margin:0;">Use <strong>JSON</strong> mode for keys not shown in the UI. Click <strong>Save</strong> to write <code>config.json</code>.</p>')
+          '<p class="skill-meta" style="margin:0;">Use <strong>JSON</strong> mode for keys not shown in the UI. Click <strong>Save</strong> to write the live runtime config at <code>~/.pasture/config.json</code>.</p>')
       );
       var selectedIdentity = getConfigAgentIdentity(configSelectedAgentId, config);
       var agentsBody =

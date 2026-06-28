@@ -96,6 +96,11 @@ function getDaemonRunning() {
 
 function loadConfig() {
   ensureMainAgentInitialized();
+  try {
+    const raw = readFileSync(getConfigPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch (_) {}
   return loadAgentConfig(DEFAULT_AGENT_ID);
 }
 
@@ -1815,7 +1820,7 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 const BRAIN_CORPUS_MAX_CHARS = 32_000;
 const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
 const BRAIN_LLM_CHUNK_CHARS = 9_000;
-const BRAIN_LLM_MAX_CHUNKS = 40;
+const BRAIN_LLM_MAX_CHUNKS = 8;
 const BRAIN_LLM_CACHE_VERSION = 4;
 const BRAIN_QUALITY_CACHE_VERSION = 3;
 const BRAIN_RESPONSE_CACHE_VERSION = 2;
@@ -1825,6 +1830,7 @@ const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
 const BRAIN_IMPORT_TEXT_EXTENSIONS = new Set(['.json', '.txt', '.md', '.csv', '.html', '.htm']);
 const BRAIN_IMPORT_PROVIDERS = new Set(['chatgpt', 'grok', 'claude', 'gemini', 'perplexity', 'copilot', 'other']);
 const brainCloudCache = new Map();
+const brainCloudBuilds = new Map();
 const brainBuildProgress = new Map();
 
 function brainDebugLog(event, details = {}) {
@@ -3064,16 +3070,32 @@ app.get('/api/brain/cloud', async (req, res) => {
       return;
     }
 
-    const dense = await buildLlmBrainGraph(corpus, {
-      range,
-      source,
-      force: refresh,
-      chunks,
-      onProgress: (progress) => setBrainBuildProgress(progressId, {
-        ...progress,
-        done: false,
-      }),
-    });
+    let denseBuild = brainCloudBuilds.get(rawResponseCacheKey);
+    if (denseBuild) {
+      brainDebugLog('raw_build_shared', {
+        range,
+        source,
+        force: refresh,
+        chunks: chunks.length,
+      });
+    } else {
+      denseBuild = buildLlmBrainGraph(corpus, {
+        range,
+        source,
+        force: refresh,
+        chunks,
+        onProgress: (progress) => setBrainBuildProgress(progressId, {
+          ...progress,
+          done: false,
+        }),
+      }).finally(() => {
+        if (brainCloudBuilds.get(rawResponseCacheKey) === denseBuild) {
+          brainCloudBuilds.delete(rawResponseCacheKey);
+        }
+      });
+      brainCloudBuilds.set(rawResponseCacheKey, denseBuild);
+    }
+    const dense = await denseBuild;
     if (req.aborted || req.destroyed || res.destroyed) return;
     const rawPayload = {
       range,
