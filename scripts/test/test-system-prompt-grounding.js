@@ -15,7 +15,7 @@
  * longer appear, the regression slips back in. So we pin the exact phrases.
  */
 
-import { buildOneOnOneSystemPrompt, RUNTIME_GROUNDING_BLOCK } from '../../lib/agent/system-prompt.js';
+import { buildOneOnOneSystemPrompt, FINAL_REPLY_POLICY_BLOCK, RUNTIME_GROUNDING_BLOCK } from '../../lib/agent/system-prompt.js';
 import { buildCronSystemPrompt } from '../../cron/run-job.js';
 
 let passed = 0;
@@ -89,6 +89,22 @@ check(
     /run_skill[^.]*http/i.test(cronPrompt),
     cronPrompt,
   );
+}
+
+// 5. Shared final reply policy is injected independent of mutable SOUL.md files
+{
+  const prompt = buildOneOnOneSystemPrompt();
+  for (const phrase of ['If the user asked for a count', 'Do not include database paths', 'Use tool results as private evidence']) {
+    check(
+      `FINAL_REPLY_POLICY_BLOCK contains "${phrase}"`,
+      FINAL_REPLY_POLICY_BLOCK.includes(phrase),
+      FINAL_REPLY_POLICY_BLOCK,
+    );
+    check(
+      `buildOneOnOneSystemPrompt() contains final reply policy phrase "${phrase}"`,
+      prompt.includes(phrase),
+    );
+  }
 }
 
 console.log(`\n[system-prompt-grounding] passed=${passed} failed=${failed}`);
