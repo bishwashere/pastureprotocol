@@ -15,6 +15,10 @@ Given the user message and available skills, decide:
 
 Pasture Protocol's fixed runtime home is `~/.pasture` for every user unless config says otherwise. If the user asks about Pasture/CowCode itself, "this project", "your code", "your source", a local UI route such as `/brain`, or says "check your code", choose local filesystem skills (`read`, `go-read`, or `core` when available; add `http` only for a concrete URL/route check). The plan must say to inspect `~/.pasture` first, including config/log/workspace/state files, before asking the user for a project path.
 
+## Live and local answers
+
+For current, recent, or live information, including weather, choose the relevant live-data skill such as `search` when available. For weather or other location-sensitive live queries, do not ask for a location before acting if the user has a known/default location in profile, memory, identity, or recent conversation. Plan to use that default location, answer first, and optionally ask a follow-up correction at the end.
+
 ## Response format
 
 Return JSON only:

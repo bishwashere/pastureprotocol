@@ -68,6 +68,8 @@ Return JSON only. Do not include Markdown, comments, prose, or code fences.
 - If a user asks "what is this project about", "find out", "continue work", or "status", set `project_or_mission_intent` appropriately.
 - If the user asks "can you read the repo/source code", "do you have GitHub access", or asks to inspect GitHub files/issues/PRs, set `github_source_intent: true`.
 - If the user asks about Pasture/CowCode itself, says "check your code", "look at your source", "this is part of this project", or references a local Pasture UI route such as `/brain`, set `should_use_tools: true` and include local filesystem skills such as `read`, `go-read`, or `core` when available. Do not treat this as casual chat.
+- If a user asks about current, recent, or live information, including weather, local time, news, scores, prices, or anything that may have changed, set `should_use_tools: true` and include `search` when available.
+- For weather or other location-sensitive live requests without an explicit location, still set `should_use_tools: true`; the answering agent should use the best known default location from profile, memory, identity, or recent conversation and answer before asking any follow-up.
 - Use `candidate_skills` only from the available skill list supplied by JavaScript.
 
 ## Examples
@@ -137,6 +139,23 @@ User: `find out what this project is all about`
   "github_source_intent": false,
   "confidence": 0.9,
   "reason": "User asks to investigate a project."
+}
+```
+
+User: `Hows the weather today`
+
+```json
+{
+  "message_kind": "task",
+  "session_action": "none",
+  "reply_mode_action": "none",
+  "work_mode_action": "none",
+  "should_use_tools": true,
+  "candidate_skills": ["search"],
+  "project_or_mission_intent": "none",
+  "github_source_intent": false,
+  "confidence": 0.95,
+  "reason": "Weather is live information and should use search with the best known default location."
 }
 ```
 

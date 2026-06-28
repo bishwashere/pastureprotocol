@@ -214,7 +214,7 @@ function normalizeEnabledList(list) {
   if (normalized.includes('core')) {
     normalized = normalized.filter((id) => id !== 'core').concat('go-read', 'go-write');
   }
-  return normalized;
+  return [...new Set(normalized)];
 }
 
 /** When the host has a GitHub token and github is enabled globally, all agents get the skill. */

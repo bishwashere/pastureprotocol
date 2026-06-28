@@ -10,6 +10,7 @@ async function main() {
   const prompt = loadPrompt('turn-intent-classifier');
   assert(prompt.includes('project_or_mission_intent'), 'prompt documents project_or_mission_intent');
   assert(prompt.includes('github_source_intent'), 'prompt documents github_source_intent');
+  assert(prompt.includes('Hows the weather today'), 'prompt includes weather/live-data example');
 
   const availableSkillIds = ['github', 'browse', 'memory', 'search'];
   const availableSkillSummaries = availableSkillIds.map((id) => ({ id, description: id }));
@@ -58,6 +59,27 @@ async function main() {
   assert(project.should_use_tools === true, 'should_use_tools true');
   assert(project.candidate_skills.join(',') === 'browse,github', 'filters unknown skills');
   assert(project.confidence === 1, 'confidence clamps high values');
+
+  const weather = await classifyTurnIntent({
+    userText: 'Hows the weather today',
+    availableSkillIds,
+    availableSkillSummaries,
+    llmChat: async () => JSON.stringify({
+      message_kind: 'task',
+      session_action: 'none',
+      reply_mode_action: 'none',
+      work_mode_action: 'none',
+      should_use_tools: true,
+      candidate_skills: ['search'],
+      project_or_mission_intent: 'none',
+      github_source_intent: false,
+      confidence: 0.95,
+      reason: 'Weather is live information.',
+    }),
+  });
+  assert(weather.message_kind === 'task', 'weather is a task');
+  assert(weather.should_use_tools === true, 'weather should use tools');
+  assert(weather.candidate_skills.join(',') === 'search', 'weather routes to search');
 
   const invalid = await classifyTurnIntent({
     userText: 'whatever',

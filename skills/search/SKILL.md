@@ -11,6 +11,7 @@ Search the web or fetch a page. Call **run_skill** with **skill: "search"**. The
 ## Commands (name is command)
 
 - **search** - For current time, weather, date, latest news, or any live query. Set **arguments.query** (e.g. "current time", "weather in Tokyo", "latest news"). Use a clear, concrete query.
+  - For weather or other location-sensitive live queries without an explicit location, use the best known default location from the user's identity/profile/memory/recent conversation. Search and answer for that location first; ask a brief correction question only after the answer if needed.
 - **navigate** - When the user gives a specific URL to read. Set **arguments.url** (full http or https URL).
 
 You can pass the command at the top level (`command: "search"`) or inside arguments (`arguments.action: "search"`). Never omit the command/action.
@@ -19,7 +20,7 @@ You can pass the command at the top level (`command: "search"`) or inside argume
 
 ```tool-schema
 search_search
-  description: Search the web. ALWAYS use this for any question about current events, recent news, election results, sports scores, prices, people, places, or anything that may have changed. Do not answer from memory when this tool is available.
+  description: Search the web. ALWAYS use this for any question about current events, recent news, election results, sports scores, prices, people, places, weather, or anything that may have changed. For weather without an explicit location, use the best known default location from context/profile and answer first; ask follow-up corrections only after. Do not answer from memory when this tool is available.
   parameters:
     query: string
 
