@@ -609,18 +609,23 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
 export async function chat(messages, options = {}) {
   const { models, dailyLimit, localRpm } = loadConfig(options);
   const purpose = options.purpose || 'chat';
+  const maxTokensOverride = Number(options.maxTokens);
   let lastError;
   let localError;
   for (const opts of models) {
+    const callOpts = Number.isFinite(maxTokensOverride) && maxTokensOverride > 0
+      ? { ...opts, maxTokens: maxTokensOverride }
+      : opts;
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
+    if (options.skipLocal && isLocal) continue;
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       const content = await runModelWithRetries({
         label,
         isLocal,
         llmCtx,
-        callFactory: ({ countUsage }) => callOne(messages, opts, null, dailyLimit, purpose, localRpm, { countUsage }),
+        callFactory: ({ countUsage }) => callOne(messages, callOpts, null, dailyLimit, purpose, localRpm, { countUsage }),
         parseOkResponse: async (res) => {
           const data = await res.json();
           const text = data.choices?.[0]?.message?.content;

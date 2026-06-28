@@ -3410,9 +3410,13 @@ function renderSystemCronVariant(row) {
       if (!terms.length) {
         stopBrainLoadingProgress();
         var hadSources = Number(stats && stats.chars) > 0 || Number(stats && stats.llmChunks) > 0;
-        var emptyText = hadSources
-          ? 'No extracted brain terms yet. Check LLM availability, then refresh.'
-          : 'No brain cloud yet.';
+        var llmUnavailable = Number(stats && stats.llmChunks) > 0 &&
+          Number(stats && stats.llmFailed) >= Number(stats && stats.llmChunks);
+        var emptyText = llmUnavailable
+          ? 'Brain extraction could not reach the LLM. Load a local model or check LLM config, then refresh.'
+          : hadSources
+            ? 'No extracted brain terms yet. Check LLM availability, then refresh.'
+            : 'No brain cloud yet.';
         cloud.innerHTML = '<p class="empty">' + escapeHtml(emptyText) + '</p>';
         renderBrainFocus('', []);
         return;

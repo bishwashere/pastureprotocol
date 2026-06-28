@@ -26,12 +26,13 @@ The input is one chunk of memory, notes, imported chat, or local user chat histo
 
 ## Graph Shape
 
-- Return 8 to 40 nodes when enough material exists (fewer for sparse chunks).
+- Return 4 to 14 nodes when enough material exists (fewer for sparse chunks).
 - Return only connections between terms you included.
 - Prefer useful local neighborhoods over a dense hairball.
-- Usually return 1 to 5 connections per important node.
+- Usually return 0 to 2 connections per important node.
 - Omit isolated generic nodes.
 - Keep labels stable across chunks when possible (use the clearest canonical name).
+- Keep the whole response compact. Do not try to exhaustively list every possible concept in the chunk.
 
 ## Input Shape
 
