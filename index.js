@@ -33,6 +33,7 @@ import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '
 import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from './lib/agent/turn-intent.js';
 import { classifySelfInspection, buildSelfInspectionIntentPlan } from './lib/agent/self-inspection.js';
 import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
+import { syncMainAgentIdentityFromWorkspace } from './lib/agent/identity-sync.js';
 import { buildDelegationContext } from './lib/agent/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from './lib/agent/delegation-routing-details.js';
 import { executeSkill } from './skills/executor.js';
@@ -1156,8 +1157,10 @@ async function main() {
       console.log('[path] buildSystemPrompt branch=one-on-one agentId=', agentId);
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
+      if (agentId === DEFAULT_AGENT_ID) syncMainAgentIdentityFromWorkspace();
       return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId)) + buildAgentTeamPromptBlock(agentId);
     }
+    if (agentId === DEFAULT_AGENT_ID) syncMainAgentIdentityFromWorkspace();
     const basePrompt = buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
     const loaded = loadGroupMd(getWorkspaceDir(), DEFAULT_WORKSPACE_DIR);
     const groupBlock = buildGroupPromptBlock(loaded, {

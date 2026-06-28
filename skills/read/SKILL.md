@@ -26,6 +26,8 @@ Use when the user says things like:
 - **"Where is pasture installed?"**, **"Where is my config?"**, **"check your code"**, **"look at this project"**, or questions about Pasture/CowCode runtime features like `/brain` - start from `~/.pasture`. Read `~/.pasture/config.json` to confirm paths, then inspect the relevant `~/.pasture` state/log/workspace files. Treat state dir `~/.pasture` and workspace `~/.pasture/workspace` as fixed defaults unless config says otherwise.
 - "What's in my config?" / "Show me my config" - use read with path `~/.pasture/config.json`.
 
+For SQLite database inspection or row counts, use **go-read** with action `sql`; `read` is only for file contents.
+
 The skill returns the file content as text. No modifications are made.
 
 ## Tool schema

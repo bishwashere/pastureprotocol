@@ -24,6 +24,7 @@ import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
 import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
 import { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } from '../lib/util/dashboard-url.js';
+import { syncMainAgentIdentityFileFromWorkspace } from '../lib/agent/identity-sync.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -1708,6 +1709,7 @@ app.patch('/api/workspace-md/:key', (req, res) => {
     const dir = join(path, '..');
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, content, 'utf8');
+    syncMainAgentIdentityFileFromWorkspace(key);
     res.json({ id: key, ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
