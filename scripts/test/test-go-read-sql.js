@@ -62,12 +62,22 @@ async function main() {
   assert(grouped.rows.find((row) => row.source === 'memory')?.count === 1, 'expected memory source count');
 
   const schema = JSON.parse(await executeGoRead({}, {
+    action: 'sql_schema',
+    path: indexPath,
+    sampleRows: 1,
+  }));
+  const chunksTable = schema.tables.find((table) => table.name === 'chunks');
+  assert(chunksTable, 'expected chunks table in schema result');
+  assert(chunksTable.columns.some((column) => column.name === 'path'), 'expected chunks.path in schema result');
+  assert(chunksTable.sample.length === 1, 'expected one sample row for chunks');
+
+  const sqlSchema = JSON.parse(await executeGoRead({}, {
     action: 'sql',
     path: indexPath,
     sql: "select name from sqlite_master where type = ? order by name",
     params: ['table'],
   }));
-  assert(schema.rows.some((row) => row.name === 'chunks'), 'expected chunks table in schema result');
+  assert(sqlSchema.rows.some((row) => row.name === 'chunks'), 'expected chunks table from manual sqlite_master query');
 
   const blocked = JSON.parse(await executeGoRead({}, {
     action: 'sql',
@@ -76,8 +86,16 @@ async function main() {
   }));
   assert(/read-only/i.test(blocked.error || ''), `expected read-only rejection, got ${JSON.stringify(blocked)}`);
 
+  const badQuery = JSON.parse(await executeGoRead({}, {
+    action: 'sql',
+    path: indexPath,
+    sql: 'select missing_column from chunks',
+  }));
+  assert(/missing_column/i.test(badQuery.error || ''), `expected missing column error, got ${JSON.stringify(badQuery)}`);
+  assert(/sql_schema/i.test(badQuery.schemaHint || ''), 'expected schema repair hint');
+
   console.log('Go-read SQL test passed.');
-  console.log(JSON.stringify({ chunks: count.rows[0].chunks, tables: schema.rows.map((row) => row.name) }, null, 2));
+  console.log(JSON.stringify({ chunks: count.rows[0].chunks, tables: schema.tables.map((table) => table.name) }, null, 2));
 }
 
 main().catch((err) => {

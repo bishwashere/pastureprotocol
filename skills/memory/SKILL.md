@@ -12,6 +12,8 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and optional **
 
 **Filesystem index** - If the user has run `pasture index --source filesystem`, the same memory index contains **directory listings** (one chunk per directory). Results can have path `filesystem/` or `filesystem/rel/path` and snippet text like "Directory: /path\nContents: file1, file2, subdir/, ...". When the user asks "what files do I have?", "list my files", "what's in my workspace?", "search my memory for files", use **memory_search** with a query that matches directory/listings, e.g. "directory contents", "list of files and folders", "files and directories". Then report the path and snippet from any results whose path starts with `filesystem/` - the snippet is the directory listing. Do not use memory_get for paths starting with `filesystem/` (only notes and chat-log paths are readable that way).
 
+**Brain item / word questions** - When the user asks for "top brain items", "brain words", "brain nodes", "brain terms", or asks to "give the word", they want the final display labels from the Brain graph, not memory chunks. Do not answer with chat-log paths, source files, internal IDs, chunk lengths, row counts, or raw stopword frequency (`the`, `and`, `you`, etc.). If Brain graph data is available from a tool/API result, list only `terms[].text` / `denseTerms[].text` labels in rank order. If only chunk rows or file paths are available, say you need the Brain graph terms rather than inventing proxies.
+
 **Auto-indexing** - Notes (MEMORY.md, memory/*.md) and chat-log files are synced when you run memory_search. No manual "moo index" needed.
 
 ## Tools (pass `tool` in arguments: "memory_search", "memory_get", or "memory_save")
