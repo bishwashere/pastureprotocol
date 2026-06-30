@@ -6,7 +6,7 @@ For **real user messages → LLM → bot reply → agent-send**, use **[Agent Te
 
 | | |
 |--|--|
-| **Test file** | `../test-agent-config.js` |
+| **Test file** | `scripts/test/unit/agent/test-agent-config.js` |
 
 ## Inputs
 

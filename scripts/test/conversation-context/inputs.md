@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-conversation-context.js` |
+| **Test file** | `scripts/test/unit/core/test-conversation-context.js` |
 
 ## Inputs
 

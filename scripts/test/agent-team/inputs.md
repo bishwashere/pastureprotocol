@@ -1,4 +1,4 @@
-# Agent team E2E (`test-agent-team-e2e.js`)
+# Agent team E2E (`scripts/test/e2e/agent/test-agent-team-e2e.js`)
 
 Natural user messages only — no tool names, no agent names, no "ask the marketer/Chloe/Alex". Delegation must come from specialization matching.
 
@@ -9,12 +9,12 @@ That file was deleted in favor of **real user-path E2E** (`index.js --test` / da
 | Old flow scenario | Where it lives now |
 | --- | --- |
 | Create team + links | Fixture setup in `agent-team-fixture.js` (not a separate test row) |
-| Rename → Chloe, resolve aliases | `test-agent-config.js` (config contract, no LLM) |
-| Delegate by specialization (not agent name) | `test-agent-team-e2e.js` (natural chat + real `agent-send`) |
-| Remove / re-add alex link | `test-agent-team-e2e.js` |
-| Stale allow `[chloe, ghost]` → repair | `test-agent-config.js` |
+| Rename → Chloe, resolve aliases | `scripts/test/unit/agent/test-agent-config.js` (config contract, no LLM) |
+| Delegate by specialization (not agent name) | `scripts/test/e2e/agent/test-agent-team-e2e.js` (natural chat + real `agent-send`) |
+| Remove / re-add alex link | `scripts/test/e2e/agent/test-agent-team-e2e.js` |
+| Stale allow `[chloe, ghost]` → repair | `scripts/test/unit/agent/test-agent-config.js` |
 | Short reply "Chloe" after rename offer | Partially similar to two-turn nickname test; full history probe not duplicated in E2E |
-| New session ack | `test-agent-team-e2e.js` + `test-chat-session.js` |
+| New session ack | `scripts/test/e2e/agent/test-agent-team-e2e.js` + `scripts/test/unit/core/test-chat-session.js` |
 
 Run config contracts: `pnpm run test:agent-config` (see **agent-config** in Tests panel).
 

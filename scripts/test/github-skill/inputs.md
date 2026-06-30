@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-github-skill.js` |
+| **Test file** | `scripts/test/unit/skills/test-github-skill.js` |
 
 ## Inputs
 

@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-skill-install.js` |
+| **Test file** | `scripts/test/unit/skills/test-skill-install.js` |
 
 ## Inputs
 

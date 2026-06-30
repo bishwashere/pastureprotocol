@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-calendar-skill.js` |
+| **Test file** | `scripts/test/unit/skills/test-calendar-skill.js` |
 
 ## Inputs
 

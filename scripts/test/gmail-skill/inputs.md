@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-gmail-skill.js` |
+| **Test file** | `scripts/test/unit/skills/test-gmail-skill.js` |
 
 ## Inputs
 

@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-fixture-state.js` |
+| **Test file** | `scripts/test/support/test-fixture-state.js` |
 
 ## Inputs
 

@@ -31,22 +31,22 @@ done
 
 # not in package.json
 for pair in \
-  "agent-map-ui|node scripts/test/test-agent-map-ui.js" \
-  "apply-patch|node scripts/test/test-apply-patch.js" \
-  "credential-utils|node scripts/test/test-credential-utils.js" \
-  "fixture-state|node scripts/test/test-fixture-state.js" \
-  "read-e2e|node scripts/test/test-read-e2e.js" \
-  "search-e2e|node scripts/test/test-search-e2e.js" \
-  "core-e2e|node scripts/test/test-core-e2e.js" \
-  "go-read-e2e|node scripts/test/test-go-read-e2e.js" \
-  "go-write-e2e|node scripts/test/test-go-write-e2e.js" \
-  "apply-patch-e2e|node scripts/test/test-apply-patch-e2e.js" \
-  "speech-e2e|node scripts/test/test-speech-e2e.js" \
-  "vision-e2e|node scripts/test/test-vision-e2e.js" \
-  "gog-e2e|node scripts/test/test-gog-e2e.js" \
-  "basic-e2e|node scripts/test/test-basic-e2e.js" \
-  "agent|node scripts/test/test-agent.js" \
-  "server-inspect-e2e|node scripts/test/test-server-inspect-e2e.js"; do
+  "agent-map-ui|node scripts/test/unit/agent/test-agent-map-ui.js" \
+  "apply-patch|node scripts/test/unit/skills/test-apply-patch.js" \
+  "credential-utils|node scripts/test/unit/core/test-credential-utils.js" \
+  "fixture-state|node scripts/test/support/test-fixture-state.js" \
+  "read-e2e|node scripts/test/e2e/skills/test-read-e2e.js" \
+  "search-e2e|node scripts/test/e2e/skills/test-search-e2e.js" \
+  "core-e2e|node scripts/test/e2e/skills/test-core-e2e.js" \
+  "go-read-e2e|node scripts/test/e2e/skills/test-go-read-e2e.js" \
+  "go-write-e2e|node scripts/test/e2e/skills/test-go-write-e2e.js" \
+  "apply-patch-e2e|node scripts/test/e2e/skills/test-apply-patch-e2e.js" \
+  "speech-e2e|node scripts/test/e2e/skills/test-speech-e2e.js" \
+  "vision-e2e|node scripts/test/e2e/skills/test-vision-e2e.js" \
+  "gog-e2e|node scripts/test/e2e/skills/test-gog-e2e.js" \
+  "basic-e2e|node scripts/test/e2e/core/test-basic-e2e.js" \
+  "agent|node scripts/test/e2e/agent/test-agent.js" \
+  "server-inspect-e2e|node scripts/test/e2e/skills/test-server-inspect-e2e.js"; do
   name="${pair%%|*}"
   cmd="${pair#*|}"
   run_suite "$name" $cmd || true

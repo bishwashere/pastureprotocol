@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-dry-run.js` → `dry-run-reminder.js` |
+| **Test file** | `scripts/test/unit/core/test-dry-run.js` → `dry-run-reminder.js` |
 
 ## Inputs
 

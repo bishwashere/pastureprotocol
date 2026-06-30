@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-output-parse.js` |
+| **Test file** | `scripts/test/unit/dashboard/test-output-parse.js` |
 
 ## Inputs
 

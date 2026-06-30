@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-tide-checklist.js` |
+| **Test file** | `scripts/test/unit/agent/test-tide-checklist.js` |
 
 ## Inputs
 

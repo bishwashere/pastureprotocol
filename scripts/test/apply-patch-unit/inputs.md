@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-apply-patch.js` |
+| **Test file** | `scripts/test/unit/skills/test-apply-patch.js` |
 
 ## Inputs
 

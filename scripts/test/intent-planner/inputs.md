@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-intent-planner.js` |
+| **Test file** | `scripts/test/unit/agent/test-intent-planner.js` |
 
 ## Inputs
 

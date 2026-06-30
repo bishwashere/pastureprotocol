@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-memory-index-files.js` |
+| **Test file** | `scripts/test/unit/core/test-memory-index-files.js` |
 
 ## Inputs
 

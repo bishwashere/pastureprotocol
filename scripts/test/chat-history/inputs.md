@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-chat-history.js` |
+| **Test file** | `scripts/test/unit/core/test-chat-history.js` |
 
 ## Inputs
 

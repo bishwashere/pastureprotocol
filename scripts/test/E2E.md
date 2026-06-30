@@ -35,7 +35,19 @@ User message  →  index.js --test  OR  chat-dashboard.js  →  Reply
               Pass / Fail
 ```
 
-Shared runner: `skill-test-runner.js` (`runSkillTests`). Report table: `e2e-report.js` (`recordCase`, `startReport` / `endReport` — prints **Input | Output | Status** per case). Helpers: `e2e-run.js` (`runE2E`, `runDashboardE2E`).
+Shared runner: `scripts/test/support/skill-test-runner.js` (`runSkillTests`). Report table: `scripts/test/support/e2e-report.js` (`recordCase`, `startReport` / `endReport` — prints **Input | Output | Status** per case). Helpers live in `scripts/test/support/`.
+
+## Test layout
+
+- `scripts/test/e2e/skills/` — user prompt → app entry point → LLM → skill/tool → reply.
+- `scripts/test/e2e/agent/` — chat/delegation/team E2E flows.
+- `scripts/test/e2e/core/` — app-level E2E flows that are not tied to one skill.
+- `scripts/test/e2e/dashboard/` — browser/dashboard E2E flows.
+- `scripts/test/unit/skills/` — direct executor and skill contract tests.
+- `scripts/test/unit/agent/` — agent planning, routing, prompt, and state contract tests.
+- `scripts/test/unit/core/` — storage, config, migrations, utility, and process contract tests.
+- `scripts/test/unit/dashboard/` — dashboard static/UI parser contract tests.
+- `scripts/test/support/` — shared runners, judges, fixtures, and helpers.
 
 ## Internal contract tests
 
@@ -51,39 +63,39 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 
 | Folder | Test file | Entry |
 |--------|-----------|--------|
-| [cron/](cron/inputs.md) | `test-cron-e2e.js` | `--test` |
-| [agent/](agent/inputs.md) | `test-agent.js` | `--test` |
-| [agent-team/](agent-team/inputs.md) | `test-agent-team-e2e.js` | `--test` + dashboard |
-| [evaluate-team-capability/](evaluate-team-capability/inputs.md) | `test-evaluate-team-capability.js` | direct (routing logic) |
-| - | `test-delegation-llm-router.js` | direct (LLM hybrid router; mock LLM) |
-| [agent-team/](agent-team/inputs.md) | `test-agent-config.js` | direct (config only; replaces deleted `test-agent-team-flow.js`) |
-| [basic/](basic/inputs.md) | `test-basic-e2e.js` | `--test` |
-| [casual-greetings/](casual-greetings/inputs.md) | `test-casual-greetings.js` | unit + `--test` |
-| - | `test-chat-session.js` | direct (session logic only) |
-| [edit/](edit/inputs.md) | `test-edit-e2e.js` | `--test` |
-| [write/](write/inputs.md) | `test-write-e2e.js` | `--test` |
-| [browser/](browser/inputs.md) | `test-browser-e2e.js` | `--test` |
-| [memory/](memory/inputs.md) | `test-memory-e2e.js` | `--test` |
-| [me/](me/inputs.md) | `test-me-e2e.js` | `--test` |
-| [home-assistant/](home-assistant/inputs.md) | `test-home-assistant-e2e.js` | `--test` |
-| [vision/](vision/inputs.md) | `test-vision-e2e.js` | `--test` |
-| [apply-patch/](apply-patch/inputs.md) | `test-apply-patch-e2e.js` | `--test` |
-| [read/](read/inputs.md) | `test-read-e2e.js` | `--test` |
-| [go-read/](go-read/inputs.md) | `test-go-read-e2e.js` | `--test` |
-| [core/](core/inputs.md) | `test-core-e2e.js` | `--test` |
-| [go-write/](go-write/inputs.md) | `test-go-write-e2e.js` | `--test` |
-| [search/](search/inputs.md) | `test-search-e2e.js` | `--test` |
-| [server-inspect/](server-inspect/inputs.md) | `test-server-inspect-e2e.js` | `--test` |
-| [speech/](speech/inputs.md) | `test-speech-e2e.js` | `--test` |
-| [gog/](gog/inputs.md) | `test-gog-e2e.js` | `--test` |
-| [tide/](tide/inputs.md) | `test-tide.js` | direct (payload) |
-| - | `test-work-mode.js` | direct (LLM-stubbed; chat-session storage + md-llm runner + work-mode classifier; pins "toggle takes effect next turn" contract) |
-| - | `test-autonomy-gating.js` | direct (mission engine + system pulse only start once the first mission is created or already on disk; idempotent) |
-| [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `test-project-workflow-e2e.js` | `--test` (multi-turn) |
+| [cron/](cron/inputs.md) | `scripts/test/e2e/skills/test-cron-e2e.js` | `--test` |
+| [agent/](agent/inputs.md) | `scripts/test/e2e/agent/test-agent.js` | `--test` |
+| [agent-team/](agent-team/inputs.md) | `scripts/test/e2e/agent/test-agent-team-e2e.js` | `--test` + dashboard |
+| [evaluate-team-capability/](evaluate-team-capability/inputs.md) | `scripts/test/unit/agent/test-evaluate-team-capability.js` | direct (routing logic) |
+| - | `scripts/test/unit/agent/test-delegation-llm-router.js` | direct (LLM hybrid router; mock LLM) |
+| [agent-team/](agent-team/inputs.md) | `scripts/test/unit/agent/test-agent-config.js` | direct (config only; replaces deleted `test-agent-team-flow.js`) |
+| [basic/](basic/inputs.md) | `scripts/test/e2e/core/test-basic-e2e.js` | `--test` |
+| [casual-greetings/](casual-greetings/inputs.md) | `scripts/test/e2e/agent/test-casual-greetings.js` | unit + `--test` |
+| - | `scripts/test/unit/core/test-chat-session.js` | direct (session logic only) |
+| [edit/](edit/inputs.md) | `scripts/test/e2e/skills/test-edit-e2e.js` | `--test` |
+| [write/](write/inputs.md) | `scripts/test/e2e/skills/test-write-e2e.js` | `--test` |
+| [browser/](browser/inputs.md) | `scripts/test/e2e/skills/test-browser-e2e.js` | `--test` |
+| [memory/](memory/inputs.md) | `scripts/test/e2e/skills/test-memory-e2e.js` | `--test` |
+| [me/](me/inputs.md) | `scripts/test/e2e/skills/test-me-e2e.js` | `--test` |
+| [home-assistant/](home-assistant/inputs.md) | `scripts/test/e2e/skills/test-home-assistant-e2e.js` | `--test` |
+| [vision/](vision/inputs.md) | `scripts/test/e2e/skills/test-vision-e2e.js` | `--test` |
+| [apply-patch/](apply-patch/inputs.md) | `scripts/test/e2e/skills/test-apply-patch-e2e.js` | `--test` |
+| [read/](read/inputs.md) | `scripts/test/e2e/skills/test-read-e2e.js` | `--test` |
+| [go-read/](go-read/inputs.md) | `scripts/test/e2e/skills/test-go-read-e2e.js` | `--test` |
+| [core/](core/inputs.md) | `scripts/test/e2e/skills/test-core-e2e.js` | `--test` |
+| [go-write/](go-write/inputs.md) | `scripts/test/e2e/skills/test-go-write-e2e.js` | `--test` |
+| [search/](search/inputs.md) | `scripts/test/e2e/skills/test-search-e2e.js` | `--test` |
+| [server-inspect/](server-inspect/inputs.md) | `scripts/test/e2e/skills/test-server-inspect-e2e.js` | `--test` |
+| [speech/](speech/inputs.md) | `scripts/test/e2e/skills/test-speech-e2e.js` | `--test` |
+| [gog/](gog/inputs.md) | `scripts/test/e2e/skills/test-gog-e2e.js` | `--test` |
+| [tide/](tide/inputs.md) | `scripts/test/unit/agent/test-tide.js` | direct (payload) |
+| - | `scripts/test/unit/agent/test-work-mode.js` | direct (LLM-stubbed; chat-session storage + md-llm runner + work-mode classifier; pins "toggle takes effect next turn" contract) |
+| - | `scripts/test/unit/agent/test-autonomy-gating.js` | direct (mission engine + system pulse only start once the first mission is created or already on disk; idempotent) |
+| [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `scripts/test/e2e/core/test-project-workflow-e2e.js` | `--test` (multi-turn) |
 
 ### Dashboard Tests panel (all `scripts/test/<id>/inputs.md` + matching script)
 
-Discovery rule: folder `scripts/test/<id>/inputs.md` plus `scripts/test/test-<id>.js` or `test-<id>-e2e.js`. Restart the dashboard after adding suites.
+Discovery rule: folder `scripts/test/<id>/inputs.md` plus a matching script under `scripts/test/unit/**` or `scripts/test/e2e/**`. Restart the dashboard after adding suites.
 
 | ID | Script | In UI |
 |----|--------|-------|
@@ -99,4 +111,4 @@ Discovery rule: folder `scripts/test/<id>/inputs.md` plus `scripts/test/test-<id
 | project-workflow-e2e | E2E (multi-turn) | ✅ |
 | dashboard-boot, dashboard-browser | static + Playwright | — |
 
-Not in UI (wrappers only): `test-agent-send.js`, `test-agent-title.js` → run `test-agent-team-e2e.js` via pnpm aliases.
+Not in UI (wrappers only): `scripts/test/e2e/agent/test-agent-send.js`, `scripts/test/e2e/agent/test-agent-title.js` → run `scripts/test/e2e/agent/test-agent-team-e2e.js` via pnpm aliases.

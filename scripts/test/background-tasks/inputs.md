@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-background-tasks.js` |
+| **Test file** | `scripts/test/unit/agent/test-background-tasks.js` |
 
 ## Inputs
 

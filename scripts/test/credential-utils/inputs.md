@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-credential-utils.js` |
+| **Test file** | `scripts/test/unit/core/test-credential-utils.js` |
 
 ## Inputs
 

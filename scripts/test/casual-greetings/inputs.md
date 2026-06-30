@@ -4,7 +4,7 @@ Fast **unit** checks (no LLM) plus optional **E2E** via `index.js --test`.
 
 | | |
 |--|--|
-| **Test file** | `../test-casual-greetings.js` |
+| **Test file** | `scripts/test/e2e/agent/test-casual-greetings.js` |
 | **Run** | `pnpm run test:casual-greetings` |
 
 ## Unit inputs (`isNonTaskMessage` = true)

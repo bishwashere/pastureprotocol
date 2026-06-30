@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-workspace-path.js` |
+| **Test file** | `scripts/test/unit/core/test-workspace-path.js` |
 
 ## Inputs
 

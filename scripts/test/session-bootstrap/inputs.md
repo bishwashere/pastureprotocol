@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-session-bootstrap.js` |
+| **Test file** | `scripts/test/unit/core/test-session-bootstrap.js` |
 
 ## Inputs
 

@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-e2e-expect.js` |
+| **Test file** | `scripts/test/unit/core/test-e2e-expect.js` |
 
 ## Inputs
 

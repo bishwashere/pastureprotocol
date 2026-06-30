@@ -1,10 +1,10 @@
-# Evaluate team capability (`test-evaluate-team-capability.js`)
+# Evaluate team capability (`scripts/test/unit/agent/test-evaluate-team-capability.js`)
 
 Unit tests for coordinator routing when no specialist is an obvious fit.
 
 | | |
 |--|--|
-| **Test file** | `../test-evaluate-team-capability.js` |
+| **Test file** | `scripts/test/unit/agent/test-evaluate-team-capability.js` |
 | **Run** | `pnpm run test:evaluate-team-capability` |
 
 ## Scenarios

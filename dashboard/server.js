@@ -7,7 +7,7 @@
 
 import dotenv from 'dotenv';
 import express from 'express';
-import { join, dirname } from 'path';
+import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 import { spawn, execSync, execFileSync } from 'child_process';
@@ -1432,7 +1432,8 @@ app.post('/api/chat', (req, res) => {
 });
 
 // ---- Tests (skill test runner: list, inputs, run) ----
-// Discover tests automatically: any scripts/test/<dir>/ with inputs.md and a matching test-<dir>-e2e.js or test-<dir>.js
+// Discover tests automatically: any scripts/test/<dir>/ with inputs.md and a
+// matching test script anywhere under scripts/test/unit or scripts/test/e2e.
 
 const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
 
@@ -1441,29 +1442,46 @@ function getTestRoot() {
   if (process.env.PASTURE_TEST_ROOT) {
     return resolve(process.env.PASTURE_TEST_ROOT);
   }
-  const installMarker = join(INSTALL_DIR, 'scripts', 'test', 'e2e-report.js');
+  const installMarker = join(INSTALL_DIR, 'scripts', 'test', 'support', 'e2e-report.js');
   if (existsSync(installMarker)) return INSTALL_DIR;
-  const repoMarker = join(ROOT, 'scripts', 'test', 'e2e-report.js');
+  const repoMarker = join(ROOT, 'scripts', 'test', 'support', 'e2e-report.js');
   if (ROOT !== INSTALL_DIR && existsSync(repoMarker)) return ROOT;
   return INSTALL_DIR;
+}
+
+function listTestScripts(dir) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...listTestScripts(p));
+    } else if (/^test-.+\.(js|ps1|sh)$/.test(entry.name)) {
+      out.push(p);
+    }
+  }
+  return out;
 }
 
 function getTestList() {
   const testDir = join(getTestRoot(), 'scripts', 'test');
   if (!existsSync(testDir)) return [];
+  const scripts = listTestScripts(testDir);
+  const scriptByBase = new Map(scripts.map((p) => [p.split(/[\\/]/).pop(), p]));
   const dirs = readdirSync(testDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
+    .filter((d) => !['unit', 'e2e', 'support', 'fixtures'].includes(d.name))
     .map((d) => d.name)
     .sort();
   const list = [];
   for (const id of dirs) {
     const inputsPath = join(testDir, id, 'inputs.md');
     if (!existsSync(inputsPath)) continue;
-    const scriptE2e = join(testDir, 'test-' + id + '-e2e.js');
-    const scriptPlain = join(testDir, 'test-' + id + '.js');
-    const scriptPath = existsSync(scriptE2e) ? scriptE2e : (existsSync(scriptPlain) ? scriptPlain : null);
+    const scriptE2e = scriptByBase.get('test-' + id + '-e2e.js');
+    const scriptPlain = scriptByBase.get('test-' + id + '.js');
+    const scriptPath = scriptE2e || scriptPlain || null;
     if (!scriptPath) continue;
-    const script = 'scripts/test/' + (existsSync(scriptE2e) ? 'test-' + id + '-e2e.js' : 'test-' + id + '.js');
+    const script = relative(getTestRoot(), scriptPath).replace(/\\/g, '/');
     let name = id.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') +
       (script.endsWith('-e2e.js') ? ' E2E' : '');
     if (id === 'agent-config') name = 'Agent Config (unit, no LLM)';

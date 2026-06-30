@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-update-build.js` |
+| **Test file** | `scripts/test/unit/core/test-update-build.js` |
 
 ## Inputs
 

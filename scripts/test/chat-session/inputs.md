@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-chat-session.js` |
+| **Test file** | `scripts/test/unit/core/test-chat-session.js` |
 
 ## Inputs
 

@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-telegram-send.js` |
+| **Test file** | `scripts/test/unit/core/test-telegram-send.js` |
 
 ## Inputs
 

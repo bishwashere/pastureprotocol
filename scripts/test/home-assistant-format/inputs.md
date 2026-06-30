@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-home-assistant-format.js` |
+| **Test file** | `scripts/test/unit/skills/test-home-assistant-format.js` |
 
 ## Inputs
 

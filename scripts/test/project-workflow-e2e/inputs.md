@@ -1,11 +1,11 @@
-# Project workflow E2E (`test-project-workflow-e2e.js`)
+# Project workflow E2E (`scripts/test/e2e/core/test-project-workflow-e2e.js`)
 
 Multi-turn conversational tests. Every user message must read like a real user.
 No tool names, no function names, no pre-written steps for the agent to parrot back.
 
-## Why this file exists separately from `test-project-workflow.js`
+## Why this file exists separately from `scripts/test/unit/core/test-project-workflow.js`
 
-`test-project-workflow.js` calls library functions directly — it is a unit/contract test for
+`scripts/test/unit/core/test-project-workflow.js` calls library functions directly — it is a unit/contract test for
 the project-workflow data layer. This file tests the **full user path** through `index.js --test`,
 where the agent must decide on its own what to do next.
 
@@ -13,7 +13,7 @@ where the agent must decide on its own what to do next.
 
 `seedProjectOnly()` may write a project catalog entry (name, description, URL) to stateDir before
 the first message. That is the only setup allowed — equivalent to agent fixture setup in
-`test-agent-team-e2e.js`. No mission, no tasks, no plan steps are pre-seeded.
+`scripts/test/e2e/agent/test-agent-team-e2e.js`. No mission, no tasks, no plan steps are pre-seeded.
 
 ## Multi-turn approach
 

@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-agent-map-ui.js` |
+| **Test file** | `scripts/test/unit/agent/test-agent-map-ui.js` |
 
 ## Inputs
 

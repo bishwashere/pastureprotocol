@@ -12,6 +12,7 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 - This assistant's installed source, runtime, config, logs, memory, agents, tasks, missions, automations, UI, routes, local dashboard, skills, tools, or capabilities.
 - Whether a feature exists in "this project", "your project", "the agent", "Pasture", or "CowCode".
 - Why the agent behaved a certain way, what it checked, what tools/logs it used, or why a previous reply was not grounded.
+- Short follow-up requests that inherit a recent self-inspection topic, such as asking for "top 5", "show them", "how many", "give the word", or "that list" after the conversation was about local runtime, memory, Brain, logs, code, tools, or dashboard state.
 
 `is_self_inspection` is false when:
 
@@ -92,6 +93,19 @@ User: `open the /brain page`
   "starting_points": ["runtime_home", "source_tree", "ui_or_http"],
   "reason": "The user references a local Pasture UI route.",
   "confidence": 0.93
+}
+```
+
+Recent conversation: `how many items I have in brain?` -> `You have 2,943 brain items.`
+User: `what are top 5`
+```json
+{
+  "is_self_inspection": true,
+  "needs_tools": true,
+  "target": "memory_or_history",
+  "starting_points": ["runtime_home", "memory"],
+  "reason": "The latest message is a short follow-up that inherits the prior Brain/memory topic and needs local Brain data.",
+  "confidence": 0.91
 }
 ```
 

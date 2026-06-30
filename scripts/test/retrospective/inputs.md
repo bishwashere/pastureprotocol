@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-retrospective.js` |
+| **Test file** | `scripts/test/unit/agent/test-retrospective.js` |
 
 ## Inputs
 

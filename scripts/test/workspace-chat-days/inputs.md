@@ -2,7 +2,7 @@
 
 | | |
 |--|--|
-| **Test file** | `../test-workspace-chat-days.js` |
+| **Test file** | `scripts/test/unit/core/test-workspace-chat-days.js` |
 
 ## Inputs
 
