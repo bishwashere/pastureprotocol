@@ -29,7 +29,7 @@ import { loadConfig, chat as llmChat, isDailyLimitReached, msUntilLimitResets } 
 import { runAgentTurn, stripThinking } from './lib/agent/agent.js';
 import { runInternalAgentTurn } from './lib/agent/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent/agent-context-state.js';
-import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/agent/intent-planner.js';
+import { routeTurn, turnRouteToSystemBlock, buildCasualChatTurnRoute } from './lib/agent/turn-router.js';
 import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from './lib/agent/turn-intent.js';
 import { classifySelfInspection, buildSelfInspectionIntentPlan } from './lib/agent/self-inspection.js';
 import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
@@ -1426,7 +1426,7 @@ async function main() {
         details: delegationDecision,
       });
     }
-    // Step 4: intent planner — one small LLM call before loading any tool schemas.
+    // Step 4: turn router — one small LLM call before loading any tool schemas.
     //
     // The planner (and its companion hint classifiers — casual chat, missions
     // discovery, github source) is a multi-agent / work-mode concern. In
@@ -1450,7 +1450,7 @@ async function main() {
     const casualIntentPlan = isMultiAgent && !presetDelegationPlan
       ? (turnIntentIsConfident
           ? buildCasualPlanFromTurnIntent(turnIntent)
-          : (isNonTaskMessage(text) ? buildCasualChatIntentPlan() : null))
+          : (isNonTaskMessage(text) ? buildCasualChatTurnRoute() : null))
       : null;
     const missionForIntent = isMultiAgent && !presetDelegationPlan && !casualIntentPlan && turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
       ? resolveMissionForUserTurn({
@@ -1468,7 +1468,7 @@ async function main() {
           ? buildGithubSourceIntentPlan(enabledSkillIds)
           : null)
       : null;
-    const selfInspection = !presetDelegationPlan && enabledSkillIds.length > 0
+    const selfInspection = isMultiAgent && !presetDelegationPlan && enabledSkillIds.length > 0
       ? await traceAsyncStep('self_inspection', () => classifySelfInspection({
           userText: text,
           historyMessages,
@@ -1481,8 +1481,8 @@ async function main() {
       skills: selfInspectionPlan.skills,
       target: selfInspection?.target || '',
     }));
-    const intentPlan = presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
-      ? await traceAsyncStep('intent_planner', () => planIntent({
+    const turnRoute = presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
+      ? await traceAsyncStep('turn_router', () => routeTurn({
           userText: text,
           historyMessages,
           availableSkillIds: enabledSkillIds,
@@ -1492,23 +1492,26 @@ async function main() {
           workDurability: durabilityDecision,
         }))
       : null);
-    if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
-    // Step 5: load tool schemas based on what the planner returned.
-    //   intentPlan === null      → planner failed  → full tools (safe fallback)
-    //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
-    //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
-    const plannerSaysNoTools = intentPlan !== null && Array.isArray(intentPlan.skills) && intentPlan.skills.length === 0;
+    if (turnRoute) console.log('[turn-router]', JSON.stringify(turnRoute));
+    // Step 5: load tool schemas. In single-agent mode there is no semantic
+    // pre-router: load the full enabled skill set and let skill docs/schemas
+    // determine which tool the model calls. In multi-agent mode, route hints can
+    // still narrow tools for delegation / durable work.
+    //   turnRoute === null      → full tools (single mode or router fallback)
+    //   turnRoute.skills = []   → router: chat   → skip schema loading entirely
+    //   turnRoute.skills = [...] → router: tools  → load only selected schemas
+    const plannerSaysNoTools = turnRoute !== null && Array.isArray(turnRoute.skills) && turnRoute.skills.length === 0;
     let skillContext = null;
     let toolsForRequest = [];
     if (!plannerSaysNoTools) {
-      skillContext = getSkillContext({ groupJid: groupJidForSkills, agentId, hintSkills: intentPlan?.skills ?? null });
+      skillContext = getSkillContext({ groupJid: groupJidForSkills, agentId, hintSkills: turnRoute?.skills ?? null });
       toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
         ? skillContext.runSkillTool
         : [];
     }
     const toolNames = toolsForRequest.map((t) => t?.function?.name).filter(Boolean);
     console.log(
-      '[path] plannerMode=', intentPlan?.mode ?? 'fallback',
+      '[path] plannerMode=', turnRoute?.mode ?? 'fallback',
       plannerSaysNoTools ? 'noTools(chat)' : ('toolsCount=' + toolsForRequest.length),
       toolNames.length ? 'tools=' + toolNames.join(',') : '',
     );
@@ -1522,7 +1525,7 @@ async function main() {
         }
       : { groupSenderName: bioOpts.groupSenderName, agentId };
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
-    const planBlock = intentPlanToSystemBlock(intentPlan);
+    const planBlock = turnRouteToSystemBlock(turnRoute);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     if (!isGroupJid) {

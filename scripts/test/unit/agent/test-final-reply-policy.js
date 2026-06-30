@@ -13,7 +13,7 @@ const policy = readFileSync(join(root, 'lib/agent/templates/final-reply-policy.m
 const memorySkill = readFileSync(join(root, 'skills/memory/SKILL.md'), 'utf8');
 const goReadSkill = readFileSync(join(root, 'skills/go-read/SKILL.md'), 'utf8');
 const selfInspectionClassifier = readFileSync(join(root, 'lib/agent/templates/self-inspection-classifier.md'), 'utf8');
-const intentPlanner = readFileSync(join(root, 'lib/agent/templates/intent-planner-prompt.md'), 'utf8');
+const turnRouter = readFileSync(join(root, 'lib/agent/templates/turn-router-prompt.md'), 'utf8');
 
 const checks = [
   {
@@ -62,8 +62,8 @@ const checks = [
     name: 'router prompts preserve short grounded follow-ups',
     ok: selfInspectionClassifier.includes('Short follow-up requests that inherit a recent self-inspection topic') &&
       selfInspectionClassifier.includes('User: `what are top 5`') &&
-      intentPlanner.includes('Use recent conversation to resolve short follow-ups') &&
-      intentPlanner.includes('rather than treating it as casual chat'),
+      turnRouter.includes('Use recent conversation to resolve short follow-ups') &&
+      turnRouter.includes('rather than treating it as casual chat'),
   },
 ];
 

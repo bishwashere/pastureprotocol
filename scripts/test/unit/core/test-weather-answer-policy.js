@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { classifyTurnIntent } from '../../../../lib/agent/turn-intent.js';
-import { planIntent } from '../../../../lib/agent/intent-planner.js';
+import { routeTurn } from '../../../../lib/agent/turn-router.js';
 import { loadPrompt } from '../../../../lib/agent/md-llm.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,13 +33,13 @@ async function main() {
   const soul = readFileSync(join(ROOT, 'workspace-default', 'SOUL.md'), 'utf8');
   const searchSkill = readFileSync(join(ROOT, 'skills', 'search', 'SKILL.md'), 'utf8');
   const turnPrompt = loadPrompt('turn-intent-classifier');
-  const plannerPrompt = loadPrompt('intent-planner');
+  const plannerPrompt = loadPrompt('turn-router');
 
   assert(soul.includes('Give the useful answer first'), 'SOUL says to answer first for location-sensitive live requests');
   assert(soul.includes('Be concise. Say what matters, then stop.'), 'SOUL keeps replies compact');
   assert(searchSkill.includes('Search and answer for that location first'), 'search skill says to use default location and answer first');
   assert(turnPrompt.includes('answer before asking any follow-up'), 'turn intent prompt requires answer before follow-up');
-  assert(plannerPrompt.includes('answer first'), 'intent planner prompt requires answer first');
+  assert(plannerPrompt.includes('answer first'), 'turn router prompt requires answer first');
 
   for (const phrase of WEATHER_PHRASES) {
     let turnMessages = null;
@@ -70,7 +70,7 @@ async function main() {
     assert(turnMessages?.[1]?.content.includes(phrase), `${phrase}: classifier sees the exact user phrasing`);
 
     let plannerMessages = null;
-    const plan = await planIntent({
+    const plan = await routeTurn({
       userText: phrase,
       availableSkillIds: SKILLS.map((s) => s.id),
       availableSkillSummaries: SKILLS,

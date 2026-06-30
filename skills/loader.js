@@ -251,7 +251,7 @@ export function getSkillsEnabled() {
 /**
  * Return the filtered list of enabled skill IDs for an agent/group without
  * reading any SKILL.md files — config reads only, very cheap.
- * Use this to feed the intent planner before loading full tool schemas.
+ * Use this to feed the turn router before loading full tool schemas.
  *
  * @param {{ groupJid?: string, agentId?: string }} [options]
  * @returns {string[]}
@@ -272,7 +272,7 @@ export function getEnabledSkillIds(options = {}) {
 /**
  * Return enabled skill IDs paired with their one-line description from SKILL.md frontmatter.
  * Slightly more expensive than getEnabledSkillIds (reads SKILL.md per skill) but still cheap
- * compared to loading full tool schemas. Feed this to the intent planner so it can route by
+ * compared to loading full tool schemas. Feed this to the turn router so it can route by
  * meaning rather than just skill names.
  *
  * @param {{ groupJid?: string, agentId?: string }} [options]
@@ -311,7 +311,7 @@ export function getSkillContext(options = {}) {
   }
   const enabled = applyImplicitChatSkills(resolveEnabledForAgent(agentId, baseSkills.filter((id) => !deny.has(id))))
     .filter((id) => !deny.has(id));
-  // When the intent planner provided skill hints, restrict to only those skills.
+  // When the turn router provided skill hints, restrict to only those skills.
   // Fall back to the full enabled list if the intersection is empty (safety net).
   const hinted =
     Array.isArray(hintSkills) && hintSkills.length > 0

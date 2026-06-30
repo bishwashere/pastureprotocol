@@ -2,7 +2,7 @@
 /**
  * Casual greetings — fast unit routing + E2E reply checks.
  *
- * Unit: isNonTaskMessage, buildCasualChatIntentPlan, planIntent (no LLM for greetings).
+ * Unit: isNonTaskMessage, buildCasualChatTurnRoute, routeTurn (no LLM for greetings).
  * E2E: index.js --test — no search/browse, no dictionary-style citations.
  *
  * Run: pnpm run test:casual-greetings
@@ -48,7 +48,7 @@ function assertNoTools(skillsCalled) {
 
 async function runUnitTests() {
   const { isNonTaskMessage } = await import('../../../../lib/agent/evaluate-team-capability.js');
-  const { buildCasualChatIntentPlan, planIntent } = await import('../../../../lib/agent/intent-planner.js');
+  const { buildCasualChatTurnRoute, routeTurn } = await import('../../../../lib/agent/turn-router.js');
 
   const rows = [];
 
@@ -76,19 +76,19 @@ async function runUnitTests() {
     assert(!casual, `expected task: ${msg}`);
   }
 
-  const plan = buildCasualChatIntentPlan();
+  const plan = buildCasualChatTurnRoute();
   assert(plan.mode === 'chat' && plan.skills.length === 0, 'casual plan shape');
   rows.push({
-    name: 'buildCasualChatIntentPlan',
+    name: 'buildCasualChatTurnRoute',
     input: '(none)',
     output: `mode=${plan.mode} skills=[]`,
     status: 'pass',
   });
 
-  const hiPlan = await planIntent({ userText: 'hi', availableSkillIds: ['search', 'browse', 'read'] });
-  assert(hiPlan && hiPlan.mode === 'chat' && hiPlan.skills.length === 0, `planIntent(hi): ${JSON.stringify(hiPlan)}`);
+  const hiPlan = await routeTurn({ userText: 'hi', availableSkillIds: ['search', 'browse', 'read'] });
+  assert(hiPlan && hiPlan.mode === 'chat' && hiPlan.skills.length === 0, `routeTurn(hi): ${JSON.stringify(hiPlan)}`);
   rows.push({
-    name: 'planIntent("hi") fast path',
+    name: 'routeTurn("hi") fast path',
     input: 'hi',
     output: `mode=${hiPlan.mode} skills=[${hiPlan.skills.join(', ')}]`,
     status: 'pass',

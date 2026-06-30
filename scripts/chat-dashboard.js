@@ -15,7 +15,7 @@ import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
-import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/agent/intent-planner.js';
+import { routeTurn, turnRouteToSystemBlock, buildCasualChatTurnRoute } from '../lib/agent/turn-router.js';
 import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from '../lib/agent/turn-intent.js';
 import { isNonTaskMessage } from '../lib/agent/evaluate-team-capability.js';
 import { buildDelegationContext } from '../lib/agent/agent-delegation-router.js';
@@ -250,7 +250,7 @@ async function main() {
       details: delegationDecision,
     });
   }
-  // Step 4: intent planner — one small LLM call before loading any tool schemas.
+  // Step 4: turn router — one small LLM call before loading any tool schemas.
   const turnIntent = isMultiAgent && !presetDelegationPlan
     ? await classifyTurnIntent({
         userText: message,
@@ -266,7 +266,7 @@ async function main() {
   const casualIntentPlan = !presetDelegationPlan
     ? (turnIntentIsConfident
         ? buildCasualPlanFromTurnIntent(turnIntent)
-        : (isNonTaskMessage(message) ? buildCasualChatIntentPlan() : null))
+        : (isNonTaskMessage(message) ? buildCasualChatTurnRoute() : null))
     : null;
   const missionForIntent = isMultiAgent && !presetDelegationPlan && !casualIntentPlan && turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
     ? resolveMissionForUserTurn({
@@ -284,8 +284,8 @@ async function main() {
         ? buildGithubSourceIntentPlan(enabledSkillIds)
         : null)
     : null;
-  const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
-    ? await planIntent({
+  const turnRoute = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+    ? await routeTurn({
         userText: message,
         historyMessages,
         availableSkillIds: enabledSkillIds,
@@ -295,21 +295,21 @@ async function main() {
         workDurability: durabilityDecision,
       })
     : null);
-  if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
+  if (turnRoute) process.stderr.write('[turn-router] ' + JSON.stringify(turnRoute) + '\n');
   // Step 5: load tool schemas based on what the planner returned.
-  //   intentPlan === null      → planner failed  → full tools (safe fallback)
-  //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
-  //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
-  const plannerSaysNoTools = intentPlan !== null && Array.isArray(intentPlan.skills) && intentPlan.skills.length === 0;
+  //   turnRoute === null      → planner failed  → full tools (safe fallback)
+  //   turnRoute.skills = []   → planner: chat   → skip schema loading entirely, no tools
+  //   turnRoute.skills = [...] → planner: tools  → load only selected schemas
+  const plannerSaysNoTools = turnRoute !== null && Array.isArray(turnRoute.skills) && turnRoute.skills.length === 0;
   let skillContext = null;
   let toolsToUse = [];
   if (!plannerSaysNoTools) {
-    skillContext = getSkillContext({ agentId, hintSkills: intentPlan?.skills ?? null });
+    skillContext = getSkillContext({ agentId, hintSkills: turnRoute?.skills ?? null });
     toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
   }
   const toolNames = toolsToUse.map((t) => t?.function?.name).filter(Boolean);
   const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + buildAgentTeamPromptBlock(agentId);
-  const planBlock = intentPlanToSystemBlock(intentPlan);
+  const planBlock = turnRouteToSystemBlock(turnRoute);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
   if (sessionRotated) {
     systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
