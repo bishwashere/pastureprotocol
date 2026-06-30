@@ -9,7 +9,7 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 `is_self_inspection` is true when the user is asking about:
 
 - Pasture/CowCode itself as a running system.
-- This assistant's installed source, runtime, config, logs, memory, agents, tasks, missions, automations, UI, routes, local dashboard, skills, tools, or capabilities.
+- This assistant's setup or implementation: installed source, runtime, config, logs, routing, prompt behavior, memory/index implementation, agents, tasks/missions internals, UI routes, local dashboard implementation, skill/tool availability, or capabilities.
 - Whether a feature exists in "this project", "your project", "the agent", "Pasture", or "CowCode".
 - Why the agent behaved a certain way, what it checked, what tools/logs it used, or why a previous reply was not grounded.
 - Short follow-up requests that inherit a recent self-inspection topic, such as asking for "top 5", "show them", "how many", "give the word", or "that list" after the conversation was about local runtime, memory, Brain, logs, code, tools, or dashboard state.
@@ -19,7 +19,9 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 - The user is asking about an unrelated app, repo, product, or project that is not identified as Pasture/CowCode.
 - The user is chatting casually.
 - The user is asking for general advice or knowledge unrelated to this agent/runtime.
-- The user asks to use a normal user skill, but not to inspect this agent or its implementation/runtime.
+- The user asks to use a normal user-facing skill, but not to inspect this agent's setup, code, logs, routing, or tool availability.
+- The user asks to perform, list, add, remove, update, send, query, search, browse, call, edit, write, or check something using a skill. These are ordinary skill actions even when the skill stores data in Pasture-owned runtime files.
+- Cron/reminder actions are not self-inspection by themselves. Requests like "remove all crons", "list reminders", "delete reminder 3", "add a reminder", or "what crons do I have?" should be handled by the cron/reminder skill, not local runtime inspection, unless the user explicitly asks why cron routing/config/code/logs behaved a certain way.
 
 When true, `needs_tools` should normally be true because claims about the local runtime/source/logs must be grounded before answering. Only set it false if the user is explicitly asking for a conceptual explanation of the design and no local truth claim is needed.
 
@@ -118,6 +120,42 @@ User: `what is a brain-computer interface?`
   "starting_points": [],
   "reason": "This is a general knowledge question, not about Pasture/CowCode.",
   "confidence": 0.9
+}
+```
+
+User: `Remove all crons`
+```json
+{
+  "is_self_inspection": false,
+  "needs_tools": false,
+  "target": "none",
+  "starting_points": [],
+  "reason": "The user is asking to perform a normal cron/reminder skill action, not inspect the assistant's setup, code, logs, routing, or prior behavior.",
+  "confidence": 0.95
+}
+```
+
+User: `List my reminders`
+```json
+{
+  "is_self_inspection": false,
+  "needs_tools": false,
+  "target": "none",
+  "starting_points": [],
+  "reason": "The user is asking to use the reminder skill, not inspect Pasture/CowCode implementation or runtime behavior.",
+  "confidence": 0.95
+}
+```
+
+User: `why did remove all crons only get read-only tools?`
+```json
+{
+  "is_self_inspection": true,
+  "needs_tools": true,
+  "target": "agent_behavior",
+  "starting_points": ["logs", "runtime_home", "source_tree"],
+  "reason": "The user asks why a previous cron request was routed to read-only tools, so the answer should inspect logs and routing/source behavior.",
+  "confidence": 0.97
 }
 ```
 
