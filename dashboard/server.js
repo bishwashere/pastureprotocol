@@ -3892,8 +3892,25 @@ app.get('*', (req, res) => {
 
 async function releasePort(port) {
   try {
-    const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
-    const pids = out.trim().split(/\s+/).filter(Boolean);
+    let pids = [];
+    if (process.platform === 'win32') {
+      const out = execSync('netstat -ano -p tcp', { encoding: 'utf8' });
+      const suffix = `:${port}`;
+      const seen = new Set();
+      for (const line of out.split(/\r?\n/)) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 5 || parts[0] !== 'TCP' || parts[3] !== 'LISTENING') continue;
+        if (!parts[1].endsWith(suffix)) continue;
+        const pid = parts[4];
+        if (pid && !seen.has(pid)) {
+          seen.add(pid);
+          pids.push(pid);
+        }
+      }
+    } else {
+      const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+      pids = out.trim().split(/\s+/).filter(Boolean);
+    }
     for (const pid of pids) {
       try {
         process.kill(Number(pid), 'SIGTERM');

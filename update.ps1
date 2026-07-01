@@ -261,7 +261,8 @@ $BranchPath = Encode-GitHubBranchPath $Branch
 $Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
 
 $Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
-$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } elseif ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
+$StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
+$LegacyState = $Root
 
 if (-not (Test-Path (Join-Path $Root "package.json")) -or -not (Test-Path (Join-Path $Root "index.js"))) {
     Write-Host ""
@@ -305,13 +306,19 @@ try {
 
     New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 
-    if (-not $env:PASTURE_STATE_DIR -and -not $env:PASTURE_STATE_DIR) {
+    if (-not $env:PASTURE_STATE_DIR) {
         $legacyConfig = Join-Path $LegacyState "config.json"
         $stateConfig = Join-Path $StateDir "config.json"
         $stateAgents = Join-Path $StateDir "agents"
         if ((Test-Path -LiteralPath $legacyConfig) -and (-not (Test-Path -LiteralPath $stateConfig) -or -not (Test-Path -LiteralPath $stateAgents))) {
             Write-Host "  > Migrating state from $LegacyState to $StateDir"
-            Copy-Item -LiteralPath (Join-Path $LegacyState "*") -Destination $StateDir -Recurse -Force
+            Copy-Item -LiteralPath $legacyConfig -Destination $StateDir -Force
+            foreach ($entry in @(".env", "cron", "auth_info", "agents")) {
+                $legacyPath = Join-Path $LegacyState $entry
+                if (Test-Path -LiteralPath $legacyPath) {
+                    Copy-Item -LiteralPath $legacyPath -Destination $StateDir -Recurse -Force
+                }
+            }
         }
     }
 

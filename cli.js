@@ -67,6 +67,42 @@ function restartBotAfterSkillChange() {
   }
 }
 
+async function releaseDashboardPort(port) {
+  try {
+    let pids = [];
+    if (IS_WIN) {
+      const out = execSync('netstat -ano -p tcp', { encoding: 'utf8' });
+      const suffix = `:${port}`;
+      const seen = new Set();
+      for (const line of out.split(/\r?\n/)) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 5 || parts[0] !== 'TCP' || parts[3] !== 'LISTENING') continue;
+        if (!parts[1].endsWith(suffix)) continue;
+        const pid = parts[4];
+        if (pid && !seen.has(pid)) {
+          seen.add(pid);
+          pids.push(pid);
+        }
+      }
+    } else {
+      const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+      pids = out.trim().split(/\s+/).filter(Boolean);
+    }
+    if (pids.length) {
+      for (const pid of pids) {
+        try {
+          process.kill(Number(pid), 'SIGTERM');
+        } catch (_) {}
+      }
+      const list = pids.length === 1 ? `PID ${pids[0]}` : `PIDs ${pids.join(', ')}`;
+      console.log('Stopped previous dashboard (' + list + ').');
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  } catch (_) {
+    // No process on port, or no platform-specific port lookup available.
+  }
+}
+
 async function runSkillCommand(action, skillArg) {
   try {
     const skillInstallPath = join(INSTALL_DIR, 'lib', 'util', 'skill-install.js');
@@ -218,22 +254,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     const port = process.env.PASTURE_DASHBOARD_PORT || String(DEFAULT_DASHBOARD_PORT);
     const host = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
     const url = `http://${host}:${port}`;
-    try {
-      const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
-      const pids = out.trim().split(/\s+/).filter(Boolean);
-      if (pids.length) {
-        for (const pid of pids) {
-          try {
-            process.kill(Number(pid), 'SIGTERM');
-          } catch (_) {}
-        }
-        const list = pids.length === 1 ? `PID ${pids[0]}` : `PIDs ${pids.join(', ')}`;
-        console.log('Stopped previous dashboard (' + list + ').');
-        await new Promise((r) => setTimeout(r, 400));
-      }
-    } catch (_) {
-      // No process on port (or lsof not available, e.g. Windows)
-    }
+    await releaseDashboardPort(port);
     const child = spawn(process.execPath, [serverPath], {
       stdio: 'ignore',
       detached: true,
@@ -244,8 +265,12 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     console.log('Started dashboard at', url);
     console.log('(Refresh the page if you had it open.)');
     setTimeout(() => {
-      const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-      spawn(openCmd, [url], { stdio: 'ignore' }).unref();
+      if (IS_WIN) {
+        spawn('cmd', ['/c', 'start', '', url], { stdio: 'ignore' }).unref();
+      } else {
+        const openCmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+        spawn(openCmd, [url], { stdio: 'ignore' }).unref();
+      }
     }, 800);
     process.exit(0);
   })();
