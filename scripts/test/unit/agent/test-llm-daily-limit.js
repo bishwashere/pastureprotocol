@@ -195,9 +195,28 @@ async function runLocalRpmPerMessage() {
   console.log('test-llm-local-rpm-per-message passed');
 }
 
+async function runDailyLimitUserMessage() {
+  const { toUserMessage } = await import('../../../../lib/util/user-error.js');
+  const byCode = new Error('provider details should not leak to the user');
+  byCode.code = 'LLM_DAILY_LIMIT';
+
+  assert(
+    toUserMessage(byCode) === 'The API limit 100 has been reached for the day.',
+    'daily-limit user message must be the exact API limit text',
+  );
+  assert(
+    toUserMessage('Daily cloud LLM limit reached (100/100 calls today). Resets at midnight UTC.') ===
+      'The API limit 100 has been reached for the day.',
+    'daily-limit message text should not fall through to the generic error',
+  );
+
+  console.log('test-llm-daily-limit-user-message passed');
+}
+
 run()
   .then(() => runLocalDownCloudLimited())
   .then(() => runLocalRpmPerMessage())
+  .then(() => runDailyLimitUserMessage())
   .catch((err) => {
     console.error(err);
     process.exit(1);
