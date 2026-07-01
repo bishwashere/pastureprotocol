@@ -122,6 +122,39 @@ function checkCliSetupCommand() {
   return { ok: true, detail: 'pasture setup runs setup.js with PASTURE_INSTALL_DIR' };
 }
 
+function checkSetupCloudSelectionSetsPriority() {
+  const src = readFileSync(SETUP_JS, 'utf8');
+  const start = src.indexOf('function saveCloudLlmSelection');
+  const end = src.indexOf('\nfunction ', start + 1);
+  const body = start >= 0 ? src.slice(start, end >= 0 ? end : undefined) : '';
+  const checks = [];
+
+  if (!body.includes('models[i].priority = true')) {
+    checks.push('chosen cloud provider must become priority');
+  }
+  if (!body.includes("delete models[i].priority")) {
+    checks.push('previous priority flags must be cleared');
+  }
+  if (body.includes('hasPriorityAlready')) {
+    checks.push('setup must not preserve an existing local/cloud priority after provider selection');
+  }
+  if (!body.includes('models[i].model = selectedModel')) {
+    checks.push('selected cloud model must be saved');
+  }
+  if (!src.includes("if ((llm1Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel)")) {
+    checks.push('OpenAI priority should be saved only after a key exists');
+  }
+  if (!src.includes("if ((llm2Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel)")) {
+    checks.push('Grok priority should be saved only after a key exists');
+  }
+  if (!src.includes("if ((llm3Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel)")) {
+    checks.push('Anthropic priority should be saved only after a key exists');
+  }
+
+  if (checks.length) return { ok: false, detail: checks.join('; ') };
+  return { ok: true, detail: 'pasture setup makes the selected cloud provider the LLM priority' };
+}
+
 async function main() {
   startReport('test-install');
 
@@ -165,6 +198,14 @@ async function main() {
     status: setupCmd.ok ? 'pass' : 'fail',
   });
 
+  const cloudPriority = checkSetupCloudSelectionSetsPriority();
+  recordCase({
+    name: 'setup cloud priority',
+    input: 'select OpenAI/Grok/Anthropic during setup',
+    output: cloudPriority.detail,
+    status: cloudPriority.ok ? 'pass' : 'fail',
+  });
+
   const shellTest = spawnSync('bash', [join(ROOT, 'scripts/test/unit/core/test-install.sh')], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -181,7 +222,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && shellOk ? 0 : 1);
+  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && setupCmd.ok && cloudPriority.ok && shellOk ? 0 : 1);
 }
 
 main();

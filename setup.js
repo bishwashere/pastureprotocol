@@ -427,22 +427,14 @@ function saveCloudLlmSelection(session, provider, selectedModel) {
   session.saveConfigIfChanged((cfg) => {
     if (!Array.isArray(cfg?.llm?.models)) return;
     const models = cfg.llm.models;
-    const hasPriorityAlready = models.some(
-      (m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'
-    );
-    if (!hasPriorityAlready) {
-      for (let i = 0; i < models.length; i++) {
-        const p = (models[i].provider || '').toLowerCase();
-        const isChosen = p === provider;
-        models[i].priority = isChosen;
-        if (isChosen) models[i].model = selectedModel;
-      }
-    } else {
-      for (let i = 0; i < models.length; i++) {
-        if ((models[i].provider || '').toLowerCase() === provider) {
-          models[i].model = selectedModel;
-          break;
-        }
+    for (let i = 0; i < models.length; i++) {
+      const p = (models[i].provider || '').toLowerCase();
+      const isChosen = p === provider;
+      if (isChosen) {
+        models[i].priority = true;
+        models[i].model = selectedModel;
+      } else if (Object.prototype.hasOwnProperty.call(models[i], 'priority')) {
+        delete models[i].priority;
       }
     }
   });
@@ -621,19 +613,19 @@ async function onboarding() {
   if (provider === 'openai') {
     const models = CLOUD_LLM_MODELS.openai;
     selectedModel = await selectModel(q('OpenAI model version'), models);
-    saveCloudLlmSelection(session, provider, selectedModel);
     llm1Key = await setupPromptSecret(session, 'LLM_1_API_KEY', q('OpenAI API key'), session.pendingEnv.LLM_1_API_KEY || '');
+    if ((llm1Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel);
     wireWhisperToOpenAiKey(session);
   } else if (provider === 'grok') {
     const models = CLOUD_LLM_MODELS.grok;
     selectedModel = await selectModel(q('Grok model version'), models);
-    saveCloudLlmSelection(session, provider, selectedModel);
     llm2Key = await setupPromptSecret(session, 'LLM_2_API_KEY', q('Grok API key'), session.pendingEnv.LLM_2_API_KEY || '');
+    if ((llm2Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel);
   } else if (provider === 'anthropic') {
     const models = CLOUD_LLM_MODELS.anthropic;
     selectedModel = await selectModel(q('Anthropic (Claude) model version'), models);
-    saveCloudLlmSelection(session, provider, selectedModel);
     llm3Key = await setupPromptSecret(session, 'LLM_3_API_KEY', q('Anthropic API key'), session.pendingEnv.LLM_3_API_KEY || '');
+    if ((llm3Key || '').trim()) saveCloudLlmSelection(session, provider, selectedModel);
   }
 
   await setupPromptSecret(session, 'BRAVE_API_KEY', q('Brave Search API key – optional'), session.pendingEnv.BRAVE_API_KEY || '');
