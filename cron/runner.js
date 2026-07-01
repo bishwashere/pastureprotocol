@@ -19,6 +19,7 @@ import { ensureChatSession, getCurrentSession } from '../lib/context/chat-sessio
 import { isTelegramGroupJid } from '../lib/channels/telegram.js';
 import { getMemoryConfig } from '../lib/context/memory-config.js';
 import { indexChatExchange } from '../lib/context/memory-index.js';
+import { runConditionalJob } from './conditional.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
@@ -73,6 +74,14 @@ function sleep(ms) {
 async function runJobOnce({ job, sock, selfJid }) {
   const jid = job.jid || selfJid;
   if (!jid) throw new Error('No JID for job');
+
+  const conditionalText = await runConditionalJob(job);
+  if (conditionalText != null) {
+    const text = isTelegramChatId(jid) ? conditionalText.replace(/^\[Pasture\]\s*/i, '').trim() : conditionalText;
+    if (text) await sendAndLogCronReply({ jid, text, job });
+    return;
+  }
+
   // Reply goes to job.jid (same channel where reminder was set up) when set; else selfJid fallback
   const storePath = currentStorePath || getCronStorePath();
   const payload = JSON.stringify({
@@ -80,6 +89,7 @@ async function runJobOnce({ job, sock, selfJid }) {
     jid,
     storePath,
     workspaceDir: getWorkspaceDir(),
+    job,
   });
   const textToSend = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['cron/run-job.js'], {
@@ -114,32 +124,36 @@ async function runJobOnce({ job, sock, selfJid }) {
   });
   const text = isTelegramChatId(jid) ? textToSend.replace(/^\[Pasture\]\s*/i, '').trim() : textToSend;
   if (text) {
-    await sendCronReply(jid, text);
-    const workspaceDir = getWorkspaceDir();
-    // Group jids stay as-is (cron jobs to groups log into the group's main file
-    // via the regular exchange path). Owner DM jids collapse into the unified
-    // owner log so cron-driven check-ins live alongside the rest of the convo.
-    const cronLogJid = isTelegramGroupJid(jid) ? jid : toLogJid(jid);
-    const sessionKey = String(cronLogJid || jid).trim();
-    ensureChatSession(sessionKey, {});
-    const sessionId = getCurrentSession(sessionKey)?.sessionId;
-    const exchange = {
-      user: job.message || '',
-      assistant: text,
-      timestampMs: Date.now(),
-      jid: cronLogJid,
-      sessionId,
-    };
-    try {
-      const memoryConfig = getMemoryConfig();
-      if (memoryConfig) {
-        await indexChatExchange(memoryConfig, exchange);
-      } else {
-        appendExchange(workspaceDir, exchange);
-      }
-    } catch (err) {
-      console.error('[cron] Chat log write failed:', err.message);
+    await sendAndLogCronReply({ jid, text, job });
+  }
+}
+
+async function sendAndLogCronReply({ jid, text, job }) {
+  await sendCronReply(jid, text);
+  const workspaceDir = getWorkspaceDir();
+  // Group jids stay as-is (cron jobs to groups log into the group's main file
+  // via the regular exchange path). Owner DM jids collapse into the unified
+  // owner log so cron-driven check-ins live alongside the rest of the convo.
+  const cronLogJid = isTelegramGroupJid(jid) ? jid : toLogJid(jid);
+  const sessionKey = String(cronLogJid || jid).trim();
+  ensureChatSession(sessionKey, {});
+  const sessionId = getCurrentSession(sessionKey)?.sessionId;
+  const exchange = {
+    user: job.message || '',
+    assistant: text,
+    timestampMs: Date.now(),
+    jid: cronLogJid,
+    sessionId,
+  };
+  try {
+    const memoryConfig = getMemoryConfig();
+    if (memoryConfig) {
+      await indexChatExchange(memoryConfig, exchange);
+    } else {
+      appendExchange(workspaceDir, exchange);
     }
+  } catch (err) {
+    console.error('[cron] Chat log write failed:', err.message);
   }
 }
 

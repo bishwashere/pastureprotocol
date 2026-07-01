@@ -4,7 +4,7 @@
  * The main process uses this so cron never runs in the same bot/agent session as active chat.
  *
  * Usage: node cron/run-job.js < payload.json
- * Payload: { "message": "...", "jid": "...", "storePath": "?", "workspaceDir": "?" }
+ * Payload: { "message": "...", "jid": "...", "storePath": "?", "workspaceDir": "?", "job": "?" }
  */
 
 import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/util/paths.js';
@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
 import { getTimezoneContextLine } from '../lib/util/timezone.js';
+import { runConditionalJob } from './conditional.js';
 
 dotenv.config({ path: getEnvPath() });
 
@@ -39,6 +40,11 @@ async function main() {
   }
   const storePath = payload.storePath && String(payload.storePath).trim() || getCronStorePath();
   const workspaceDir = payload.workspaceDir && String(payload.workspaceDir).trim() || getWorkspaceDir();
+  const conditionalText = await runConditionalJob(payload.job);
+  if (conditionalText != null) {
+    process.stdout.write(JSON.stringify({ textToSend: conditionalText }) + '\n');
+    return;
+  }
   const noop = () => {};
   const ctx = { storePath, jid, workspaceDir, scheduleOneShot: noop, startCron: noop };
   const { runSkillTool, getFullSkillDoc, resolveToolName } = getSkillContext();

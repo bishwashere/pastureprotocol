@@ -34,6 +34,7 @@ const DEFAULT_STORE_PATH = getCronStorePath();
  * @property {CronSchedule} schedule
  * @property {string} message - Prompt sent to the LLM
  * @property {string} [jid] - Reply channel: WhatsApp JID or Telegram chat id where the reminder was set up. Reply is sent here by default (even when a separate cron process runs the job).
+ * @property {object} [conditional] - Optional deterministic condition for poll-style jobs.
  * @property {number} createdAtMs
  * @property {number} updatedAtMs
  * @property {number} [sentAtMs] - When set, this one-shot was already sent; do not run again (avoids duplicate after restart)
@@ -109,6 +110,7 @@ export function addJob(input, storePath = DEFAULT_STORE_PATH) {
     schedule: input.schedule,
     message: input.message ?? '',
     jid: input.jid ?? null,
+    conditional: input.conditional && typeof input.conditional === 'object' ? input.conditional : undefined,
     createdAtMs: now,
     updatedAtMs: now,
   };
@@ -119,7 +121,7 @@ export function addJob(input, storePath = DEFAULT_STORE_PATH) {
 
 /**
  * @param {string} id
- * @param {Partial<Pick<CronJob, 'name'|'enabled'|'schedule'|'message'|'jid'|'sentAtMs'>>} patch
+ * @param {Partial<Pick<CronJob, 'name'|'enabled'|'schedule'|'message'|'jid'|'conditional'|'sentAtMs'>>} patch
  * @param {string} [storePath]
  * @returns {CronJob|null}
  */

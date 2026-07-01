@@ -16,16 +16,18 @@ Manage reminders and scheduled messages: **one-shot** (at a specific time) or **
 - **add** - When the user's **intent** is to CREATE or SET a reminder, or to have something **checked repeatedly** or **get notified when something happens** (e.g. status change, arrival, result). Treat that intent as a request to create a job; do not ask for confirmation before adding. Set **arguments.job** with **message** (what to check or remind) and **schedule**:
   - **One-shot:** `{ "kind": "at", "at": "<future ISO 8601>" }`. Always use an exact full ISO 8601 timestamp (e.g. 2026-02-19T08:00:00.000Z). Schedules are saved and run at that exact time. For "in 1 hour" or "tomorrow 8am" compute the exact datetime and pass it as ISO 8601.
   - **Recurring (cron):** `{ "kind": "cron", "expr": "<cron expression>", "tz": "optional IANA timezone" }`. Use the **expr** values below for common setups. Never invent message text. **If the user does not specify how often to check,** use a sensible default (e.g. every 10 minutes: `*/10 * * * *`), create the job, then say they can change the interval or remove it later.
+  - **Direct conditional HTTP poll:** When the user gives a plain HTTP/JSON URL and asks to notify only if the response is non-empty, create a direct poll job, not a generic LLM reminder. Include either top-level `job.url` + `job.notifyWhen`, or `job.conditional`: `{ "notifyWhen": "non_empty_response", "url": "<url>", "label": "<short label>" }`. Keep `job.message` human-readable, but the structured condition is what suppresses empty responses. Empty means empty body, `[]`, `{}`, or `null`.
 - **remove** - When the user asks to cancel a reminder. Set **arguments.jobId** (from a previous list result). **When the user refers to a reminder by position** (e.g. "remove reminder number 3", "delete the third one"): call `list` first to get the numbered list (1-indexed from top), find the job at that exact position across the full combined list (one-time + recurring in the order shown), then call `remove` with that job's id. Confirm what was removed by name and position.
 
 You can pass the command at the top level (`command: "list"`) or inside arguments (`arguments.action: "list"`). Never omit the command/action.
 
 ## Recurring (cron) - every morning, every 5 minutes, etc.
 
-Cron **expr** is 5 fields: **minute hour day-of-month month day-of-week** (space-separated). Use these for natural-language requests:
+Cron **expr** is usually 5 fields: **minute hour day-of-month month day-of-week**. For second-level direct polling only, Croner also accepts 6 fields: **second minute hour day-of-month month day-of-week**. Use these for natural-language requests:
 
 | User says | **expr** | Meaning |
 |-----------|----------|---------|
+| every 20 seconds | `*/20 * * * * *` | Every 20 seconds |
 | every 5 minutes | `*/5 * * * *` | Every 5 minutes |
 | every minute | `* * * * *` | Every minute |
 | every hour | `0 * * * *` | At minute 0 of every hour |
@@ -50,7 +52,7 @@ cron_list
   description: List all scheduled jobs/reminders. No parameters.
 
 cron_add
-  description: Create a reminder. Set job with message and schedule (kind at|cron, at or expr, tz).
+  description: Create a reminder or direct conditional HTTP poll. Set job with message and schedule (kind at|cron, at or expr, tz). For direct HTTP polls, set job.notifyWhen="non_empty_response" and job.url, or job.conditional.
   parameters:
     job: object
 

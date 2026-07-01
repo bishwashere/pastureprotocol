@@ -40,6 +40,7 @@
     "test:dashboard-boot": "node scripts/test/unit/dashboard/test-dashboard-boot.js",
     "test:dev-script": "node scripts/test/unit/core/test-dev-script.js",
     "test:system-crons": "node scripts/test/unit/core/test-system-crons.js",
+    "test:cron-conditional": "node scripts/test/unit/core/test-cron-conditional.js",
     "test:dashboard-browser-e2e": "node scripts/test/e2e/dashboard/test-dashboard-browser-e2e.js",
     "test:apply-patch-unit": "node scripts/test/unit/skills/test-apply-patch-unit.js",
     "test:group-blocklist": "node scripts/test/unit/skills/test-group-blocklist.js",

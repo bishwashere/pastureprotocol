@@ -9,6 +9,7 @@ import { tmpdir } from 'os';
 import {
   appendExchange,
   DEFAULT_CHAT_HISTORY_EXCHANGES,
+  getLastPrivateExchange,
   readLastPrivateExchanges,
   resolveChatHistoryExchanges,
 } from '../../../../lib/context/chat-log.js';
@@ -61,6 +62,35 @@ function testReadLastPrivateExchangesDefault() {
   }
 }
 
+function testGetLastPrivateExchangeIgnoresSessionBoundary() {
+  const workspaceDir = setupWorkspace();
+  const logKey = 'test-jid';
+  const session = startNewSession(logKey, 'manual');
+  appendExchange(workspaceDir, {
+    jid: logKey,
+    sessionId: session.sessionId,
+    user: 'real user',
+    assistant: 'real reply',
+    timestampMs: 1,
+  });
+  appendExchange(workspaceDir, {
+    jid: logKey,
+    sessionId: null,
+    user: 'Tide nudge',
+    assistant: 'synthetic reply',
+    timestampMs: 2,
+  });
+
+  const sessionHistory = readLastPrivateExchanges(workspaceDir, logKey, 5, session.sessionId);
+  if (sessionHistory.some((m) => m.content === 'Tide nudge')) {
+    throw new Error('session-filtered history should not include sessionless Tide nudge');
+  }
+  const latest = getLastPrivateExchange(workspaceDir, logKey);
+  if (latest?.user !== 'Tide nudge') {
+    throw new Error(`expected raw latest exchange to be Tide nudge, got ${latest?.user}`);
+  }
+}
+
 async function main() {
   console.log('Chat history depth\n');
   const rows = [];
@@ -69,6 +99,7 @@ async function main() {
   for (const [label, fn] of [
     ['defaults', testDefaults],
     ['readLastPrivateExchanges default cap', testReadLastPrivateExchangesDefault],
+    ['getLastPrivateExchange raw latest', testGetLastPrivateExchangeIgnoresSessionBoundary],
   ]) {
     process.stdout.write(`  ${label} … `);
     try {

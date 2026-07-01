@@ -74,7 +74,7 @@ import {
   buildRetrospectiveContextBlock,
 } from './lib/agent/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs, migratePrivateChatLogFileNames } from './lib/context/chat-log.js';
+import { appendExchange, appendGroupExchange, getLastPrivateExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs, migratePrivateChatLogFileNames } from './lib/context/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from './lib/context/chat-session.js';
 import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
@@ -654,6 +654,19 @@ async function main() {
     } catch (_) {}
     return {};
   }
+  function isTideGeneratedUserText(text) {
+    const value = String(text || '').trim();
+    return value === 'Tide check' || value === 'Tide nudge';
+  }
+  function lastUserMessageWasTideGenerated(historyMessages) {
+    if (!Array.isArray(historyMessages)) return false;
+    for (let i = historyMessages.length - 1; i >= 0; i--) {
+      const msg = historyMessages[i];
+      if (msg?.role !== 'user') continue;
+      return isTideGeneratedUserText(msg.content);
+    }
+    return false;
+  }
   async function runTideForJid(tideJid) {
     const trace = startRequestTrace({ source: 'tide_followup', jid: String(tideJid), agentId: 'main' });
     logRequestStart(trace);
@@ -701,10 +714,12 @@ async function main() {
     const historyMessages = isTgGroup
       ? readLastGroupExchanges(getWorkspaceDir(), tideJid, MAX_CHAT_HISTORY_EXCHANGES, tideSessionId)
       : readLastPrivateExchanges(getWorkspaceDir(), tideLogJid, MAX_CHAT_HISTORY_EXCHANGES, tideSessionId);
-    // Old UX preserved: only send one follow-up per "round". Once we've sent a Tide message,
-    // don't send another until the user replies. The health check above still runs every cycle.
-    const lastUserMsg = historyMessages.length >= 2 ? historyMessages[historyMessages.length - 2] : null;
-    const alreadySentTide = lastUserMsg?.role === 'user' && lastUserMsg?.content === 'Tide check';
+    // Only send one proactive Tide message per round. Tide-generated log entries are
+    // synthetic "user" messages, so the next real user message must appear after them.
+    const latestPrivateExchange = isTgGroup ? null : getLastPrivateExchange(getWorkspaceDir(), tideLogJid);
+    const alreadySentTide = isTgGroup
+      ? lastUserMessageWasTideGenerated(historyMessages)
+      : isTideGeneratedUserText(latestPrivateExchange?.user);
     if (!alreadySentTide) {
       const payload = JSON.stringify({
         jid: tideJid,
@@ -903,6 +918,13 @@ async function main() {
     if (!isTgJid && !waSock?.sendMessage) return;
 
     const nudgeLogJid = isTelegramGroupJid(nudgeJid) ? nudgeJid : toLogJid(nudgeJid);
+    if (!isTelegramGroupJid(nudgeJid)) {
+      const lastExchange = getLastPrivateExchange(getWorkspaceDir(), nudgeLogJid);
+      if (isTideGeneratedUserText(lastExchange?.user)) {
+        console.log('[tide-nudge] Last activity was Tide-generated — skipping until user replies');
+        return;
+      }
+    }
     const lookbackDays = Math.max(1, Number(nudgeCfg.lookbackDays) || 7);
     const maxItems = Math.min(40, Math.max(5, Number(nudgeCfg.maxHistoryItems) || 20));
     const historyItems = readPrivateExchangesInWindow(getWorkspaceDir(), nudgeLogJid, lookbackDays, maxItems);
