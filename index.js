@@ -80,8 +80,12 @@ import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
+  buildProjectTeamGateReply,
   enrichMessageWithProjectContext,
+  getProjectTeamId,
+  resolveFocusedProjectForTurn,
 } from './lib/context/projects-context.js';
+import { getAgentTeamId } from './lib/agent/teams.js';
 import { buildMissionsContextBlock, buildMissionIntentPlan, resolveMissionForUserTurn } from './lib/context/missions-context.js';
 import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/context/project-workflow.js';
 import {
@@ -1180,10 +1184,10 @@ async function main() {
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
       if (agentId === DEFAULT_AGENT_ID) syncMainAgentIdentityFromWorkspace();
-      return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId)) + buildAgentTeamPromptBlock(agentId);
+      return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId), { agentId }) + buildAgentTeamPromptBlock(agentId);
     }
     if (agentId === DEFAULT_AGENT_ID) syncMainAgentIdentityFromWorkspace();
-    const basePrompt = buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
+    const basePrompt = buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId), { agentId });
     const loaded = loadGroupMd(getWorkspaceDir(), DEFAULT_WORKSPACE_DIR);
     const groupBlock = buildGroupPromptBlock(loaded, {
       groupSenderName: opts.groupSenderName,
@@ -1309,6 +1313,9 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
+    const focusedProject = resolveFocusedProjectForTurn({ userText: text, historyMessages });
+    const focusedProjectTeamId = getProjectTeamId(focusedProject);
+    const activeAgentTeamId = getAgentTeamId(agentId);
     // Step 1.5: classify work-mode for this turn (LLM, MD-driven).
     //
     // Two-tier gating:
@@ -1348,7 +1355,24 @@ async function main() {
         }
       }
     }
-    const isMultiAgent = !isGroupJid && workMode === 'multi';
+    const isMultiAgent = !isGroupJid && workMode === 'multi' && !!focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId;
+    const teamGateReply = !isGroupJid && workMode === 'multi' && !workModeAck && !isNonTaskMessage(text) && !isMultiAgent
+      ? buildProjectTeamGateReply({
+          agentId,
+          agentTeamId: activeAgentTeamId,
+          focusedProject,
+          focusedProjectTeamId,
+        })
+      : '';
+    if (!isGroupJid && workMode === 'multi' && !isMultiAgent) {
+      console.log('[team-gate]', JSON.stringify({
+        mode: teamGateReply ? 'blocked' : 'single',
+        reason: focusedProjectTeamId ? 'agent_not_on_project_team' : 'no_project_team',
+        projectId: focusedProject?.id || '',
+        projectTeamId: focusedProjectTeamId || '',
+        agentTeamId: activeAgentTeamId || '',
+      }));
+    }
     // Step 2: decide work durability before delegation. Persistence must be
     // attached to the turn before agent-send chooses who should do the work.
     // Single-agent mode skips this entirely — focus is on tool execution.
@@ -1575,8 +1599,10 @@ async function main() {
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     ctx._originalUserText = text;
-    let turnResult = null;
-    if (presetDelegationPlan && delegatedTarget) {
+    let turnResult = teamGateReply
+      ? { textToSend: teamGateReply, skillsCalled: [] }
+      : null;
+    if (!turnResult && presetDelegationPlan && delegatedTarget) {
       try {
         logTeamActivity({
           type: 'turn_start',

@@ -65,8 +65,12 @@
         var urlHtml = project.url
           ? '<div class="proj-root-url"><a href="' + esc(project.url) + '" target="_blank" rel="noopener noreferrer">' + esc(project.url) + '</a></div>'
           : '';
+        var teamHtml = project.team_id
+          ? '<div class="proj-root-url">Team: ' + esc(project.team_id) + '</div>'
+          : '';
         root.innerHTML = '<div class="proj-root-name">' + esc(project.name) + '</div>'
           + urlHtml
+          + teamHtml
           + (project.description ? '<div class="proj-root-desc">' + esc(project.description) + '</div>' : '');
         var editProjCorner = document.createElement('button');
         editProjCorner.type = 'button';
@@ -363,9 +367,11 @@
         var nameEl = document.getElementById('project-edit-name');
         var urlEl = document.getElementById('project-edit-url');
         var descEl = document.getElementById('project-edit-desc');
+        var teamEl = document.getElementById('project-edit-team');
         if (nameEl) nameEl.value = String(project.name || '');
         if (urlEl) urlEl.value = String(project.url || '');
         if (descEl) descEl.value = String(project.description || '');
+        if (teamEl) teamEl.value = String(project.team_id || '');
         var setupEl = document.getElementById('project-edit-setup');
         if (setupEl) setupEl.value = String(project.setup_notes || '');
         showProjectEditError('');
@@ -388,6 +394,7 @@
         var nameEl = document.getElementById('project-edit-name');
         var urlEl = document.getElementById('project-edit-url');
         var descEl = document.getElementById('project-edit-desc');
+        var teamEl = document.getElementById('project-edit-team');
         var setupEl = document.getElementById('project-edit-setup');
         var name = nameEl ? String(nameEl.value || '').trim() : '';
         if (!name) {
@@ -405,6 +412,7 @@
               name: name,
               url: urlEl ? String(urlEl.value || '').trim() : '',
               description: descEl ? String(descEl.value || '').trim() : '',
+              team_id: teamEl ? String(teamEl.value || '').trim() : '',
               setup_notes: setupEl ? String(setupEl.value || '').trim() : '',
             }),
           });
@@ -436,7 +444,7 @@
           if (e.target === projectEditModalEl) closeProjectEditModal();
         });
       }
-      ['project-edit-name', 'project-edit-url', 'project-edit-desc'].forEach(function (id) {
+      ['project-edit-name', 'project-edit-url', 'project-edit-desc', 'project-edit-team'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) {
           el.addEventListener('keydown', function (e) {
@@ -678,23 +686,26 @@
       }
 
       // ── Add project ──
-      async function addProjectFromForm(nameInputId, urlInputId, descInputId, canvasId) {
+      async function addProjectFromForm(nameInputId, urlInputId, descInputId, canvasId, teamInputId) {
         var nameEl = document.getElementById(nameInputId);
         var urlEl = document.getElementById(urlInputId);
         var descEl = document.getElementById(descInputId);
+        var teamEl = teamInputId ? document.getElementById(teamInputId) : document.getElementById('mc2-proj-new-team');
         var name = nameEl ? nameEl.value.trim() : '';
         var url = urlEl ? urlEl.value.trim() : '';
         var desc = descEl ? descEl.value.trim() : '';
+        var team = teamEl ? String(teamEl.value || '').trim() : '';
         if (!name) { if (nameEl) nameEl.focus(); return; }
         var r = await projFetch('/projects', {
           method: 'POST',
-          body: JSON.stringify({ name: name, url: url, description: desc }),
+          body: JSON.stringify({ name: name, url: url, description: desc, team_id: team }),
         });
         if (!r) return;
         var proj = await r.json();
         if (nameEl) nameEl.value = '';
         if (urlEl) urlEl.value = '';
         if (descEl) descEl.value = '';
+        if (teamEl) teamEl.value = '';
         var canvas = canvasId ? document.getElementById(canvasId) : activeProjectsCanvas();
         if (!canvas) return;
         var empty = canvas.querySelector('.proj-empty');

@@ -305,10 +305,14 @@ function renderSystemCronVariant(row) {
       return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
     }
 
-    async function createAgentViaApi(name, fromAgentId, title) {
+    async function createAgentViaApi(name, fromAgentId, title, teamName, options) {
+      options = options || {};
       var body = { id: name };
       if (fromAgentId) body.fromAgentId = fromAgentId;
       if (title && String(title).trim()) body.title = String(title).trim();
+      if (teamName && String(teamName).trim()) body.teamName = String(teamName).trim();
+      if (options.isolated === true) body.isolated = true;
+      if (options.sharedUserMemory !== undefined) body.sharedUserMemory = options.sharedUserMemory !== false;
       var r = await fetch(API + '/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -414,9 +418,11 @@ function renderSystemCronVariant(row) {
       opts = opts || {};
       var modal = document.getElementById('agent-create-modal');
       var titleInput = document.getElementById('agent-create-modal-title-input');
+      var teamInput = document.getElementById('agent-create-modal-team');
       if (!modal || !titleInput) return;
       showAgentCreateModalError('');
       titleInput.value = '';
+      if (teamInput) teamInput.value = opts.teamName ? String(opts.teamName) : 'default';
       await populateAgentCreateFromSelect(opts.fromAgentId);
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
@@ -436,6 +442,7 @@ function renderSystemCronVariant(row) {
     async function submitAgentCreateModal(switchChatToNew) {
       var titleInput = document.getElementById('agent-create-modal-title-input');
       var fromSelect = document.getElementById('agent-create-modal-from');
+      var teamInput = document.getElementById('agent-create-modal-team');
       var submitBtn = document.getElementById('agent-create-modal-submit');
       if (!titleInput || !fromSelect) return;
       var title = titleInput.value.trim();
@@ -456,10 +463,11 @@ function renderSystemCronVariant(row) {
         return;
       }
       var fromAgentId = (fromSelect.value || 'main').trim() || 'main';
+      var teamName = teamInput ? (teamInput.value || 'default').trim() : 'default';
       if (submitBtn) submitBtn.disabled = true;
       showAgentCreateModalError('');
       try {
-        var d = await createAgentViaApi(normalized, fromAgentId, title);
+        var d = await createAgentViaApi(normalized, fromAgentId, title, teamName || 'default');
         closeAgentCreateModal();
         selectedAgentId = d.id || normalized;
         if (switchChatToNew) selectedChatAgentId = d.id || normalized;
@@ -472,6 +480,234 @@ function renderSystemCronVariant(row) {
         if (submitBtn) submitBtn.disabled = false;
       }
     }
+
+    function showTeamsPageError(msg) {
+      var el = document.getElementById('teams-page-error');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    function teamsOptionHtml(teams, selectedId) {
+      return (teams || []).map(function (team) {
+        var id = String(team.id || 'default');
+        var selected = id === selectedId ? ' selected' : '';
+        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(team.name || id) + ' (' + escapeHtml(id) + ')</option>';
+      }).join('');
+    }
+
+    function teamsCssEscape(value) {
+      if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(value || ''));
+      return String(value || '').replace(/["\\]/g, '\\$&');
+    }
+
+    function projectOptionHtml(projects, selectedId) {
+      var html = '<option value="">No project selected</option>';
+      html += (projects || []).map(function (project) {
+        var id = String(project.id || '');
+        var selected = id === String(selectedId || '') ? ' selected' : '';
+        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(project.name || ('Project ' + id)) + '</option>';
+      }).join('');
+      return html;
+    }
+
+    async function fetchTeamsPage() {
+      var grid = document.getElementById('teams-page-grid');
+      if (!grid) return;
+      showTeamsPageError('');
+      try {
+        var results = await Promise.all([
+          fetch(API + '/api/teams').then(function (r) { return r.json(); }),
+          fetch(API + '/api/agents').then(function (r) { return r.json(); }),
+          fetch(API + '/api/projects').then(function (r) { return r.json(); }),
+        ]);
+        var teams = Array.isArray(results[0].teams) ? results[0].teams : [];
+        var agents = Array.isArray(results[1].agents) ? results[1].agents : [];
+        var projects = Array.isArray(results[2]) ? results[2] : [];
+        if (!teams.length) teams = [{ id: 'default', name: 'Default team', members: [] }];
+        var agentsByTeam = {};
+        agents.forEach(function (agent) {
+          var tid = String(agent.teamId || 'default');
+          if (!agentsByTeam[tid]) agentsByTeam[tid] = [];
+          agentsByTeam[tid].push(agent);
+        });
+        var projectsByTeam = {};
+        var unassignedProjects = [];
+        projects.forEach(function (project) {
+          var tid = String(project.team_id || '');
+          if (!tid) {
+            unassignedProjects.push(project);
+            return;
+          }
+          if (!projectsByTeam[tid]) projectsByTeam[tid] = [];
+          projectsByTeam[tid].push(project);
+        });
+        grid.innerHTML = teams.map(function (team) {
+          var tid = String(team.id || 'default');
+          var members = agentsByTeam[tid] || [];
+          var teamProjects = projectsByTeam[tid] || [];
+          var memberRows = members.length ? members.map(function (agent) {
+            return '<div class="teams-member-row" data-agent-id="' + escapeHtml(agent.id) + '">' +
+              '<div><strong>' + escapeHtml(agent.title || agent.id) + '</strong><span>' + escapeHtml(agent.id) + '</span></div>' +
+              '<select data-team-move-agent="' + escapeHtml(agent.id) + '">' + teamsOptionHtml(teams, tid) + '</select>' +
+              '<button type="button" class="secondary" data-team-move-btn="' + escapeHtml(agent.id) + '">Move</button>' +
+            '</div>';
+          }).join('') : '<p class="skill-meta">No agents in this team.</p>';
+          var projectRows = teamProjects.length ? teamProjects.map(function (project) {
+            return '<div class="teams-project-row" data-project-id="' + escapeHtml(project.id) + '">' +
+              '<div><strong>' + escapeHtml(project.name || ('Project ' + project.id)) + '</strong><span>' + (project.url ? escapeHtml(project.url) : 'No URL') + '</span></div>' +
+              '<select data-team-project-target="' + escapeHtml(project.id) + '">' + teamsOptionHtml(teams, tid) + '</select>' +
+              '<button type="button" class="secondary" data-team-project-move="' + escapeHtml(project.id) + '">Switch</button>' +
+              '<button type="button" class="secondary" data-team-project-clear="' + escapeHtml(project.id) + '">Unassign</button>' +
+            '</div>';
+          }).join('') : '<p class="skill-meta">No projects assigned. This team will not run multi-agent work until a project is assigned.</p>';
+          return '<section class="card teams-card" data-team-id="' + escapeHtml(tid) + '">' +
+            '<div class="teams-card-head">' +
+              '<div class="field teams-name-field"><label>Team</label><input data-team-name-input="' + escapeHtml(tid) + '" type="text" value="' + escapeHtml(team.name || tid) + '"></div>' +
+              '<button type="button" data-team-rename="' + escapeHtml(tid) + '">Save name</button>' +
+            '</div>' +
+            '<div class="teams-card-meta">' + members.length + ' agent' + (members.length === 1 ? '' : 's') + ' · ' + teamProjects.length + ' project' + (teamProjects.length === 1 ? '' : 's') + '</div>' +
+            '<div class="teams-card-actions">' +
+              '<button type="button" class="secondary" data-team-create-agent="' + escapeHtml(tid) + '">Create agent in team</button>' +
+            '</div>' +
+            '<h3>Agents</h3>' + memberRows +
+            '<h3>Projects</h3>' + projectRows +
+            '<div class="teams-assign-project"><select data-team-assign-project="' + escapeHtml(tid) + '">' + projectOptionHtml(projects, '') + '</select>' +
+            '<button type="button" class="secondary" data-team-assign-project-btn="' + escapeHtml(tid) + '">Assign project</button></div>' +
+          '</section>';
+        }).join('');
+        if (unassignedProjects.length) {
+          grid.insertAdjacentHTML('beforeend', '<section class="card teams-card"><h2>Unassigned projects</h2>' +
+            unassignedProjects.map(function (project) {
+              return '<div class="teams-project-row" data-project-id="' + escapeHtml(project.id) + '">' +
+                '<div><strong>' + escapeHtml(project.name || ('Project ' + project.id)) + '</strong><span>Not assigned to a team</span></div>' +
+                '<select data-team-project-target="' + escapeHtml(project.id) + '">' + teamsOptionHtml(teams, '') + '</select>' +
+                '<button type="button" class="secondary" data-team-project-move="' + escapeHtml(project.id) + '">Assign</button>' +
+              '</div>';
+            }).join('') + '</section>');
+        }
+      } catch (err) {
+        showTeamsPageError(err.message || String(err));
+      }
+    }
+
+    async function createTeamFromTeamsPage() {
+      var input = document.getElementById('teams-new-name');
+      var name = input ? String(input.value || '').trim() : '';
+      if (!name) { if (input) input.focus(); return; }
+      showTeamsPageError('');
+      var r = await fetch(API + '/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name }),
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        showTeamsPageError(d.error || 'Could not create team.');
+        return;
+      }
+      if (input) input.value = '';
+      await fetchTeamsPage();
+    }
+
+    async function createIsolatedAgentFromTeamsPage() {
+      var input = document.getElementById('teams-isolated-agent-name');
+      var title = input ? String(input.value || '').trim() : '';
+      if (!title) { if (input) input.focus(); return; }
+      var id = normalizeAgentIdInput(title);
+      if (!id || id === 'main') {
+        showTeamsPageError('Choose a different agent name.');
+        return;
+      }
+      showTeamsPageError('');
+      try {
+        await createAgentViaApi(id, 'main', title, id, { isolated: true, sharedUserMemory: false });
+        if (input) input.value = '';
+        await fetchTeamsPage();
+        if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+        if (typeof fetchChatAgents === 'function') await fetchChatAgents();
+      } catch (err) {
+        showTeamsPageError(err.message || String(err));
+      }
+    }
+
+    async function moveAgentToTeam(agentId, teamId) {
+      var r = await fetch(API + '/api/teams/' + encodeURIComponent(teamId) + '/agents/' + encodeURIComponent(agentId), { method: 'PUT' });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(d.error || 'Could not move agent.');
+    }
+
+    async function assignProjectToTeam(projectId, teamId) {
+      var r = await fetch(API + '/api/projects/' + encodeURIComponent(projectId), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team_id: teamId || '' }),
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(d.error || 'Could not update project.');
+    }
+
+    wireClick('teams-create-btn', createTeamFromTeamsPage);
+    wireClick('teams-refresh-btn', fetchTeamsPage);
+    wireClick('teams-create-isolated-btn', createIsolatedAgentFromTeamsPage);
+    document.addEventListener('click', async function (e) {
+      var target = e.target;
+      if (!target || !target.getAttribute) return;
+      var renameTeamId = target.getAttribute('data-team-rename');
+      var createAgentTeamId = target.getAttribute('data-team-create-agent');
+      var moveAgentId = target.getAttribute('data-team-move-btn');
+      var assignTeamId = target.getAttribute('data-team-assign-project-btn');
+      var moveProjectId = target.getAttribute('data-team-project-move');
+      var clearProjectId = target.getAttribute('data-team-project-clear');
+      try {
+        if (renameTeamId) {
+          var input = document.querySelector('[data-team-name-input="' + teamsCssEscape(renameTeamId) + '"]');
+          var name = input ? String(input.value || '').trim() : '';
+          var r = await fetch(API + '/api/teams/' + encodeURIComponent(renameTeamId), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name }),
+          });
+          var d = await r.json().catch(function () { return {}; });
+          if (!r.ok) throw new Error(d.error || 'Could not rename team.');
+          await fetchTeamsPage();
+        } else if (createAgentTeamId) {
+          await openAgentCreateModal({ teamName: createAgentTeamId });
+        } else if (moveAgentId) {
+          var sel = document.querySelector('[data-team-move-agent="' + teamsCssEscape(moveAgentId) + '"]');
+          var nextTeam = sel ? String(sel.value || 'default') : 'default';
+          await moveAgentToTeam(moveAgentId, nextTeam);
+          await fetchTeamsPage();
+          if (typeof fetchAgentsPage === 'function') await fetchAgentsPage();
+          if (typeof fetchChatAgents === 'function') await fetchChatAgents();
+        } else if (assignTeamId) {
+          var assignSel = document.querySelector('[data-team-assign-project="' + teamsCssEscape(assignTeamId) + '"]');
+          var projectId = assignSel ? String(assignSel.value || '') : '';
+          if (!projectId) return;
+          await assignProjectToTeam(projectId, assignTeamId);
+          await fetchTeamsPage();
+          if (window.pastureProjectsApi && window.pastureProjectsApi.loadProjects) window.pastureProjectsApi.loadProjects();
+        } else if (moveProjectId) {
+          var targetSel = document.querySelector('[data-team-project-target="' + teamsCssEscape(moveProjectId) + '"]');
+          var targetTeam = targetSel ? String(targetSel.value || '') : '';
+          if (!targetTeam) return;
+          await assignProjectToTeam(moveProjectId, targetTeam);
+          await fetchTeamsPage();
+          if (window.pastureProjectsApi && window.pastureProjectsApi.loadProjects) window.pastureProjectsApi.loadProjects();
+        } else if (clearProjectId) {
+          await assignProjectToTeam(clearProjectId, '');
+          await fetchTeamsPage();
+          if (window.pastureProjectsApi && window.pastureProjectsApi.loadProjects) window.pastureProjectsApi.loadProjects();
+        }
+      } catch (err) {
+        showTeamsPageError(err.message || String(err));
+      }
+    });
 
     var agentEditModalOpen = false;
     var agentEditorState = {
@@ -615,6 +851,9 @@ function renderSystemCronVariant(row) {
       var p = scope === 'page' ? 'team-agent' : 'agent-edit-modal';
       return {
         title: document.getElementById(p + '-title'),
+        team: document.getElementById(p + '-team'),
+        sharedMemory: document.getElementById(p + '-shared-memory'),
+        sharedMemoryHint: document.getElementById(p + '-shared-memory-hint'),
         id: document.getElementById(p + '-id'),
         heading: document.getElementById(p + '-heading'),
         llmPriority: document.getElementById(p + '-llm-priority'),
@@ -765,6 +1004,17 @@ function renderSystemCronVariant(row) {
         : (Array.isArray(projectCfg.llm && projectCfg.llm.models) ? projectCfg.llm.models.slice() : []);
       if (dom.id) dom.id.value = agentId;
       if (dom.title) dom.title.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
+      if (dom.team) dom.team.value = (cfg.teamId && String(cfg.teamId).trim()) ? String(cfg.teamId).trim() : 'default';
+      if (dom.sharedMemory) {
+        var isolated = cfg.isolated === true;
+        dom.sharedMemory.checked = !isolated && cfg.sharedUserMemory !== false;
+        dom.sharedMemory.disabled = isolated;
+        if (dom.sharedMemoryHint) {
+          dom.sharedMemoryHint.textContent = isolated
+            ? 'Isolated agents use their own memory workspace when calling the memory skill.'
+            : 'Allow this normal agent to use the memory skill against global user memory.';
+        }
+      }
       if (dom.llmPriority) {
         var priorityMode = (cfg.llm && cfg.llm.priorityMode === 'custom') ? 'custom' : 'system';
         dom.llmPriority.value = priorityMode;
@@ -782,7 +1032,9 @@ function renderSystemCronVariant(row) {
       }
       var messaging = cfg.agentMessaging || {};
       var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
+      var currentTeamId = (cfg.teamId && String(cfg.teamId).trim()) ? String(cfg.teamId).trim() : 'default';
       var inboundFrom = (agentsResp.agents || []).filter(function (a) {
+        if (String(a.teamId || 'default') !== currentTeamId) return false;
         var peerAllow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
         return a.id !== agentId && peerAllow.indexOf(agentId) !== -1;
       }).map(function (a) { return a.title && String(a.title).trim() ? String(a.title).trim() + ' (' + a.id + ')' : a.id; });
@@ -795,7 +1047,9 @@ function renderSystemCronVariant(row) {
           dom.inbound.textContent = '';
         }
       }
-      var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
+      var others = (agentsResp.agents || []).filter(function (a) {
+        return a.id !== agentId && String(a.teamId || 'default') === currentTeamId;
+      });
       if (dom.links) {
         if (!others.length) {
           dom.links.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
@@ -829,6 +1083,8 @@ function renderSystemCronVariant(row) {
       }
       var patch = {
         title: dom.title ? dom.title.value : '',
+        teamName: dom.team ? (dom.team.value || 'default') : 'default',
+        sharedUserMemory: dom.sharedMemory ? (dom.sharedMemory.checked && !dom.sharedMemory.disabled) : true,
         skills: { enabled: enabled },
         agentMessaging: { allow: allow },
       };

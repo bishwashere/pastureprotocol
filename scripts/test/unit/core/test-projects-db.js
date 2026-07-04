@@ -18,13 +18,15 @@ async function main() {
       normalizeProjectUrl,
       getProjectsDb,
     } = await import('../../../../lib/context/projects-db.js');
+    const { buildProjectTeamGateReply } = await import('../../../../lib/context/projects-context.js');
 
     assert(normalizeProjectUrl('') === '', 'empty url');
     assert(normalizeProjectUrl('https://example.com') === 'https://example.com', 'https kept');
     assert(normalizeProjectUrl('nextpostai.com') === 'https://nextpostai.com', 'bare host gets https');
 
-    const p1 = createProject({ name: 'NextPostAI', description: 'Onboarding work' });
+    const p1 = createProject({ name: 'NextPostAI', description: 'Onboarding work', team_id: 'default' });
     assert(p1.url === '', 'url optional on create');
+    assert(p1.team_id === 'default', `team id on create: ${p1.team_id}`);
 
     const p2 = createProject({
       name: 'Site',
@@ -32,6 +34,7 @@ async function main() {
       description: '',
     });
     assert(p2.url === 'https://nextpostai.com', `stored url: ${p2.url}`);
+    assert(p2.team_id === '', `project can be unassigned from team: ${p2.team_id}`);
 
     const p3 = createProject({ name: 'Bare', url: 'app.example.io/path' });
     assert(p3.url === 'https://app.example.io/path', `normalized: ${p3.url}`);
@@ -40,16 +43,19 @@ async function main() {
       name: 'Renamed',
       description: 'New desc',
       url: 'docs.example.com',
+      team_id: 'Growth Team',
     });
     assert(updated.name === 'Renamed', `patch name: ${updated.name}`);
     assert(updated.description === 'New desc', `patch desc: ${updated.description}`);
     assert(updated.url === 'https://docs.example.com', `patch url: ${updated.url}`);
+    assert(updated.team_id === 'growth-team', `patch team_id: ${updated.team_id}`);
 
     const db = getProjectsDb();
     const cols = db.prepare('PRAGMA table_info(projects)').all().map((c) => c.name);
     assert(cols.includes('url'), 'projects table has url column');
     assert(cols.includes('setup_notes'), 'projects table has setup_notes column');
     assert(cols.includes('connectors_json'), 'projects table has connectors_json column');
+    assert(cols.includes('team_id'), 'projects table has team_id column');
 
     const withSetup = createProject({
       name: 'WithSetup',
@@ -81,6 +87,15 @@ async function main() {
 
     const reloaded = getProject(p2.id);
     assert(reloaded.name === 'Site' && reloaded.url === 'https://nextpostai.com', 'reload ok');
+
+    createProject({ name: 'DefaultTeamProject', team_id: 'default' });
+    const gate = buildProjectTeamGateReply({
+      agentId: 'main',
+      agentTeamId: 'default',
+      focusedProject: null,
+      focusedProjectTeamId: '',
+    });
+    assert(gate.includes('Multi-agent work needs a project'), `gate reply: ${gate}`);
 
     console.log('projects-db tests passed');
   } finally {

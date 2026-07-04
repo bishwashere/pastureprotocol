@@ -37,8 +37,12 @@ import {
 } from '../lib/agent/retrospective.js';
 import {
   buildProjectsContextBlock,
+  buildProjectTeamGateReply,
   enrichMessageWithProjectContext,
+  getProjectTeamId,
+  resolveFocusedProjectForTurn,
 } from '../lib/context/projects-context.js';
+import { getAgentTeamId } from '../lib/agent/teams.js';
 import { buildMissionsContextBlock, buildMissionIntentPlan, resolveMissionForUserTurn } from '../lib/context/missions-context.js';
 import { buildProjectWorkflowContextBlock } from '../lib/context/project-workflow.js';
 import {
@@ -133,6 +137,9 @@ async function main() {
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
   const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);
+  const focusedProject = resolveFocusedProjectForTurn({ userText: message, historyMessages });
+  const focusedProjectTeamId = getProjectTeamId(focusedProject);
+  const activeAgentTeamId = getAgentTeamId(agentId);
 
   const noop = () => {};
   const ctx = {
@@ -168,7 +175,24 @@ async function main() {
       process.stderr.write('[work-mode] ' + JSON.stringify({ mode: workMode }) + '\n');
     }
   }
-  const isMultiAgent = workMode === 'multi';
+  const isMultiAgent = workMode === 'multi' && !!focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId;
+  const teamGateReply = workMode === 'multi' && !workModeAck && !isNonTaskMessage(message) && !isMultiAgent
+    ? buildProjectTeamGateReply({
+        agentId,
+        agentTeamId: activeAgentTeamId,
+        focusedProject,
+        focusedProjectTeamId,
+      })
+    : '';
+  if (workMode === 'multi' && !isMultiAgent) {
+    process.stderr.write('[team-gate] ' + JSON.stringify({
+      mode: teamGateReply ? 'blocked' : 'single',
+      reason: focusedProjectTeamId ? 'agent_not_on_project_team' : 'no_project_team',
+      projectId: focusedProject?.id || '',
+      projectTeamId: focusedProjectTeamId || '',
+      agentTeamId: activeAgentTeamId || '',
+    }) + '\n');
+  }
   // Step 2: decide work durability before delegation. Persistence must be
   // attached to the turn before agent-send chooses who should do the work.
   // Single-agent mode skips this entirely.
@@ -308,7 +332,7 @@ async function main() {
     toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
   }
   const toolNames = toolsToUse.map((t) => t?.function?.name).filter(Boolean);
-  const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + buildAgentTeamPromptBlock(agentId);
+  const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir, { agentId }) + buildAgentTeamPromptBlock(agentId);
   const planBlock = turnRouteToSystemBlock(turnRoute);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
   if (sessionRotated) {
@@ -336,7 +360,9 @@ async function main() {
     let textToSend = '';
     let voiceReplyText = '';
     let skillsCalled = [];
-    if (presetDelegationPlan && delegatedTarget) {
+    if (teamGateReply) {
+      textToSend = teamGateReply;
+    } else if (presetDelegationPlan && delegatedTarget) {
       try {
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
         const forcedRaw = await executeSkill('agent-send', ctx, {

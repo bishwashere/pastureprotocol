@@ -17,6 +17,10 @@
 
 import { buildOneOnOneSystemPrompt, FINAL_REPLY_POLICY_BLOCK, RUNTIME_GROUNDING_BLOCK } from '../../../../lib/agent/system-prompt.js';
 import { buildCronSystemPrompt } from '../../../../cron/run-job.js';
+import { resolveMemoryWorkspaceDir } from '../../../../lib/agent/executors/memory.js';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 let passed = 0;
 let failed = 0;
@@ -105,6 +109,34 @@ check(
       prompt.includes(phrase),
     );
   }
+}
+
+// 6. Shared user memory is accessed through the memory skill, not injected into prompts.
+{
+  const stateDir = mkdtempSync(join(tmpdir(), 'pasture-system-prompt-shared-memory-'));
+  process.env.PASTURE_STATE_DIR = stateDir;
+  mkdirSync(join(stateDir, 'workspace'), { recursive: true });
+  mkdirSync(join(stateDir, 'agents', 'normal', 'workspace'), { recursive: true });
+  mkdirSync(join(stateDir, 'agents', 'revoked', 'workspace'), { recursive: true });
+  mkdirSync(join(stateDir, 'agents', 'isolated', 'workspace'), { recursive: true });
+  writeFileSync(join(stateDir, 'workspace', 'MEMORY.md'), 'User likes shared memory tests.', 'utf8');
+  writeFileSync(join(stateDir, 'agents', 'normal', 'config.json'), JSON.stringify({ sharedUserMemory: true }), 'utf8');
+  writeFileSync(join(stateDir, 'agents', 'revoked', 'config.json'), JSON.stringify({ sharedUserMemory: false }), 'utf8');
+  writeFileSync(join(stateDir, 'agents', 'isolated', 'config.json'), JSON.stringify({ isolated: true }), 'utf8');
+  const normalPrompt = buildOneOnOneSystemPrompt(join(stateDir, 'agents', 'normal', 'workspace'), { agentId: 'normal' });
+  check('agent prompt does not inject shared MEMORY.md', !normalPrompt.includes('User likes shared memory tests.'));
+  check(
+    'normal agent memory skill uses root workspace',
+    resolveMemoryWorkspaceDir({ agentId: 'normal', workspaceDir: join(stateDir, 'agents', 'normal', 'workspace') }, '') === join(stateDir, 'workspace'),
+  );
+  check(
+    'revoked agent memory skill uses own workspace',
+    resolveMemoryWorkspaceDir({ agentId: 'revoked', workspaceDir: join(stateDir, 'agents', 'revoked', 'workspace') }, '') === join(stateDir, 'agents', 'revoked', 'workspace'),
+  );
+  check(
+    'isolated agent memory skill uses own workspace',
+    resolveMemoryWorkspaceDir({ agentId: 'isolated', workspaceDir: join(stateDir, 'agents', 'isolated', 'workspace') }, '') === join(stateDir, 'agents', 'isolated', 'workspace'),
+  );
 }
 
 console.log(`\n[system-prompt-grounding] passed=${passed} failed=${failed}`);

@@ -199,7 +199,7 @@
         addBtn.addEventListener('click', function () {
           var api = window.pastureProjectsApi;
           if (!api) return;
-          api.addProjectFromForm('mc2-proj-new-name', 'mc2-proj-new-url', 'mc2-proj-new-desc', 'mc2-proj-canvas');
+          api.addProjectFromForm('mc2-proj-new-name', 'mc2-proj-new-url', 'mc2-proj-new-desc', 'mc2-proj-canvas', 'mc2-proj-new-team');
         });
       }
       function mc2ProjEnterSubmit(e) {

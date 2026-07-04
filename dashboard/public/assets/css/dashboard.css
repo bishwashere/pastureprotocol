@@ -1100,6 +1100,99 @@
       margin: 0.15rem 0 0 0;
       padding-left: 1.1rem;
     }
+    .teams-page-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .teams-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .teams-card h2,
+    .teams-card h3 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    .teams-card h3 {
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .teams-card-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.6rem;
+      align-items: end;
+    }
+    .teams-name-field {
+      margin: 0;
+    }
+    .teams-card-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .teams-card-actions,
+    .teams-assign-project {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .teams-member-row,
+    .teams-project-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(130px, 0.7fr) auto auto;
+      gap: 0.45rem;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.55rem;
+      background: rgba(255,255,255,0.02);
+    }
+    .teams-member-row > div,
+    .teams-project-row > div {
+      min-width: 0;
+    }
+    .teams-member-row strong,
+    .teams-project-row strong {
+      display: block;
+      font-size: 0.9rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .teams-member-row span,
+    .teams-project-row span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .teams-member-row select,
+    .teams-project-row select,
+    .teams-assign-project select {
+      min-width: 0;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 0.35rem 0.45rem;
+      font: inherit;
+      font-size: 0.82rem;
+    }
+    @media (max-width: 720px) {
+      .teams-card-head,
+      .teams-member-row,
+      .teams-project-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .team-rail-shell,
     .team-activity-shell {
       height: 100%;

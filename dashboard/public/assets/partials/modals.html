@@ -12,6 +12,11 @@
         <select id="agent-create-modal-from"></select>
         <p class="field-hint">Copies LLM config, skills (minus risky defaults), and identity files. Does not copy memory.</p>
       </div>
+      <div class="field">
+        <label for="agent-create-modal-team">Team</label>
+        <input id="agent-create-modal-team" type="text" placeholder="default" value="default" autocomplete="off">
+        <p class="field-hint">Agents in the same team can delegate to each other. Leave as default if unsure.</p>
+      </div>
       <p id="agent-create-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">
         <button type="button" id="agent-create-modal-cancel" class="secondary">Cancel</button>
@@ -33,6 +38,18 @@
         <div class="field">
           <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
           <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="agent-edit-modal-team">Team</label>
+          <input id="agent-edit-modal-team" type="text" placeholder="default" autocomplete="off">
+          <p class="field-hint" style="margin:0.35rem 0 0;">Changing this moves the agent out of its current team.</p>
+        </div>
+        <div class="field">
+          <label>
+            <input id="agent-edit-modal-shared-memory" type="checkbox">
+            Shared memory skill access
+          </label>
+          <p id="agent-edit-modal-shared-memory-hint" class="field-hint" style="margin:0.35rem 0 0;">Allow this normal agent to use the memory skill against global user memory.</p>
         </div>
         <div class="field">
           <label for="agent-edit-modal-llm-priority">LLM priority</label>

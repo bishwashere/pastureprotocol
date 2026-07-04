@@ -33,6 +33,7 @@ import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/channels/group-config.js';
 import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent/agent-config.js';
+import { DEFAULT_TEAM_ID, assignAgentToTeam, ensureTeam, getAgentTeamId, listTeams, normalizeTeamId, updateTeam } from '../lib/agent/teams.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -43,6 +44,7 @@ import {
   listProjects, getProject, createProject, updateProject, deleteProject,
   getProjectGraph, createUpdate, editUpdate, deleteUpdate,
   createBranch, deleteBranch,
+  normalizeProjectTeamId,
 } from '../lib/context/projects-db.js';
 import {
   listPendingProposals,
@@ -474,6 +476,9 @@ app.get('/api/agents', (_req, res) => {
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
         hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
+        teamId: getAgentTeamId(id),
+        isolated: config.isolated === true,
+        sharedUserMemory: config.sharedUserMemory !== false && config.isolated !== true,
         color: typeof config.color === 'string' ? config.color : null,
         avatarUrl: (() => {
           if (!hasAgentAvatar(id)) return null;
@@ -486,6 +491,52 @@ app.get('/api/agents', (_req, res) => {
     });
     res.json({ agents });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/teams', (_req, res) => {
+  try {
+    ensureTeam(DEFAULT_TEAM_ID);
+    res.json({ teams: listTeams() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/teams', (req, res) => {
+  try {
+    const rawId = String(req.body?.id || req.body?.name || DEFAULT_TEAM_ID).trim();
+    const name = String(req.body?.name || rawId || '').trim();
+    const created = ensureTeam(rawId, { name });
+    res.status(created.created ? 201 : 200).json(created.team);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/teams/:id', (req, res) => {
+  try {
+    const team = updateTeam(req.params.id, req.body || {});
+    res.json(team);
+  } catch (err) {
+    if (/not found/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/teams/:id/agents/:agentId', (req, res) => {
+  try {
+    const result = assignAgentToTeam(req.params.agentId, req.params.id);
+    res.json(result);
+  } catch (err) {
+    if (/unknown agent/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -906,6 +957,14 @@ app.patch('/api/agents/:id/config', (req, res) => {
         ...patch.agentMessaging,
       });
     }
+    if (patch.teamId !== undefined || patch.teamName !== undefined) {
+      const teamId = normalizeTeamId(patch.teamId || patch.teamName || DEFAULT_TEAM_ID);
+      ensureTeam(teamId, { name: patch.teamName });
+      config.teamId = teamId;
+    }
+    if (patch.sharedUserMemory !== undefined) {
+      config.sharedUserMemory = patch.sharedUserMemory !== false;
+    }
     syncAgentSendSkillInConfig(config);
     saveAgentConfig(id, config);
     if (id === DEFAULT_AGENT_ID) saveConfig(config);
@@ -927,8 +986,20 @@ app.post('/api/agents', (req, res) => {
     const opts = {};
     if (fromAgentId) opts.fromAgentId = fromAgentId;
     if (titleRaw.trim()) opts.title = titleRaw;
+    const teamRaw = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+    const teamNameRaw = typeof req.body?.teamName === 'string' ? req.body.teamName.trim() : '';
+    const teamId = normalizeTeamId(teamRaw || teamNameRaw || DEFAULT_TEAM_ID);
+    const teamName = teamNameRaw || teamRaw || '';
+    ensureTeam(teamId, { name: teamName });
+    opts.teamId = teamId;
+    if (req.body?.isolated === true) opts.isolated = true;
+    if (req.body?.sharedUserMemory !== undefined) opts.sharedUserMemory = req.body.sharedUserMemory !== false;
     const created = createAgent(rawId, opts);
     let config = loadAgentConfig(created.id);
+    if (!config.teamId || config.teamId !== teamId) {
+      config.teamId = teamId;
+      saveAgentConfig(created.id, config);
+    }
     if (!created.created && titleRaw.trim()) {
       const t = normalizeAgentTitle(titleRaw);
       if (t) config.title = t;
@@ -3693,33 +3764,42 @@ app.get('/api/projects', (_req, res) => {
 });
 
 app.post('/api/projects', (req, res) => {
-  const { name, description, url, setup_notes } = req.body || {};
+  const { name, description, url, setup_notes, team_id, teamId } = req.body || {};
   if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
   try {
+    const hasTeam = team_id !== undefined || teamId !== undefined;
+    const projectTeamId = hasTeam ? normalizeProjectTeamId(team_id || teamId || '') : '';
+    if (projectTeamId) ensureTeam(projectTeamId);
     res.status(201).json(createProject({
       name: String(name).trim(),
       description: String(description || '').trim(),
       url: String(url || '').trim(),
       setup_notes: String(setup_notes || '').trim(),
+      team_id: projectTeamId,
     }));
   }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.patch('/api/projects/:id', (req, res) => {
-  const { name, description, url, setup_notes, connectors } = req.body || {};
+  const { name, description, url, setup_notes, connectors, team_id, teamId } = req.body || {};
   const id = Number(req.params.id);
   const existing = getProject(id);
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
   const nextName = name !== undefined ? String(name || '').trim() : existing.name;
   if (!nextName) { res.status(400).json({ error: 'name required' }); return; }
   try {
+    const nextTeamId = team_id !== undefined || teamId !== undefined
+      ? normalizeProjectTeamId(team_id || teamId || '')
+      : undefined;
+    if (nextTeamId) ensureTeam(nextTeamId);
     const p = updateProject(id, {
       name: nextName,
       description: description !== undefined ? String(description || '').trim() : existing.description,
       url: url !== undefined ? String(url || '').trim() : undefined,
       setup_notes: setup_notes !== undefined ? String(setup_notes || '').trim() : undefined,
       connectors: connectors !== undefined && typeof connectors === 'object' ? connectors : undefined,
+      team_id: nextTeamId,
     });
     if (!p) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(p);

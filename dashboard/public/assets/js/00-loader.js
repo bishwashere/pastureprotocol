@@ -31,7 +31,7 @@
       return fetchText('pages/mc2/' + name + '.html');
     }).join('\n');
   }
-  var pages = ['home', 'brain', 'memory', 'crons', 'skills', 'agents', 'team', 'team-agent', 'groups', 'config', 'test'];
+  var pages = ['home', 'brain', 'memory', 'crons', 'skills', 'agents', 'teams', 'team', 'team-agent', 'groups', 'config', 'test'];
   var root = document.getElementById('page-fragments-root');
   if (!root) return;
   root.outerHTML = pages.map(function (page) {

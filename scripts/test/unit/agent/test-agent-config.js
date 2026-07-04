@@ -118,6 +118,40 @@ async function main() {
       },
     },
     {
+      name: 'agents in different teams are not eligible delegation peers',
+      input: 'Setup: main+marketer default team, alex growth team — expect main cannot delegate to alex',
+      expectMode: 'behavior',
+      run: async () => {
+        createStateDir();
+        const ac = await loadAgentConfigModule();
+        const { executeAgentSend } = await loadAgentSendModule();
+        ac.ensureMainAgentInitialized();
+        ac.createAgent('marketer', { fromAgentId: 'main', title: 'Marketer' });
+        ac.createAgent('alex', { fromAgentId: 'main', title: 'Alex', teamId: 'growth' });
+        const mainPolicy = ac.getAgentMessagingPolicy('main');
+        const alexPolicy = ac.getAgentMessagingPolicy('alex');
+        if (!mainPolicy.allow.includes('marketer')) throw new Error(`Expected marketer in main allow: [${mainPolicy.allow.join(', ')}]`);
+        if (mainPolicy.allow.includes('alex')) throw new Error(`Did not expect alex in main allow: [${mainPolicy.allow.join(', ')}]`);
+        if (alexPolicy.allow.includes('main') || alexPolicy.allow.includes('marketer')) {
+          throw new Error(`Did not expect cross-team peers in alex allow: [${alexPolicy.allow.join(', ')}]`);
+        }
+        const raw = await executeAgentSend({
+          agentId: 'main',
+          agentDepth: 0,
+          agentCallChain: ['main'],
+          runInternalAgent: async () => ({ textToSend: '[Pasture] should not run', skillsCalled: [] }),
+        }, {
+          agent: 'alex',
+          message: 'Please help with this task.',
+        });
+        const out = JSON.parse(raw);
+        if (!/cross-team|not linked/i.test(String(out.error || ''))) {
+          throw new Error(`Expected cross-team/not-linked error, got ${raw}`);
+        }
+        return { reply: `main=[${mainPolicy.allow.join(', ')}], alex=[${alexPolicy.allow.join(', ')}], error=${out.error}` };
+      },
+    },
+    {
       name: 'new agents inherit system LLM priority mode',
       input: 'Setup: main has openai priority; create alex — expect priorityMode=system and no copied priority flags',
       expectMode: 'behavior',

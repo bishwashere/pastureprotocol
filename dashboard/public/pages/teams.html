@@ -1,0 +1,23 @@
+<div id="page-teams" class="page">
+  <div class="card">
+    <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Teams</h2>
+    <p class="skill-meta" style="margin:0 0 0.75rem 0;">Manage project-scoped agent teams. Agents belong to one team; projects may be unassigned.</p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end;">
+      <div class="field" style="min-width:220px; margin:0;">
+        <label for="teams-new-name">New team</label>
+        <input id="teams-new-name" type="text" placeholder="e.g. Growth, Product, Support" autocomplete="off">
+      </div>
+      <button id="teams-create-btn" type="button" style="margin-top:0;">Create team</button>
+      <button id="teams-refresh-btn" type="button" class="secondary" style="margin-top:0;">Refresh</button>
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end; margin-top:0.75rem;">
+      <div class="field" style="min-width:220px; margin:0;">
+        <label for="teams-isolated-agent-name">Isolated agent</label>
+        <input id="teams-isolated-agent-name" type="text" placeholder="Agent name" autocomplete="off">
+      </div>
+      <button id="teams-create-isolated-btn" type="button" class="secondary" style="margin-top:0;">Create isolated agent</button>
+    </div>
+    <p id="teams-page-error" class="modal-error" role="alert"></p>
+  </div>
+  <div id="teams-page-grid" class="teams-page-grid"></div>
+</div>
