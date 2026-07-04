@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "node scripts/dev-block.js",
     "dashboard": "node dashboard/server.js",
+    "agent-api": "node scripts/agent-api-server.js",
     "test": "node scripts/test/e2e/agent/test-agent.js",
     "start": "node index.js",
     "setup": "node setup.js",
