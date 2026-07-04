@@ -39,6 +39,8 @@
     "test:evaluate-team-capability": "node scripts/test/unit/agent/test-evaluate-team-capability.js",
     "test:agent-map-ui": "node scripts/test/unit/agent/test-agent-map-ui.js",
     "test:dashboard-boot": "node scripts/test/unit/dashboard/test-dashboard-boot.js",
+    "test:isolated-agent-core": "node scripts/test/unit/agent/test-isolated-agent-core.js",
+    "test:isolated-agent-ui": "node scripts/test/e2e/dashboard/test-isolated-agent-ui.js",
     "test:dev-script": "node scripts/test/unit/core/test-dev-script.js",
     "test:system-crons": "node scripts/test/unit/core/test-system-crons.js",
     "test:cron-conditional": "node scripts/test/unit/core/test-cron-conditional.js",

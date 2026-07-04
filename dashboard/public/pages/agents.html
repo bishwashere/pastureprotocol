@@ -3,10 +3,14 @@
       <div class="groups-sidebar card">
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Agents</h2>
         <p class="skill-meta" style="margin:0 0 0.5rem 0;">Default <code>main</code> exists automatically. Create additional agents here.</p>
-        <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.5rem;">
           <input id="agent-create-name" type="text" placeholder="Agent name (e.g. Alex, Backend Bot)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
           <button id="agent-create-btn" type="button" style="margin-top:0;">Create</button>
         </div>
+        <label class="skill-meta" style="display:flex; gap:0.45rem; align-items:flex-start; margin:0 0 0.75rem 0;">
+          <input id="agent-create-api-only" type="checkbox" style="margin-top:0.15rem;">
+          <span>API-only isolated agent</span>
+        </label>
         <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
           <button id="agent-delete-btn" type="button" style="margin-top:0; background:var(--red); color:#fff;">Delete selected</button>
         </div>
@@ -18,6 +22,16 @@
           <p id="agent-detail-meta" class="skill-meta" style="margin:0 0 0.75rem 0;"></p>
           <div id="agent-skills-list"></div>
           <button id="agent-skills-save" style="display:none;">Save skills</button>
+        </div>
+        <div id="agent-api-test-card" class="card" style="display:none;">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">API isolation test</h2>
+          <p id="agent-api-test-meta" class="skill-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div style="display:flex; gap:0.4rem; margin-bottom:0.5rem;">
+            <input id="agent-api-test-conversation" type="text" value="dashboard-test" style="max-width:16rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
+            <button id="agent-api-test-send" type="button" style="margin-top:0;">Send</button>
+          </div>
+          <textarea id="agent-api-test-input" spellcheck="false" placeholder="Message this agent through the isolated API path" style="width:100%; min-height:5rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.75rem; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+          <pre id="agent-api-test-output" style="white-space:pre-wrap; margin:0.75rem 0 0 0; color:var(--muted); font-size:0.85rem;"></pre>
         </div>
         <div class="card">
           <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Identity files</h2>

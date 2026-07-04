@@ -12,6 +12,13 @@
         <select id="agent-create-modal-from"></select>
         <p class="field-hint">Copies LLM config, skills (minus risky defaults), and identity files. Does not copy memory.</p>
       </div>
+      <label class="field" style="display:flex; gap:0.55rem; align-items:flex-start;">
+        <input id="agent-create-modal-api-only" type="checkbox" style="margin-top:0.2rem;">
+        <span>
+          <span style="display:block;">API-only isolated agent</span>
+          <span class="field-hint" style="display:block;">Hide from team/delegation, disable auto-links, and use isolated API sessions.</span>
+        </span>
+      </label>
       <p id="agent-create-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">
         <button type="button" id="agent-create-modal-cancel" class="secondary">Cancel</button>

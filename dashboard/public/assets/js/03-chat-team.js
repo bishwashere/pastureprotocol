@@ -40,6 +40,7 @@
     var chatAbortController = null;
     var currentSessionId = null;
     var chatLastInputWasVoice = false;
+    var chatAgentData = [];
 
     function newSessionId() { return 'cs-' + Date.now(); }
 
@@ -329,6 +330,7 @@
         var meta = mode === 'edit-page'
           ? (skillCount + ' skill' + (skillCount === 1 ? '' : 's'))
           : (skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + (isMain ? 'root' : 'agent'));
+        if (a.apiOnly) meta += ' · API isolated';
         var stateHtml = renderAgentMapStateHtml(a.id, mode);
         var selectedId = mode === 'edit-page' ? selectedTeamInboxAgentId : selectedChatAgentId;
         var sel = a.id === selectedId ? ' selected' : '';
@@ -346,6 +348,7 @@
           ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
           '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
+          (a.apiOnly ? '<div class="agent-map-node-inbound" title="API-only isolated agent">API isolated</div>' : '') +
           inboundHtml +
           stateHtml +
           '<div class="agent-map-node-meta">' + escapeHtml(meta) + '</div></div>';
@@ -398,7 +401,7 @@
 
     async function fetchAgentMapData() {
       try {
-        var r = await fetch(API + '/api/agents');
+        var r = await fetch(API + '/api/agents?includeHidden=1');
         var d = await r.json();
         var agents = Array.isArray(d.agents) ? d.agents : [];
         agentMapData = agents;
@@ -430,6 +433,7 @@
       var id = (agentId || '').trim();
       if (!id) return '';
       var hit = (agentMapData || []).find(function (a) { return a && a.id === id; });
+      if (!hit) hit = (chatAgentData || []).find(function (a) { return a && a.id === id; });
       if (hit) return agentDisplayLabel(hit);
       return id;
     }
@@ -5884,15 +5888,25 @@
     async function fetchChatAgents() {
       var select = document.getElementById('chat-agent-select');
       if (!select) return;
-      var agents = await fetchAgentMapData();
+      await fetchAgentMapData();
+      var agents = [];
+      try {
+        var r = await fetch(API + '/api/agents?includeHidden=1');
+        var d = await r.json();
+        agents = Array.isArray(d.agents) ? d.agents : [];
+      } catch (_) {
+        agents = agentMapData || [];
+      }
       if (!agents.length) agents = [{ id: 'main' }];
+      chatAgentData = agents;
       if (!agents.some(function (a) { return a.id === selectedChatAgentId; })) {
         selectedChatAgentId = agents[0].id;
       }
       select.innerHTML = agents.map(function (a) {
         var id = String(a.id || 'main');
         var selected = id === selectedChatAgentId ? ' selected' : '';
-        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
+        var suffix = a.apiOnly ? ' [API isolated]' : '';
+        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a) + suffix) + '</option>';
       }).join('');
       setChatAgent(selectedChatAgentId);
     }
@@ -6072,7 +6086,7 @@
         var r = await fetch(API + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId, voiceInput: isVoice }),
+          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId, conversationId: currentSessionId, voiceInput: isVoice }),
           signal: chatAbortController.signal
         });
         var ct = (r.headers.get('content-type') || '').toLowerCase();
