@@ -216,17 +216,20 @@ function renderSystemCronVariant(row) {
     var selectedAgentId = 'main';
     var selectedAgentMdFile = null;
     var agentSkillsDirty = false;
+    var agentsPageList = [];
 
     async function fetchAgentsPage() {
-      var r = await fetch(API + '/api/agents');
+      var r = await fetch(API + '/api/agents?includeHidden=1');
       var d = await r.json();
       var list = d.agents || [];
+      agentsPageList = list;
       if (!list.some(function (a) { return a.id === selectedAgentId; })) selectedAgentId = list.length ? list[0].id : 'main';
       var ul = document.getElementById('agents-list');
       if (!ul) return;
       ul.innerHTML = list.map(function (a) {
         var selected = a.id === selectedAgentId ? 'selected' : '';
-        return '<li class="' + selected + '"><button type="button" class="link" data-agent-id="' + escapeHtml(a.id) + '">' + escapeHtml(a.id) + '</button></li>';
+        var badge = a.apiOnly ? ' <span class="skill-config-badge unchecked">API</span>' : '';
+        return '<li class="' + selected + '"><button type="button" class="link" data-agent-id="' + escapeHtml(a.id) + '">' + escapeHtml(a.id) + badge + '</button></li>';
       }).join('');
       ul.querySelectorAll('button[data-agent-id]').forEach(function (btn) {
         btn.addEventListener('click', function () { selectAgent(btn.getAttribute('data-agent-id')); });
@@ -249,7 +252,11 @@ function renderSystemCronVariant(row) {
         delBtn.disabled = selectedAgentId === 'main';
         delBtn.title = selectedAgentId === 'main' ? 'Default main agent cannot be deleted' : '';
       }
-      await loadAgentSkills(selectedAgentId);
+      var cfg = await loadAgentSkills(selectedAgentId);
+      if (selectedAgentId !== 'main' && isApiOnlyAgent(selectedAgentId, cfg || {})) {
+        document.getElementById('agent-detail-meta').textContent = 'API-only isolated agent. Hidden from team/delegation; use the API isolation test below.';
+      }
+      updateAgentApiTestPanel(selectedAgentId, cfg);
       await loadAgentMdFiles(selectedAgentId);
     }
 
@@ -271,6 +278,7 @@ function renderSystemCronVariant(row) {
       });
       document.getElementById('agent-skills-save').style.display = 'none';
       agentSkillsDirty = false;
+      return cfg;
     }
 
     async function loadAgentMdFiles(agentId) {
@@ -305,10 +313,11 @@ function renderSystemCronVariant(row) {
       return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
     }
 
-    async function createAgentViaApi(name, fromAgentId, title) {
+    async function createAgentViaApi(name, fromAgentId, title, options) {
       var body = { id: name };
       if (fromAgentId) body.fromAgentId = fromAgentId;
       if (title && String(title).trim()) body.title = String(title).trim();
+      if (options && options.apiOnly) body.apiOnly = true;
       var r = await fetch(API + '/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,8 +424,10 @@ function renderSystemCronVariant(row) {
       var modal = document.getElementById('agent-create-modal');
       var titleInput = document.getElementById('agent-create-modal-title-input');
       if (!modal || !titleInput) return;
+      var apiOnly = document.getElementById('agent-create-modal-api-only');
       showAgentCreateModalError('');
       titleInput.value = '';
+      if (apiOnly) apiOnly.checked = !!opts.apiOnly;
       await populateAgentCreateFromSelect(opts.fromAgentId);
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
@@ -436,6 +447,7 @@ function renderSystemCronVariant(row) {
     async function submitAgentCreateModal(switchChatToNew) {
       var titleInput = document.getElementById('agent-create-modal-title-input');
       var fromSelect = document.getElementById('agent-create-modal-from');
+      var apiOnlyInput = document.getElementById('agent-create-modal-api-only');
       var submitBtn = document.getElementById('agent-create-modal-submit');
       if (!titleInput || !fromSelect) return;
       var title = titleInput.value.trim();
@@ -459,7 +471,7 @@ function renderSystemCronVariant(row) {
       if (submitBtn) submitBtn.disabled = true;
       showAgentCreateModalError('');
       try {
-        var d = await createAgentViaApi(normalized, fromAgentId, title);
+        var d = await createAgentViaApi(normalized, fromAgentId, title, { apiOnly: !!(apiOnlyInput && apiOnlyInput.checked) });
         closeAgentCreateModal();
         selectedAgentId = d.id || normalized;
         if (switchChatToNew) selectedChatAgentId = d.id || normalized;
@@ -962,18 +974,62 @@ function renderSystemCronVariant(row) {
 
     wireEl('agent-create-btn', 'click', async function () {
       var input = document.getElementById('agent-create-name');
+      var apiOnlyInput = document.getElementById('agent-create-api-only');
       var rawName = (input && input.value) ? input.value.trim() : '';
       if (!rawName) return;
       var id = normalizeAgentIdInput(rawName);
       if (!id) return;
       try {
-        var d = await createAgentViaApi(id, 'main', rawName);
+        var d = await createAgentViaApi(id, 'main', rawName, { apiOnly: !!(apiOnlyInput && apiOnlyInput.checked) });
         selectedAgentId = d.id || id;
         if (input) input.value = '';
+        if (apiOnlyInput) apiOnlyInput.checked = false;
         await fetchAgentsPage();
         await fetchChatAgents();
       } catch (err) {
         window.alert('Create failed: ' + (err.message || err));
+      }
+    });
+
+    function isApiOnlyAgent(agentId, cfg) {
+      var row = agentsPageList.find(function (a) { return a.id === agentId; }) || {};
+      return row.apiOnly || cfg.visibleInTeam === false || cfg.visibility === 'api_only' || (cfg.surface === 'api' && cfg.visibleInTeam !== true);
+    }
+
+    function updateAgentApiTestPanel(agentId, cfg) {
+      var card = document.getElementById('agent-api-test-card');
+      var meta = document.getElementById('agent-api-test-meta');
+      var out = document.getElementById('agent-api-test-output');
+      if (!card) return;
+      var show = agentId && isApiOnlyAgent(agentId, cfg || {});
+      card.style.display = show ? 'block' : 'none';
+      if (meta && show) {
+        meta.textContent = 'Sends through the isolated API chat runner for ' + agentId + '. Use different conversation ids to check history separation.';
+      }
+      if (out && !show) out.textContent = '';
+    }
+
+    wireEl('agent-api-test-send', 'click', async function () {
+      var input = document.getElementById('agent-api-test-input');
+      var conv = document.getElementById('agent-api-test-conversation');
+      var out = document.getElementById('agent-api-test-output');
+      var text = input && input.value ? input.value.trim() : '';
+      if (!selectedAgentId || !text) return;
+      if (out) out.textContent = 'Sending...';
+      try {
+        var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/api-chat-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: conv && conv.value ? conv.value.trim() : 'dashboard-test',
+            userText: text,
+          })
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(d.error || ('Request failed (' + r.status + ')'));
+        if (out) out.textContent = d.reply || '';
+      } catch (err) {
+        if (out) out.textContent = 'Error: ' + (err.message || err);
       }
     });
 

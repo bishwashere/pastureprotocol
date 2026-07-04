@@ -32,7 +32,8 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/util/timezone
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/channels/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listVisibleAgentIds, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, listVisibleAgentIds, isAgentVisibleInTeam, isInternalAgent, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig, appendAgentTitleAlias } from '../lib/agent/agent-config.js';
+import { runAgentApiChatTurn } from '../lib/agent/api-chat-turn.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -463,10 +464,14 @@ function rejectInternalAgent(id, res) {
 
 app.get('/api/agents', (_req, res) => {
   try {
-    const ids = listVisibleAgentIds();
+    const includeHidden = _req.query?.includeHidden === '1' || _req.query?.includeHidden === 'true';
+    const ids = includeHidden
+      ? listAgentIds().filter((id) => !isInternalAgent(id))
+      : listVisibleAgentIds();
     const agents = ids.map((id) => {
       const config = loadAgentConfig(id);
       const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
+      const visibleInTeam = isAgentVisibleInTeam(id);
       return {
         id,
         title: getAgentTitle(id),
@@ -474,6 +479,10 @@ app.get('/api/agents', (_req, res) => {
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
         hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
+        visibleInTeam,
+        surface: typeof config.surface === 'string' ? config.surface : '',
+        visibility: typeof config.visibility === 'string' ? config.visibility : '',
+        apiOnly: visibleInTeam === false,
         color: typeof config.color === 'string' ? config.color : null,
         avatarUrl: (() => {
           if (!hasAgentAvatar(id)) return null;
@@ -927,12 +936,43 @@ app.post('/api/agents', (req, res) => {
     const opts = {};
     if (fromAgentId) opts.fromAgentId = fromAgentId;
     if (titleRaw.trim()) opts.title = titleRaw;
+    const apiOnly = req.body?.apiOnly === true || req.body?.isolated === true;
+    if (apiOnly) {
+      opts.surface = 'api';
+      opts.visibility = 'api_only';
+      opts.visibleInTeam = false;
+      opts.autoLinkTeam = false;
+      opts.memoryScope = 'agent';
+      opts.sessionScope = 'agent';
+    }
+    if (req.body?.surface !== undefined) opts.surface = String(req.body.surface || '').trim();
+    if (req.body?.visibility !== undefined) opts.visibility = String(req.body.visibility || '').trim();
+    if (req.body?.visibleInTeam !== undefined) opts.visibleInTeam = req.body.visibleInTeam !== false;
+    if (req.body?.autoLinkTeam !== undefined) opts.autoLinkTeam = req.body.autoLinkTeam !== false;
+    if (req.body?.memoryScope !== undefined) opts.memoryScope = String(req.body.memoryScope || '').trim();
+    if (req.body?.sessionScope !== undefined) opts.sessionScope = String(req.body.sessionScope || '').trim();
     const created = createAgent(rawId, opts);
     let config = loadAgentConfig(created.id);
     if (!created.created && titleRaw.trim()) {
       const t = normalizeAgentTitle(titleRaw);
       if (t) config.title = t;
       else delete config.title;
+      saveAgentConfig(created.id, config);
+    }
+    if (!created.created && apiOnly) {
+      config.surface = 'api';
+      config.visibility = 'api_only';
+      config.visibleInTeam = false;
+      config.autoLinkTeam = false;
+      config.memoryScope = config.memoryScope || 'agent';
+      config.sessionScope = config.sessionScope || 'agent';
+      config.agentMessaging = normalizeAgentMessagingPolicy({
+        ...(config.agentMessaging || {}),
+        allow: [],
+        maxDepth: 0,
+        maxCallsPerTurn: 0,
+      });
+      syncAgentSendSkillInConfig(config);
       saveAgentConfig(created.id, config);
     }
     // Kick off avatar generation asynchronously — never block the response.
@@ -943,6 +983,43 @@ app.post('/api/agents', (req, res) => {
     res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/agents/:id/api-chat-test', async (req, res) => {
+  try {
+    const id = req.params.id || DEFAULT_AGENT_ID;
+    if (rejectInternalAgent(id, res)) return;
+    const conversationId = String(req.body?.conversationId || req.body?.conversation_id || 'dashboard-test').trim() || 'dashboard-test';
+    const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const messages = rawMessages
+      .map((msg) => ({
+        role: String(msg?.role || '').trim(),
+        content: typeof msg?.content === 'string' ? msg.content : '',
+      }))
+      .filter((msg) => ['system', 'user', 'assistant'].includes(msg.role) && msg.content.trim());
+    const lastUser = [...messages].reverse().find((msg) => msg.role === 'user');
+    const userText = String(req.body?.userText || lastUser?.content || '').trim();
+    if (!userText) {
+      res.status(400).json({ error: 'userText or a user message is required' });
+      return;
+    }
+    const historyMessages = messages.length
+      ? messages.slice(0, Math.max(0, messages.lastIndexOf(lastUser))).map((msg) => ({
+          role: msg.role,
+          content: msg.role === 'system' ? `Caller system instruction: ${msg.content}` : msg.content,
+        }))
+      : null;
+    const turn = await runAgentApiChatTurn({
+      agentId: id,
+      userText,
+      conversationId,
+      historyMessages,
+      model: req.body?.model || '',
+    });
+    res.json({ ok: true, agentId: id, conversationId, ...turn });
+  } catch (err) {
+    res.status(500).json({ error: err.message || String(err) });
   }
 });
 
@@ -1339,13 +1416,35 @@ app.post('/api/tide/checklist/run', async (_req, res) => {
 
 const CHAT_SCRIPT = join(INSTALL_DIR, 'scripts', 'chat-dashboard.js');
 
-app.post('/api/chat', (req, res) => {
+app.post('/api/chat', async (req, res) => {
   const message = req.body?.message != null ? String(req.body.message).trim() : '';
   const history = Array.isArray(req.body?.history) ? req.body.history : [];
   const agentId = req.body?.agentId != null ? String(req.body.agentId).trim() : '';
+  const conversationId = req.body?.conversationId != null ? String(req.body.conversationId).trim() : '';
   const voiceInput = req.body?.voiceInput === true;
   if (!message) {
     res.status(400).json({ error: 'message is required' });
+    return;
+  }
+  if (agentId && !isAgentVisibleInTeam(agentId)) {
+    try {
+      const turn = await runAgentApiChatTurn({
+        agentId,
+        userText: message,
+        conversationId: conversationId || 'dashboard-chat',
+        historyMessages: history,
+      });
+      res.json({
+        reply: turn.reply || '',
+        agentId,
+        conversationId: conversationId || 'dashboard-chat',
+        sessionId: turn.sessionId || '',
+        logKey: turn.logKey || '',
+        skillsCalled: turn.skillsCalled || [],
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
     return;
   }
   const payload = JSON.stringify({ message, history, agentId, voiceInput });
