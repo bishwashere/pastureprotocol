@@ -6,7 +6,7 @@ description: Read and inspect local filesystem resources. Commands: ls, find, cd
 
 # Go read
 
-Read-only local inspection commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, and query SQLite databases without modifying them.
+Read-only local inspection commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, and query SQLite databases without modifying them. Filesystem commands are implemented by Pasture directly; do not treat them as raw shell access.
 
 Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.action** to the command name. Set **arguments.argv** to an array of arguments (e.g. paths, flags).
 
