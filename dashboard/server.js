@@ -2952,11 +2952,31 @@ async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: p
 app.get('/api/brain/cloud', async (req, res) => {
   try {
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
+    const cacheOnly = req.query.cacheOnly === '1' || req.query.cacheOnly === 'true';
     const progressId = normalizeBrainProgressId(req.query.progressId);
     brainDebugLog('cloud_request', {
       refresh,
+      cacheOnly,
       progressId,
     });
+
+    if (cacheOnly && !refresh) {
+      const fallback = readLatestCompatibleBrainResponseCache();
+      const fallbackPayload = brainFallbackPayloadForResponse(fallback);
+      if (fallbackPayload) {
+        brainCloudCache.set(`latest:${BRAIN_RESPONSE_CACHE_VERSION}`, { cachedAtMs: Date.now(), payload: fallbackPayload });
+        brainDebugLog('cloud_cache_only_hit', {
+          terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,
+          connections: Array.isArray(fallbackPayload?.connections) ? fallbackPayload.connections.length : 0,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.json({ ...fallbackPayload, cached: true, cacheOnly: true });
+        return;
+      }
+      brainDebugLog('cloud_cache_only_miss', {});
+      res.status(404).json({ error: 'Brain graph has not been generated yet.', needsGenerate: true });
+      return;
+    }
 
     setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
     const collectStartedAt = Date.now();
