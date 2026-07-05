@@ -13,9 +13,9 @@ async function main() {
   const prompt = loadPrompt('self-inspection-classifier');
   assert(prompt.includes('is_self_inspection'), 'prompt documents is_self_inspection');
   assert(prompt.includes('Pasture/CowCode'), 'prompt anchors on Pasture/CowCode');
-  assert(prompt.includes('normal user-facing skill'), 'prompt excludes normal skill actions from self-inspection');
-  assert(prompt.includes('Remove all crons'), 'prompt includes cron removal as non-self-inspection example');
-  assert(prompt.includes('why did remove all crons only get read-only tools'), 'prompt keeps routing/debug questions as self-inspection');
+  assert(prompt.includes('normal work done with a skill or project'), 'prompt excludes normal skill/project actions from self-inspection');
+  assert(prompt.includes('writing, editing, cloning'), 'prompt keeps implementation actions out of self-inspection');
+  assert(prompt.includes('diagnose Pasture/CowCode behavior'), 'prompt keeps routing/debug questions as self-inspection');
 
   const brainFeature = await classifySelfInspection({
     userText: 'Does this project have brain feature?',

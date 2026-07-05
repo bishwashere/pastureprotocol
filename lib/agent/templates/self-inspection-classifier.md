@@ -1,53 +1,34 @@
 # Self-Inspection Classifier
 
-You decide whether the latest user message is asking Pasture/CowCode to inspect or reason about itself.
+Decide whether the latest user message is asking Pasture/CowCode to inspect itself.
 
-Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
+Return JSON only, with no prose or markdown fences.
 
-## Meaning
+Self-inspection means the user is asking about this assistant/runtime itself: Pasture/CowCode source, config, logs, routing, prompts, memory, dashboard internals, enabled tools, agent behavior, or why a previous turn behaved a certain way.
 
-`is_self_inspection` is true when the user is asking about:
+Not self-inspection: the user wants normal work done with a skill or project, including reading, writing, editing, cloning, searching, browsing, reminders, crons, dashboard data, or code implementation in a user project. These must return `is_self_inspection: false` so the normal router can choose the needed tools.
 
-- Pasture/CowCode itself as a running system.
-- This assistant's setup or implementation: installed source, runtime, config, logs, routing, prompt behavior, memory/index implementation, agents, tasks/missions internals, UI routes, local dashboard implementation, skill/tool availability, or capabilities.
-- Whether a feature exists in "this project", "your project", "the agent", "Pasture", or "CowCode".
-- Why the agent behaved a certain way, what it checked, what tools/logs it used, or why a previous reply was not grounded.
-- Short follow-up requests that inherit a recent self-inspection topic, such as asking for "top 5", "show them", "how many", "give the word", or "that list" after the conversation was about local runtime, memory, Brain, logs, code, tools, or dashboard state.
+If the message mixes capability checking with an action request, prefer `is_self_inspection: false` unless the main request is explicitly to diagnose Pasture/CowCode behavior.
 
-`is_self_inspection` is false when:
+Use these target values:
 
-- The user is asking about an unrelated app, repo, product, or project that is not identified as Pasture/CowCode.
-- The user is chatting casually.
-- The user is asking for general advice or knowledge unrelated to this agent/runtime.
-- The user asks to use a normal user-facing skill, but not to inspect this agent's setup, code, logs, routing, or tool availability.
-- The user asks to perform, list, add, remove, update, send, query, search, browse, call, edit, write, or check something using a skill. These are ordinary skill actions even when the skill stores data in Pasture-owned runtime files.
-- Cron/reminder actions are not self-inspection by themselves. Requests like "remove all crons", "list reminders", "delete reminder 3", "add a reminder", or "what crons do I have?" should be handled by the cron/reminder skill, not local runtime inspection, unless the user explicitly asks why cron routing/config/code/logs behaved a certain way.
-
-When true, `needs_tools` should normally be true because claims about the local runtime/source/logs must be grounded before answering. Only set it false if the user is explicitly asking for a conceptual explanation of the design and no local truth claim is needed.
-
-## Targets
-
-Use one of:
-
-- `runtime_state`: logs, config, sessions, current daemon state, runtime files.
-- `source_tree`: installed source code, implementation, project files.
-- `feature_or_capability`: whether a Pasture/CowCode feature, skill, route, UI, or capability exists.
-- `agent_behavior`: why the agent answered/routed/used tools/delegated a certain way.
-- `memory_or_history`: memory, chat history, brain data, indexes, recalls.
-- `unknown`: self-inspection is likely, but the target is unclear.
+- `runtime_state`: current runtime files, daemon state, config, sessions, logs.
+- `source_tree`: Pasture/CowCode source or installed implementation.
+- `feature_or_capability`: whether Pasture/CowCode itself has a feature, route, skill, or capability.
+- `agent_behavior`: why the assistant routed, answered, delegated, or used tools a certain way.
+- `memory_or_history`: Pasture memory, chat history, Brain data, indexes, or recalls.
+- `unknown`: self-inspection is likely but the target is unclear.
 - `none`: not self-inspection.
 
-## Starting Points
+When `needs_tools` is true, choose 1 to 4 starting points:
 
-When `needs_tools` is true, include 1 to 4 starting points:
+- `runtime_home`
+- `logs`
+- `source_tree`
+- `memory`
+- `ui_or_http`
 
-- `runtime_home`: inspect `~/.pasture` first.
-- `logs`: inspect daemon/request/chat/team logs.
-- `source_tree`: inspect installed/source project files.
-- `memory`: inspect memory/chat/brain state.
-- `ui_or_http`: inspect dashboard route or localhost only if the user asks about a UI/page/route being live.
-
-## Response Format
+Return exactly this JSON shape:
 
 ```json
 {
@@ -57,116 +38,5 @@ When `needs_tools` is true, include 1 to 4 starting points:
   "starting_points": [],
   "reason": "",
   "confidence": 0.0
-}
-```
-
-## Examples
-
-User: `Does this project have brain feature?`
-```json
-{
-  "is_self_inspection": true,
-  "needs_tools": true,
-  "target": "feature_or_capability",
-  "starting_points": ["runtime_home", "source_tree", "memory"],
-  "reason": "The user asks whether this Pasture/CowCode project has a feature; answer should be grounded in runtime/source inspection.",
-  "confidence": 0.94
-}
-```
-
-User: `why did you not check pasture logs?`
-```json
-{
-  "is_self_inspection": true,
-  "needs_tools": true,
-  "target": "agent_behavior",
-  "starting_points": ["logs", "runtime_home"],
-  "reason": "The user asks about prior agent behavior and whether logs were checked.",
-  "confidence": 0.98
-}
-```
-
-User: `open the /brain page`
-```json
-{
-  "is_self_inspection": true,
-  "needs_tools": true,
-  "target": "feature_or_capability",
-  "starting_points": ["runtime_home", "source_tree", "ui_or_http"],
-  "reason": "The user references a local Pasture UI route.",
-  "confidence": 0.93
-}
-```
-
-Recent conversation: `how many items I have in brain?` -> `You have 2,943 brain items.`
-User: `what are top 5`
-```json
-{
-  "is_self_inspection": true,
-  "needs_tools": true,
-  "target": "memory_or_history",
-  "starting_points": ["runtime_home", "memory"],
-  "reason": "The latest message is a short follow-up that inherits the prior Brain/memory topic and needs local Brain data.",
-  "confidence": 0.91
-}
-```
-
-User: `what is a brain-computer interface?`
-```json
-{
-  "is_self_inspection": false,
-  "needs_tools": false,
-  "target": "none",
-  "starting_points": [],
-  "reason": "This is a general knowledge question, not about Pasture/CowCode.",
-  "confidence": 0.9
-}
-```
-
-User: `Remove all crons`
-```json
-{
-  "is_self_inspection": false,
-  "needs_tools": false,
-  "target": "none",
-  "starting_points": [],
-  "reason": "The user is asking to perform a normal cron/reminder skill action, not inspect the assistant's setup, code, logs, routing, or prior behavior.",
-  "confidence": 0.95
-}
-```
-
-User: `List my reminders`
-```json
-{
-  "is_self_inspection": false,
-  "needs_tools": false,
-  "target": "none",
-  "starting_points": [],
-  "reason": "The user is asking to use the reminder skill, not inspect Pasture/CowCode implementation or runtime behavior.",
-  "confidence": 0.95
-}
-```
-
-User: `why did remove all crons only get read-only tools?`
-```json
-{
-  "is_self_inspection": true,
-  "needs_tools": true,
-  "target": "agent_behavior",
-  "starting_points": ["logs", "runtime_home", "source_tree"],
-  "reason": "The user asks why a previous cron request was routed to read-only tools, so the answer should inspect logs and routing/source behavior.",
-  "confidence": 0.97
-}
-```
-
-User: `hi`
-```json
-{
-  "is_self_inspection": false,
-  "needs_tools": false,
-  "target": "none",
-  "starting_points": [],
-  "reason": "Casual greeting.",
-  "confidence": 0.99
 }
 ```
