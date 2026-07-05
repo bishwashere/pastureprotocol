@@ -3833,6 +3833,7 @@ function renderSystemCronVariant(row) {
           currentRelations = toRelations;
           activeHover = nextFocus ? nextFocus.id : '';
           if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, meshPointer);
+          if (brainLineGlowPresence(meshPointer) > 0.01 && meshPointer.onTerm) scheduleBrainPointerDraw();
         }
 
         hoverFrame = requestAnimationFrame(step);
