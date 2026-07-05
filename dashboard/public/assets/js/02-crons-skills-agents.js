@@ -2861,7 +2861,7 @@ function renderSystemCronVariant(row) {
     }
 
     function brainLastGoodKey() {
-      return 'brainMeshLastGood:all';
+      return 'brainMeshLastGood:all:v2';
     }
 
     function saveBrainLastGood(data) {
