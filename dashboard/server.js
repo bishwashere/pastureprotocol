@@ -1908,8 +1908,8 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 
 const BRAIN_LLM_CHUNK_CHARS = 45_000;
 const BRAIN_LLM_CHUNK_OVERLAP_CHARS = 3_000;
-const BRAIN_LLM_CACHE_VERSION = 11;
-const BRAIN_RESPONSE_CACHE_VERSION = 10;
+const BRAIN_LLM_CACHE_VERSION = 12;
+const BRAIN_RESPONSE_CACHE_VERSION = 11;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
@@ -2562,6 +2562,20 @@ function brainCorpusChunkText(chunk) {
   return String(chunk?.text || '').trim();
 }
 
+function formatBrainCorpusItemForLlm(item) {
+  const text = brainCorpusChunkText(item);
+  if (!text) return '';
+  const header = [
+    '---',
+    `Source: ${String(item?.source || 'unknown')}`,
+    `Label: ${String(item?.label || item?.source || 'unknown')}`,
+    item?.role ? `Role: ${String(item.role)}` : '',
+    item?.ts ? `Timestamp: ${Number(item.ts)}` : '',
+    '---',
+  ].filter(Boolean).join('\n');
+  return `${header}\n${text}`;
+}
+
 function collectBrainCorpus() {
   const workspaceDir = getWorkspaceDir();
   const stats = { memoryFiles: 0, noteFiles: 0, importFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
@@ -2680,21 +2694,22 @@ function collectBrainCorpus() {
 function splitBrainCorpusForLlm(corpus) {
   const chunks = [];
   const stride = Math.max(1, BRAIN_LLM_CHUNK_CHARS - BRAIN_LLM_CHUNK_OVERLAP_CHARS);
-  for (const item of corpus || []) {
-    const text = String(item?.text || '').trim();
-    if (!text) continue;
-    for (let start = 0, index = 0; start < text.length; start += stride, index++) {
-      const slice = text.slice(start, start + BRAIN_LLM_CHUNK_CHARS).trim();
-      if (!slice) continue;
-      chunks.push({
-        source: item.source,
-        label: item.label,
-        role: item.role || '',
-        ts: item.ts || 0,
-        chunkIndex: index,
-        text: slice,
-      });
-    }
+  const text = (corpus || [])
+    .map(formatBrainCorpusItemForLlm)
+    .filter(Boolean)
+    .join('\n\n');
+  if (!text.trim()) return chunks;
+  for (let start = 0, index = 0; start < text.length; start += stride, index++) {
+    const slice = text.slice(start, start + BRAIN_LLM_CHUNK_CHARS).trim();
+    if (!slice) continue;
+    chunks.push({
+      source: 'combined',
+      label: 'combined brain corpus',
+      role: '',
+      ts: 0,
+      chunkIndex: index,
+      text: slice,
+    });
   }
   return chunks;
 }
