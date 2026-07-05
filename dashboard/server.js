@@ -1908,8 +1908,8 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 
 const BRAIN_LLM_CHUNK_CHARS = 45_000;
 const BRAIN_LLM_CHUNK_OVERLAP_CHARS = 3_000;
-const BRAIN_LLM_CACHE_VERSION = 10;
-const BRAIN_RESPONSE_CACHE_VERSION = 9;
+const BRAIN_LLM_CACHE_VERSION = 11;
+const BRAIN_RESPONSE_CACHE_VERSION = 10;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
@@ -2512,23 +2512,37 @@ function renderBrainConversationMarkdown({ provider, originalName, conversation,
 function stripBrainInputStopWords(text) {
   const raw = String(text || '');
   if (!raw.trim()) return '';
-  if (typeof Intl === 'undefined' || typeof Intl.Segmenter !== 'function') {
-    return raw.trim();
-  }
-  const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
+  let token = '';
   let cleaned = '';
-  for (const part of segmenter.segment(raw)) {
-    const segment = part?.segment || '';
-    if (part?.isWordLike && BRAIN_INPUT_STOP_WORDS.has(segment.toLowerCase())) {
-      continue;
-    }
-    cleaned += segment;
+
+  function isTokenChar(code) {
+    return (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      code === 39 ||
+      code === 45 ||
+      code === 95;
   }
-  return cleaned
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .trim();
+
+  function flushToken() {
+    if (!token) return;
+    if (!BRAIN_INPUT_STOP_WORDS.has(token.toLowerCase())) {
+      cleaned += token;
+    }
+    token = '';
+  }
+
+  for (const ch of raw) {
+    const code = ch.charCodeAt(0);
+    if (isTokenChar(code)) {
+      token += ch;
+    } else {
+      flushToken();
+      cleaned += ch;
+    }
+  }
+  flushToken();
+  return cleaned.trim();
 }
 
 function pushBrainCorpusChunk(out, chunk) {
@@ -2930,8 +2944,40 @@ app.get('/api/brain/cloud', async (req, res) => {
     });
 
     setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
+    const collectStartedAt = Date.now();
+    brainDebugLog('cloud_collect_start', {
+      refresh,
+      progressId,
+    });
     const { corpus, stats } = collectBrainCorpus();
+    brainDebugLog('cloud_collect_complete', {
+      refresh,
+      progressId,
+      ms: Date.now() - collectStartedAt,
+      corpusItems: corpus.length,
+      chars: stats.chars,
+      memoryFiles: stats.memoryFiles,
+      noteFiles: stats.noteFiles,
+      importFiles: stats.importFiles,
+      historyDays: stats.historyDays,
+      exchanges: stats.exchanges,
+    });
+    const splitStartedAt = Date.now();
+    brainDebugLog('cloud_split_start', {
+      refresh,
+      progressId,
+      corpusItems: corpus.length,
+      chars: stats.chars,
+    });
     const chunks = splitBrainCorpusForLlm(corpus);
+    brainDebugLog('cloud_split_complete', {
+      refresh,
+      progressId,
+      ms: Date.now() - splitStartedAt,
+      chunks: chunks.length,
+      chunkChars: BRAIN_LLM_CHUNK_CHARS,
+      overlapChars: BRAIN_LLM_CHUNK_OVERLAP_CHARS,
+    });
     const totalFiles = new Set((chunks || []).map((chunk) => `${chunk.source || ''}:${chunk.label || ''}`)).size;
     setBrainBuildProgress(progressId, {
       phase: chunks.length ? 'processing' : 'complete',
@@ -3096,6 +3142,12 @@ app.get('/api/brain/cloud', async (req, res) => {
   } catch (err) {
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const progressId = normalizeBrainProgressId(req.query.progressId);
+    brainDebugLog('cloud_error', {
+      refresh,
+      progressId,
+      error: err.message,
+      stack: String(err?.stack || '').slice(0, 4000),
+    });
     if (!refresh) {
       const fallback = readLatestCompatibleBrainResponseCache();
       const fallbackPayload = brainFallbackPayloadForResponse(fallback);
