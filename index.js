@@ -9,6 +9,28 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
 
+const FLOW_STEP = Object.freeze({
+  RECEIVE: '[1 RECEIVE]',
+  CONTEXT: '[2 CONTEXT]',
+  WORK_MODE: '[3 WORK MODE]',
+  TASK_FRAME: '[4 TASK FRAME]',
+  PATH: '[5 PATH]',
+  FAST_REUSE: '[6 FAST REUSE]',
+  PLANNER: '[7 PLANNER]',
+  APPLY_PLAN: '[8 APPLY PLAN]',
+  DELEGATE: '[9 DELEGATE]',
+  RUN_AGENT: '[10 RUN AGENT]',
+  SKILLS: '[11 SKILLS]',
+  RETRY: '[12 RETRY]',
+  TASK_STATUS: '[13 TASK STATUS]',
+  PERSIST: '[14 PERSIST]',
+  REPLY: '[15 REPLY]',
+});
+
+function logFlow(step, ...args) {
+  console.log(step, ...args);
+}
+
 // Log to daemon.log so "tail -f" shows when the process actually started (after pasture start/restart)
 console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] Pasture Protocol daemon started`);
 
@@ -621,7 +643,7 @@ async function main() {
   }
 
   function logReplySeparator() {
-    console.log('---');
+    logFlow(FLOW_STEP.REPLY, '------------------------------');
   }
 
   function clearInMemoryHistoryForJids(...jids) {
@@ -1195,10 +1217,10 @@ async function main() {
     const forGroup = !!opts.groupSenderName;
     const groupJid = opts.groupJid || 'default';
     if (forGroup) {
-      console.log('[path] buildSystemPrompt branch=group groupJid=', groupJid, 'agentId=', agentId);
+      logFlow(FLOW_STEP.APPLY_PLAN, '[path] buildSystemPrompt branch=group groupJid=', groupJid, 'agentId=', agentId);
       ensureGroupConfigFor(groupJid);
     } else {
-      console.log('[path] buildSystemPrompt branch=one-on-one agentId=', agentId);
+      logFlow(FLOW_STEP.APPLY_PLAN, '[path] buildSystemPrompt branch=one-on-one agentId=', agentId);
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
       if (agentId === DEFAULT_AGENT_ID) syncMainAgentIdentityFromWorkspace();
@@ -1212,7 +1234,7 @@ async function main() {
       groupMentioned: !!opts.groupMentioned,
       groupNonOwner: !!opts.groupNonOwner,
     });
-    console.log('[path] buildSystemPrompt groupBlockLen=', (groupBlock || '').length, 'basePromptLen=', basePrompt.length);
+    logFlow(FLOW_STEP.APPLY_PLAN, '[path] buildSystemPrompt groupBlockLen=', (groupBlock || '').length, 'basePromptLen=', basePrompt.length);
     return groupBlock ? (basePrompt + '\n\n' + groupBlock) : basePrompt;
   }
 
@@ -1250,9 +1272,9 @@ async function main() {
   async function runAgentWithSkillsBody(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}, trace = null) {
     let skillsCalled = [];
     console.log('[USER]');
-    console.log('[replied] question:', text);
+    logFlow(FLOW_STEP.RECEIVE, 'message:', text);
     console.log('[AGENT]');
-    console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
+    logFlow(FLOW_STEP.RECEIVE, '[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
@@ -1288,13 +1310,13 @@ async function main() {
             afterExchangeLogged(getWorkspaceDir(), exchange, logMeta);
           }
         }
-        console.log('[replied] (new session ack)');
+        logFlow(FLOW_STEP.REPLY, '[replied] (new session ack)');
         logReplySeparator();
       } catch (sendErr) {
         lastSentByJidMap.set(jid, replyText);
         if (!isTelegramChatId(jid)) pendingReplies.push({ jid, text: replyText });
         else addPendingTelegram(jid, replyText);
-        console.log('[replied] new session ack queued (send failed):', getErrorMessageForLog(sendErr));
+        logFlow(FLOW_STEP.REPLY, '[replied] new session ack queued (send failed):', getErrorMessageForLog(sendErr));
         logReplySeparator();
       }
       if (trace) logRequestEnd(trace, 'ok', { skillsCalled: [], note: 'new_session_ack' });
@@ -1307,7 +1329,7 @@ async function main() {
         : '';
     const agentId = (bioOpts.agentIdOverride && String(bioOpts.agentIdOverride).trim())
       || (isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID);
-    console.log('[path] chat=', isGroupJid ? 'group' : 'one-on-one', 'jid=', jid, 'agentId=', agentId);
+    logFlow(FLOW_STEP.CONTEXT, '[path] chat=', isGroupJid ? 'group' : 'one-on-one', 'jid=', jid, 'agentId=', agentId);
     const ctx = {
       storePath: getCronStorePath(),
       jid,
@@ -1355,7 +1377,7 @@ async function main() {
         workMode = wm.modeBefore;
         if (wm.toggled) {
           workModeAck = wm.ack;
-          console.log('[work-mode]', JSON.stringify({
+          logFlow(FLOW_STEP.WORK_MODE, '[work-mode]', JSON.stringify({
             before: wm.modeBefore,
             after: wm.modeAfter,
             effectiveThisTurn: wm.modeBefore,
@@ -1363,7 +1385,7 @@ async function main() {
             source: 'work_mode_controller',
           }));
         } else {
-          console.log('[work-mode]', JSON.stringify({
+          logFlow(FLOW_STEP.WORK_MODE, '[work-mode]', JSON.stringify({
             mode: workMode,
             reason: wm.reason || '',
             source: 'work_mode_controller',
@@ -1395,7 +1417,7 @@ async function main() {
     let taskFrameFastPath = false;
     let taskFrameRoute = null;
     if (taskFrameDecision) {
-      console.log('[task-frame]', JSON.stringify({
+      logFlow(FLOW_STEP.TASK_FRAME, '[task-frame]', JSON.stringify({
         action: taskFrameDecision.action,
         confidence: taskFrameDecision.confidence,
         mustUseTool: taskFrameDecision.mustUseTool,
@@ -1425,7 +1447,7 @@ async function main() {
     if (taskFrameDecision?.action === 'exit' && taskFrameDecision.confidence >= 0.72) {
       const closed = clearTaskFrame(sessionLogKey, { reason: taskFrameDecision.reason || 'user_exit' });
       activeTaskFrame = null;
-      console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: taskFrameDecision.reason || '' }));
+      logFlow(FLOW_STEP.TASK_FRAME, '[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: taskFrameDecision.reason || '' }));
       logTeamActivity({
         type: 'task_frame_closed',
         agentId,
@@ -1436,7 +1458,7 @@ async function main() {
       });
     } else if (taskFrameDecision?.action === 'new_candidate' && taskFrameDecision.confidence >= 0.72) {
       taskFrameCandidate = taskFrameDecision;
-      console.log('[task-frame] candidate', JSON.stringify({
+      logFlow(FLOW_STEP.TASK_FRAME, '[task-frame] candidate', JSON.stringify({
         kind: taskFrameCandidate.kind || '',
         title: taskFrameCandidate.title || '',
         skills: taskFrameCandidate.toolProfile || [],
@@ -1455,7 +1477,7 @@ async function main() {
     } else if (shouldUseTaskFrameFastPath(taskFrameDecision)) {
       taskFrameRoute = taskFrameDecisionToTurnRoute(taskFrameDecision, activeTaskFrame);
       taskFrameFastPath = !!taskFrameRoute;
-      console.log('[task-frame] fast-path', JSON.stringify({
+      logFlow(FLOW_STEP.FAST_REUSE, '[task-frame] fast-path', JSON.stringify({
         frameId: activeTaskFrame?.id || '',
         kind: activeTaskFrame?.kind || '',
         skills: taskFrameRoute?.skills || [],
@@ -1485,7 +1507,7 @@ async function main() {
                   : (taskFrameDecision?.action === 'ignore'
                       ? 'task_frame_ignore_uses_normal_path'
                       : 'no_task_frame_fast_path'))));
-    console.log('[path] turnPath=', turnPath, 'reason=', turnPathReason);
+    logFlow(FLOW_STEP.PATH, '[path] turnPath=', turnPath, 'reason=', turnPathReason);
     logTeamActivity({
       type: 'turn_path',
       agentId,
@@ -1505,7 +1527,7 @@ async function main() {
     // task-frame updates.
     let unifiedPlan = null;
     if (taskFrameFastPath) {
-      console.log('[unified-planner]', JSON.stringify({ skipped: 'task_frame_fast_path' }));
+      logFlow(FLOW_STEP.FAST_REUSE, '[unified-planner]', JSON.stringify({ skipped: 'task_frame_fast_path' }));
     } else if (!isGroupJid) {
       unifiedPlan = await traceAsyncStep('unified_turn_planner', () => planUnifiedTurn({
         userText: text,
@@ -1521,7 +1543,7 @@ async function main() {
         agentId,
       }));
       if (unifiedPlan) {
-        console.log('[unified-planner]', JSON.stringify({
+        logFlow(FLOW_STEP.PLANNER, '[unified-planner]', JSON.stringify({
           workModeToggle: unifiedPlan.workModeToggle,
           needsMultiAgent: unifiedPlan.needsMultiAgent,
           needsDurability: unifiedPlan.needsDurability,
@@ -1563,14 +1585,14 @@ async function main() {
             taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
           },
         });
-        console.log('[work-mode]', JSON.stringify({
+        logFlow(FLOW_STEP.APPLY_PLAN, '[work-mode]', JSON.stringify({
           mode: workMode,
           source: 'work_mode_controller',
           plannerSuggestion: unifiedPlan.workModeToggle || 'no_change',
         }));
       } else {
         const canUseActiveFrameFallback = activeTaskFrame && ['continue_fast', 'continue_replan'].includes(taskFrameDecision?.action || '');
-        console.log('[unified-planner]', JSON.stringify({
+        logFlow(FLOW_STEP.PLANNER, '[unified-planner]', JSON.stringify({
           skipped: 'no_plan_safe_fallback',
           fallback: canUseActiveFrameFallback ? 'active_frame_profile' : 'no_tools',
         }));
@@ -1593,7 +1615,7 @@ async function main() {
         })
       : '';
     if (!taskFrameFastPath && !isGroupJid && workMode === 'multi' && plannerNeedsMulti && !isMultiAgent) {
-      console.log('[team-gate]', JSON.stringify({
+      logFlow(FLOW_STEP.APPLY_PLAN, '[team-gate]', JSON.stringify({
         mode: teamGateReply ? 'blocked' : 'single',
         reason: focusedProjectTeamId ? 'agent_not_on_project_team' : 'no_project_team',
         projectId: focusedProject?.id || '',
@@ -1607,7 +1629,7 @@ async function main() {
       : null;
     if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
     if (durabilityDecision) {
-      console.log('[work-durability]', JSON.stringify({
+      logFlow(FLOW_STEP.APPLY_PLAN, '[work-durability]', JSON.stringify({
         kind: durabilityDecision.kind,
         persistence: durabilityDecision.persistence,
         missionId: durabilityDecision.missionId || '',
@@ -1733,7 +1755,7 @@ async function main() {
             })
       : null;
     const turnRoute = taskFrameRoute || presetDelegationPlan || unifiedPlanToTurnRoute(unifiedPlan) || plannerFailureFallbackRoute;
-    if (turnRoute) console.log('[turn-router]', JSON.stringify(turnRoute));
+    if (turnRoute) logFlow(FLOW_STEP.APPLY_PLAN, '[turn-router]', JSON.stringify(turnRoute));
     // Load tool schemas from the unified route.
     //   private planner failure → active frame tools, otherwise no tools
     //   turnRoute === null      → legacy/group fallback: full tools
@@ -1749,7 +1771,8 @@ async function main() {
         : [];
     }
     const toolNames = toolsForRequest.map((t) => t?.function?.name).filter(Boolean);
-    console.log(
+    logFlow(
+      FLOW_STEP.APPLY_PLAN,
       '[path] plannerMode=', turnRoute?.mode ?? 'fallback',
       plannerSaysNoTools ? 'noTools(chat)' : ('toolsCount=' + toolsForRequest.length),
       toolNames.length ? 'tools=' + toolNames.join(',') : '',
@@ -1797,7 +1820,7 @@ async function main() {
         if (workflowBlock) systemPromptWithPlan += workflowBlock;
       }
     }
-    console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
+    logFlow(FLOW_STEP.RUN_AGENT, '[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     ctx._originalUserText = text;
     let turnResult = teamGateReply
       ? { textToSend: teamGateReply, skillsCalled: [] }
@@ -1814,7 +1837,7 @@ async function main() {
           message: text,
         });
         onAgentTurnStart({ agentId, userText: text, ctx });
-        console.log('[agent-router] forcing agent-send to', delegatedTarget);
+        logFlow(FLOW_STEP.DELEGATE, '[agent-router] forcing agent-send to', delegatedTarget);
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
         const forcedDelegationMessage = taskFrameOwnerTarget && activeTaskFrame
           ? [
@@ -1843,7 +1866,7 @@ async function main() {
             skillsCalled: ['agent-send'],
           };
         } else if (forced && typeof forced.error === 'string') {
-          console.log('[agent-router] forced agent-send failed:', forced.error);
+          logFlow(FLOW_STEP.DELEGATE, '[agent-router] forced agent-send failed:', forced.error);
           turnResult = {
             textToSend: `[Pasture] ${forced.error.trim()}`,
             skillsCalled: ['agent-send'],
@@ -1862,7 +1885,7 @@ async function main() {
           onAgentTurnDone({ agentId });
         }
       } catch (err) {
-        console.log('[agent-router] forced agent-send exception:', getErrorMessageForLog(err));
+        logFlow(FLOW_STEP.DELEGATE, '[agent-router] forced agent-send exception:', getErrorMessageForLog(err));
       }
     }
     if (!turnResult) {
@@ -1882,7 +1905,7 @@ async function main() {
       || presetDelegationPlan
     );
     if (plannedMustUseTool) {
-      console.log('[unified-planner] mustUseTool=true');
+      logFlow(FLOW_STEP.RETRY, '[unified-planner] mustUseTool=true');
     }
     if (
       plannedMustUseTool
@@ -1892,7 +1915,7 @@ async function main() {
       && toolsForRequest.length > 0
       && (!Array.isArray(turnResult?.skillsCalled) || turnResult.skillsCalled.length === 0)
     ) {
-      console.log('[unified-planner] retrying because the planned tool turn used no tools');
+      logFlow(FLOW_STEP.RETRY, '[unified-planner] retrying because the planned tool turn used no tools');
       const retryPrompt = systemPromptWithPlan +
         '\n\n--- Planned Tool Requirement ---\n' +
         'This turn was routed as a tool-backed turn. Before final answering, call at least one available planned tool and ground the answer in what it returns.\n' +
@@ -1933,7 +1956,7 @@ async function main() {
       if (validPostTurnFrameStatuses.has(statusDecision?.status) && Number(statusDecision?.confidence || 0) >= 0.55) {
         postTurnTaskFrameStatus = statusDecision.status;
         postTurnTaskFrameReason = statusDecision.reason || '';
-        console.log('[task-frame-status]', JSON.stringify(statusDecision));
+        logFlow(FLOW_STEP.TASK_STATUS, '[task-frame-status]', JSON.stringify(statusDecision));
       }
     }
     if (!postTurnTaskFrameStatus && unifiedPlan?.taskFrameStatusHint && unifiedPlan.taskFrameStatusHint !== 'continue') {
@@ -1949,7 +1972,7 @@ async function main() {
       if (postTurnTaskFrameStatus === 'completed') {
         const closed = clearTaskFrame(sessionLogKey, { reason: 'post_turn_completed' });
         activeTaskFrame = null;
-        console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: 'post_turn_completed' }));
+        logFlow(FLOW_STEP.PERSIST, '[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: 'post_turn_completed' }));
         logTeamActivity({
           type: 'task_frame_closed',
           agentId,
@@ -1968,7 +1991,7 @@ async function main() {
           skillsCalled: skillsCalledFromTurn,
           status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
         });
-        console.log('[task-frame] updated', JSON.stringify({
+        logFlow(FLOW_STEP.PERSIST, '[task-frame] updated', JSON.stringify({
           frameId: updatedFrame?.id || activeTaskFrame.id || '',
           status: updatedFrame?.status || activeTaskFrame.status || '',
           postTurnStatus: postTurnTaskFrameStatus || 'continue',
@@ -1994,7 +2017,7 @@ async function main() {
         ? clearTaskFrame(sessionLogKey, { reason: postTurnTaskFrameReason || 'post_turn_completed' })
         : null;
       activeTaskFrame = null;
-      console.log('[task-frame] completed', JSON.stringify({ frameId: closed?.id || '', reason: postTurnTaskFrameReason || 'post_turn_completed' }));
+      logFlow(FLOW_STEP.PERSIST, '[task-frame] completed', JSON.stringify({ frameId: closed?.id || '', reason: postTurnTaskFrameReason || 'post_turn_completed' }));
       logTeamActivity({
         type: 'task_frame_completed',
         agentId,
@@ -2006,7 +2029,7 @@ async function main() {
     } else if (!isGroupJid && unifiedPlan?.taskFrameAction === 'close') {
       const closed = clearTaskFrame(sessionLogKey, { reason: unifiedPlan.reason || 'unified_planner_close' });
       activeTaskFrame = null;
-      console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: unifiedPlan.reason || '' }));
+      logFlow(FLOW_STEP.PERSIST, '[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: unifiedPlan.reason || '' }));
       logTeamActivity({
         type: 'task_frame_closed',
         agentId,
@@ -2045,7 +2068,7 @@ async function main() {
         skillsCalled: skillsCalledFromTurn,
         status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
       });
-      console.log('[task-frame] updated', JSON.stringify({
+      logFlow(FLOW_STEP.PERSIST, '[task-frame] updated', JSON.stringify({
         frameId: updatedFrame?.id || activeTaskFrame?.id || '',
         status: updatedFrame?.status || activeTaskFrame?.status || '',
         action: unifiedPlan.taskFrameAction,
@@ -2162,11 +2185,11 @@ async function main() {
             }
           }
         }
-        console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
+        logFlow(FLOW_STEP.REPLY, '[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
         const partialLen = 300;
-        console.log('[replied] answer (partial):', (replyText || '').slice(0, partialLen) + ((replyText || '').length > partialLen ? '…' : ''));
+        logFlow(FLOW_STEP.REPLY, '[replied] answer (partial):', (replyText || '').slice(0, partialLen) + ((replyText || '').length > partialLen ? '…' : ''));
         if (Array.isArray(skillsCalled) && skillsCalled.length > 0) {
-          console.log('[replied] skills called:', skillsCalled.join(', '));
+          logFlow(FLOW_STEP.SKILLS, '[replied] skills called:', skillsCalled.join(', '));
         }
         logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
@@ -2188,10 +2211,10 @@ async function main() {
         const errMsg = getErrorMessageForLog(sendErr);
         if (!isTelegramChatId(jid)) {
           pendingReplies.push({ jid, text: replyText });
-          console.log('[replied] queued (send failed, will retry after reconnect):', errMsg);
+          logFlow(FLOW_STEP.REPLY, '[replied] queued (send failed, will retry after reconnect):', errMsg);
         } else {
           addPendingTelegram(jid, replyText);
-          console.log('[replied] Telegram queued (send failed, will retry on next message):', errMsg);
+          logFlow(FLOW_STEP.REPLY, '[replied] Telegram queued (send failed, will retry on next message):', errMsg);
         }
         logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);

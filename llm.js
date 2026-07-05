@@ -138,6 +138,15 @@ function writeUsage(usage) {
  */
 let _dailyLimitReachedDate = null;
 
+function llmLogPrefix() {
+  const step = getActiveTrace()?.flowStep;
+  return step ? `[LLM - ${step}]` : '[LLM]';
+}
+
+function logLlm(...args) {
+  console.log(llmLogPrefix(), ...args);
+}
+
 /**
  * Check and increment the daily cloud LLM counter.
  * Throws a non-retryable error with code 'LLM_DAILY_LIMIT' if the cap is reached.
@@ -155,7 +164,7 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   }
   usage.count += 1;
   writeUsage(usage);
-  console.log(`[LLM] daily usage: ${usage.count}/${limit}`);
+  logLlm(`daily usage: ${usage.count}/${limit}`);
 }
 
 /**
@@ -254,9 +263,9 @@ async function runModelWithRetries({
       }
       const parsed = await parseOkResponse(res);
       if (attempt > 1) {
-        console.log(`[LLM] used: ${label} (after ${attempt} attempts${toolCount ? ', with tools' : ''})`);
+        logLlm(`used: ${label} (after ${attempt} attempts${toolCount ? ', with tools' : ''})`);
       } else {
-        console.log(`[LLM] used: ${label}${toolCount ? ' (with tools)' : ''}`);
+        logLlm(`used: ${label}${toolCount ? ' (with tools)' : ''}`);
       }
       endLlmCall(llmCtx, {
         model: label,
@@ -272,8 +281,8 @@ async function runModelWithRetries({
       const canRetry = !isLocal && attempt < maxAttempts && isTransientCloudError(err);
       if (canRetry) {
         const delay = CLOUD_RETRY_DELAYS_MS[attempt - 1] || 2000;
-        console.log(
-          `[LLM] transient error on ${label} (attempt ${attempt}/${maxAttempts}), retry in ${delay}ms:`,
+        logLlm(
+          `transient error on ${label} (attempt ${attempt}/${maxAttempts}), retry in ${delay}ms:`,
           summarizeLlmError(err?.message),
         );
         await sleep(delay);
@@ -477,7 +486,7 @@ function loadConfig(options = {}) {
       const isLocal = m.baseUrl && /127\.0\.0\.1|localhost/i.test(m.baseUrl);
       if (isLocal) return true;
       const hasKey = m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '';
-      if (!hasKey) console.log('[LLM] skipping model (API key not set):', m.model || m.baseUrl);
+      if (!hasKey) logLlm('skipping model (API key not set):', m.model || m.baseUrl);
       return hasKey;
     });
     // When any model has priority, try it first regardless of position in config.
@@ -636,19 +645,19 @@ export async function chat(messages, options = {}) {
       return content;
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        console.log('[LLM] local rate limit reached, rejecting request:', err.message);
+        logLlm('local rate limit reached, rejecting request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, skipping:', label);
+        logLlm('cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
       if (isLocal) {
-        console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
+        logLlm('local model unreachable, trying cloud fallback:', err.message);
         localError = err;
       } else {
-        console.log('[LLM] try failed:', label, summarizeLlmError(err?.message));
+        logLlm('try failed:', label, summarizeLlmError(err?.message));
       }
       lastError = err;
     }
@@ -702,19 +711,19 @@ export async function chatWithTools(messages, tools, options = {}) {
       });
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        console.log('[LLM] local rate limit reached, rejecting request:', err.message);
+        logLlm('local rate limit reached, rejecting request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, skipping:', label);
+        logLlm('cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
       if (isLocal) {
-        console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
+        logLlm('local model unreachable, trying cloud fallback:', err.message);
         localError = err;
       } else {
-        console.log('[LLM] try failed:', label, summarizeLlmError(err?.message));
+        logLlm('try failed:', label, summarizeLlmError(err?.message));
       }
       lastError = err;
     }
@@ -780,15 +789,15 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       return intent;
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        console.log('[LLM] local rate limit reached, rejecting intent request:', err.message);
+        logLlm('local rate limit reached, rejecting intent request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        logLlm('cloud daily limit reached, trying next model:', label);
         lastError = err;
         continue;
       }
-      console.log('[LLM] intent try failed:', label, summarizeLlmError(err?.message));
+      logLlm('intent try failed:', label, summarizeLlmError(err?.message));
       lastError = err;
     }
   }
@@ -878,7 +887,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
       const data = await res.json();
       const text = data.content?.[0]?.text ?? data.choices?.[0]?.message?.content ?? '';
       if (text) {
-        console.log('[LLM] vision used:', label);
+        logLlm('vision used:', label);
         endLlmCall(llmCtx, { model: label, status: 'ok' });
         return String(text).trim();
       }
@@ -886,13 +895,13 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        logLlm('cloud daily limit reached, trying next model:', label);
         lastError = err;
         continue;
       }
       const msg = (err && err.message) || '';
       const looksLikeTextOnly = /invalid.*content|does not support|400|image|vision|multimodal/i.test(msg);
-      console.log('[LLM] vision try failed:', label, err.message);
+      logLlm('vision try failed:', label, err.message);
       lastError = err;
       if (looksLikeTextOnly) continue;
     }
