@@ -620,6 +620,10 @@ async function main() {
     chatHistoryByJid.set(jid, list);
   }
 
+  function logReplySeparator() {
+    console.log('---');
+  }
+
   function clearInMemoryHistoryForJids(...jids) {
     for (const id of jids) {
       if (id != null && String(id).trim()) chatHistoryByJid.delete(String(id).trim());
@@ -1245,6 +1249,9 @@ async function main() {
 
   async function runAgentWithSkillsBody(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}, trace = null) {
     let skillsCalled = [];
+    console.log('[USER]');
+    console.log('[replied] question:', text);
+    console.log('[AGENT]');
     console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
       await sock.sendPresenceUpdate('composing', jid);
@@ -1282,11 +1289,13 @@ async function main() {
           }
         }
         console.log('[replied] (new session ack)');
+        logReplySeparator();
       } catch (sendErr) {
         lastSentByJidMap.set(jid, replyText);
         if (!isTelegramChatId(jid)) pendingReplies.push({ jid, text: replyText });
         else addPendingTelegram(jid, replyText);
         console.log('[replied] new session ack queued (send failed):', getErrorMessageForLog(sendErr));
+        logReplySeparator();
       }
       if (trace) logRequestEnd(trace, 'ok', { skillsCalled: [], note: 'new_session_ack' });
       return { skillsCalled: [] };
@@ -2154,12 +2163,12 @@ async function main() {
           }
         }
         console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
-        console.log('[replied] question:', text);
         const partialLen = 300;
         console.log('[replied] answer (partial):', (replyText || '').slice(0, partialLen) + ((replyText || '').length > partialLen ? '…' : ''));
         if (Array.isArray(skillsCalled) && skillsCalled.length > 0) {
           console.log('[replied] skills called:', skillsCalled.join(', '));
         }
+        logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
         const alreadySentBioPrompt = bioOpts.bioPromptSentJids?.has(jid);
         if (bioOpts.pendingBioConfirmJids != null && !isBioSet() && !alreadySentBioPrompt) {
@@ -2184,6 +2193,7 @@ async function main() {
           addPendingTelegram(jid, replyText);
           console.log('[replied] Telegram queued (send failed, will retry on next message):', errMsg);
         }
+        logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
       }
       });
