@@ -3903,7 +3903,7 @@ function renderSystemCronVariant(row) {
         saveBrainSettings();
         var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(progressId);
         if (!refresh) url += '&cacheOnly=1';
-        if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
+        if (refresh) url += '&refresh=1&ts=' + Date.now();
         var timeoutId = null;
         if (brainCloudAbortController) {
           timeoutId = setTimeout(function () {

@@ -2103,10 +2103,6 @@ function readBrainLlmChunkCache(key) {
       brainDebugLog('chunk_cache_invalid', { key, reason: 'bad_shape' });
       return null;
     }
-    if (!parsed.terms.length && !parsed.connections.length) {
-      brainDebugLog('chunk_cache_ignored_empty', { key });
-      return null;
-    }
     return parsed;
   } catch (_) {
     brainDebugLog('chunk_cache_invalid', { key, reason: 'read_failed' });
@@ -2951,11 +2947,13 @@ async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: p
 
 app.get('/api/brain/cloud', async (req, res) => {
   try {
-    const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
+    const hard = req.query.hard === '1' || req.query.hard === 'true';
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || hard;
     const cacheOnly = req.query.cacheOnly === '1' || req.query.cacheOnly === 'true';
     const progressId = normalizeBrainProgressId(req.query.progressId);
     brainDebugLog('cloud_request', {
       refresh,
+      hard,
       cacheOnly,
       progressId,
     });
@@ -2981,11 +2979,13 @@ app.get('/api/brain/cloud', async (req, res) => {
     const collectStartedAt = Date.now();
     brainDebugLog('cloud_collect_start', {
       refresh,
+      hard,
       progressId,
     });
     const { corpus, stats } = collectBrainCorpus();
     brainDebugLog('cloud_collect_complete', {
       refresh,
+      hard,
       progressId,
       ms: Date.now() - collectStartedAt,
       corpusItems: corpus.length,
@@ -2999,6 +2999,7 @@ app.get('/api/brain/cloud', async (req, res) => {
     const splitStartedAt = Date.now();
     brainDebugLog('cloud_split_start', {
       refresh,
+      hard,
       progressId,
       corpusItems: corpus.length,
       chars: stats.chars,
@@ -3006,6 +3007,7 @@ app.get('/api/brain/cloud', async (req, res) => {
     const chunks = splitBrainCorpusForLlm(corpus);
     brainDebugLog('cloud_split_complete', {
       refresh,
+      hard,
       progressId,
       ms: Date.now() - splitStartedAt,
       chunks: chunks.length,
@@ -3085,12 +3087,12 @@ app.get('/api/brain/cloud', async (req, res) => {
     let denseBuild = brainCloudBuilds.get(responseCacheKey);
     if (denseBuild) {
       brainDebugLog('raw_build_shared', {
-        force: refresh,
+        force: hard,
         chunks: chunks.length,
       });
     } else {
       denseBuild = buildLlmBrainGraph(corpus, {
-        force: refresh,
+        force: hard,
         chunks,
         onProgress: (progress) => setBrainBuildProgress(progressId, {
           ...progress,
