@@ -1952,6 +1952,48 @@ function brainDebugLog(event, details = {}) {
   } catch (_) {}
 }
 
+let dashboardProcessExitLogged = false;
+
+function logDashboardProcessExit(event, details = {}) {
+  if (dashboardProcessExitLogged && event === 'dashboard_process_exit') return;
+  if (event === 'dashboard_process_exit') dashboardProcessExitLogged = true;
+  brainDebugLog(event, {
+    pid: process.pid,
+    ...details,
+  });
+}
+
+process.on('SIGTERM', () => {
+  logDashboardProcessExit('dashboard_process_signal', { signal: 'SIGTERM' });
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logDashboardProcessExit('dashboard_process_signal', { signal: 'SIGINT' });
+  process.exit(0);
+});
+
+process.on('uncaughtException', (err) => {
+  logDashboardProcessExit('dashboard_process_uncaught_exception', {
+    error: err?.message || String(err),
+    stack: String(err?.stack || '').slice(0, 4000),
+  });
+  console.error(err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  brainDebugLog('dashboard_process_unhandled_rejection', {
+    pid: process.pid,
+    error: reason?.message || String(reason),
+    stack: String(reason?.stack || '').slice(0, 4000),
+  });
+});
+
+process.on('exit', (code) => {
+  logDashboardProcessExit('dashboard_process_exit', { code });
+});
+
 function brainHashText(value) {
   return createHash('sha256').update(String(value || '')).digest('hex');
 }
@@ -1992,6 +2034,18 @@ function finishBrainBuildProgress(id, patch = {}) {
   if (!id) return;
   setBrainBuildProgress(id, { ...patch, done: true });
   setTimeout(() => brainBuildProgress.delete(id), 5 * 60 * 1000).unref?.();
+}
+
+function getActiveBrainBuildProgress() {
+  let active = null;
+  for (const [id, progress] of brainBuildProgress.entries()) {
+    if (!progress || progress.done) continue;
+    const updatedAtMs = Number(progress.updatedAtMs || 0);
+    if (!active || updatedAtMs > active.updatedAtMs) {
+      active = { id, ...progress, updatedAtMs };
+    }
+  }
+  return active;
 }
 
 function brainLlmCacheDir() {
@@ -2995,6 +3049,23 @@ app.get('/api/brain/cloud', async (req, res) => {
         });
         res.set('Cache-Control', 'no-store');
         res.json({ ...fallbackPayload, cached: true, cacheOnly: true });
+        return;
+      }
+      const activeProgress = getActiveBrainBuildProgress();
+      if (activeProgress) {
+        brainDebugLog('cloud_cache_only_in_progress', {
+          progressId: activeProgress.id,
+          phase: activeProgress.phase,
+          doneChunks: activeProgress.doneChunks || 0,
+          totalChunks: activeProgress.totalChunks || 0,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.status(409).json({
+          error: 'Brain graph generation is already running.',
+          inProgress: true,
+          progressId: activeProgress.id,
+          progress: activeProgress,
+        });
         return;
       }
       brainDebugLog('cloud_cache_only_miss', {});

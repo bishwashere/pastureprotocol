@@ -2948,7 +2948,13 @@ function renderSystemCronVariant(row) {
         try {
           var r = await fetch(API + '/api/brain/progress?id=' + encodeURIComponent(progressId), { cache: 'no-store' });
           var d = await r.json();
-          if (r.ok) updateBrainLoadingProgress(cloud, d, label);
+          if (r.ok) {
+            updateBrainLoadingProgress(cloud, d, label);
+            if (d && d.done && d.phase === 'complete') {
+              stopBrainLoadingProgress();
+              fetchBrainCloud(false);
+            }
+          }
         } catch (_) {}
       }, 350);
     }
@@ -3919,7 +3925,13 @@ function renderSystemCronVariant(row) {
         if (!r.ok) {
           var err = new Error(d.error || 'Brain cloud failed');
           err.needsGenerate = !!d.needsGenerate;
+          err.inProgress = !!d.inProgress;
+          err.progressId = d.progressId || (d.progress && d.progress.id) || '';
           throw err;
+        }
+        if (d && d.inProgress) {
+          showBrainLoadingProgress(cloud, 'Generating brain graph', d.progressId || progressId);
+          return;
         }
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
@@ -3927,6 +3939,13 @@ function renderSystemCronVariant(row) {
       } catch (e) {
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
+        if (e && e.inProgress) {
+          setBrainActionMode(false);
+          showBrainLoadingProgress(cloud, 'Generating brain graph', e.progressId || '');
+          var metaProgress = document.getElementById('brain-meta');
+          if (metaProgress) metaProgress.textContent = 'Brain graph generation is already running...';
+          return;
+        }
         if (e && e.needsGenerate && !brainCloudLastData && !loadBrainLastGood()) {
           setBrainActionMode(false);
           cloud.innerHTML = '<p class="empty">No brain graph yet. Click Generate to create it.</p>';
