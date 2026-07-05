@@ -2881,6 +2881,13 @@ function renderSystemCronVariant(row) {
       return null;
     }
 
+    function setBrainActionMode(hasGraph) {
+      var btn = document.getElementById('brain-refresh');
+      if (!btn) return;
+      btn.textContent = hasGraph ? 'Refresh' : 'Generate';
+      btn.title = hasGraph ? 'Rebuild the brain graph' : 'Generate the brain graph';
+    }
+
     function stopBrainLoadingProgress() {
       if (brainLoadingTimer) {
         clearInterval(brainLoadingTimer);
@@ -3657,6 +3664,7 @@ function renderSystemCronVariant(row) {
       var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : [];
       var connections = Array.isArray(data && data.denseConnections) ? data.denseConnections : [];
       var stats = data && data.stats ? data.stats : {};
+      setBrainActionMode(terms.length > 0);
       var cloudRect = cloud.getBoundingClientRect();
       var visibleCount = brainVisibleTerms(terms, cloudRect.width, cloudRect.height, connections).length;
       var sourceCount = [
@@ -3884,15 +3892,17 @@ function renderSystemCronVariant(row) {
           hasGraph = true;
         }
       }
+      setBrainActionMode(hasGraph);
       var progressId = 'brain_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
       if (!hasGraph || refresh) {
-        showBrainLoadingProgress(cloud, refresh ? 'Rebuilding brain map' : 'Building brain map', progressId);
+        if (refresh) showBrainLoadingProgress(cloud, hasGraph ? 'Rebuilding brain map' : 'Generating brain map', progressId);
       }
       var meta = document.getElementById('brain-meta');
-      if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
+      if (meta && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
         saveBrainSettings();
         var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(progressId);
+        if (!refresh) url += '&cacheOnly=1';
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
         var timeoutId = null;
         if (brainCloudAbortController) {
@@ -3905,14 +3915,26 @@ function renderSystemCronVariant(row) {
           signal: brainCloudAbortController ? brainCloudAbortController.signal : undefined,
         });
         if (timeoutId) clearTimeout(timeoutId);
-        var d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Brain cloud failed');
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) {
+          var err = new Error(d.error || 'Brain cloud failed');
+          err.needsGenerate = !!d.needsGenerate;
+          throw err;
+        }
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
         renderBrainCloud(d);
       } catch (e) {
         if (requestSeq !== brainCloudRequestSeq) return;
         stopBrainLoadingProgress();
+        if (e && e.needsGenerate && !brainCloudLastData && !loadBrainLastGood()) {
+          setBrainActionMode(false);
+          cloud.innerHTML = '<p class="empty">No brain graph yet. Click Generate to create it.</p>';
+          renderBrainFocus('', []);
+          var metaGenerate = document.getElementById('brain-meta');
+          if (metaGenerate) metaGenerate.textContent = 'No generated brain graph yet';
+          return;
+        }
         if (brainCloudLastData) {
           renderBrainCloud(brainCloudLastData);
         } else {
