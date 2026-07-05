@@ -2964,7 +2964,6 @@ app.get('/api/brain/cloud', async (req, res) => {
       const fallback = readLatestCompatibleBrainResponseCache();
       const fallbackPayload = brainFallbackPayloadForResponse(fallback);
       if (fallbackPayload) {
-        brainCloudCache.set(`latest:${BRAIN_RESPONSE_CACHE_VERSION}`, { cachedAtMs: Date.now(), payload: fallbackPayload });
         brainDebugLog('cloud_cache_only_hit', {
           terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,
           connections: Array.isArray(fallbackPayload?.connections) ? fallbackPayload.connections.length : 0,
