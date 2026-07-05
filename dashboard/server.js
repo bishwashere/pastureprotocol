@@ -2792,25 +2792,36 @@ async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: p
     if (force && chunkIndex === 0) brainDebugLog('chunk_cache_bypassed', { reason: 'force_refresh' });
     if (graph) {
       stats.cacheHits += 1;
+      brainDebugLog('chunk_cache_hit', {
+        index: chunkIndex,
+        cacheKey: cacheKey.slice(0, 16),
+        terms: Array.isArray(graph.terms) ? graph.terms.length : 0,
+        connections: Array.isArray(graph.connections) ? graph.connections.length : 0,
+      });
       markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'cached');
     } else {
+      brainDebugLog('chunk_llm_start', {
+        index: chunkIndex,
+        cacheKey: cacheKey.slice(0, 16),
+        source: chunk.source,
+        label: String(chunk.label || '').slice(0, 120),
+        chars: String(chunk.text || '').length,
+      });
       graph = await generateBrainChunkGraph({ chunk });
       if (!graph) {
         stats.failed += 1;
+        brainDebugLog('chunk_llm_failed', {
+          index: chunkIndex,
+          cacheKey: cacheKey.slice(0, 16),
+          source: chunk.source,
+          label: String(chunk.label || '').slice(0, 120),
+        });
         graph = { terms: [], connections: [] };
         markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'failed');
       } else {
-        if ((graph.terms || []).length || (graph.connections || []).length) {
-          writeBrainLlmChunkCache(cacheKey, {
-            source: chunk.source,
-            label: chunk.label,
-            role: chunk.role,
-            chunkIndex: chunk.chunkIndex,
-            textHash: brainHashText(chunk.text || ''),
-            terms: graph.terms,
-            connections: graph.connections,
-          });
-        } else {
+        const graphTerms = Array.isArray(graph.terms) ? graph.terms : [];
+        const graphConnections = Array.isArray(graph.connections) ? graph.connections : [];
+        if (!graphTerms.length && !graphConnections.length) {
           stats.empty += 1;
           brainDebugLog('chunk_generated_empty', {
             index: chunkIndex,
@@ -2819,6 +2830,22 @@ async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: p
             chars: String(chunk.text || '').length,
           });
         }
+        writeBrainLlmChunkCache(cacheKey, {
+          source: chunk.source,
+          label: chunk.label,
+          role: chunk.role,
+          chunkIndex: chunk.chunkIndex,
+          textHash: brainHashText(chunk.text || ''),
+          terms: graphTerms,
+          connections: graphConnections,
+        });
+        brainDebugLog('chunk_llm_complete', {
+          index: chunkIndex,
+          cacheKey: cacheKey.slice(0, 16),
+          terms: graphTerms.length,
+          connections: graphConnections.length,
+          empty: !graphTerms.length && !graphConnections.length,
+        });
         stats.generated += 1;
         markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'processed');
       }
@@ -3106,7 +3133,7 @@ app.get('/api/brain/cloud', async (req, res) => {
       brainCloudBuilds.set(responseCacheKey, denseBuild);
     }
     const dense = await denseBuild;
-    if (req.aborted || req.destroyed || res.destroyed) return;
+    const responseStillOpen = !(req.aborted || req.destroyed || res.destroyed);
     const denseHasTerms = Array.isArray(dense?.terms) && dense.terms.length > 0;
     if (!refresh && !denseHasTerms) {
       const fallback = readLatestCompatibleBrainResponseCache();
@@ -3127,6 +3154,10 @@ app.get('/api/brain/cloud', async (req, res) => {
           generated: dense.llmStats?.generated || 0,
           failed: dense.llmStats?.failed || 0,
         });
+        if (!responseStillOpen) {
+          brainDebugLog('cloud_response_skipped', { reason: 'client_closed_after_fallback' });
+          return;
+        }
         res.set('Cache-Control', 'no-store');
         res.json({ ...fallbackPayload, cached: true, stale: true, staleReason: 'raw_build_empty' });
         return;
@@ -3173,6 +3204,14 @@ app.get('/api/brain/cloud', async (req, res) => {
       generated: dense.llmStats?.generated || 0,
       failed: dense.llmStats?.failed || 0,
     });
+    if (!responseStillOpen) {
+      brainDebugLog('cloud_response_skipped', {
+        reason: 'client_closed_after_cache_write',
+        terms: payload.stats.finalTerms,
+        connections: payload.stats.finalConnections,
+      });
+      return;
+    }
     res.set('Cache-Control', 'no-store');
     res.json({ ...payload, cached: false });
   } catch (err) {
@@ -3207,6 +3246,10 @@ app.get('/api/brain/cloud', async (req, res) => {
       phase: 'error',
       error: err.message,
     });
+    if (req.aborted || req.destroyed || res.destroyed) {
+      brainDebugLog('cloud_error_response_skipped', { reason: 'client_closed' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
