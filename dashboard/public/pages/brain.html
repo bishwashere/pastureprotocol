@@ -18,23 +18,6 @@
           <button id="brain-settings-toggle" type="button">Settings</button>
           <div id="brain-settings-panel" class="brain-settings-panel" hidden>
             <label>
-              <span>Range</span>
-              <select id="brain-range">
-                <option value="all">All</option>
-                <option value="30d">30 days</option>
-                <option value="7d">7 days</option>
-              </select>
-            </label>
-            <label>
-              <span>Source</span>
-              <select id="brain-source">
-                <option value="all">All</option>
-                <option value="memory">Long-term</option>
-                <option value="notes">Notes</option>
-                <option value="history">History</option>
-              </select>
-            </label>
-            <label>
               <span>Direct links</span>
               <input id="brain-setting-direct" type="number" min="1" max="40" step="1">
             </label>
@@ -57,10 +40,6 @@
             <label>
               <span>Max font</span>
               <input id="brain-setting-max-font" type="number" min="12" max="80" step="1">
-            </label>
-            <label>
-              <span>Quality layer</span>
-              <input id="brain-setting-quality" type="checkbox">
             </label>
             <button id="brain-import-submit" class="brain-import-button" type="button">Import</button>
             <input id="brain-import-file" type="file" accept=".zip,.json,.txt,.md,.csv,.html,application/zip,application/x-zip-compressed,text/plain,application/json" multiple hidden>

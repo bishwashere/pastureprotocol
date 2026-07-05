@@ -51,7 +51,7 @@ import {
   approvePendingProposal,
   rejectPendingProposal,
 } from '../lib/context/project-workflow-pending.js';
-import { generateBrainChunkGraph, refineBrainGraphQuality } from '../lib/agent/brain-word-cloud.js';
+import { generateBrainChunkGraph } from '../lib/agent/brain-word-cloud.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -1906,18 +1906,32 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 
 // ---- Brain (LLM knowledge graph over memory + history) ----
 
-const BRAIN_CORPUS_MAX_CHARS = 32_000;
-const BRAIN_DENSE_CORPUS_MAX_CHARS = 1_200_000;
-const BRAIN_LLM_CHUNK_CHARS = 9_000;
-const BRAIN_LLM_MAX_CHUNKS = 8;
-const BRAIN_LLM_CACHE_VERSION = 4;
-const BRAIN_QUALITY_CACHE_VERSION = 3;
-const BRAIN_RESPONSE_CACHE_VERSION = 2;
+const BRAIN_LLM_CHUNK_CHARS = 45_000;
+const BRAIN_LLM_CHUNK_OVERLAP_CHARS = 3_000;
+const BRAIN_LLM_CACHE_VERSION = 10;
+const BRAIN_RESPONSE_CACHE_VERSION = 8;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
 const BRAIN_IMPORT_TEXT_EXTENSIONS = new Set(['.json', '.txt', '.md', '.csv', '.html', '.htm']);
 const BRAIN_IMPORT_PROVIDERS = new Set(['chatgpt', 'grok', 'claude', 'gemini', 'perplexity', 'copilot', 'other']);
+const BRAIN_INPUT_STOP_WORDS = new Set([
+  'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an',
+  'and', 'any', 'are', 'as', 'at', 'be', 'because', 'been', 'before',
+  'being', 'below', 'between', 'both', 'but', 'by', 'can', 'could', 'did',
+  'do', 'does', 'doing', 'done', 'down', 'during', 'each', 'few', 'for',
+  'from', 'further', 'had', 'has', 'have', 'having', 'he', 'her', 'here',
+  'hers', 'herself', 'him', 'himself', 'his', 'how', 'i', 'if', 'in',
+  'into', 'is', 'it', 'its', 'itself', 'just', 'me', 'more', 'most', 'my',
+  'myself', 'no', 'nor', 'not', 'now', 'of', 'off', 'on', 'once', 'only',
+  'or', 'other', 'our', 'ours', 'ourselves', 'out', 'over', 'own', 'same',
+  'she', 'should', 'so', 'some', 'such', 'than', 'that', 'the', 'their',
+  'theirs', 'them', 'themselves', 'then', 'there', 'these', 'they', 'this',
+  'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was',
+  'we', 'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom',
+  'why', 'will', 'with', 'would', 'you', 'your', 'yours', 'yourself',
+  'yourselves',
+]);
 const brainCloudCache = new Map();
 const brainCloudBuilds = new Map();
 const brainBuildProgress = new Map();
@@ -1988,14 +2002,6 @@ function brainLlmChunkCachePath(key) {
   return join(brainLlmCacheDir(), key.slice(0, 2), `${key}.json`);
 }
 
-function brainQualityCacheDir() {
-  return join(getStateDir(), 'brain-quality-cache', `v${BRAIN_QUALITY_CACHE_VERSION}`);
-}
-
-function brainQualityCachePath(key) {
-  return join(brainQualityCacheDir(), key.slice(0, 2), `${key}.json`);
-}
-
 function brainResponseCacheDir() {
   return join(getStateDir(), 'brain-response-cache', `v${BRAIN_RESPONSE_CACHE_VERSION}`);
 }
@@ -2029,7 +2035,7 @@ function brainPayloadIsReusable(payload) {
   return !!payload && (brainPayloadHasTerms(payload) || brainPayloadHadNoCorpus(payload));
 }
 
-function readLatestBrainResponseCache({ range, source, qualityEnabled, requireTerms = false } = {}) {
+function readLatestBrainResponseCache({ requireTerms = false } = {}) {
   const root = brainResponseCacheDir();
   let best = null;
   function visit(dir) {
@@ -2057,8 +2063,6 @@ function readLatestBrainResponseCache({ range, source, qualityEnabled, requireTe
         const payload = parsed?.payload;
         if (!brainPayloadIsReusable(payload)) continue;
         if (requireTerms && !brainPayloadHasTerms(payload)) continue;
-        if (payload.range !== range || payload.source !== source) continue;
-        if (!!payload.qualityEnabled !== !!qualityEnabled) continue;
         const cachedAtMs = Number(parsed?.cachedAtMs || payload?.updatedAtMs || st.mtimeMs) || st.mtimeMs;
         if (!best || cachedAtMs > best.cachedAtMs) {
           best = { payload, cachedAtMs, path };
@@ -2070,24 +2074,13 @@ function readLatestBrainResponseCache({ range, source, qualityEnabled, requireTe
   return best;
 }
 
-function readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled } = {}) {
-  return readLatestBrainResponseCache({ range, source, qualityEnabled, requireTerms: true }) ||
-    (qualityEnabled ? readLatestBrainResponseCache({ range, source, qualityEnabled: false, requireTerms: true }) : null);
+function readLatestCompatibleBrainResponseCache() {
+  return readLatestBrainResponseCache({ requireTerms: true });
 }
 
-function brainFallbackPayloadForResponse(fallback, qualityEnabled) {
+function brainFallbackPayloadForResponse(fallback) {
   if (!fallback?.payload) return null;
-  if (!qualityEnabled || fallback.payload.qualityEnabled) return fallback.payload;
-  return {
-    ...fallback.payload,
-    qualityEnabled: true,
-    qualityMode: fallback.payload.qualityMode || 'raw',
-    stats: {
-      ...(fallback.payload.stats || {}),
-      qualityDisabled: 1,
-      qualityFailed: 1,
-    },
-  };
+  return fallback.payload;
 }
 
 function writeBrainResponseCache(key, payload) {
@@ -2098,28 +2091,6 @@ function writeBrainResponseCache(key, payload) {
   writeFileSync(path, JSON.stringify({
     cachedAtMs: Date.now(),
     payload,
-  }, null, 2), 'utf8');
-}
-
-function readBrainQualityCache(key) {
-  const path = brainQualityCachePath(key);
-  try {
-    if (!existsSync(path)) return null;
-    const parsed = JSON.parse(readFileSync(path, 'utf8'));
-    if (!Array.isArray(parsed?.terms) || !Array.isArray(parsed?.connections)) return null;
-    return parsed;
-  } catch (_) {
-    return null;
-  }
-}
-
-function writeBrainQualityCache(key, payload) {
-  const path = brainQualityCachePath(key);
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify({
-    cachedAtMs: Date.now(),
-    ...payload,
   }, null, 2), 'utf8');
 }
 
@@ -2179,21 +2150,6 @@ function markBrainImportChunkProcessed(label, chunkIndex, cacheKey, status = 'pr
     manifest.updatedAt = new Date().toISOString();
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
   } catch (_) {}
-}
-
-function normalizeBrainRange(value) {
-  const v = String(value || 'all').trim();
-  return v === '7d' || v === '30d' || v === 'all' ? v : 'all';
-}
-
-function normalizeBrainSource(value) {
-  const v = String(value || 'all').trim();
-  return v === 'memory' || v === 'notes' || v === 'history' || v === 'all' ? v : 'all';
-}
-
-function normalizeBrainQualityEnabled(value) {
-  const v = String(value ?? '1').trim().toLowerCase();
-  return !(v === '0' || v === 'false' || v === 'off' || v === 'no');
 }
 
 function normalizeBrainImportProvider(value) {
@@ -2553,216 +2509,167 @@ function renderBrainConversationMarkdown({ provider, originalName, conversation,
   return lines.join('\n').trim() + '\n';
 }
 
-function brainRangeCutoffMs(range) {
-  if (range === '7d') return Date.now() - 7 * 86400000;
-  if (range === '30d') return Date.now() - 30 * 86400000;
-  return 0;
+function stripBrainInputStopWords(text) {
+  const raw = String(text || '');
+  if (!raw.trim()) return '';
+  if (typeof Intl === 'undefined' || typeof Intl.Segmenter !== 'function') {
+    return raw.trim();
+  }
+  const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
+  let cleaned = '';
+  for (const part of segmenter.segment(raw)) {
+    const segment = part?.segment || '';
+    if (part?.isWordLike && BRAIN_INPUT_STOP_WORDS.has(segment.toLowerCase())) {
+      continue;
+    }
+    cleaned += segment;
+  }
+  return cleaned
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .trim();
 }
 
-function pushBrainCorpusChunk(out, chunk, remaining) {
-  if (!chunk || remaining.value <= 0) return;
-  const text = String(chunk.text || '').trim();
+function pushBrainCorpusChunk(out, chunk) {
+  if (!chunk) return;
+  const text = stripBrainInputStopWords(chunk.text);
   if (!text) return;
-  const sliced = text.length > remaining.value ? text.slice(0, remaining.value) : text;
   out.push({
     source: chunk.source,
     label: String(chunk.label || chunk.source || '').slice(0, 120),
     role: chunk.role ? String(chunk.role).slice(0, 40) : '',
     ts: Number(chunk.ts || 0) || 0,
-    text: sliced,
+    text,
   });
-  remaining.value -= sliced.length;
 }
 
 function brainCorpusChunkText(chunk) {
   return String(chunk?.text || '').trim();
 }
 
-function brainCorpusBucketHasRemaining(bucket) {
-  return bucket.cursor < bucket.items.length;
-}
-
-function takeBrainCorpusBucket(out, bucket, maxChars) {
-  let remaining = Math.max(0, Math.floor(Number(maxChars) || 0));
-  const before = remaining;
-  while (remaining > 0 && brainCorpusBucketHasRemaining(bucket)) {
-    const chunk = bucket.items[bucket.cursor];
-    const text = brainCorpusChunkText(chunk);
-    if (!text) {
-      bucket.cursor += 1;
-      bucket.offset = 0;
-      continue;
-    }
-    const start = Math.max(0, bucket.offset || 0);
-    const rawSlice = text.slice(start, start + remaining);
-    const slice = rawSlice.trim();
-    if (slice) {
-      out.push({
-        source: chunk.source,
-        label: String(chunk.label || chunk.source || '').slice(0, 120),
-        role: chunk.role ? String(chunk.role).slice(0, 40) : '',
-        ts: Number(chunk.ts || 0) || 0,
-        text: slice,
-      });
-    }
-    remaining -= rawSlice.length;
-    if (start + rawSlice.length >= text.length) {
-      bucket.cursor += 1;
-      bucket.offset = 0;
-    } else {
-      bucket.offset = start + rawSlice.length;
-      break;
-    }
-  }
-  return before - remaining;
-}
-
-function mergeBrainCorpusBuckets(bucketInputs, maxChars) {
-  const out = [];
-  const buckets = bucketInputs
-    .filter((bucket) => bucket && Array.isArray(bucket.items) && bucket.items.length)
-    .map((bucket) => ({
-      ...bucket,
-      cursor: 0,
-      offset: 0,
-      weight: Math.max(1, Number(bucket.weight) || 1),
-    }));
-  if (!buckets.length) return out;
-
-  let remaining = Math.max(0, Math.floor(Number(maxChars) || 0));
-  const totalWeight = buckets.reduce((sum, bucket) => sum + bucket.weight, 0);
-  for (const bucket of buckets) {
-    if (remaining <= 0) break;
-    const quota = Math.max(1, Math.floor(maxChars * (bucket.weight / totalWeight)));
-    remaining -= takeBrainCorpusBucket(out, bucket, Math.min(quota, remaining));
-  }
-
-  while (remaining > 0 && buckets.some(brainCorpusBucketHasRemaining)) {
-    const active = buckets.filter(brainCorpusBucketHasRemaining);
-    const perBucket = Math.max(1, Math.ceil(remaining / active.length));
-    let usedThisRound = 0;
-    for (const bucket of active) {
-      if (remaining <= 0) break;
-      const used = takeBrainCorpusBucket(out, bucket, Math.min(perBucket, remaining));
-      usedThisRound += used;
-      remaining -= used;
-    }
-    if (usedThisRound <= 0) break;
-  }
-
-  return out;
-}
-
-function collectBrainCorpus({ range, source, maxChars = BRAIN_CORPUS_MAX_CHARS }) {
+function collectBrainCorpus() {
   const workspaceDir = getWorkspaceDir();
-  const includeMemory = source === 'all' || source === 'memory';
-  const includeNotes = source === 'all' || source === 'notes';
-  const includeHistory = source === 'all' || source === 'history';
-  const cutoffMs = brainRangeCutoffMs(range);
-  const memoryCorpus = [];
-  const notesCorpus = [];
-  const importCorpus = [];
-  const historyCorpus = [];
   const stats = { memoryFiles: 0, noteFiles: 0, importFiles: 0, historyDays: 0, exchanges: 0, chars: 0 };
-
-  if (includeMemory) {
-    for (const name of ['MEMORY.md', 'memory.md']) {
-      const full = join(workspaceDir, name);
-      try {
-        if (existsSync(full) && statSync(full).isFile()) {
-          const text = readFileSync(full, 'utf8');
-          stats.memoryFiles += 1;
-          memoryCorpus.push({ source: 'memory', label: name, text });
+  const sourceSpecs = [
+    {
+      collect() {
+        const items = [];
+        for (const name of ['MEMORY.md', 'memory.md']) {
+          const full = join(workspaceDir, name);
+          try {
+            if (existsSync(full) && statSync(full).isFile()) {
+              const text = readFileSync(full, 'utf8');
+              stats.memoryFiles += 1;
+              items.push({ source: 'memory', label: name, text });
+            }
+          } catch (_) {}
         }
-      } catch (_) {}
-    }
-  }
-
-  if (includeNotes) {
-    const memoryDir = join(workspaceDir, 'memory');
-    try {
-      if (existsSync(memoryDir) && statSync(memoryDir).isDirectory()) {
-        for (const name of readdirSync(memoryDir).sort()) {
-          if (!name.endsWith('.md')) continue;
-          if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) continue;
-          const full = join(memoryDir, name);
-          if (!statSync(full).isFile()) continue;
-          const text = readFileSync(full, 'utf8');
-          stats.noteFiles += 1;
-          notesCorpus.push({ source: 'notes', label: `memory/${name}`, text });
-        }
-      }
-    } catch (_) {}
-
-    const importsDir = brainImportsDir(workspaceDir);
-    try {
-      if (existsSync(importsDir) && statSync(importsDir).isDirectory()) {
-        for (const providerName of readdirSync(importsDir).sort()) {
-          if (providerName.startsWith('.')) continue;
-          const providerDir = join(importsDir, providerName);
-          if (!statSync(providerDir).isDirectory()) continue;
-          for (const importName of readdirSync(providerDir).sort()) {
-            if (importName.startsWith('.')) continue;
-            const importRoot = join(providerDir, importName);
-            if (!readValidBrainImportManifest(importRoot)) continue;
-            const conversationsDir = join(importRoot, 'conversations');
-            if (!existsSync(conversationsDir) || !statSync(conversationsDir).isDirectory()) continue;
-            for (const name of readdirSync(conversationsDir).sort()) {
+        return items;
+      },
+    },
+    {
+      collect() {
+        const items = [];
+        const memoryDir = join(workspaceDir, 'memory');
+        try {
+          if (existsSync(memoryDir) && statSync(memoryDir).isDirectory()) {
+            for (const name of readdirSync(memoryDir).sort()) {
               if (!name.endsWith('.md')) continue;
-              const full = join(conversationsDir, name);
+              if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) continue;
+              const full = join(memoryDir, name);
               if (!statSync(full).isFile()) continue;
               const text = readFileSync(full, 'utf8');
-              stats.importFiles += 1;
-              importCorpus.push({
-                source: 'notes',
-                label: `brain-imports/${providerName}/${importName}/conversations/${name}`,
-                text,
-              });
+              stats.noteFiles += 1;
+              items.push({ source: 'notes', label: `memory/${name}`, text });
             }
           }
+        } catch (_) {}
+        return items;
+      },
+    },
+    {
+      collect() {
+        const items = [];
+        const importsDir = brainImportsDir(workspaceDir);
+        try {
+          if (existsSync(importsDir) && statSync(importsDir).isDirectory()) {
+            for (const providerName of readdirSync(importsDir).sort()) {
+              if (providerName.startsWith('.')) continue;
+              const providerDir = join(importsDir, providerName);
+              if (!statSync(providerDir).isDirectory()) continue;
+              for (const importName of readdirSync(providerDir).sort()) {
+                if (importName.startsWith('.')) continue;
+                const importRoot = join(providerDir, importName);
+                if (!readValidBrainImportManifest(importRoot)) continue;
+                const conversationsDir = join(importRoot, 'conversations');
+                if (!existsSync(conversationsDir) || !statSync(conversationsDir).isDirectory()) continue;
+                for (const name of readdirSync(conversationsDir).sort()) {
+                  if (!name.endsWith('.md')) continue;
+                  const full = join(conversationsDir, name);
+                  if (!statSync(full).isFile()) continue;
+                  const text = readFileSync(full, 'utf8');
+                  if (!text) continue;
+                  stats.importFiles += 1;
+                  items.push({
+                    source: 'notes',
+                    label: `brain-imports/${providerName}/${importName}/conversations/${name}`,
+                    text,
+                  });
+                }
+              }
+            }
+          }
+        } catch (_) {}
+        return items;
+      },
+    },
+    {
+      collect() {
+        const items = [];
+        for (const day of collectChatLogDateEntries(workspaceDir)) {
+          const exchanges = readChatLogDayExchanges(workspaceDir, day.date);
+          if (!exchanges.length) continue;
+          stats.historyDays += 1;
+          stats.exchanges += exchanges.length;
+          for (const ex of exchanges) {
+            const parts = [];
+            const userText = String(ex?.user || '').trim();
+            const assistantText = String(ex?.assistant || '').trim();
+            if (userText) parts.push(`User:\n${userText}`);
+            if (assistantText) parts.push(`Assistant:\n${assistantText}`);
+            const text = parts.join('\n\n').trim();
+            if (!text) continue;
+            items.push({
+              source: 'history',
+              label: day.date,
+              ts: ex.ts,
+              text,
+            });
+          }
         }
-      }
-    } catch (_) {}
-  }
+        return items;
+      },
+    }
+  ];
 
-  if (includeHistory) {
-    const days = collectChatLogDateEntries(workspaceDir)
-      .filter((d) => !cutoffMs || Number(d.lastActivityMs || 0) >= cutoffMs);
-    for (const day of days) {
-      const exchanges = readChatLogDayExchanges(workspaceDir, day.date);
-      if (!exchanges.length) continue;
-      stats.historyDays += 1;
-      stats.exchanges += exchanges.length;
-      for (const ex of exchanges) {
-        const text = String(ex?.user || '').trim();
-        if (!text) continue;
-        historyCorpus.push({
-          source: 'history',
-          label: day.date,
-          role: 'user',
-          ts: ex.ts,
-          text,
-        });
-      }
+  const corpus = [];
+  for (const spec of sourceSpecs) {
+    for (const item of spec.collect()) {
+      pushBrainCorpusChunk(corpus, item);
     }
   }
-
-  const corpus = mergeBrainCorpusBuckets([
-    includeMemory ? { key: 'memory', weight: 2, items: memoryCorpus } : null,
-    includeNotes ? { key: 'notes', weight: 2, items: notesCorpus } : null,
-    includeNotes ? { key: 'imports', weight: source === 'notes' ? 2 : 3, items: importCorpus } : null,
-    includeHistory ? { key: 'history', weight: 3, items: historyCorpus } : null,
-  ], maxChars);
   stats.chars = corpus.reduce((sum, chunk) => sum + brainCorpusChunkText(chunk).length, 0);
   return { corpus, stats };
 }
 
 function splitBrainCorpusForLlm(corpus) {
   const chunks = [];
+  const stride = Math.max(1, BRAIN_LLM_CHUNK_CHARS - BRAIN_LLM_CHUNK_OVERLAP_CHARS);
   for (const item of corpus || []) {
     const text = String(item?.text || '').trim();
     if (!text) continue;
-    for (let start = 0, index = 0; start < text.length; start += BRAIN_LLM_CHUNK_CHARS, index++) {
+    for (let start = 0, index = 0; start < text.length; start += stride, index++) {
       const slice = text.slice(start, start + BRAIN_LLM_CHUNK_CHARS).trim();
       if (!slice) continue;
       chunks.push({
@@ -2773,7 +2680,6 @@ function splitBrainCorpusForLlm(corpus) {
         chunkIndex: index,
         text: slice,
       });
-      if (chunks.length >= BRAIN_LLM_MAX_CHUNKS) return chunks;
     }
   }
   return chunks;
@@ -2798,26 +2704,18 @@ function brainLlmChunkCacheKey(chunk) {
   }));
 }
 
-function brainResponseCacheKey({ range, source, qualityEnabled, chunks }) {
+function brainResponseCacheKey({ chunks }) {
   return brainHashText(JSON.stringify({
     version: BRAIN_RESPONSE_CACHE_VERSION,
     llmVersion: BRAIN_LLM_CACHE_VERSION,
-    qualityVersion: qualityEnabled ? BRAIN_QUALITY_CACHE_VERSION : 0,
-    range,
-    source,
-    qualityEnabled: !!qualityEnabled,
     chunkKeys: (chunks || []).map((chunk) => brainLlmChunkCacheKey(chunk)),
   }));
 }
 
 const BRAIN_BLOCKED_TERM_TEXT = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'from',
-  'has', 'have', 'he', 'her', 'his', 'i', 'if', 'in', 'is', 'it', 'its',
-  'me', 'my', 'of', 'on', 'or', 'our', 'she', 'so', 'that', 'the', 'their',
-  'them', 'then', 'there', 'they', 'this', 'to', 'was', 'we', 'were', 'what',
-  'when', 'where', 'who', 'why', 'will', 'with', 'you', 'your',
-  'user', 'assistant', 'system', 'human', 'message', 'messages', 'chat',
-  'conversation', 'reply', 'response',
+  ...BRAIN_INPUT_STOP_WORDS,
+  'user', 'assistant', 'system', 'human', 'message', 'messages',
+  'chat', 'conversation', 'conversations', 'reply', 'response',
 ]);
 
 function normalizeBrainDisplayKey(text) {
@@ -2838,7 +2736,7 @@ function mergeBrainSources(target, sources) {
   }
 }
 
-async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = false, chunks: providedChunks = null } = {}) {
+async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: providedChunks = null } = {}) {
   const chunks = Array.isArray(providedChunks) ? providedChunks : splitBrainCorpusForLlm(corpus);
   const termMap = new Map();
   const edgeMap = new Map();
@@ -2848,8 +2746,6 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = f
   let doneFiles = 0;
 
   brainDebugLog('raw_build_start', {
-    range,
-    source,
     force,
     corpusItems: Array.isArray(corpus) ? corpus.length : 0,
     chunks: chunks.length,
@@ -2884,7 +2780,7 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = f
       stats.cacheHits += 1;
       markBrainImportChunkProcessed(chunk.label, chunk.chunkIndex, cacheKey, 'cached');
     } else {
-      graph = await generateBrainChunkGraph({ range, source, chunk });
+      graph = await generateBrainChunkGraph({ chunk });
       if (!graph) {
         stats.failed += 1;
         graph = { terms: [], connections: [] };
@@ -3023,8 +2919,6 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = f
   }
 
   brainDebugLog('raw_build_complete', {
-    range,
-    source,
     chunks: stats.chunks,
     cacheHits: stats.cacheHits,
     generated: stats.generated,
@@ -3037,103 +2931,17 @@ async function buildLlmBrainGraph(corpus, { range, source, onProgress, force = f
   return { terms, connections, llmStats: stats };
 }
 
-async function refineLlmBrainGraphQuality(graph, { range, source, stats, onProgress, force = false } = {}) {
-  const qualityInput = {
-    version: BRAIN_QUALITY_CACHE_VERSION,
-    range,
-    source,
-    stats: {
-      memoryFiles: stats?.memoryFiles || 0,
-      noteFiles: stats?.noteFiles || 0,
-      importFiles: stats?.importFiles || 0,
-      historyDays: stats?.historyDays || 0,
-      exchanges: stats?.exchanges || 0,
-    },
-    terms: (graph.terms || []).slice(0, 260),
-    connections: (graph.connections || []).slice(0, 900),
-  };
-  const cacheKey = brainHashText(JSON.stringify(qualityInput));
-  const cached = force ? null : readBrainQualityCache(cacheKey);
-  if (cached) {
-    brainDebugLog('quality_cache_hit', {
-      range,
-      source,
-      terms: cached.terms.length,
-      connections: cached.connections.length,
-    });
-    return {
-      terms: cached.terms,
-      connections: cached.connections,
-      qualityStats: { cached: true, generated: false },
-    };
-  }
-
-  brainDebugLog('quality_build_start', {
-    range,
-    source,
-    force,
-    inputTerms: qualityInput.terms.length,
-    inputConnections: qualityInput.connections.length,
-  });
-  if (onProgress) onProgress({ phase: 'quality' });
-  const refined = await refineBrainGraphQuality({
-    range,
-    source,
-    stats,
-    graph: {
-      terms: qualityInput.terms,
-      connections: qualityInput.connections,
-    },
-  });
-
-  if (refined?.terms?.length) {
-    writeBrainQualityCache(cacheKey, {
-      terms: refined.terms,
-      connections: refined.connections || [],
-    });
-    brainDebugLog('quality_build_complete', {
-      range,
-      source,
-      terms: refined.terms.length,
-      connections: (refined.connections || []).length,
-    });
-    return {
-      terms: refined.terms,
-      connections: refined.connections || [],
-      qualityStats: { cached: false, generated: true },
-    };
-  }
-
-  brainDebugLog('quality_build_failed_or_empty', {
-    range,
-    source,
-    inputTerms: qualityInput.terms.length,
-    inputConnections: qualityInput.connections.length,
-  });
-  return {
-    terms: graph.terms || [],
-    connections: graph.connections || [],
-    qualityStats: { cached: false, generated: false, failed: true },
-  };
-}
-
 app.get('/api/brain/cloud', async (req, res) => {
   try {
-    const range = normalizeBrainRange(req.query.range);
-    const source = normalizeBrainSource(req.query.source);
-    const qualityEnabled = normalizeBrainQualityEnabled(req.query.quality);
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const progressId = normalizeBrainProgressId(req.query.progressId);
     brainDebugLog('cloud_request', {
-      range,
-      source,
-      qualityEnabled,
       refresh,
       progressId,
     });
 
     setBrainBuildProgress(progressId, { phase: 'collecting', done: false });
-    const { corpus, stats } = collectBrainCorpus({ range, source, maxChars: BRAIN_DENSE_CORPUS_MAX_CHARS });
+    const { corpus, stats } = collectBrainCorpus();
     const chunks = splitBrainCorpusForLlm(corpus);
     const totalFiles = new Set((chunks || []).map((chunk) => `${chunk.source || ''}:${chunk.label || ''}`)).size;
     setBrainBuildProgress(progressId, {
@@ -3148,12 +2956,9 @@ app.get('/api/brain/cloud', async (req, res) => {
       generated: 0,
       failed: 0,
     });
-    const rawResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: false, chunks });
-    const qualityResponseCacheKey = brainResponseCacheKey({ range, source, qualityEnabled: true, chunks });
-    const responseCacheKey = qualityEnabled ? qualityResponseCacheKey : rawResponseCacheKey;
+    const responseCacheKey = brainResponseCacheKey({ chunks });
     if (refresh) {
-      brainCloudCache.delete(rawResponseCacheKey);
-      brainCloudCache.delete(qualityResponseCacheKey);
+      brainCloudCache.delete(responseCacheKey);
     }
     const cachedMemory = refresh ? null : brainCloudCache.get(responseCacheKey)?.payload;
     const cachedDisk = refresh || cachedMemory ? null : readBrainResponseCache(responseCacheKey);
@@ -3161,9 +2966,6 @@ app.get('/api/brain/cloud', async (req, res) => {
     if (!refresh && brainPayloadIsReusable(cachedPayload)) {
       brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload: cachedPayload });
       brainDebugLog('cloud_response_cache_hit', {
-        range,
-        source,
-        qualityMode: cachedPayload?.qualityMode,
         cache: cachedMemory ? 'memory' : 'disk',
         terms: Array.isArray(cachedPayload?.terms) ? cachedPayload.terms.length : 0,
         connections: Array.isArray(cachedPayload?.connections) ? cachedPayload.connections.length : 0,
@@ -3181,42 +2983,23 @@ app.get('/api/brain/cloud', async (req, res) => {
       return;
     }
     if (!corpus.length) {
-      const rawPayload = {
-        range,
-        source,
-        qualityEnabled: false,
-        qualityMode: 'raw',
+      const payload = {
         updatedAtMs: Date.now(),
         terms: [],
+        connections: [],
+        denseTerms: [],
+        denseConnections: [],
         stats: {
           ...stats,
           rawTerms: 0,
           rawConnections: 0,
           finalTerms: 0,
           finalConnections: 0,
-          qualityDisabled: 1,
         },
       };
-      brainCloudCache.set(rawResponseCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
-      writeBrainResponseCache(rawResponseCacheKey, rawPayload);
-      const payload = qualityEnabled
-        ? {
-            ...rawPayload,
-            qualityEnabled: true,
-            qualityMode: 'quality',
-            stats: {
-              ...rawPayload.stats,
-              qualityDisabled: 0,
-            },
-          }
-        : rawPayload;
       brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload });
       writeBrainResponseCache(responseCacheKey, payload);
-      brainDebugLog('cloud_response_empty_corpus', {
-        range,
-        source,
-        qualityMode: payload.qualityMode,
-      });
+      brainDebugLog('cloud_response_empty_corpus', {});
       finishBrainBuildProgress(progressId, {
         phase: 'complete',
         doneChunks: 0,
@@ -3230,18 +3013,14 @@ app.get('/api/brain/cloud', async (req, res) => {
       return;
     }
 
-    let denseBuild = brainCloudBuilds.get(rawResponseCacheKey);
+    let denseBuild = brainCloudBuilds.get(responseCacheKey);
     if (denseBuild) {
       brainDebugLog('raw_build_shared', {
-        range,
-        source,
         force: refresh,
         chunks: chunks.length,
       });
     } else {
       denseBuild = buildLlmBrainGraph(corpus, {
-        range,
-        source,
         force: refresh,
         chunks,
         onProgress: (progress) => setBrainBuildProgress(progressId, {
@@ -3249,24 +3028,21 @@ app.get('/api/brain/cloud', async (req, res) => {
           done: false,
         }),
       }).finally(() => {
-        if (brainCloudBuilds.get(rawResponseCacheKey) === denseBuild) {
-          brainCloudBuilds.delete(rawResponseCacheKey);
+        if (brainCloudBuilds.get(responseCacheKey) === denseBuild) {
+          brainCloudBuilds.delete(responseCacheKey);
         }
       });
-      brainCloudBuilds.set(rawResponseCacheKey, denseBuild);
+      brainCloudBuilds.set(responseCacheKey, denseBuild);
     }
     const dense = await denseBuild;
     if (req.aborted || req.destroyed || res.destroyed) return;
     const denseHasTerms = Array.isArray(dense?.terms) && dense.terms.length > 0;
     if (!refresh && !denseHasTerms) {
-      const fallback = readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled });
-      const fallbackPayload = brainFallbackPayloadForResponse(fallback, qualityEnabled);
+      const fallback = readLatestCompatibleBrainResponseCache();
+      const fallbackPayload = brainFallbackPayloadForResponse(fallback);
       if (fallbackPayload) {
         brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload: fallbackPayload });
         brainDebugLog('cloud_response_fallback', {
-          range,
-          source,
-          qualityMode: fallbackPayload?.qualityMode,
           reason: 'raw_build_empty',
           terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,
           connections: Array.isArray(fallbackPayload?.connections) ? fallbackPayload.connections.length : 0,
@@ -3285,11 +3061,7 @@ app.get('/api/brain/cloud', async (req, res) => {
         return;
       }
     }
-    const rawPayload = {
-      range,
-      source,
-      qualityEnabled: false,
-      qualityMode: 'raw',
+    const payload = {
       updatedAtMs: Date.now(),
       terms: dense.terms || [],
       connections: dense.connections || [],
@@ -3306,59 +3078,11 @@ app.get('/api/brain/cloud', async (req, res) => {
         rawConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
         finalTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
         finalConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
-        qualityDisabled: 1,
-        qualityCached: 0,
-        qualityGenerated: 0,
-        qualityFailed: 0,
       },
     };
-    brainCloudCache.set(rawResponseCacheKey, { cachedAtMs: Date.now(), payload: rawPayload });
-    writeBrainResponseCache(rawResponseCacheKey, rawPayload);
-    let payload = rawPayload;
-    if (qualityEnabled) {
-      const finalGraph = await refineLlmBrainGraphQuality(dense, {
-        range,
-        source,
-        stats,
-        force: refresh,
-        onProgress: (progress) => setBrainBuildProgress(progressId, {
-          ...progress,
-          done: false,
-        }),
-      });
-      payload = {
-        ...rawPayload,
-        qualityEnabled: true,
-        qualityMode: 'quality',
-        terms: finalGraph.terms,
-        connections: finalGraph.connections,
-        denseTerms: finalGraph.terms,
-        denseConnections: finalGraph.connections,
-        stats: {
-          ...rawPayload.stats,
-          finalTerms: Array.isArray(finalGraph.terms) ? finalGraph.terms.length : 0,
-          finalConnections: Array.isArray(finalGraph.connections) ? finalGraph.connections.length : 0,
-          qualityDisabled: 0,
-          qualityCached: finalGraph.qualityStats?.cached ? 1 : 0,
-          qualityGenerated: finalGraph.qualityStats?.generated ? 1 : 0,
-          qualityFailed: finalGraph.qualityStats?.failed ? 1 : 0,
-        },
-      };
-      brainCloudCache.set(qualityResponseCacheKey, { cachedAtMs: Date.now(), payload });
-      writeBrainResponseCache(qualityResponseCacheKey, payload);
-    } else {
-      brainDebugLog('quality_skipped', {
-        range,
-        source,
-        reason: 'disabled',
-        rawTerms: rawPayload.stats.rawTerms,
-        rawConnections: rawPayload.stats.rawConnections,
-      });
-    }
+    brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload });
+    writeBrainResponseCache(responseCacheKey, payload);
     brainDebugLog('cloud_response_complete', {
-      range,
-      source,
-      qualityMode: payload.qualityMode,
       rawTerms: payload.stats.rawTerms,
       rawConnections: payload.stats.rawConnections,
       finalTerms: payload.stats.finalTerms,
@@ -3381,19 +3105,13 @@ app.get('/api/brain/cloud', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ ...payload, cached: false });
   } catch (err) {
-    const range = normalizeBrainRange(req.query.range);
-    const source = normalizeBrainSource(req.query.source);
-    const qualityEnabled = normalizeBrainQualityEnabled(req.query.quality);
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.query.hard === '1';
     const progressId = normalizeBrainProgressId(req.query.progressId);
     if (!refresh) {
-      const fallback = readLatestCompatibleBrainResponseCache({ range, source, qualityEnabled });
-      const fallbackPayload = brainFallbackPayloadForResponse(fallback, qualityEnabled);
+      const fallback = readLatestCompatibleBrainResponseCache();
+      const fallbackPayload = brainFallbackPayloadForResponse(fallback);
       if (fallbackPayload) {
         brainDebugLog('cloud_response_fallback', {
-          range,
-          source,
-          qualityMode: fallbackPayload?.qualityMode,
           reason: 'error',
           error: err.message,
           terms: Array.isArray(fallbackPayload?.terms) ? fallbackPayload.terms.length : 0,

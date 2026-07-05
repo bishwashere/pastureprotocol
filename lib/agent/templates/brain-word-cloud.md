@@ -1,17 +1,29 @@
 # Brain Chunk Graph
 
-You extract a knowledge graph chunk for Pasture Protocol's Brain dashboard.
+You extract concepts and relationships for Pasture Protocol's Brain dashboard.
 
-The input is one chunk of memory, notes, imported chat, or local user chat history. Your job is to identify the concepts, topics, projects, tools, problems, and ideas that actually matter to the user.
+The input is one large text chunk from the user's memory, notes, chat history, or imported chat files. Obvious standalone helper words are stripped before this prompt, but role labels such as `User:` and `Assistant:` are intentionally preserved. The text may still contain metadata, punctuation, or transcript formatting. Your job is to identify the words, concepts, topics, projects, tools, problems, and ideas the user is talking about.
+
+Judge only the evidence inside this chunk. Do not assume you know previous or later chunks. Nearby chunk boundaries may overlap, so repeated text can appear in more than one chunk.
+
+## Speaker Evidence
+
+- Treat concepts introduced by the user as strong evidence.
+- Treat concepts introduced by the assistant as useful only when the user asked for them, accepted them, reacted to them, corrected them, continued discussing them, or used them later.
+- If the assistant mentions a concept and the user never engages with it, treat it as weak evidence or ignore it.
+- If the user rejects or corrects an assistant concept, reduce that concept or relationship using `decay`.
+- Never return speaker labels such as `User`, `Assistant`, `System`, `message`, `chat`, or `conversation` as nodes.
 
 ## Node Rules
 
-- Return meaningful nodes - preferably single compact words when possible, but allow short noun phrases (max 3-4 words) when they represent a clear, natural concept.
+- Return meaningful nodes - preferably single compact words when possible, but allow short noun phrases when they represent a clear, natural concept.
 - Good examples: `Cloudflare`, `TaskMentor`, `cowCode`, `Home Assistant`, `knowledge graph`, `chicken strips`, `Dairy Queen`, `N-400`, `psoriasis treatment`, `fried rice`, `NextJS`.
 - Prefer nouns, proper nouns, project names, product names, tools, people, places, APIs, services, durable topics, recurring interests, problems, and plans.
-- Do not return verbs, verb-like action words, conversational filler, pronouns, generic adjectives, adverbs, timestamps, markdown syntax, JSON keys, command fragments, stack traces, local URLs, ports, secrets, phone numbers, or email addresses.
+- Do not return connector words, filler, pronouns, helper words, generic adjectives, adverbs, timestamps, markdown syntax, JSON keys, command fragments, stack traces, local URLs, ports, secrets, phone numbers, or email addresses.
+- Do not return words like `the`, `and`, `or`, `but`, `they`, `this`, `that`, `here`, or `there`.
 - Include words because they represent real user knowledge, projects, tools, recurring topics, or durable intent - not just because they are frequent.
-- Be specific and diverse. Capture both broad recurring themes and concrete details the user keeps mentioning.
+- Use only concepts directly supported by the chunk text. Do not add adjacent tools, services, jargon, or likely next steps from world knowledge unless the text names them or clearly describes them.
+- Return as many useful concepts as the chunk supports. Do not force a tiny list.
 
 ## Weight Rules
 
@@ -26,22 +38,16 @@ The input is one chunk of memory, notes, imported chat, or local user chat histo
 
 ## Graph Shape
 
-- Return 4 to 14 nodes when enough material exists (fewer for sparse chunks).
 - Return only connections between terms you included.
-- Prefer useful local neighborhoods over a dense hairball.
-- Usually return 0 to 2 connections per important node.
 - Omit isolated generic nodes.
 - Keep labels stable across chunks when possible (use the clearest canonical name).
-- Keep the whole response compact. Do not try to exhaustively list every possible concept in the chunk.
+- Keep the response valid JSON. It is okay to return a large list when the text supports it.
 
 ## Input Shape
 
 ```json
 {
-  "range": "all | 30d | 7d",
-  "source": "all | memory | notes | history",
   "chunk": {
-    "source": "memory | notes | history",
     "label": "source label",
     "role": "user | assistant | empty",
     "chunkIndex": 0,

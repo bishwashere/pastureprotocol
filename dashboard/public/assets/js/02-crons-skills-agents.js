@@ -2822,7 +2822,6 @@ function renderSystemCronVariant(row) {
       minVisibleConnections: 1,
       minFont: 10,
       maxFont: 46,
-      qualityLayer: true,
     };
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
@@ -2848,7 +2847,6 @@ function renderSystemCronVariant(row) {
         minVisibleConnections: clampBrainNumber(saved.minVisibleConnections, BRAIN_SETTINGS_DEFAULTS.minVisibleConnections, 1, 20),
         minFont: clampBrainNumber(saved.minFont, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(saved.maxFont, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
-        qualityLayer: saved.qualityLayer !== false,
       };
     }
 
@@ -2858,44 +2856,29 @@ function renderSystemCronVariant(row) {
       } catch (_) {}
     }
 
-    function getBrainQualityEnabled() {
-      var quality = document.getElementById('brain-setting-quality');
-      if (quality) return !!quality.checked;
-      return brainSettings.qualityLayer !== false;
-    }
-
     function rerenderBrainCloud() {
       if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
     }
 
-    function brainLastGoodKey(range, source, qualityEnabled) {
-      return 'brainMeshLastGood:' + String(range || 'all') + ':' + String(source || 'all') + ':' + (qualityEnabled ? 'quality' : 'raw');
+    function brainLastGoodKey() {
+      return 'brainMeshLastGood:all';
     }
 
-    function saveBrainLastGood(data, range, source, qualityEnabled) {
+    function saveBrainLastGood(data) {
       var terms = Array.isArray(data && data.denseTerms) ? data.denseTerms : (Array.isArray(data && data.terms) ? data.terms : []);
       if (!terms.length) return;
       try {
-        localStorage.setItem(brainLastGoodKey(range || data.range, source || data.source, qualityEnabled != null ? qualityEnabled : data.qualityEnabled), JSON.stringify(data));
+        localStorage.setItem(brainLastGoodKey(), JSON.stringify(data));
       } catch (_) {}
     }
 
-    function loadBrainLastGood(range, source, qualityEnabled) {
+    function loadBrainLastGood() {
       try {
-        var parsed = JSON.parse(localStorage.getItem(brainLastGoodKey(range, source, qualityEnabled)) || 'null');
+        var parsed = JSON.parse(localStorage.getItem(brainLastGoodKey()) || 'null');
         var terms = Array.isArray(parsed && parsed.denseTerms) ? parsed.denseTerms : (Array.isArray(parsed && parsed.terms) ? parsed.terms : []);
         if (terms.length) return parsed;
-      } catch (_) {
-        parsed = null;
-      }
-      if (!qualityEnabled) return null;
-      try {
-        var raw = JSON.parse(localStorage.getItem(brainLastGoodKey(range, source, false)) || 'null');
-        var rawTerms = Array.isArray(raw && raw.denseTerms) ? raw.denseTerms : (Array.isArray(raw && raw.terms) ? raw.terms : []);
-        return rawTerms.length ? raw : null;
-      } catch (_) {
-        return null;
-      }
+      } catch (_) {}
+      return null;
     }
 
     function stopBrainLoadingProgress() {
@@ -3685,9 +3668,6 @@ function renderSystemCronVariant(row) {
         stats.llmChunks ? stats.llmChunks + ' chunks' : '',
         stats.llmCacheHits ? stats.llmCacheHits + ' cached' : '',
         stats.llmGenerated ? stats.llmGenerated + ' generated' : '',
-        stats.qualityDisabled ? 'quality off' : '',
-        stats.qualityCached ? 'quality cached' : '',
-        stats.qualityGenerated ? 'quality refined' : '',
         stats.rawTerms != null ? 'raw ' + stats.rawTerms + '/' + (stats.rawConnections || 0) : '',
         stats.finalTerms != null ? 'final ' + stats.finalTerms + '/' + (stats.finalConnections || 0) : '',
         terms.length ? visibleCount + ' visible words' : '',
@@ -3708,7 +3688,7 @@ function renderSystemCronVariant(row) {
         return;
       }
       brainCloudLastData = data;
-      saveBrainLastGood(data, data.range, data.source, data.qualityEnabled);
+      saveBrainLastGood(data);
       var rect = cloud.getBoundingClientRect();
       cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
       cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
@@ -3896,14 +3876,9 @@ function renderSystemCronVariant(row) {
       }
       var requestSeq = ++brainCloudRequestSeq;
       brainCloudAbortController = window.AbortController ? new AbortController() : null;
-      var rangeEl = document.getElementById('brain-range');
-      var sourceEl = document.getElementById('brain-source');
-      var range = rangeEl ? rangeEl.value : 'all';
-      var source = sourceEl ? sourceEl.value : 'all';
-      var qualityEnabled = getBrainQualityEnabled();
       var hasGraph = !!cloud.querySelector('.brain-mesh-canvas');
       if (!hasGraph) {
-        var storedBrain = loadBrainLastGood(range, source, qualityEnabled);
+        var storedBrain = loadBrainLastGood();
         if (storedBrain) {
           renderBrainCloud(storedBrain);
           hasGraph = true;
@@ -3916,12 +3891,8 @@ function renderSystemCronVariant(row) {
       var meta = document.getElementById('brain-meta');
       if (meta && hasGraph && !refresh) meta.textContent = 'Checking cached brain map...';
       try {
-        brainSettings.qualityLayer = qualityEnabled;
         saveBrainSettings();
-        var url = API + '/api/brain/cloud?range=' + encodeURIComponent(range) +
-          '&source=' + encodeURIComponent(source) +
-          '&quality=' + (qualityEnabled ? '1' : '0') +
-          '&progressId=' + encodeURIComponent(progressId);
+        var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(progressId);
         if (refresh) url += '&refresh=1&hard=1&ts=' + Date.now();
         var timeoutId = null;
         if (brainCloudAbortController) {
@@ -3945,7 +3916,7 @@ function renderSystemCronVariant(row) {
         if (brainCloudLastData) {
           renderBrainCloud(brainCloudLastData);
         } else {
-          var fallbackBrain = loadBrainLastGood(range, source, qualityEnabled);
+          var fallbackBrain = loadBrainLastGood();
           if (fallbackBrain) {
             renderBrainCloud(fallbackBrain);
           } else {
@@ -4150,19 +4121,15 @@ function renderSystemCronVariant(row) {
         var el = document.getElementById(pair[0]);
         if (el) el.value = String(pair[1]);
       });
-      var quality = document.getElementById('brain-setting-quality');
-      if (quality) quality.checked = brainSettings.qualityLayer !== false;
     }
 
     function readBrainSettingsInputs() {
-      var previousQuality = brainSettings.qualityLayer !== false;
       var direct = document.getElementById('brain-setting-direct');
       var second = document.getElementById('brain-setting-second');
       var words = document.getElementById('brain-setting-words');
       var minLinks = document.getElementById('brain-setting-min-links');
       var minFont = document.getElementById('brain-setting-min-font');
       var maxFont = document.getElementById('brain-setting-max-font');
-      var quality = document.getElementById('brain-setting-quality');
       brainSettings = {
         directRelations: clampBrainNumber(direct && direct.value, BRAIN_SETTINGS_DEFAULTS.directRelations, 1, 40),
         secondRelations: clampBrainNumber(second && second.value, BRAIN_SETTINGS_DEFAULTS.secondRelations, 0, 80),
@@ -4170,16 +4137,11 @@ function renderSystemCronVariant(row) {
         minVisibleConnections: clampBrainNumber(minLinks && minLinks.value, BRAIN_SETTINGS_DEFAULTS.minVisibleConnections, 1, 20),
         minFont: clampBrainNumber(minFont && minFont.value, BRAIN_SETTINGS_DEFAULTS.minFont, 6, 30),
         maxFont: clampBrainNumber(maxFont && maxFont.value, BRAIN_SETTINGS_DEFAULTS.maxFont, 12, 80),
-        qualityLayer: quality ? !!quality.checked : BRAIN_SETTINGS_DEFAULTS.qualityLayer,
       };
       if (brainSettings.maxFont <= brainSettings.minFont) brainSettings.maxFont = brainSettings.minFont + 4;
       saveBrainSettings();
       setBrainSettingsInputs();
-      if ((brainSettings.qualityLayer !== false) !== previousQuality) {
-        fetchBrainCloud(true);
-      } else {
-        rerenderBrainCloud();
-      }
+      rerenderBrainCloud();
     }
 
     function toggleBrainSettingsPanel(forceOpen) {
@@ -4191,8 +4153,6 @@ function renderSystemCronVariant(row) {
     }
 
     wireEl('brain-refresh', 'click', function () { fetchBrainCloud(true); });
-    wireEl('brain-range', 'change', function () { fetchBrainCloud(true); });
-    wireEl('brain-source', 'change', function () { fetchBrainCloud(true); });
     setBrainSettingsInputs();
     wireEl('brain-settings-toggle', 'click', function (e) {
       if (e) e.stopPropagation();
@@ -4203,7 +4163,6 @@ function renderSystemCronVariant(row) {
     });
     wireEl('brain-settings-apply', 'click', readBrainSettingsInputs);
     wireEl('brain-settings-reset', 'click', function () {
-      var previousQuality = brainSettings.qualityLayer !== false;
       brainSettings = {
         directRelations: BRAIN_SETTINGS_DEFAULTS.directRelations,
         secondRelations: BRAIN_SETTINGS_DEFAULTS.secondRelations,
@@ -4211,15 +4170,10 @@ function renderSystemCronVariant(row) {
         minVisibleConnections: BRAIN_SETTINGS_DEFAULTS.minVisibleConnections,
         minFont: BRAIN_SETTINGS_DEFAULTS.minFont,
         maxFont: BRAIN_SETTINGS_DEFAULTS.maxFont,
-        qualityLayer: BRAIN_SETTINGS_DEFAULTS.qualityLayer,
       };
       saveBrainSettings();
       setBrainSettingsInputs();
-      if ((brainSettings.qualityLayer !== false) !== previousQuality) {
-        fetchBrainCloud(true);
-      } else {
-        rerenderBrainCloud();
-      }
+      rerenderBrainCloud();
     });
     document.addEventListener('click', function (event) {
       var panel = document.getElementById('brain-settings-panel');

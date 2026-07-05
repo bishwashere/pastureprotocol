@@ -38,7 +38,7 @@ const checks = [
     name: 'go-read avoids chunk/id/length proxies for top Brain terms',
     ok: goReadSkill.includes('top Brain items/words/nodes/terms') &&
       goReadSkill.includes('Use generic read steps instead') &&
-      goReadSkill.includes('/api/brain/cloud?range=all&source=all') &&
+      goReadSkill.includes('/api/brain/cloud') &&
       goReadSkill.includes('payload.terms[].text') &&
       goReadSkill.includes('prefer larger files') &&
       goReadSkill.includes('Brain cache filenames are usually hashes') &&
