@@ -3346,6 +3346,49 @@ function renderSystemCronVariant(row) {
       return pos.font + (target - pos.font) * presence;
     }
 
+    function brainFocusSpacingPositions(positions, selectedText, selectedLinks, focusMode, focusPresence, width, height) {
+      var list = Array.isArray(positions) ? positions : [];
+      if (!selectedText || focusMode === 'path' || focusPresence <= 0.01) return list;
+      var focus = null;
+      list.some(function (pos) {
+        if (String(pos.term?.text || '') !== selectedText) return false;
+        focus = pos;
+        return true;
+      });
+      if (!focus) return list;
+      var focusRel = (selectedLinks && selectedLinks[selectedText]) || { depth: 0, strength: 100, presence: 1 };
+      var focusFont = brainHoverFont(focus, focusRel, focusMode);
+      var label = selectedText.length > 16 ? selectedText.slice(0, 15) + '…' : selectedText;
+      var focusWidth = Math.max(72, Math.min(260, String(label || '').length * focusFont * 0.62 + 26));
+      var focusHeight = Math.max(32, focusFont * 1.2);
+      var influenceRadius = Math.max(2.05, Math.min(2.7, width < 560 ? 2.15 : 2.45));
+      var maxPush = Math.min(118, Math.max(34, focusFont * 1.24)) * Math.max(0, Math.min(1, focusPresence));
+      var margin = width < 560 ? 18 : 24;
+
+      return list.map(function (pos) {
+        if (String(pos.term?.text || '') === selectedText) return pos;
+        var dx = pos.x - focus.x;
+        var dy = pos.y - focus.y;
+        var radialDistance = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (radialDistance < 1.5) {
+          var angle = brainSeededRandom(brainHash(String(pos.term?.text || '') + ':focus-spacing')) * Math.PI * 2;
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+          radialDistance = 1;
+        }
+        var sx = dx / Math.max(60, focusWidth * 0.54 + (pos.cellW || 56) * 0.34);
+        var sy = dy / Math.max(36, focusHeight * 1.08 + (pos.cellH || 18) * 0.95);
+        var normalizedDistance = Math.sqrt(sx * sx + sy * sy);
+        if (normalizedDistance >= influenceRadius) return pos;
+        var falloff = 1 - normalizedDistance / influenceRadius;
+        var push = maxPush * falloff * falloff;
+        return Object.assign({}, pos, {
+          x: Math.max(margin, Math.min(width - margin, pos.x + (dx / radialDistance) * push)),
+          y: Math.max(margin, Math.min(height - margin, pos.y + (dy / radialDistance) * push)),
+        });
+      });
+    }
+
     function brainDisplaySelected(fromRel, toRel, t) {
       var blended = brainBlendRelation(fromRel, toRel, t);
       return !!(blended && blended.depth === 0 && (blended.presence == null || blended.presence > 0.35));
@@ -3512,13 +3555,7 @@ function renderSystemCronVariant(row) {
       ctx.clearRect(0, 0, width, height);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      var positions = brainMeshPositions(visibleTerms, width, height);
-      var byText = {};
-      positions.forEach(function (pos) { byText[pos.term.text] = pos; });
-      canvas.setAttribute('data-brain-word-count', String(positions.length));
-      canvas._brainMeshPositions = positions;
-      canvas._brainMeshVisibleConnections = visibleConnections;
-      canvas._brainMeshPositionByText = byText;
+      var basePositions = brainMeshPositions(visibleTerms, width, height);
       var hasFocus = !!selectedText || !!transition;
       var relationSelectedText = selectedText || transition?.selectedText || '';
       var focusMode = transition?.focusMode || 'word';
@@ -3526,10 +3563,17 @@ function renderSystemCronVariant(row) {
         ? brainTransitionFocusPresence(transition.fromRelations, transition.toRelations, transition.progress)
         : (hasFocus ? 1 : 0);
       var dimPresence = focusMode === 'path' ? focusPresence * 0.32 : focusPresence * 0.62;
-      brainDrawClusterClouds(ctx, positions, width, height);
       var selectedLinks = transition
         ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
         : brainRelationMap(relationSelectedText, visibleConnections);
+      var positions = brainFocusSpacingPositions(basePositions, relationSelectedText, selectedLinks, focusMode, focusPresence, width, height);
+      var byText = {};
+      positions.forEach(function (pos) { byText[pos.term.text] = pos; });
+      canvas.setAttribute('data-brain-word-count', String(positions.length));
+      canvas._brainMeshPositions = positions;
+      canvas._brainMeshVisibleConnections = visibleConnections;
+      canvas._brainMeshPositionByText = byText;
+      brainDrawClusterClouds(ctx, positions, width, height);
       var baseLineLimit = Math.max(220, Math.min(2600, Math.round((width * height) / 850)));
       visibleConnections.slice(0, baseLineLimit).forEach(function (c) {
         var a = byText[c.from];
