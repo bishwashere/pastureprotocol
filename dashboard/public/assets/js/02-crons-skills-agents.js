@@ -3539,11 +3539,13 @@ function renderSystemCronVariant(row) {
           ctx.stroke();
         }
       });
-      if (relationSelectedText) {
+
+      function drawBrainFocusedConnections(layerSelectedText, relationMap, layerFocusMode, layerAlpha) {
+        if (!layerSelectedText || !relationMap || layerAlpha <= 0.01) return;
         visibleConnections.forEach(function (c) {
-          var fromRel = selectedLinks[c.from];
-          var toRel = selectedLinks[c.to];
-          var lineState = brainLinePresence(fromRel, toRel, relationSelectedText, c.from, c.to);
+          var fromRel = relationMap[c.from];
+          var toRel = relationMap[c.to];
+          var lineState = brainLinePresence(fromRel, toRel, layerSelectedText, c.from, c.to);
           var isPrimary = lineState.primary;
           var visible = lineState.visible && lineState.presence > 0.02;
           if (visible) {
@@ -3554,20 +3556,38 @@ function renderSystemCronVariant(row) {
             ctx.beginPath();
             brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
             var tierAlpha = lineState.tier === 1 ? 0.76 : lineState.tier === 2 ? 0.42 : 0.2;
-            if (focusMode === 'path') tierAlpha *= lineState.tier === 1 ? 0.72 : 0.64;
+            if (layerFocusMode === 'path') tierAlpha *= lineState.tier === 1 ? 0.72 : 0.64;
             if (lineState.sharedRoute && lineState.tier > 1) tierAlpha += 0.08;
-            var alpha = tierAlpha * lineState.presence;
+            var alpha = tierAlpha * lineState.presence * layerAlpha;
             var baseWidth = lineState.tier === 1
               ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1)
               : lineState.tier === 2
                 ? 0.9
                 : 0.55;
             if (lineState.sharedRoute && lineState.tier > 1) baseWidth += 0.25;
-            ctx.lineWidth = baseWidth * Math.max(0.35, lineState.presence);
+            ctx.lineWidth = baseWidth * Math.max(0.35, lineState.presence) * (0.65 + layerAlpha * 0.35);
             ctx.strokeStyle = lineState.tier === 1 ? 'rgba(148,163,184,' + alpha.toFixed(3) + ')' : 'rgba(100,116,139,' + alpha.toFixed(3) + ')';
             ctx.stroke();
           }
         });
+      }
+
+      if (transition) {
+        var focusLayerProgress = brainEase(transition.progress == null ? 1 : transition.progress);
+        drawBrainFocusedConnections(
+          transition.fromSelectedText || transition.selectedText || relationSelectedText,
+          transition.fromRelations,
+          transition.fromFocusMode || focusMode,
+          1 - focusLayerProgress
+        );
+        drawBrainFocusedConnections(
+          transition.toSelectedText || selectedText || relationSelectedText,
+          transition.toRelations,
+          transition.toFocusMode || focusMode,
+          focusLayerProgress
+        );
+      } else if (relationSelectedText) {
+        drawBrainFocusedConnections(relationSelectedText, selectedLinks, focusMode, 1);
       }
       positions.slice().sort(function (a, b) {
         var aRel = hasFocus && selectedLinks[String(a.term.text || '')];
@@ -3718,6 +3738,7 @@ function renderSystemCronVariant(row) {
       var meshPointer = { x: 0, y: 0, active: false, onTerm: false };
       var lockedFocus = null;
       var currentFocusMode = 'word';
+      var displayedFocus = { label: '', mode: 'word' };
 
       function stopBrainHoverAnimation() {
         if (hoverFrame) {
@@ -3728,7 +3749,17 @@ function renderSystemCronVariant(row) {
 
       function drawBrainMeshCurrent() {
         var transition = currentFocus
-          ? { fromRelations: currentRelations, toRelations: currentRelations, progress: 1, selectedText: currentFocus, focusMode: currentFocusMode }
+          ? {
+            fromRelations: currentRelations,
+            toRelations: currentRelations,
+            progress: 1,
+            selectedText: currentFocus,
+            fromSelectedText: currentFocus,
+            toSelectedText: currentFocus,
+            focusMode: currentFocusMode,
+            fromFocusMode: currentFocusMode,
+            toFocusMode: currentFocusMode,
+          }
           : null;
         drawBrainMeshCanvas(meshCanvas, terms, connections, currentFocus, transition, meshPointer);
       }
@@ -3745,28 +3776,37 @@ function renderSystemCronVariant(row) {
         stopBrainHoverAnimation();
         var fromRelations = currentRelations || {};
         var toRelations = nextFocus ? nextFocus.relations : {};
-        var transitionFocus = nextFocus ? nextFocus.label : currentFocus || '';
+        var fromLabel = displayedFocus.label || currentFocus || '';
+        var fromMode = displayedFocus.mode || currentFocusMode || 'word';
+        var toLabel = nextFocus ? nextFocus.label : '';
+        var toMode = nextFocus ? nextFocus.mode : 'word';
+        var transitionFocus = toLabel || fromLabel;
         var startedAt = performance.now();
         var duration = 420;
         activeHover = nextFocus ? nextFocus.id : '';
+        displayedFocus = { label: toLabel, mode: toMode };
 
         function step(now) {
           var progress = Math.min(1, (now - startedAt) / duration);
           currentRelations = brainDrawState(fromRelations, toRelations, progress);
-          drawBrainMeshCanvas(meshCanvas, terms, connections, nextFocus ? nextFocus.label : '', {
+          drawBrainMeshCanvas(meshCanvas, terms, connections, toLabel, {
             fromRelations: fromRelations,
             toRelations: toRelations,
             progress: progress,
             selectedText: transitionFocus,
-            focusMode: nextFocus ? nextFocus.mode : currentFocusMode,
+            fromSelectedText: fromLabel,
+            toSelectedText: toLabel,
+            focusMode: toMode,
+            fromFocusMode: fromMode,
+            toFocusMode: toMode,
           }, meshPointer);
           if (progress < 1) {
             hoverFrame = requestAnimationFrame(step);
             return;
           }
           hoverFrame = null;
-          currentFocus = nextFocus ? nextFocus.label : '';
-          currentFocusMode = nextFocus ? nextFocus.mode : 'word';
+          currentFocus = toLabel;
+          currentFocusMode = toMode;
           currentRelations = toRelations;
           activeHover = nextFocus ? nextFocus.id : '';
           if (!currentFocus) drawBrainMeshCanvas(meshCanvas, terms, connections, '', null, meshPointer);
