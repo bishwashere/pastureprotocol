@@ -3531,6 +3531,7 @@ function renderSystemCronVariant(row) {
         ? brainDrawState(transition.fromRelations, transition.toRelations, transition.progress)
         : brainRelationMap(relationSelectedText, visibleConnections);
       var baseLineLimit = Math.max(220, Math.min(2600, Math.round((width * height) / 850)));
+      var liveVisualLineInfluences = {};
       visibleConnections.slice(0, baseLineLimit).forEach(function (c) {
         var a = byText[c.from];
         var b = byText[c.to];
@@ -3544,6 +3545,9 @@ function renderSystemCronVariant(row) {
         ctx.stroke();
         var influence = brainLinePointerInfluence(a, b, pointer, connectionKey);
         if (influence > 0) {
+          if (pointer && pointer.active && !pointer.onTerm) {
+            liveVisualLineInfluences[connectionKey] = Math.max(liveVisualLineInfluences[connectionKey] || 0, influence);
+          }
           ctx.beginPath();
           brainDrawConnectionPath(ctx, a, b, connectionKey);
           ctx.lineWidth = 0.9 + influence * 1.8;
@@ -3565,12 +3569,17 @@ function renderSystemCronVariant(row) {
             var b = byText[c.to];
             if (!a || !b) return;
             var level = brainEdgeLevel(c.strength);
+            var connectionKey = brainConnectionKey(c);
             ctx.beginPath();
-            brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
+            brainDrawConnectionPath(ctx, a, b, connectionKey);
             var tierAlpha = lineState.tier === 1 ? 0.76 : lineState.tier === 2 ? 0.42 : 0.2;
             if (layerFocusMode === 'path') tierAlpha *= lineState.tier === 1 ? 0.72 : 0.64;
             if (lineState.sharedRoute && lineState.tier > 1) tierAlpha += 0.08;
             var alpha = tierAlpha * lineState.presence * layerAlpha;
+            if (pointer && pointer.active && !pointer.onTerm && layerFocusMode === 'path') {
+              var focusInfluence = Math.min(1, alpha * 1.35 + (lineState.tier === 1 ? 0.24 : 0));
+              liveVisualLineInfluences[connectionKey] = Math.max(liveVisualLineInfluences[connectionKey] || 0, focusInfluence);
+            }
             var baseWidth = lineState.tier === 1
               ? (level === 'strong' ? 2.5 : level === 'medium' ? 1.7 : 1.1)
               : lineState.tier === 2
@@ -3600,6 +3609,9 @@ function renderSystemCronVariant(row) {
         );
       } else if (relationSelectedText) {
         drawBrainFocusedConnections(relationSelectedText, selectedLinks, focusMode, 1);
+      }
+      if (pointer && pointer.active && !pointer.onTerm && Object.keys(liveVisualLineInfluences).length) {
+        pointer.lastVisualLineInfluences = liveVisualLineInfluences;
       }
       positions.slice().sort(function (a, b) {
         var aRel = hasFocus && selectedLinks[String(a.term.text || '')];
@@ -3754,8 +3766,9 @@ function renderSystemCronVariant(row) {
         onTerm: false,
         lineInfluences: {},
         fadingLineInfluences: {},
+        lastVisualLineInfluences: {},
         lineFadeStartedAt: 0,
-        lineFadeDuration: 420,
+        lineFadeDuration: 560,
       };
       var lockedFocus = null;
       var currentFocusMode = 'word';
@@ -3819,11 +3832,16 @@ function renderSystemCronVariant(row) {
         return map;
       }
 
-      function updateBrainPointerLineInfluences(onTerm) {
+      function updateBrainPointerLineInfluences(wasOnTerm, onTerm) {
         if (onTerm) {
-          if (meshPointer.lineInfluences && Object.keys(meshPointer.lineInfluences).length) {
-            meshPointer.fadingLineInfluences = Object.assign({}, meshPointer.lineInfluences);
-            meshPointer.lineFadeStartedAt = performance.now();
+          if (!wasOnTerm) {
+            var visualInfluences = meshPointer.lastVisualLineInfluences || {};
+            var liveInfluences = meshPointer.lineInfluences || {};
+            var fadeSource = Object.keys(visualInfluences).length ? visualInfluences : liveInfluences;
+            if (fadeSource && Object.keys(fadeSource).length) {
+              meshPointer.fadingLineInfluences = Object.assign({}, fadeSource);
+              meshPointer.lineFadeStartedAt = performance.now();
+            }
           }
           meshPointer.lineInfluences = {};
           return;
@@ -3893,8 +3911,9 @@ function renderSystemCronVariant(row) {
 
       function focusTargetAtPointer() {
         var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
+        var wasOnTerm = meshPointer.onTerm;
         meshPointer.onTerm = !!selected;
-        updateBrainPointerLineInfluences(meshPointer.onTerm);
+        updateBrainPointerLineInfluences(wasOnTerm, meshPointer.onTerm);
         return selected
           ? brainTermFocus(selected)
           : brainConnectionFocus(nearestBrainMeshConnection(meshCanvas, meshPointer.x, meshPointer.y));
