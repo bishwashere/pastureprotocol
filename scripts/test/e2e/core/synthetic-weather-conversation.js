@@ -270,9 +270,41 @@ function runTurn(message, stateDir) {
     }, TIMEOUT_MS);
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
+    let stdoutLineBuffer = '';
+    let suppressE2EReply = false;
+    function shouldHideHarnessLine(line) {
+      const trimmed = line.trim();
+      if (trimmed.includes('E2E_REPLY_START')) {
+        suppressE2EReply = true;
+        return true;
+      }
+      if (trimmed.includes('E2E_REPLY_END')) {
+        suppressE2EReply = false;
+        return true;
+      }
+      if (suppressE2EReply) return true;
+      if (trimmed.includes('E2E_SKILLS_CALLED:')) return true;
+      if (trimmed.includes('] [test] ') || trimmed.startsWith('[test] ')) return true;
+      return false;
+    }
+    function writeLiveStdout(chunk) {
+      stdoutLineBuffer += chunk;
+      let newlineIndex = stdoutLineBuffer.indexOf('\n');
+      while (newlineIndex >= 0) {
+        const line = stdoutLineBuffer.slice(0, newlineIndex + 1);
+        stdoutLineBuffer = stdoutLineBuffer.slice(newlineIndex + 1);
+        if (!shouldHideHarnessLine(line)) process.stdout.write(line);
+        newlineIndex = stdoutLineBuffer.indexOf('\n');
+      }
+    }
+    function flushLiveStdout() {
+      if (!stdoutLineBuffer) return;
+      if (!shouldHideHarnessLine(stdoutLineBuffer)) process.stdout.write(stdoutLineBuffer);
+      stdoutLineBuffer = '';
+    }
     child.stdout.on('data', (chunk) => {
       stdout += chunk;
-      process.stdout.write(chunk);
+      writeLiveStdout(chunk);
     });
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
@@ -284,6 +316,7 @@ function runTurn(message, stateDir) {
     });
     child.on('close', (code) => {
       clearTimeout(timeout);
+      flushLiveStdout();
       const start = stdout.indexOf('E2E_REPLY_START');
       const end = stdout.indexOf('E2E_REPLY_END');
       if (start === -1 || end === -1 || end <= start) {
@@ -313,15 +346,10 @@ async function main() {
   const fakeLlm = await startFakeLlmServer(`http://127.0.0.1:${weather.port}`);
   const stateDir = createStateDir(fakeLlm.port);
   try {
-    console.log('SYNTHETIC_WEATHER_CONVERSATION_START');
-    console.log('STATE_DIR', stateDir, KEEP_STATE ? '(kept)' : '(temporary)');
     for (let i = 0; i < TURNS.length; i += 1) {
       const user = TURNS[i];
-      console.log('');
-      console.log(`[TEST TURN ${i + 1}] injecting message: ${user}`);
       await runTurn(user, stateDir);
     }
-    console.log('\nSYNTHETIC_WEATHER_CONVERSATION_END');
   } finally {
     fakeLlm.server.close();
     weather.server.close();
