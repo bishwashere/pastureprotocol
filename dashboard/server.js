@@ -1909,7 +1909,7 @@ app.get('/api/workspace-logs/:key', (req, res) => {
 const BRAIN_LLM_CHUNK_CHARS = 45_000;
 const BRAIN_LLM_CHUNK_OVERLAP_CHARS = 3_000;
 const BRAIN_LLM_CACHE_VERSION = 10;
-const BRAIN_RESPONSE_CACHE_VERSION = 8;
+const BRAIN_RESPONSE_CACHE_VERSION = 9;
 const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_INPUT_BYTES = 180 * 1024 * 1024;
 const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 96 * 1024 * 1024;
@@ -2712,21 +2712,10 @@ function brainResponseCacheKey({ chunks }) {
   }));
 }
 
-const BRAIN_BLOCKED_TERM_TEXT = new Set([
-  ...BRAIN_INPUT_STOP_WORDS,
-  'user', 'assistant', 'system', 'human', 'message', 'messages',
-  'chat', 'conversation', 'conversations', 'reply', 'response',
-]);
-
 function normalizeBrainDisplayKey(text) {
   const normalized = String(text || '').trim().replace(/\s+/g, ' ');
   if (!normalized) return '';
-  const words = normalized.split(' ').filter(Boolean);
-  const lower = normalized.toLowerCase();
-  if (words.length > 4) return '';
-  if (BRAIN_BLOCKED_TERM_TEXT.has(lower)) return '';
-  if (words.every((word) => BRAIN_BLOCKED_TERM_TEXT.has(word.toLowerCase()))) return '';
-  return lower;
+  return normalized.toLowerCase();
 }
 
 function mergeBrainSources(target, sources) {
