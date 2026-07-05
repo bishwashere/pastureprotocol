@@ -124,7 +124,7 @@ Return this exact JSON shape:
   "githubSourceIntent": false,
   "taskFrameAction": "none | new | update | close | replace",
   "taskFrameSeedPolicy": "accept_candidate | revise_candidate | reject_candidate",
-  "taskFrameStatusHint": "continue | completed | blocked | mismatch",
+  "taskFrameStatusHint": "continue | completed | blocked | mismatch | waiting_user",
   "taskFrame": {
     "kind": "repo_work | project_work | feature_work | debugging | general_task",
     "title": "",

@@ -34,6 +34,8 @@ async function main() {
   assert(prompt.includes('continue_fast'), 'prompt documents continue_fast action');
   assert(prompt.includes('continue_replan'), 'prompt documents continue_replan action');
   assert(prompt.includes('new_candidate'), 'prompt documents new_candidate action');
+  assert(prompt.includes('mustUseTool'), 'prompt documents mustUseTool');
+  assert(prompt.includes('resemblance'), 'prompt documents resemblance');
   assert(prompt.includes('fall back to the normal turn pipeline'), 'prompt documents fallback behavior');
   assert(prompt.includes('toolProfile'), 'prompt documents tool profile');
 
@@ -46,6 +48,8 @@ async function main() {
     llmChat: async () => JSON.stringify({
       action: 'new_candidate',
       confidence: 0.91,
+      mustUseTool: true,
+      resemblance: 'none',
       kind: 'repo_work',
       title: 'Clone my-work-list',
       objective: 'Clone and inspect my-work-list',
@@ -73,6 +77,8 @@ async function main() {
     llmChat: async () => JSON.stringify({
       action: 'continue_fast',
       confidence: 0.89,
+      mustUseTool: true,
+      resemblance: 'strong',
       kind: 'repo_work',
       title: 'Clone my-work-list',
       objective: 'Inspect my-work-list',
@@ -103,6 +109,20 @@ async function main() {
   const closed = clearTaskFrame(logKey, { reason: 'user exited' });
   assert(closed.status === 'closed', 'frame closes');
   assert(getActiveTaskFrame(logKey) === null, 'closed frame is not active');
+
+  const { classifyTaskFrameStatusAfterTurn } = await import('../../../../lib/context/task-frame.js');
+  const status = await classifyTaskFrameStatusAfterTurn({
+    frame,
+    userText: 'is it done?',
+    assistantText: 'Yes, the requested repo inspection is complete.',
+    skillsCalled: ['go-read'],
+    llmChat: async () => JSON.stringify({
+      status: 'completed',
+      confidence: 0.91,
+      reason: 'Assistant reported completion.',
+    }),
+  });
+  assert(status.status === 'completed', 'post-turn status classifier returns completed');
 
   console.log('task-frame tests passed');
 }

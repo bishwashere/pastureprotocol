@@ -42,6 +42,7 @@ async function main() {
       projectOrMissionIntent: 'continue',
       githubSourceIntent: false,
       taskFrameAction: 'update',
+      taskFrameSeedPolicy: 'reject_candidate',
       taskFrameStatusHint: 'continue',
       taskFrame: {
         kind: 'repo_work',
@@ -62,6 +63,7 @@ async function main() {
   assert(implementationPlan.mode === 'code', 'implementation plan remains code mode');
   assert(implementationPlan.mustUseTool === true, 'mustUseTool is preserved');
   assert(implementationPlan.fallbackToolPolicy === 'active_frame_profile', 'fallback policy is preserved');
+  assert(implementationPlan.taskFrameSeedPolicy === 'reject_candidate', 'seed policy is preserved');
   assert(implementationPlan.skills.includes('write'), 'write skill preserved');
   assert(implementationPlan.skills.includes('apply-patch'), 'apply-patch skill preserved');
   assert(!implementationPlan.skills.includes('not-enabled'), 'hallucinated skills are filtered');
@@ -93,7 +95,8 @@ async function main() {
       fallbackToolPolicy: 'active_frame_profile',
       projectOrMissionIntent: 'continue',
       githubSourceIntent: false,
-      taskFrameAction: 'none',
+      taskFrameAction: 'replace',
+      taskFrameSeedPolicy: 'revise_candidate',
       taskFrameStatusHint: 'continue',
       taskFrame: {},
       plan: 'Delegate through agent-send and preserve project workflow state.',
@@ -105,6 +108,8 @@ async function main() {
     'durable delegation coerces execution mode');
   assert(delegatedPlan.mustUseTool === true, 'delegation forces mustUseTool');
   assert(delegatedPlan.delegationAction === 'delegate', 'delegation action is preserved');
+  assert(delegatedPlan.taskFrameAction === 'replace', 'replace action is preserved');
+  assert(delegatedPlan.taskFrameSeedPolicy === 'revise_candidate', 'candidate seed policy is preserved');
   assert(delegatedPlan.skills.includes('agent-send'), 'delegation forces agent-send when available');
   assert(delegatedPlan.skills.includes('project-workflow'), 'durable work forces project-workflow when available');
   assert(delegatedPlan.needsDelegation === true && delegatedPlan.targetAgentId === 'builder',
