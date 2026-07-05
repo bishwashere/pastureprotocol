@@ -19,7 +19,12 @@ Read the latest user message and the current mode. Decide one of:
 
 Be **conservative**: only return `enable` or `disable` when the user is clearly directing the agent to switch modes. Casual mentions of work, team, mode, etc. in other contexts are `no_change`.
 
-Also be **idempotent-aware**: if the current mode is already `multi` and the user asks to enable it again, return `enable` (the caller handles deduplication). Same for `disable` when already `single`.
+Be **stateful**:
+
+- If `currentMode` is `single`, only look for a strong request to turn work mode ON; otherwise return `no_change`.
+- If `currentMode` is `multi`, treat multi-agent work as already active and sticky for the session. Do not re-decide whether work mode should continue. Only return `disable` for a strong request to turn work mode OFF; otherwise return `no_change`.
+- Do not return `enable` when `currentMode` is already `multi`.
+- Do not return `disable` when `currentMode` is already `single`.
 
 ## Input shape
 
@@ -97,4 +102,13 @@ Input:
 Output:
 ```json
 { "toggle": "no_change", "reason": "Task within work mode; not a request to leave it." }
+```
+
+Input:
+```json
+{ "currentMode": "multi", "userText": "go ahead and implement it" }
+```
+Output:
+```json
+{ "toggle": "no_change", "reason": "Work mode is already active; this is a normal task continuation." }
 ```

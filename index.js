@@ -97,6 +97,15 @@ import {
   prepareWorkDurabilityWithAi,
 } from './lib/context/work-durability.js';
 import { buildGithubSourceIntentPlan } from './lib/context/github-context.js';
+import {
+  classifyTaskFrameTurn,
+  clearTaskFrame,
+  shouldUseTaskFrameFastPath,
+  taskFrameDecisionToTurnRoute,
+  taskFrameToSystemBlock,
+  updateTaskFrameAfterTurn,
+  upsertTaskFrame,
+} from './lib/context/task-frame.js';
 import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/agent/user-facing-reply.js';
 import { toLogJid, getOwnerLogJid } from './lib/util/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/channels/telegram-private-handler.js';
@@ -1321,6 +1330,97 @@ async function main() {
       if (teamProjects.length === 1) focusedProject = teamProjects[0];
     }
     const focusedProjectTeamId = getProjectTeamId(focusedProject);
+    const taskFrameRouting = !isGroupJid
+      ? await traceAsyncStep('task_frame', () => classifyTaskFrameTurn({
+          logKey: sessionLogKey,
+          userText: text,
+          historyMessages,
+          availableSkillIds: enabledSkillIds,
+          availableSkillSummaries: enabledSkillSummaries,
+          agentId,
+        }))
+      : null;
+    const taskFrameDecision = taskFrameRouting?.decision || null;
+    let activeTaskFrame = taskFrameRouting?.activeFrame || null;
+    let taskFrameFastPath = false;
+    let taskFrameRoute = null;
+    if (taskFrameDecision) {
+      console.log('[task-frame]', JSON.stringify({
+        action: taskFrameDecision.action,
+        confidence: taskFrameDecision.confidence,
+        kind: taskFrameDecision.kind,
+        title: taskFrameDecision.title || '',
+        activeFrameId: activeTaskFrame?.id || '',
+        tools: taskFrameDecision.toolProfile || [],
+      }));
+      logTeamActivity({
+        type: 'task_frame_decision',
+        agentId,
+        status: taskFrameDecision.action,
+        jid,
+        message: taskFrameDecision.reason || taskFrameDecision.plan || '',
+        details: {
+          confidence: taskFrameDecision.confidence,
+          kind: taskFrameDecision.kind,
+          title: taskFrameDecision.title,
+          activeFrameId: activeTaskFrame?.id || '',
+          toolProfile: taskFrameDecision.toolProfile || [],
+        },
+      });
+    }
+    if (taskFrameDecision?.action === 'exit' && taskFrameDecision.confidence >= 0.72) {
+      const closed = clearTaskFrame(sessionLogKey, { reason: taskFrameDecision.reason || 'user_exit' });
+      activeTaskFrame = null;
+      console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: taskFrameDecision.reason || '' }));
+      logTeamActivity({
+        type: 'task_frame_closed',
+        agentId,
+        status: 'closed',
+        jid,
+        message: taskFrameDecision.reason || 'Task frame closed.',
+        details: { frameId: closed?.id || '' },
+      });
+    } else if (taskFrameDecision?.action === 'new' && taskFrameDecision.confidence >= 0.72) {
+      activeTaskFrame = upsertTaskFrame(sessionLogKey, taskFrameDecision, activeTaskFrame, { userText: text });
+      console.log('[task-frame] created', JSON.stringify({
+        frameId: activeTaskFrame?.id || '',
+        kind: activeTaskFrame?.kind || '',
+        skills: activeTaskFrame?.toolProfile || [],
+      }));
+      logTeamActivity({
+        type: 'task_frame_created',
+        agentId,
+        status: 'active',
+        jid,
+        message: activeTaskFrame?.objective || activeTaskFrame?.title || 'Task frame created.',
+        details: {
+          frameId: activeTaskFrame?.id || '',
+          kind: activeTaskFrame?.kind || '',
+          toolProfile: activeTaskFrame?.toolProfile || [],
+        },
+      });
+    } else if (shouldUseTaskFrameFastPath(taskFrameDecision)) {
+      activeTaskFrame = upsertTaskFrame(sessionLogKey, taskFrameDecision, activeTaskFrame, { userText: text });
+      taskFrameRoute = taskFrameDecisionToTurnRoute(taskFrameDecision, activeTaskFrame);
+      taskFrameFastPath = !!taskFrameRoute;
+      console.log('[task-frame] fast-path', JSON.stringify({
+        frameId: activeTaskFrame?.id || '',
+        kind: activeTaskFrame?.kind || '',
+        skills: taskFrameRoute?.skills || [],
+      }));
+      logTeamActivity({
+        type: 'task_frame_fast_path',
+        agentId,
+        status: taskFrameDecision.action,
+        jid,
+        message: activeTaskFrame?.objective || activeTaskFrame?.title || 'Using active task frame.',
+        details: {
+          frameId: activeTaskFrame?.id || '',
+          kind: activeTaskFrame?.kind || '',
+          toolProfile: taskFrameRoute?.skills || [],
+        },
+      });
+    }
     // Step 1.5: classify work-mode for this turn (LLM, MD-driven).
     //
     // Two-tier gating:
@@ -1339,7 +1439,9 @@ async function main() {
     // Group chats are always single-mode (group flows skip multi-agent today).
     let workModeAck = null;
     let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
-    if (!isGroupJid) {
+    if (taskFrameFastPath) {
+      console.log('[work-mode]', JSON.stringify({ mode: workMode, skipped: 'task_frame_fast_path' }));
+    } else if (!isGroupJid) {
       const wm = await traceAsyncStep('work_mode', () => resolveWorkModeForTurn({
         userText: text,
         logKey: sessionLogKey,
@@ -1360,8 +1462,8 @@ async function main() {
         }
       }
     }
-    const isMultiAgent = !isGroupJid && workMode === 'multi' && !!focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId;
-    const teamGateReply = !isGroupJid && workMode === 'multi' && !workModeAck && !isNonTaskMessage(text) && !isMultiAgent
+    const isMultiAgent = !taskFrameFastPath && !isGroupJid && workMode === 'multi' && !!focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId;
+    const teamGateReply = !taskFrameFastPath && !isGroupJid && workMode === 'multi' && !workModeAck && !isNonTaskMessage(text) && !isMultiAgent
       ? buildProjectTeamGateReply({
           agentId,
           agentTeamId: activeAgentTeamId,
@@ -1369,7 +1471,7 @@ async function main() {
           focusedProjectTeamId,
         })
       : '';
-    if (!isGroupJid && workMode === 'multi' && !isMultiAgent) {
+    if (!taskFrameFastPath && !isGroupJid && workMode === 'multi' && !isMultiAgent) {
       console.log('[team-gate]', JSON.stringify({
         mode: teamGateReply ? 'blocked' : 'single',
         reason: focusedProjectTeamId ? 'agent_not_on_project_team' : 'no_project_team',
@@ -1532,7 +1634,7 @@ async function main() {
       skills: selfInspectionPlan.skills,
       target: selfInspection?.target || '',
     }));
-    const turnRoute = presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
+    const turnRoute = taskFrameRoute || presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
       ? await traceAsyncStep('turn_router', () => routeTurn({
           userText: text,
           historyMessages,
@@ -1578,6 +1680,9 @@ async function main() {
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = turnRouteToSystemBlock(turnRoute);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    if (taskFrameFastPath && activeTaskFrame) {
+      systemPromptWithPlan += taskFrameToSystemBlock(activeTaskFrame, taskFrameDecision);
+    }
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     if (!isGroupJid) {
       // durability block is null-safe when durabilityDecision is null
@@ -1689,6 +1794,29 @@ async function main() {
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
+    if (taskFrameFastPath && activeTaskFrame) {
+      const updatedFrame = updateTaskFrameAfterTurn(sessionLogKey, {
+        userText: text,
+        assistantText: rawTextToSend,
+        skillsCalled: skillsCalledFromTurn,
+      });
+      console.log('[task-frame] updated', JSON.stringify({
+        frameId: updatedFrame?.id || activeTaskFrame.id || '',
+        status: updatedFrame?.status || activeTaskFrame.status || '',
+        skillsCalled: skillsCalledFromTurn,
+      }));
+      logTeamActivity({
+        type: 'task_frame_update',
+        agentId,
+        status: updatedFrame?.status || activeTaskFrame.status || 'active',
+        jid,
+        message: updatedFrame?.objective || activeTaskFrame.objective || activeTaskFrame.title || 'Task frame updated.',
+        details: {
+          frameId: updatedFrame?.id || activeTaskFrame.id || '',
+          skillsCalled: skillsCalledFromTurn,
+        },
+      });
+    }
     const healthNote = !isGroupJid ? getPendingHealthFlags() : '';
     if (healthNote && rawTextToSend) rawTextToSend = healthNote + '\n\n' + rawTextToSend;
     // If the user toggled work mode this turn, surface the acknowledgement

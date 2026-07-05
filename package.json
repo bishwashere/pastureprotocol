@@ -116,6 +116,7 @@
     "test:workspace-path": "node scripts/test/unit/core/test-workspace-path.js",
     "test:work-durability": "node scripts/test/unit/agent/test-work-durability.js",
     "test:work-mode": "node scripts/test/unit/agent/test-work-mode.js",
+    "test:task-frame": "node scripts/test/unit/agent/test-task-frame.js",
     "test:self-inspection": "node scripts/test/unit/agent/test-self-inspection.js",
     "test:identity-sync": "node scripts/test/unit/agent/test-identity-sync.js",
     "test:dashboard-url": "node scripts/test/unit/dashboard/test-dashboard-url.js",

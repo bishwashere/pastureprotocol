@@ -79,6 +79,10 @@ async function main() {
   const prompt = loadPrompt('work-mode-classifier');
   assert(prompt.length > 100, 'work-mode-classifier MD should be non-trivial');
   assert(/single/i.test(prompt) && /multi/i.test(prompt), 'MD must define both modes');
+  assert(prompt.includes('Do not return `enable` when `currentMode` is already `multi`'),
+    'prompt must not re-enable already-active multi mode');
+  assert(prompt.includes('Only return `disable` for a strong request to turn work mode OFF'),
+    'prompt must keep multi mode sticky until a strong off request');
 
   // ── 3. md-llm: runMdPrompt strips code fences and parses JSON ──────────────
   const fencedReply = '```json\n{ "toggle": "enable", "reason": "fenced" }\n```';
@@ -134,6 +138,22 @@ async function main() {
     llmChat: async () => '{"toggle":"banana","reason":"weird"}',
   });
   assert(invalidToggle && invalidToggle.toggle === 'no_change', 'invalid toggle coerces to no_change');
+
+  const redundantEnable = await classifyWorkModeToggle({
+    userText: 'continue the feature work',
+    currentMode: 'multi',
+    llmChat: async () => '{"toggle":"enable","reason":"bad re-enable"}',
+  });
+  assert(redundantEnable && redundantEnable.toggle === 'no_change',
+    'multi mode must not be re-enabled every turn');
+
+  const redundantDisable = await classifyWorkModeToggle({
+    userText: 'normal chat please',
+    currentMode: 'single',
+    llmChat: async () => '{"toggle":"disable","reason":"bad disable"}',
+  });
+  assert(redundantDisable && redundantDisable.toggle === 'no_change',
+    'single mode must not be disabled again');
 
   // ── 8. classifyWorkModeToggle: LLM throw → null ────────────────────────────
   const thrown = await classifyWorkModeToggle({
