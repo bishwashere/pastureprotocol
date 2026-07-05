@@ -3449,12 +3449,24 @@ function renderSystemCronVariant(row) {
     }
 
     function brainLinePointerInfluence(a, b, pointer, key) {
-      if (!pointer || !pointer.active || pointer.onTerm || !a || !b) return 0;
-      var closest = brainDistanceToCurve(pointer.x, pointer.y, a, b, key);
+      if (!pointer || !a || !b) return 0;
       var radius = 46;
-      if (closest >= radius) return 0;
-      var closeness = 1 - closest / radius;
-      return closeness * closeness;
+      var influence = 0;
+      if (pointer.active && !pointer.onTerm) {
+        var closest = brainDistanceToCurve(pointer.x, pointer.y, a, b, key);
+        if (closest < radius) {
+          var closeness = 1 - closest / radius;
+          influence = closeness * closeness;
+        }
+      }
+      var fadingInfluence = pointer.fadingLineInfluences && pointer.fadingLineInfluences[key];
+      if (fadingInfluence && pointer.lineFadeStartedAt) {
+        var elapsed = performance.now() - pointer.lineFadeStartedAt;
+        var duration = pointer.lineFadeDuration || 420;
+        var fade = elapsed >= duration ? 0 : 1 - brainEase(elapsed / duration);
+        influence = Math.max(influence, fadingInfluence * fade);
+      }
+      return influence;
     }
 
     function brainDistanceToCurve(px, py, a, b, key) {
@@ -3735,7 +3747,16 @@ function renderSystemCronVariant(row) {
       var currentRelations = {};
       var hoverFrame = null;
       var pointerFrame = null;
-      var meshPointer = { x: 0, y: 0, active: false, onTerm: false };
+      var meshPointer = {
+        x: 0,
+        y: 0,
+        active: false,
+        onTerm: false,
+        lineInfluences: {},
+        fadingLineInfluences: {},
+        lineFadeStartedAt: 0,
+        lineFadeDuration: 420,
+      };
       var lockedFocus = null;
       var currentFocusMode = 'word';
       var displayedFocus = { label: '', mode: 'word' };
@@ -3769,7 +3790,45 @@ function renderSystemCronVariant(row) {
         pointerFrame = requestAnimationFrame(function () {
           pointerFrame = null;
           drawBrainMeshCurrent();
+          if (brainPointerLineFadeActive()) scheduleBrainPointerDraw();
         });
+      }
+
+      function brainPointerLineFadeActive() {
+        return !!(meshPointer.lineFadeStartedAt &&
+          performance.now() - meshPointer.lineFadeStartedAt < meshPointer.lineFadeDuration);
+      }
+
+      function brainPointerLineInfluenceMap() {
+        var map = {};
+        if (!meshPointer.active || !meshCanvas) return map;
+        var visible = meshCanvas._brainMeshVisibleConnections || [];
+        var byText = meshCanvas._brainMeshPositionByText || {};
+        var radius = 46;
+        visible.forEach(function (c) {
+          var a = byText[c.from];
+          var b = byText[c.to];
+          if (!a || !b) return;
+          var key = brainConnectionKey(c);
+          var closest = brainDistanceToCurve(meshPointer.x, meshPointer.y, a, b, key);
+          if (closest >= radius) return;
+          var closeness = 1 - closest / radius;
+          var influence = closeness * closeness;
+          if (influence > 0.015) map[key] = influence;
+        });
+        return map;
+      }
+
+      function updateBrainPointerLineInfluences(onTerm) {
+        if (onTerm) {
+          if (meshPointer.lineInfluences && Object.keys(meshPointer.lineInfluences).length) {
+            meshPointer.fadingLineInfluences = Object.assign({}, meshPointer.lineInfluences);
+            meshPointer.lineFadeStartedAt = performance.now();
+          }
+          meshPointer.lineInfluences = {};
+          return;
+        }
+        meshPointer.lineInfluences = brainPointerLineInfluenceMap();
       }
 
       function animateBrainHover(nextFocus) {
@@ -3835,6 +3894,7 @@ function renderSystemCronVariant(row) {
       function focusTargetAtPointer() {
         var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
         meshPointer.onTerm = !!selected;
+        updateBrainPointerLineInfluences(meshPointer.onTerm);
         return selected
           ? brainTermFocus(selected)
           : brainConnectionFocus(nearestBrainMeshConnection(meshCanvas, meshPointer.x, meshPointer.y));
