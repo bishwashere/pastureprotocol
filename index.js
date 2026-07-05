@@ -643,7 +643,7 @@ async function main() {
   }
 
   function logReplySeparator() {
-    logFlow(FLOW_STEP.REPLY, '------------------------------');
+    console.log('[END CYCLE] ========================================');
   }
 
   function clearInMemoryHistoryForJids(...jids) {
@@ -2184,11 +2184,11 @@ async function main() {
             }
           }
         }
-        logFlow(FLOW_STEP.REPLY, '[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
-        const partialLen = 300;
-        logFlow(FLOW_STEP.REPLY, '[replied] answer (partial):', (replyText || '').slice(0, partialLen) + ((replyText || '').length > partialLen ? '…' : ''));
+        logFlow(FLOW_STEP.REPLY, 'type:', toolsForRequest.length > 0 ? 'agent + skills' : 'chat');
+        const replyLogLen = 1200;
+        logFlow(FLOW_STEP.REPLY, 'reply:', (replyText || '').slice(0, replyLogLen) + ((replyText || '').length > replyLogLen ? '…' : ''));
         if (Array.isArray(skillsCalled) && skillsCalled.length > 0) {
-          logFlow(FLOW_STEP.SKILLS, '[replied] skills called:', skillsCalled.join(', '));
+          logFlow(FLOW_STEP.SKILLS, 'skills called:', skillsCalled.join(', '));
         }
         logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
@@ -2210,10 +2210,10 @@ async function main() {
         const errMsg = getErrorMessageForLog(sendErr);
         if (!isTelegramChatId(jid)) {
           pendingReplies.push({ jid, text: replyText });
-          logFlow(FLOW_STEP.REPLY, '[replied] queued (send failed, will retry after reconnect):', errMsg);
+          logFlow(FLOW_STEP.REPLY, 'queued (send failed, will retry after reconnect):', errMsg);
         } else {
           addPendingTelegram(jid, replyText);
-          logFlow(FLOW_STEP.REPLY, '[replied] Telegram queued (send failed, will retry on next message):', errMsg);
+          logFlow(FLOW_STEP.REPLY, 'Telegram queued (send failed, will retry on next message):', errMsg);
         }
         logReplySeparator();
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);

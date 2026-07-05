@@ -9,7 +9,7 @@
 
 import { createServer } from 'http';
 import { spawn } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const TIMEOUT_MS = 90_000;
 const TEST_JID = 'synthetic-weather@s.whatsapp.net';
+const KEEP_STATE = process.argv.includes('--keep-state');
 
 const TURNS = [
   "What's the weather in Enola today?",
@@ -269,8 +270,14 @@ function runTurn(message, stateDir) {
     }, TIMEOUT_MS);
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
     child.on('error', (err) => {
       clearTimeout(timeout);
       reject(err);
@@ -301,42 +308,26 @@ function runTurn(message, stateDir) {
   });
 }
 
-function interestingLogLines(stdout) {
-  return stdout
-    .split('\n')
-    .filter((line) =>
-      line.includes('[USER]') ||
-      line.includes('[AGENT]') ||
-      /\[(\d+ [A-Z ]+)\]/.test(line) ||
-      /\[LLM\]/.test(line) ||
-      /E2E_SKILLS_CALLED|E2E_REPLY_START|E2E_REPLY_END/.test(line)
-    )
-    .filter((line) => !line.includes('E2E_REPLY_START') && !line.includes('E2E_REPLY_END'));
-}
-
 async function main() {
   const weather = await startWeatherServer();
   const fakeLlm = await startFakeLlmServer(`http://127.0.0.1:${weather.port}`);
   const stateDir = createStateDir(fakeLlm.port);
   try {
     console.log('SYNTHETIC_WEATHER_CONVERSATION_START');
-    console.log('STATE_DIR', stateDir);
+    console.log('STATE_DIR', stateDir, KEEP_STATE ? '(kept)' : '(temporary)');
     for (let i = 0; i < TURNS.length; i += 1) {
       const user = TURNS[i];
-      const result = await runTurn(user, stateDir);
-      console.log(`\nTURN ${i + 1}`);
-      console.log('USER:', user);
-      console.log('REPLY:', result.reply);
-      console.log('SKILLS:', result.skillsCalled.join(',') || '(none)');
-      console.log('LOGS:');
-      for (const line of interestingLogLines(result.stdout).slice(0, 80)) {
-        console.log(line);
-      }
+      console.log('');
+      console.log(`[TEST TURN ${i + 1}] injecting message: ${user}`);
+      await runTurn(user, stateDir);
     }
     console.log('\nSYNTHETIC_WEATHER_CONVERSATION_END');
   } finally {
     fakeLlm.server.close();
     weather.server.close();
+    if (!KEEP_STATE && stateDir.includes('pasture-weather-convo-')) {
+      rmSync(stateDir, { recursive: true, force: true });
+    }
   }
 }
 
