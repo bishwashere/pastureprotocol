@@ -31,7 +31,9 @@ async function main() {
   } = await import('../../../../lib/context/task-frame.js');
 
   const prompt = loadPrompt('task-frame-router');
-  assert(prompt.includes('continue'), 'prompt documents continue action');
+  assert(prompt.includes('continue_fast'), 'prompt documents continue_fast action');
+  assert(prompt.includes('continue_replan'), 'prompt documents continue_replan action');
+  assert(prompt.includes('new_candidate'), 'prompt documents new_candidate action');
   assert(prompt.includes('fall back to the normal turn pipeline'), 'prompt documents fallback behavior');
   assert(prompt.includes('toolProfile'), 'prompt documents tool profile');
 
@@ -42,7 +44,7 @@ async function main() {
     availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search'],
     availableSkillSummaries: [],
     llmChat: async () => JSON.stringify({
-      action: 'new',
+      action: 'new_candidate',
       confidence: 0.91,
       kind: 'repo_work',
       title: 'Clone my-work-list',
@@ -55,9 +57,9 @@ async function main() {
       reason: 'Concrete repo work request.',
     }),
   });
-  assert(first.decision.action === 'new', 'new frame decision preserved');
+  assert(first.decision.action === 'new_candidate', 'new frame candidate decision preserved');
   assert(first.decision.toolProfile.join(',') === 'read,go-read,write,apply-patch', 'tool profile filtered to enabled skills');
-  assert(!shouldUseTaskFrameFastPath(first.decision), 'new frame does not skip the normal first-turn pipeline');
+  assert(!shouldUseTaskFrameFastPath(first.decision), 'new candidate does not skip the normal first-turn pipeline');
 
   const frame = upsertTaskFrame(logKey, first.decision, first.activeFrame, { userText: 'clone this repo and inspect it' });
   assert(frame && frame.status === 'active', 'frame stored as active');
@@ -69,7 +71,7 @@ async function main() {
     availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search'],
     availableSkillSummaries: [],
     llmChat: async () => JSON.stringify({
-      action: 'continue',
+      action: 'continue_fast',
       confidence: 0.89,
       kind: 'repo_work',
       title: 'Clone my-work-list',
@@ -87,6 +89,7 @@ async function main() {
 
   const route = taskFrameDecisionToTurnRoute(cont.decision, frame);
   assert(route.mode === 'code', 'repo frame routes as code');
+  assert(route.mustUseTool === true, 'fast path route requires a tool');
   assert(route.skills.includes('apply-patch'), 'route uses stored frame tools');
   assert(taskFrameToSystemBlock(frame, cont.decision).includes('Active Task Frame'), 'system block is generated');
 

@@ -29,12 +29,14 @@ import { loadConfig, chat as llmChat, isDailyLimitReached, msUntilLimitResets } 
 import { runAgentTurn, stripThinking } from './lib/agent/agent.js';
 import { runInternalAgentTurn } from './lib/agent/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent/agent-context-state.js';
-import { routeTurn, turnRouteToSystemBlock, buildCasualChatTurnRoute } from './lib/agent/turn-router.js';
-import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from './lib/agent/turn-intent.js';
-import { classifySelfInspection, buildSelfInspectionIntentPlan } from './lib/agent/self-inspection.js';
-import { isNonTaskMessage } from './lib/agent/evaluate-team-capability.js';
+import { turnRouteToSystemBlock } from './lib/agent/turn-router.js';
+import {
+  planUnifiedTurn,
+  unifiedPlanToDelegationContext,
+  unifiedPlanToDurabilityDecision,
+  unifiedPlanToTurnRoute,
+} from './lib/agent/unified-turn-planner.js';
 import { syncMainAgentIdentityFromWorkspace } from './lib/agent/identity-sync.js';
-import { buildDelegationContext } from './lib/agent/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from './lib/agent/delegation-routing-details.js';
 import { executeSkill } from './skills/executor.js';
 import { logTeamActivity } from './lib/agent/team-activity.js';
@@ -75,8 +77,15 @@ import {
 } from './lib/agent/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/agent/system-pulse.js';
 import { appendExchange, appendGroupExchange, getLastPrivateExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges, migrateLegacyDatedChatLogs, migratePrivateChatLogFileNames } from './lib/context/chat-log.js';
-import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK, getSessionWorkMode } from './lib/context/chat-session.js';
-import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
+import {
+  ensureChatSession,
+  shouldAckNewSessionOnly,
+  NEW_SESSION_ACK,
+  getSessionWorkMode,
+  setSessionWorkMode,
+  WORK_MODE_ENABLED_ACK,
+  WORK_MODE_DISABLED_ACK,
+} from './lib/context/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
@@ -86,17 +95,13 @@ import {
   listProjectsForTeam,
   resolveFocusedProjectForTurn,
 } from './lib/context/projects-context.js';
-import { getAgentTeamId } from './lib/agent/teams.js';
-import { buildMissionsContextBlock, buildMissionIntentPlan, resolveMissionForUserTurn } from './lib/context/missions-context.js';
+import { getAgentTeamId, listTeamMemberIds } from './lib/agent/teams.js';
+import { buildMissionsContextBlock } from './lib/context/missions-context.js';
 import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/context/project-workflow.js';
 import {
   buildDurabilitySystemBlock,
-  buildDurableDelegationContext,
   delegationArgsFromDurability,
-  delegationRoutingTextFromDurability,
-  prepareWorkDurabilityWithAi,
 } from './lib/context/work-durability.js';
-import { buildGithubSourceIntentPlan } from './lib/context/github-context.js';
 import {
   classifyTaskFrameTurn,
   clearTaskFrame,
@@ -1342,6 +1347,7 @@ async function main() {
       : null;
     const taskFrameDecision = taskFrameRouting?.decision || null;
     let activeTaskFrame = taskFrameRouting?.activeFrame || null;
+    let taskFrameCandidate = null;
     let taskFrameFastPath = false;
     let taskFrameRoute = null;
     if (taskFrameDecision) {
@@ -1380,27 +1386,25 @@ async function main() {
         message: taskFrameDecision.reason || 'Task frame closed.',
         details: { frameId: closed?.id || '' },
       });
-    } else if (taskFrameDecision?.action === 'new' && taskFrameDecision.confidence >= 0.72) {
-      activeTaskFrame = upsertTaskFrame(sessionLogKey, taskFrameDecision, activeTaskFrame, { userText: text });
-      console.log('[task-frame] created', JSON.stringify({
-        frameId: activeTaskFrame?.id || '',
-        kind: activeTaskFrame?.kind || '',
-        skills: activeTaskFrame?.toolProfile || [],
+    } else if (taskFrameDecision?.action === 'new_candidate' && taskFrameDecision.confidence >= 0.72) {
+      taskFrameCandidate = taskFrameDecision;
+      console.log('[task-frame] candidate', JSON.stringify({
+        kind: taskFrameCandidate.kind || '',
+        title: taskFrameCandidate.title || '',
+        skills: taskFrameCandidate.toolProfile || [],
       }));
       logTeamActivity({
-        type: 'task_frame_created',
+        type: 'task_frame_candidate',
         agentId,
-        status: 'active',
+        status: 'candidate',
         jid,
-        message: activeTaskFrame?.objective || activeTaskFrame?.title || 'Task frame created.',
+        message: taskFrameCandidate.objective || taskFrameCandidate.title || 'Task frame candidate created.',
         details: {
-          frameId: activeTaskFrame?.id || '',
-          kind: activeTaskFrame?.kind || '',
-          toolProfile: activeTaskFrame?.toolProfile || [],
+          kind: taskFrameCandidate.kind || '',
+          toolProfile: taskFrameCandidate.toolProfile || [],
         },
       });
     } else if (shouldUseTaskFrameFastPath(taskFrameDecision)) {
-      activeTaskFrame = upsertTaskFrame(sessionLogKey, taskFrameDecision, activeTaskFrame, { userText: text });
       taskFrameRoute = taskFrameDecisionToTurnRoute(taskFrameDecision, activeTaskFrame);
       taskFrameFastPath = !!taskFrameRoute;
       console.log('[task-frame] fast-path', JSON.stringify({
@@ -1421,49 +1425,132 @@ async function main() {
         },
       });
     }
-    // Step 1.5: classify work-mode for this turn (LLM, MD-driven).
-    //
-    // Two-tier gating:
-    //   - The classifier always runs (so any turn can be the one that
-    //     toggles the mode), and the persisted mode is updated immediately.
-    //   - But the operational mode that gates THIS turn's pipeline is the
-    //     mode the session was in BEFORE the classifier ran. That is, when
-    //     the user says "enable work mode", this turn still runs as a
-    //     single-agent skills loop and just acks the switch. The next turn
-    //     onwards picks up the multi-agent pipeline (delegation, intent
-    //     planner, work-durability pre-fill, missions/projects/workflow
-    //     context blocks). This matches the design described by the user
-    //     and avoids running heavy multi-agent context for a turn whose
-    //     only real content is the toggle acknowledgement.
-    //
-    // Group chats are always single-mode (group flows skip multi-agent today).
+    const turnPath = taskFrameFastPath ? 'fast_path' : 'normal_path';
+    const turnPathReason = taskFrameFastPath
+      ? 'task_frame_continue_fast'
+      : (taskFrameDecision?.action === 'new_candidate'
+          ? 'task_frame_new_candidate_uses_normal_path'
+          : (taskFrameDecision?.action === 'exit'
+              ? 'task_frame_exit_uses_normal_path'
+              : (taskFrameDecision?.action === 'continue_replan'
+                  ? 'task_frame_continue_replan_uses_normal_path'
+                  : (taskFrameDecision?.action === 'ignore'
+                      ? 'task_frame_ignore_uses_normal_path'
+                      : 'no_task_frame_fast_path'))));
+    console.log('[path] turnPath=', turnPath, 'reason=', turnPathReason);
+    logTeamActivity({
+      type: 'turn_path',
+      agentId,
+      status: turnPath,
+      jid,
+      message: turnPathReason,
+      details: {
+        taskFrameAction: taskFrameDecision?.action || '',
+        taskFrameConfidence: taskFrameDecision?.confidence || 0,
+        frameId: activeTaskFrame?.id || '',
+      },
+    });
+    // Normal path: one MD-backed planner decides work mode, durability,
+    // delegation, tool profile, context hints, and task-frame updates.
     let workModeAck = null;
     let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
+    let unifiedPlan = null;
     if (taskFrameFastPath) {
-      console.log('[work-mode]', JSON.stringify({ mode: workMode, skipped: 'task_frame_fast_path' }));
+      console.log('[unified-planner]', JSON.stringify({ skipped: 'task_frame_fast_path' }));
     } else if (!isGroupJid) {
-      const wm = await traceAsyncStep('work_mode', () => resolveWorkModeForTurn({
+      const eligibleTeamIds = focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId
+        ? listTeamMemberIds(focusedProjectTeamId).filter((id) => id !== agentId)
+        : [];
+      unifiedPlan = await traceAsyncStep('unified_turn_planner', () => planUnifiedTurn({
         userText: text,
-        logKey: sessionLogKey,
+        historyMessages,
+        availableSkillIds: enabledSkillIds,
+        availableSkillSummaries: enabledSkillSummaries,
+        currentWorkMode: workMode,
+        activeTaskFrame,
+        taskFrameDecision,
+        taskFrameCandidate,
+        availableTeamAgents: eligibleTeamIds.map((id) => ({ agentId: id })),
+        focusedProject,
         agentId,
       }));
-      if (wm) {
-        workMode = wm.modeBefore;
-        if (wm.toggled) {
-          workModeAck = wm.ack;
+      if (unifiedPlan) {
+        console.log('[unified-planner]', JSON.stringify({
+          workModeToggle: unifiedPlan.workModeToggle,
+          needsMultiAgent: unifiedPlan.needsMultiAgent,
+          needsDurability: unifiedPlan.needsDurability,
+          needsDelegation: unifiedPlan.needsDelegation,
+          delegationAction: unifiedPlan.delegationAction || '',
+          targetAgentId: unifiedPlan.targetAgentId || '',
+          mode: unifiedPlan.mode,
+          executionMode: unifiedPlan.executionMode,
+          skills: unifiedPlan.skills,
+          mustUseTool: unifiedPlan.mustUseTool,
+          fallbackToolPolicy: unifiedPlan.fallbackToolPolicy,
+          taskFrameAction: unifiedPlan.taskFrameAction,
+          taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
+          projectOrMissionIntent: unifiedPlan.projectOrMissionIntent,
+          reason: unifiedPlan.reason,
+        }));
+        logTeamActivity({
+          type: 'unified_turn_plan',
+          agentId,
+          status: unifiedPlan.executionMode || unifiedPlan.mode || 'planned',
+          jid,
+          message: unifiedPlan.reason || unifiedPlan.plan || '',
+          details: {
+            workModeToggle: unifiedPlan.workModeToggle,
+            needsMultiAgent: unifiedPlan.needsMultiAgent,
+            needsDurability: unifiedPlan.needsDurability,
+            needsDelegation: unifiedPlan.needsDelegation,
+            delegationAction: unifiedPlan.delegationAction,
+            targetAgentId: unifiedPlan.targetAgentId || '',
+            mode: unifiedPlan.mode,
+            skills: unifiedPlan.skills,
+            mustUseTool: unifiedPlan.mustUseTool,
+            fallbackToolPolicy: unifiedPlan.fallbackToolPolicy,
+            taskFrameAction: unifiedPlan.taskFrameAction,
+            taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
+          },
+        });
+        if (unifiedPlan.workModeToggle === 'enable') {
+          setSessionWorkMode(sessionLogKey, 'multi');
+          workModeAck = WORK_MODE_ENABLED_ACK;
           console.log('[work-mode]', JSON.stringify({
-            before: wm.modeBefore,
-            after: wm.modeAfter,
-            effectiveThisTurn: wm.modeBefore,
-            reason: wm.reason,
+            before: workMode,
+            after: 'multi',
+            effectiveThisTurn: workMode,
+            reason: unifiedPlan.reason,
+            source: 'unified_planner',
+          }));
+        } else if (unifiedPlan.workModeToggle === 'disable') {
+          setSessionWorkMode(sessionLogKey, 'single');
+          workModeAck = WORK_MODE_DISABLED_ACK;
+          console.log('[work-mode]', JSON.stringify({
+            before: workMode,
+            after: 'single',
+            effectiveThisTurn: workMode,
+            reason: unifiedPlan.reason,
+            source: 'unified_planner',
           }));
         } else {
-          console.log('[work-mode]', JSON.stringify({ mode: workMode }));
+          console.log('[work-mode]', JSON.stringify({ mode: workMode, source: 'unified_planner' }));
         }
+      } else {
+        console.log('[unified-planner]', JSON.stringify({
+          skipped: 'no_plan_safe_fallback',
+          fallback: activeTaskFrame && taskFrameDecision?.action !== 'new_candidate' ? 'active_frame_profile' : 'no_tools',
+        }));
       }
     }
-    const isMultiAgent = !taskFrameFastPath && !isGroupJid && workMode === 'multi' && !!focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId;
-    const teamGateReply = !taskFrameFastPath && !isGroupJid && workMode === 'multi' && !workModeAck && !isNonTaskMessage(text) && !isMultiAgent
+    const plannerNeedsMulti = !!(unifiedPlan?.needsMultiAgent || unifiedPlan?.needsDurability || unifiedPlan?.needsDelegation);
+    const isMultiAgent = !taskFrameFastPath
+      && !isGroupJid
+      && workMode === 'multi'
+      && plannerNeedsMulti
+      && !!focusedProjectTeamId
+      && focusedProjectTeamId === activeAgentTeamId;
+    const teamGateReply = !taskFrameFastPath && !isGroupJid && workMode === 'multi' && !workModeAck && plannerNeedsMulti && !isMultiAgent
       ? buildProjectTeamGateReply({
           agentId,
           agentTeamId: activeAgentTeamId,
@@ -1471,20 +1558,18 @@ async function main() {
           focusedProjectTeamId,
         })
       : '';
-    if (!taskFrameFastPath && !isGroupJid && workMode === 'multi' && !isMultiAgent) {
+    if (!taskFrameFastPath && !isGroupJid && workMode === 'multi' && plannerNeedsMulti && !isMultiAgent) {
       console.log('[team-gate]', JSON.stringify({
         mode: teamGateReply ? 'blocked' : 'single',
         reason: focusedProjectTeamId ? 'agent_not_on_project_team' : 'no_project_team',
         projectId: focusedProject?.id || '',
         projectTeamId: focusedProjectTeamId || '',
         agentTeamId: activeAgentTeamId || '',
+        plannerNeedsMulti,
       }));
     }
-    // Step 2: decide work durability before delegation. Persistence must be
-    // attached to the turn before agent-send chooses who should do the work.
-    // Single-agent mode skips this entirely — focus is on tool execution.
     const durabilityDecision = isMultiAgent
-      ? await traceAsyncStep('work_durability', () => prepareWorkDurabilityWithAi({ userText: text, historyMessages, agentId }))
+      ? unifiedPlanToDurabilityDecision(unifiedPlan)
       : null;
     if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
     if (durabilityDecision) {
@@ -1493,24 +1578,12 @@ async function main() {
         persistence: durabilityDecision.persistence,
         missionId: durabilityDecision.missionId || '',
         createdMission: !!durabilityDecision.createdMission,
+        source: 'unified_planner',
       }));
     }
-    // Step 3: specialization-aware delegation check before planner.
-    // This runs after durability so agent-send can receive a missionId up front.
-    // Skipped in single-agent mode.
-    const durableDelegationContext = isMultiAgent
-      ? buildDurableDelegationContext(durabilityDecision, {
-          agentId,
-          availableSkillIds: enabledSkillIds,
-        })
+    const delegationContext = isMultiAgent
+      ? unifiedPlanToDelegationContext(unifiedPlan, agentId)
       : null;
-    const delegationContext = durableDelegationContext || (isMultiAgent
-      ? await traceAsyncStep('delegation_context', () => buildDelegationContext({
-          agentId,
-          userText: delegationRoutingTextFromDurability(durabilityDecision, text),
-          availableSkillIds: enabledSkillIds,
-        }))
-      : null);
     const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
       ? (delegationContext?.recommendation?.targetAgentId || '')
       : '';
@@ -1525,14 +1598,15 @@ async function main() {
       ? {
           mode: 'tool',
           skills: [
-            ...(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none' && enabledSkillIds.includes('project-workflow') ? ['project-workflow'] : []),
-            'agent-send',
+            ...((durabilityDecision?.persistence && durabilityDecision.persistence !== 'none' && enabledSkillIds.includes('project-workflow')) ? ['project-workflow'] : []),
+            ...(enabledSkillIds.includes('agent-send') ? ['agent-send'] : []),
           ],
           executionMode: durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'
             ? 'persistent_delegation'
             : 'delegation',
           usesExistingWorkIntake: !!(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'),
-          plan: `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
+          mustUseTool: true,
+          plan: unifiedPlan?.plan || `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
           answer_style: 'short',
         }
       : null;
@@ -1579,80 +1653,34 @@ async function main() {
         details: delegationDecision,
       });
     }
-    // Step 4: turn router — one small LLM call before loading any tool schemas.
-    //
-    // The planner (and its companion hint classifiers — casual chat, missions
-    // discovery, github source) is a multi-agent / work-mode concern. In
-    // single-agent mode the agent simply runs the skills tool loop directly
-    // with the full enabled skill list; there is no pre-routing decision to
-    // make, no delegation to plan around, no durable work to preserve. Skipping
-    // the planner in single mode saves one LLM call per turn and keeps the
-    // default conversational path lean.
-    const turnIntent = isMultiAgent && !presetDelegationPlan
-      ? await traceAsyncStep('turn_intent', () => classifyTurnIntent({
-          userText: text,
-          historyMessages,
-          availableSkillIds: enabledSkillIds,
-          availableSkillSummaries: enabledSkillSummaries,
-          currentWorkMode: workMode,
-          agentId,
-        }))
+    const plannerFailureFallbackRoute = !taskFrameFastPath && !isGroupJid && !unifiedPlan
+      ? (activeTaskFrame && taskFrameDecision?.action !== 'new_candidate'
+          ? {
+              mode: activeTaskFrame.kind === 'repo_work' || activeTaskFrame.kind === 'feature_work' || activeTaskFrame.kind === 'debugging' ? 'code' : 'tool',
+              skills: Array.isArray(activeTaskFrame.toolProfile) ? activeTaskFrame.toolProfile : [],
+              executionMode: 'tool_use',
+              usesExistingWorkIntake: true,
+              plan: `Planner failed; use active Task Frame profile for ${activeTaskFrame.objective || activeTaskFrame.title || activeTaskFrame.kind}.`,
+              answer_style: 'short',
+              fallbackToolPolicy: 'active_frame_profile',
+            }
+          : {
+              mode: 'chat',
+              skills: [],
+              executionMode: 'direct_answer',
+              usesExistingWorkIntake: false,
+              plan: 'Planner failed; answer directly with no tools.',
+              answer_style: 'short',
+              fallbackToolPolicy: 'no_tools',
+            })
       : null;
-    if (turnIntent) console.log('[turn-intent]', JSON.stringify(turnIntent));
-    const turnIntentIsConfident = turnIntent && turnIntent.confidence >= 0.65;
-    const casualIntentPlan = isMultiAgent && !presetDelegationPlan
-      ? (turnIntentIsConfident
-          ? buildCasualPlanFromTurnIntent(turnIntent)
-          : (isNonTaskMessage(text) ? buildCasualChatTurnRoute() : null))
-      : null;
-    const missionForIntent = isMultiAgent && !presetDelegationPlan && !casualIntentPlan && turnIntentIsConfident && turnIntent.project_or_mission_intent !== 'none'
-      ? resolveMissionForUserTurn({
-          userText: text,
-          historyMessages,
-          agentId,
-          projectOrMissionIntent: turnIntent.project_or_mission_intent,
-        })
-      : null;
-    const missionsIntentHint = missionForIntent
-      ? buildMissionIntentPlan(missionForIntent, enabledSkillIds)
-      : null;
-    const githubIntentHint = isMultiAgent && !presetDelegationPlan && !casualIntentPlan
-      ? (turnIntentIsConfident && turnIntent.github_source_intent
-          ? buildGithubSourceIntentPlan(enabledSkillIds)
-          : null)
-      : null;
-    const selfInspection = isMultiAgent && !presetDelegationPlan && enabledSkillIds.length > 0
-      ? await traceAsyncStep('self_inspection', () => classifySelfInspection({
-          userText: text,
-          historyMessages,
-          agentId,
-        }))
-      : null;
-    const selfInspectionPlan = buildSelfInspectionIntentPlan(selfInspection, enabledSkillIds);
-    if (selfInspection) console.log('[self-inspection]', JSON.stringify(selfInspection));
-    if (selfInspectionPlan) console.log('[self-inspection-plan]', JSON.stringify({
-      skills: selfInspectionPlan.skills,
-      target: selfInspection?.target || '',
-    }));
-    const turnRoute = taskFrameRoute || presetDelegationPlan || selfInspectionPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (isMultiAgent && enabledSkillIds.length > 0
-      ? await traceAsyncStep('turn_router', () => routeTurn({
-          userText: text,
-          historyMessages,
-          availableSkillIds: enabledSkillIds,
-          availableSkillSummaries: enabledSkillSummaries,
-          agentId,
-          delegationContext,
-          workDurability: durabilityDecision,
-        }))
-      : null);
+    const turnRoute = taskFrameRoute || presetDelegationPlan || unifiedPlanToTurnRoute(unifiedPlan) || plannerFailureFallbackRoute;
     if (turnRoute) console.log('[turn-router]', JSON.stringify(turnRoute));
-    // Step 5: load tool schemas. In single-agent mode there is no semantic
-    // pre-router: load the full enabled skill set and let skill docs/schemas
-    // determine which tool the model calls. In multi-agent mode, route hints can
-    // still narrow tools for delegation / durable work.
-    //   turnRoute === null      → full tools (single mode or router fallback)
-    //   turnRoute.skills = []   → router: chat   → skip schema loading entirely
-    //   turnRoute.skills = [...] → router: tools  → load only selected schemas
+    // Load tool schemas from the unified route.
+    //   private planner failure → active frame tools, otherwise no tools
+    //   turnRoute === null      → legacy/group fallback: full tools
+    //   turnRoute.skills = []   → chat/direct answer: no tools
+    //   turnRoute.skills = [...] → planned tool set only
     const plannerSaysNoTools = turnRoute !== null && Array.isArray(turnRoute.skills) && turnRoute.skills.length === 0;
     let skillContext = null;
     let toolsForRequest = [];
@@ -1680,7 +1708,7 @@ async function main() {
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = turnRouteToSystemBlock(turnRoute);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
-    if (taskFrameFastPath && activeTaskFrame) {
+    if (activeTaskFrame) {
       systemPromptWithPlan += taskFrameToSystemBlock(activeTaskFrame, taskFrameDecision);
     }
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
@@ -1690,14 +1718,19 @@ async function main() {
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
-      // Multi-agent mode adds mission / project / workflow context. Single-agent
-      // mode keeps the system prompt focused on direct tool execution.
-      if (isMultiAgent && !isNonTaskMessage(text)) {
+      // Multi-agent mode adds mission / project / workflow context when the
+      // unified planner says this turn is project/mission work.
+      const shouldAppendWorkContext = isMultiAgent && (
+        unifiedPlan?.needsDurability
+        || unifiedPlan?.needsDelegation
+        || (unifiedPlan?.projectOrMissionIntent && unifiedPlan.projectOrMissionIntent !== 'none')
+      );
+      if (shouldAppendWorkContext) {
         const missionsBlock = buildMissionsContextBlock({
           userText: text,
           historyMessages,
           agentId,
-          projectOrMissionIntent: turnIntentIsConfident ? turnIntent.project_or_mission_intent : 'none',
+          projectOrMissionIntent: unifiedPlan?.projectOrMissionIntent || 'none',
         });
         if (missionsBlock) systemPromptWithPlan += missionsBlock;
         const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
@@ -1706,12 +1739,13 @@ async function main() {
         if (workflowBlock) systemPromptWithPlan += workflowBlock;
       }
     }
-    const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     ctx._originalUserText = text;
     let turnResult = teamGateReply
       ? { textToSend: teamGateReply, skillsCalled: [] }
       : null;
+    // Forced delegation is a pre-main-turn route: when selected, the
+    // coordinator calls agent-send directly and skips the normal answer loop.
     if (!turnResult && presetDelegationPlan && delegatedTarget) {
       try {
         logTeamActivity({
@@ -1769,18 +1803,28 @@ async function main() {
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
       }), { agentId, toolsCount: toolsForRequest.length });
     }
+    const plannedMustUseTool = !!(
+      turnRoute?.mustUseTool === true
+      || unifiedPlan?.mustUseTool === true
+      || presetDelegationPlan
+    );
+    if (plannedMustUseTool) {
+      console.log('[unified-planner] mustUseTool=true');
+    }
     if (
-      selfInspectionPlan
+      plannedMustUseTool
+      && Array.isArray(turnRoute?.skills)
+      && turnRoute.skills.length > 0
       && Array.isArray(toolsForRequest)
       && toolsForRequest.length > 0
       && (!Array.isArray(turnResult?.skillsCalled) || turnResult.skillsCalled.length === 0)
     ) {
-      console.log('[self-inspection] retrying because the first agent turn used no tools');
+      console.log('[unified-planner] retrying because the planned tool turn used no tools');
       const retryPrompt = systemPromptWithPlan +
-        '\n\n--- Self-Inspection Tool Requirement ---\n' +
-        'This turn was classified as Pasture/CowCode self-inspection. Before final answering, call at least one available local inspection tool and ground the answer in what it returns.\n' +
+        '\n\n--- Planned Tool Requirement ---\n' +
+        'This turn was routed as a tool-backed turn. Before final answering, call at least one available planned tool and ground the answer in what it returns.\n' +
         '---';
-      turnResult = await traceAsyncStep('self_inspection_retry', () => runAgentTurn({
+      turnResult = await traceAsyncStep('planned_tool_retry', () => runAgentTurn({
         userText: text,
         ctx,
         systemPrompt: retryPrompt,
@@ -1790,30 +1834,110 @@ async function main() {
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
       }), { agentId, toolsCount: toolsForRequest.length });
     }
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
+    const validPostTurnFrameStatuses = new Set(['continue', 'completed', 'blocked', 'mismatch']);
+    const postTurnTaskFrameStatus = validPostTurnFrameStatuses.has(rawTaskFrameStatus)
+      ? rawTaskFrameStatus
+      : (unifiedPlan?.taskFrameStatusHint && unifiedPlan.taskFrameStatusHint !== 'continue' ? unifiedPlan.taskFrameStatusHint : '');
     if (taskFrameFastPath && activeTaskFrame) {
+      if (postTurnTaskFrameStatus === 'completed') {
+        const closed = clearTaskFrame(sessionLogKey, { reason: 'post_turn_completed' });
+        activeTaskFrame = null;
+        console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: 'post_turn_completed' }));
+        logTeamActivity({
+          type: 'task_frame_closed',
+          agentId,
+          status: 'closed',
+          jid,
+          message: 'Task frame completed after fast-path turn.',
+          details: {
+            frameId: closed?.id || '',
+            source: 'post_turn_status',
+          },
+        });
+      } else {
+        const updatedFrame = updateTaskFrameAfterTurn(sessionLogKey, {
+          userText: text,
+          assistantText: rawTextToSend,
+          skillsCalled: skillsCalledFromTurn,
+          status: postTurnTaskFrameStatus === 'blocked'
+            ? 'blocked'
+            : (postTurnTaskFrameStatus === 'mismatch' ? 'waiting_user' : undefined),
+        });
+        console.log('[task-frame] updated', JSON.stringify({
+          frameId: updatedFrame?.id || activeTaskFrame.id || '',
+          status: updatedFrame?.status || activeTaskFrame.status || '',
+          postTurnStatus: postTurnTaskFrameStatus || 'continue',
+          skillsCalled: skillsCalledFromTurn,
+        }));
+        logTeamActivity({
+          type: 'task_frame_update',
+          agentId,
+          status: updatedFrame?.status || activeTaskFrame.status || 'active',
+          jid,
+          message: updatedFrame?.objective || activeTaskFrame.objective || activeTaskFrame.title || 'Task frame updated.',
+          details: {
+            frameId: updatedFrame?.id || activeTaskFrame.id || '',
+            postTurnStatus: postTurnTaskFrameStatus || 'continue',
+            skillsCalled: skillsCalledFromTurn,
+          },
+        });
+      }
+    } else if (!isGroupJid && unifiedPlan?.taskFrameAction === 'close') {
+      const closed = clearTaskFrame(sessionLogKey, { reason: unifiedPlan.reason || 'unified_planner_close' });
+      activeTaskFrame = null;
+      console.log('[task-frame] closed', JSON.stringify({ frameId: closed?.id || '', reason: unifiedPlan.reason || '' }));
+      logTeamActivity({
+        type: 'task_frame_closed',
+        agentId,
+        status: 'closed',
+        jid,
+        message: unifiedPlan.reason || 'Task frame closed by unified planner.',
+        details: { frameId: closed?.id || '', source: 'unified_planner' },
+      });
+    } else if (!isGroupJid && unifiedPlan && ['new', 'update'].includes(unifiedPlan.taskFrameAction)) {
+      const frameDecision = {
+        action: unifiedPlan.taskFrameAction === 'new' ? 'new' : 'continue',
+        confidence: 0.8,
+        kind: unifiedPlan.taskFrame?.kind || 'general_task',
+        title: unifiedPlan.taskFrame?.title || '',
+        objective: unifiedPlan.taskFrame?.objective || '',
+        projectName: unifiedPlan.taskFrame?.projectName || '',
+        repoUrl: unifiedPlan.taskFrame?.repoUrl || '',
+        localPath: unifiedPlan.taskFrame?.localPath || '',
+        toolProfile: unifiedPlan.taskFrame?.toolProfile?.length ? unifiedPlan.taskFrame.toolProfile : unifiedPlan.skills,
+        plan: unifiedPlan.taskFrame?.plan || unifiedPlan.plan || '',
+        reason: unifiedPlan.reason || '',
+      };
+      activeTaskFrame = upsertTaskFrame(sessionLogKey, frameDecision, activeTaskFrame, {
+        userText: text,
+        replace: unifiedPlan.taskFrameAction === 'new',
+      });
       const updatedFrame = updateTaskFrameAfterTurn(sessionLogKey, {
         userText: text,
         assistantText: rawTextToSend,
         skillsCalled: skillsCalledFromTurn,
       });
       console.log('[task-frame] updated', JSON.stringify({
-        frameId: updatedFrame?.id || activeTaskFrame.id || '',
-        status: updatedFrame?.status || activeTaskFrame.status || '',
+        frameId: updatedFrame?.id || activeTaskFrame?.id || '',
+        status: updatedFrame?.status || activeTaskFrame?.status || '',
+        action: unifiedPlan.taskFrameAction,
         skillsCalled: skillsCalledFromTurn,
+        source: 'unified_planner',
       }));
       logTeamActivity({
-        type: 'task_frame_update',
+        type: unifiedPlan.taskFrameAction === 'new' ? 'task_frame_created' : 'task_frame_update',
         agentId,
-        status: updatedFrame?.status || activeTaskFrame.status || 'active',
+        status: updatedFrame?.status || activeTaskFrame?.status || 'active',
         jid,
-        message: updatedFrame?.objective || activeTaskFrame.objective || activeTaskFrame.title || 'Task frame updated.',
+        message: updatedFrame?.objective || activeTaskFrame?.objective || activeTaskFrame?.title || 'Task frame updated.',
         details: {
-          frameId: updatedFrame?.id || activeTaskFrame.id || '',
+          frameId: updatedFrame?.id || activeTaskFrame?.id || '',
           skillsCalled: skillsCalledFromTurn,
+          source: 'unified_planner',
         },
       });
     }

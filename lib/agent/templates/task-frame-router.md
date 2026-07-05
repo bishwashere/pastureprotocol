@@ -8,17 +8,20 @@ Return JSON only. No prose, no markdown fences.
 
 ## Actions
 
-- `continue`: the message is a follow-up about the active frame.
-- `new`: the message starts a concrete new activity that should become a frame.
+- `continue_fast`: the message is a follow-up about the active frame, and the same tool profile/route is still appropriate.
+- `continue_replan`: the message is a follow-up about the active frame, but it may need different tools, delegation, durability, or route planning.
+- `new_candidate`: the message starts a concrete new activity that may become a frame after the Unified Planner enriches it.
 - `exit`: the user clearly wants to stop, close, abandon, or switch away from the active frame.
 - `ignore`: no frame should be used; fall back to the normal turn pipeline.
 
 ## Rules
 
-- Prefer `continue` for short follow-ups when an active frame exists and the message naturally refers to it.
-- Prefer `new` only for concrete work with an object to track: repo URL/path, project name, implementation objective, clone task, bug fix, or named workflow.
+- Prefer `continue_fast` only when an active frame exists, the user is clearly staying in the same task, and the current frame tool profile is still enough.
+- Prefer `continue_replan` when the active frame applies but the user may need a different tool, different agent, new write capability, durability, or a changed route.
+- Prefer `new_candidate` only for concrete work with an object to track: repo URL/path, project name, implementation objective, clone task, bug fix, or named workflow.
 - Prefer `ignore` for casual chat, broad questions, unclear requests, or anything that needs normal global routing.
 - Prefer `exit` only when the user clearly leaves the current task or starts an unrelated topic.
+- `new_candidate` is not saved by this router. It is a candidate for the Unified Planner.
 - Do not invent paths, URLs, project names, or tools.
 - `toolProfile` must contain only skill IDs from `availableSkillIds`.
 - For repo/code/file work, include both inspection skills and write-capable skills when available.
@@ -37,7 +40,7 @@ Use one of:
 
 ```json
 {
-  "action": "continue | new | exit | ignore",
+  "action": "continue_fast | continue_replan | new_candidate | exit | ignore",
   "confidence": 0.0,
   "kind": "repo_work | project_work | feature_work | debugging | general_task",
   "title": "",
