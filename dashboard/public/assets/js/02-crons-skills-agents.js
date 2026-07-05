@@ -3448,13 +3448,25 @@ function renderSystemCronVariant(row) {
       return Math.sqrt(Math.pow(px - x, 2) + Math.pow(py - y, 2));
     }
 
+    function brainLineGlowPresence(pointer) {
+      if (!pointer || !pointer.active) return 0;
+      if (!pointer.onTerm) return 1;
+      if (!pointer.lineGlowFadeStartedAt) return 0;
+      var duration = pointer.lineGlowFadeDuration || 1120;
+      var elapsed = performance.now() - pointer.lineGlowFadeStartedAt;
+      if (elapsed >= duration) return 0;
+      return 1 - brainEase(elapsed / duration);
+    }
+
     function brainLinePointerInfluence(a, b, pointer, key) {
-      if (!pointer || !pointer.active || pointer.onTerm || !a || !b) return 0;
+      if (!pointer || !a || !b) return 0;
+      var glowPresence = brainLineGlowPresence(pointer);
+      if (glowPresence <= 0.01) return 0;
       var closest = brainDistanceToCurve(pointer.x, pointer.y, a, b, key);
       var radius = 46;
       if (closest >= radius) return 0;
       var closeness = 1 - closest / radius;
-      return closeness * closeness;
+      return closeness * closeness * glowPresence;
     }
 
     function brainDistanceToCurve(px, py, a, b, key) {
@@ -3735,7 +3747,7 @@ function renderSystemCronVariant(row) {
       var currentRelations = {};
       var hoverFrame = null;
       var pointerFrame = null;
-      var meshPointer = { x: 0, y: 0, active: false, onTerm: false };
+      var meshPointer = { x: 0, y: 0, active: false, onTerm: false, lineGlowFadeStartedAt: 0, lineGlowFadeDuration: 1120 };
       var lockedFocus = null;
       var currentFocusMode = 'word';
       var displayedFocus = { label: '', mode: 'word' };
@@ -3769,7 +3781,18 @@ function renderSystemCronVariant(row) {
         pointerFrame = requestAnimationFrame(function () {
           pointerFrame = null;
           drawBrainMeshCurrent();
+          if (brainLineGlowPresence(meshPointer) > 0.01 && meshPointer.onTerm) scheduleBrainPointerDraw();
         });
+      }
+
+      function updateBrainPointerTermState(nextOnTerm) {
+        var wasOnTerm = meshPointer.onTerm;
+        meshPointer.onTerm = !!nextOnTerm;
+        if (!wasOnTerm && meshPointer.onTerm) {
+          meshPointer.lineGlowFadeStartedAt = performance.now();
+        } else if (!meshPointer.onTerm) {
+          meshPointer.lineGlowFadeStartedAt = 0;
+        }
       }
 
       function animateBrainHover(nextFocus) {
@@ -3834,7 +3857,7 @@ function renderSystemCronVariant(row) {
 
       function focusTargetAtPointer() {
         var selected = nearestBrainMeshTerm(meshCanvas, meshPointer.x, meshPointer.y);
-        meshPointer.onTerm = !!selected;
+        updateBrainPointerTermState(!!selected);
         return selected
           ? brainTermFocus(selected)
           : brainConnectionFocus(nearestBrainMeshConnection(meshCanvas, meshPointer.x, meshPointer.y));
