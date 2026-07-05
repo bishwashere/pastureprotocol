@@ -56,6 +56,8 @@ async function main() {
       projectName: 'My Work List',
       repoUrl: 'https://github.com/bishwashere/my-work-list',
       localPath: '',
+      ownerAgentId: 'coder',
+      teamId: 'product-team',
       toolProfile: ['read', 'go-read', 'write', 'apply-patch', 'not-enabled'],
       plan: 'Use repo tools to continue the clone/inspection task.',
       reason: 'Concrete repo work request.',
@@ -67,6 +69,8 @@ async function main() {
 
   const frame = upsertTaskFrame(logKey, first.decision, first.activeFrame, { userText: 'clone this repo and inspect it' });
   assert(frame && frame.status === 'active', 'frame stored as active');
+  assert(frame.ownerAgentId === 'coder', 'frame stores owner agent');
+  assert(frame.teamId === 'product-team', 'frame stores team id');
   assert(getActiveTaskFrame(logKey)?.projectName === 'My Work List', 'active frame can be loaded');
 
   const cont = await classifyTaskFrameTurn({

@@ -4,6 +4,8 @@ Decide whether the latest user message should use a soft active task frame.
 
 A task frame is a short-lived working context for one concrete activity, such as a repo clone, a local project inspection, a code implementation task, or a project workflow task. It is only a shortcut. If uncertain, return `ignore` so the normal full router can handle the turn.
 
+Work mode is separate from task complexity. If `currentWorkMode` is `work`, an active frame may belong to a persistent specialist owner. `continue_fast` means the same local work thread continues inside the same ownership context.
+
 Return JSON only. No prose, no markdown fences.
 
 ## Actions

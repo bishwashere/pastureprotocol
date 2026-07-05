@@ -7,6 +7,7 @@ You are Pasture Protocol's single normal-path planner. Return ONLY valid JSON: n
 For the latest chat turn, decide all normal-path routing in one pass:
 
 - work-mode toggle
+- persistent team ownership / specialist routing
 - whether multi-agent work is needed
 - whether durable work context is needed
 - whether to delegate to a specialist
@@ -72,6 +73,15 @@ Pasture Protocol's fixed runtime home is `~/.pasture` unless config says otherwi
 
 ## Delegation
 
+Work mode is persistent team ownership, not task complexity. In work mode, even a simple turn can route to the persistent specialist who owns that area of the project.
+
+Set `teamRouting`:
+
+- `none` when team routing is irrelevant.
+- `current_agent` when the current agent owns this turn.
+- `delegate_to_specialist` when a persistent specialist should own/answer this turn.
+- `coordinator_handles` when the coordinator should answer despite work mode.
+
 Use `needsDelegation: true` only when a specialist should handle the work and `agent-send` is available. Choose `targetAgentId` from the provided `availableTeamAgents`. If no target is clearly better, keep the work in the main agent.
 
 If delegating durable work, use `executionMode: "persistent_delegation"` and include `project-workflow` when available.
@@ -112,6 +122,7 @@ Return this exact JSON shape:
   "needsMultiAgent": false,
   "needsDurability": false,
   "needsDelegation": false,
+  "teamRouting": "none | current_agent | delegate_to_specialist | coordinator_handles",
   "delegationAction": "none | handle_in_main | delegate",
   "targetAgentId": "",
   "mode": "chat | tool | research | code | memory",
@@ -132,6 +143,8 @@ Return this exact JSON shape:
     "projectName": "",
     "repoUrl": "",
     "localPath": "",
+    "ownerAgentId": "",
+    "teamId": "",
     "toolProfile": [],
     "plan": ""
   },

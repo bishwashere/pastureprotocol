@@ -31,6 +31,7 @@ async function main() {
       needsMultiAgent: true,
       needsDurability: false,
       needsDelegation: false,
+      teamRouting: 'current_agent',
       delegationAction: 'none',
       targetAgentId: '',
       mode: 'code',
@@ -51,6 +52,8 @@ async function main() {
         projectName: '',
         repoUrl: '',
         localPath: '',
+        ownerAgentId: 'main',
+        teamId: 'default',
         toolProfile: ['read', 'write', 'apply-patch', 'not-enabled'],
         plan: 'Inspect and patch files.',
       },
@@ -60,6 +63,7 @@ async function main() {
     }),
   });
   assert(implementationPlan.workModeToggle === 'no_change', 'multi mode cannot be re-enabled');
+  assert(implementationPlan.teamRouting === 'current_agent', 'team routing is preserved');
   assert(implementationPlan.mode === 'code', 'implementation plan remains code mode');
   assert(implementationPlan.mustUseTool === true, 'mustUseTool is preserved');
   assert(implementationPlan.fallbackToolPolicy === 'active_frame_profile', 'fallback policy is preserved');
@@ -85,6 +89,7 @@ async function main() {
       needsMultiAgent: true,
       needsDurability: true,
       needsDelegation: true,
+      teamRouting: 'delegate_to_specialist',
       delegationAction: 'delegate',
       targetAgentId: 'builder',
       mode: 'tool',
@@ -106,6 +111,7 @@ async function main() {
   });
   assert(delegatedPlan.executionMode === 'persistent_delegation',
     'durable delegation coerces execution mode');
+  assert(delegatedPlan.teamRouting === 'delegate_to_specialist', 'specialist team routing is preserved');
   assert(delegatedPlan.mustUseTool === true, 'delegation forces mustUseTool');
   assert(delegatedPlan.delegationAction === 'delegate', 'delegation action is preserved');
   assert(delegatedPlan.taskFrameAction === 'replace', 'replace action is preserved');

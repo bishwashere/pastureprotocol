@@ -82,10 +82,8 @@ import {
   shouldAckNewSessionOnly,
   NEW_SESSION_ACK,
   getSessionWorkMode,
-  setSessionWorkMode,
-  WORK_MODE_ENABLED_ACK,
-  WORK_MODE_DISABLED_ACK,
 } from './lib/context/chat-session.js';
+import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
 import {
   buildProjectsContextBlock,
@@ -1336,6 +1334,38 @@ async function main() {
       if (teamProjects.length === 1) focusedProject = teamProjects[0];
     }
     const focusedProjectTeamId = getProjectTeamId(focusedProject);
+    let workModeAck = null;
+    let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
+    if (!isGroupJid) {
+      const wm = await traceAsyncStep('work_mode_controller', () => resolveWorkModeForTurn({
+        userText: text,
+        logKey: sessionLogKey,
+        agentId,
+      }));
+      if (wm) {
+        workMode = wm.modeBefore;
+        if (wm.toggled) {
+          workModeAck = wm.ack;
+          console.log('[work-mode]', JSON.stringify({
+            before: wm.modeBefore,
+            after: wm.modeAfter,
+            effectiveThisTurn: wm.modeBefore,
+            reason: wm.reason,
+            source: 'work_mode_controller',
+          }));
+        } else {
+          console.log('[work-mode]', JSON.stringify({
+            mode: workMode,
+            reason: wm.reason || '',
+            source: 'work_mode_controller',
+          }));
+        }
+      }
+    }
+    const eligibleTeamIds = focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId
+      ? listTeamMemberIds(focusedProjectTeamId).filter((id) => id !== agentId)
+      : [];
+    const availableTeamAgents = eligibleTeamIds.map((id) => ({ agentId: id }));
     const taskFrameRouting = !isGroupJid
       ? await traceAsyncStep('task_frame', () => classifyTaskFrameTurn({
           logKey: sessionLogKey,
@@ -1343,6 +1373,10 @@ async function main() {
           historyMessages,
           availableSkillIds: enabledSkillIds,
           availableSkillSummaries: enabledSkillSummaries,
+          currentWorkMode: workMode === 'multi' ? 'work' : 'single',
+          focusedProject,
+          focusedProjectTeamId,
+          availableTeamAgents,
           agentId,
         }))
       : null;
@@ -1452,20 +1486,18 @@ async function main() {
       details: {
         taskFrameAction: taskFrameDecision?.action || '',
         taskFrameConfidence: taskFrameDecision?.confidence || 0,
+        taskFrameResemblance: taskFrameDecision?.resemblance || '',
+        taskFrameReason: taskFrameDecision?.reason || '',
         frameId: activeTaskFrame?.id || '',
       },
     });
-    // Normal path: one MD-backed planner decides work mode, durability,
-    // delegation, tool profile, context hints, and task-frame updates.
-    let workModeAck = null;
-    let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
+    // Normal path: one MD-backed planner decides routing inside the current
+    // work mode: durability, specialist ownership, tools, context hints, and
+    // task-frame updates.
     let unifiedPlan = null;
     if (taskFrameFastPath) {
       console.log('[unified-planner]', JSON.stringify({ skipped: 'task_frame_fast_path' }));
     } else if (!isGroupJid) {
-      const eligibleTeamIds = focusedProjectTeamId && focusedProjectTeamId === activeAgentTeamId
-        ? listTeamMemberIds(focusedProjectTeamId).filter((id) => id !== agentId)
-        : [];
       unifiedPlan = await traceAsyncStep('unified_turn_planner', () => planUnifiedTurn({
         userText: text,
         historyMessages,
@@ -1475,7 +1507,7 @@ async function main() {
         activeTaskFrame,
         taskFrameDecision,
         taskFrameCandidate,
-        availableTeamAgents: eligibleTeamIds.map((id) => ({ agentId: id })),
+        availableTeamAgents,
         focusedProject,
         agentId,
       }));
@@ -1485,6 +1517,7 @@ async function main() {
           needsMultiAgent: unifiedPlan.needsMultiAgent,
           needsDurability: unifiedPlan.needsDurability,
           needsDelegation: unifiedPlan.needsDelegation,
+          teamRouting: unifiedPlan.teamRouting || '',
           delegationAction: unifiedPlan.delegationAction || '',
           targetAgentId: unifiedPlan.targetAgentId || '',
           mode: unifiedPlan.mode,
@@ -1509,6 +1542,7 @@ async function main() {
             needsMultiAgent: unifiedPlan.needsMultiAgent,
             needsDurability: unifiedPlan.needsDurability,
             needsDelegation: unifiedPlan.needsDelegation,
+            teamRouting: unifiedPlan.teamRouting,
             delegationAction: unifiedPlan.delegationAction,
             targetAgentId: unifiedPlan.targetAgentId || '',
             mode: unifiedPlan.mode,
@@ -1520,29 +1554,11 @@ async function main() {
             taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
           },
         });
-        if (unifiedPlan.workModeToggle === 'enable') {
-          setSessionWorkMode(sessionLogKey, 'multi');
-          workModeAck = WORK_MODE_ENABLED_ACK;
-          console.log('[work-mode]', JSON.stringify({
-            before: workMode,
-            after: 'multi',
-            effectiveThisTurn: workMode,
-            reason: unifiedPlan.reason,
-            source: 'unified_planner',
-          }));
-        } else if (unifiedPlan.workModeToggle === 'disable') {
-          setSessionWorkMode(sessionLogKey, 'single');
-          workModeAck = WORK_MODE_DISABLED_ACK;
-          console.log('[work-mode]', JSON.stringify({
-            before: workMode,
-            after: 'single',
-            effectiveThisTurn: workMode,
-            reason: unifiedPlan.reason,
-            source: 'unified_planner',
-          }));
-        } else {
-          console.log('[work-mode]', JSON.stringify({ mode: workMode, source: 'unified_planner' }));
-        }
+        console.log('[work-mode]', JSON.stringify({
+          mode: workMode,
+          source: 'work_mode_controller',
+          plannerSuggestion: unifiedPlan.workModeToggle || 'no_change',
+        }));
       } else {
         const canUseActiveFrameFallback = activeTaskFrame && ['continue_fast', 'continue_replan'].includes(taskFrameDecision?.action || '');
         console.log('[unified-planner]', JSON.stringify({
@@ -1551,7 +1567,8 @@ async function main() {
         }));
       }
     }
-    const plannerNeedsMulti = !!(unifiedPlan?.needsMultiAgent || unifiedPlan?.needsDurability || unifiedPlan?.needsDelegation);
+    const plannerNeedsTeamContext = !!(unifiedPlan?.teamRouting && unifiedPlan.teamRouting !== 'none');
+    const plannerNeedsMulti = !!(unifiedPlan?.needsMultiAgent || unifiedPlan?.needsDurability || unifiedPlan?.needsDelegation || plannerNeedsTeamContext);
     const isMultiAgent = !taskFrameFastPath
       && !isGroupJid
       && workMode === 'multi'
@@ -1592,16 +1609,21 @@ async function main() {
     const delegationContext = isMultiAgent
       ? unifiedPlanToDelegationContext(unifiedPlan, agentId)
       : null;
-    const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
-      ? (delegationContext?.recommendation?.targetAgentId || '')
+    const taskFrameOwnerTarget = taskFrameFastPath
+      && activeTaskFrame?.ownerAgentId
+      && activeTaskFrame.ownerAgentId !== agentId
+      && enabledSkillIds.includes('agent-send')
+      ? activeTaskFrame.ownerAgentId
       : '';
+    const delegatedTarget = taskFrameOwnerTarget || (delegationContext?.recommendation?.action === 'delegate'
+      ? (delegationContext?.recommendation?.targetAgentId || '')
+      : '');
     const delegationBlocked = !!delegationContext?.recommendation?.blocked;
     const delegationDecision = buildDelegationDecisionDetails(delegationContext);
     // Don't force agent-send when the explicit target isn't linked from this
     // caller (recommendation.blocked === true) — that just wastes an LLM call
     // and surfaces a policy error. Let the coordinator answer instead.
     const presetDelegationPlan = delegatedTarget
-      && delegationContext?.recommendation?.action === 'delegate'
       && !delegationBlocked
       ? {
           mode: 'tool',
@@ -1614,7 +1636,9 @@ async function main() {
             : 'delegation',
           usesExistingWorkIntake: !!(durabilityDecision?.persistence && durabilityDecision.persistence !== 'none'),
           mustUseTool: true,
-          plan: unifiedPlan?.plan || `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
+          plan: taskFrameOwnerTarget
+            ? `Route active Task Frame to its owner ${delegatedTarget} via agent-send; skip global planning.`
+            : (unifiedPlan?.plan || `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`),
           answer_style: 'short',
         }
       : null;
@@ -1638,6 +1662,22 @@ async function main() {
           ? `Delegation decision (LLM router) selected ${delegatedTarget}`
           : `Delegation decision selected ${delegatedTarget}`,
         details: delegationDecision,
+      });
+    } else if (presetDelegationPlan && taskFrameOwnerTarget) {
+      logTeamActivity({
+        type: 'delegation_decision',
+        agentId,
+        targetAgentId: delegatedTarget,
+        status: 'ok',
+        depth: 0,
+        jid,
+        message: `Task Frame fast path routed to owner ${delegatedTarget}`,
+        details: {
+          action: 'delegate',
+          selected: delegatedTarget,
+          routingMethod: 'task-frame-owner',
+          reason: 'Active Task Frame has a specialist owner.',
+        },
       });
     } else if (delegationBlocked && delegatedTarget && delegationDecision) {
       logTeamActivity({
@@ -1767,9 +1807,24 @@ async function main() {
         onAgentTurnStart({ agentId, userText: text, ctx });
         console.log('[agent-router] forcing agent-send to', delegatedTarget);
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
+        const forcedDelegationMessage = taskFrameOwnerTarget && activeTaskFrame
+          ? [
+              enrichMessageWithProjectContext(text, historyMessages),
+              '',
+              '--- Task Frame Context ---',
+              `Frame: ${activeTaskFrame.title || activeTaskFrame.objective || activeTaskFrame.kind}`,
+              activeTaskFrame.objective ? `Objective: ${activeTaskFrame.objective}` : '',
+              activeTaskFrame.projectName ? `Project: ${activeTaskFrame.projectName}` : '',
+              activeTaskFrame.localPath ? `Local path: ${activeTaskFrame.localPath}` : '',
+              activeTaskFrame.repoUrl ? `Repo URL: ${activeTaskFrame.repoUrl}` : '',
+              activeTaskFrame.toolProfile?.length ? `Tool profile: ${activeTaskFrame.toolProfile.join(', ')}` : '',
+              taskFrameDecision?.plan ? `Fast-path plan: ${taskFrameDecision.plan}` : '',
+              '---',
+            ].filter(Boolean).join('\n')
+          : enrichMessageWithProjectContext(text, historyMessages);
         const forcedRaw = await traceAsyncStep('forced_delegation', () => executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
-          message: enrichMessageWithProjectContext(text, historyMessages),
+          message: forcedDelegationMessage,
           ...delegationArgsFromDurability(durabilityDecision, text),
         }), { targetAgentId: delegatedTarget });
         const forced = JSON.parse(forcedRaw || '{}');
@@ -1961,6 +2016,12 @@ async function main() {
         projectName: unifiedPlan.taskFrame?.projectName || '',
         repoUrl: unifiedPlan.taskFrame?.repoUrl || '',
         localPath: unifiedPlan.taskFrame?.localPath || '',
+        ownerAgentId: unifiedPlan.teamRouting === 'delegate_to_specialist' && unifiedPlan.targetAgentId
+          ? unifiedPlan.targetAgentId
+          : (unifiedPlan.teamRouting === 'current_agent'
+              ? agentId
+              : (unifiedPlan.taskFrame?.ownerAgentId || activeTaskFrame?.ownerAgentId || '')),
+        teamId: unifiedPlan.taskFrame?.teamId || focusedProjectTeamId || activeTaskFrame?.teamId || '',
         toolProfile: unifiedPlan.taskFrame?.toolProfile?.length ? unifiedPlan.taskFrame.toolProfile : unifiedPlan.skills,
         plan: unifiedPlan.taskFrame?.plan || unifiedPlan.plan || '',
         reason: unifiedPlan.reason || '',
