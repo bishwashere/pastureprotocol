@@ -83,6 +83,7 @@ import {
   buildProjectTeamGateReply,
   enrichMessageWithProjectContext,
   getProjectTeamId,
+  listProjectsForTeam,
   resolveFocusedProjectForTurn,
 } from './lib/context/projects-context.js';
 import { getAgentTeamId } from './lib/agent/teams.js';
@@ -1313,9 +1314,13 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
-    const focusedProject = resolveFocusedProjectForTurn({ userText: text, historyMessages });
-    const focusedProjectTeamId = getProjectTeamId(focusedProject);
     const activeAgentTeamId = getAgentTeamId(agentId);
+    let focusedProject = resolveFocusedProjectForTurn({ userText: text, historyMessages });
+    if (!focusedProject && activeAgentTeamId) {
+      const teamProjects = listProjectsForTeam(activeAgentTeamId);
+      if (teamProjects.length === 1) focusedProject = teamProjects[0];
+    }
+    const focusedProjectTeamId = getProjectTeamId(focusedProject);
     // Step 1.5: classify work-mode for this turn (LLM, MD-driven).
     //
     // Two-tier gating:

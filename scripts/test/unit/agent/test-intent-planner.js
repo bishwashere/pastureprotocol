@@ -17,6 +17,7 @@ const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
 
 dotenv.config({ path: join(homedir(), '.pasture', '.env') });
 
+const { loadPrompt } = await import('../../../../lib/agent/md-llm.js');
 const { planIntent } = await import('../../../../lib/agent/intent-planner.js');
 const { getEnabledSkillSummaries } = await import('../../../../skills/loader.js');
 
@@ -97,6 +98,14 @@ async function runCase(tc) {
 async function main() {
   console.log('Intent planner routing tests (with skill summaries)\n');
 
+  const routerPrompt = loadPrompt('turn-router');
+  if (!routerPrompt.includes('Code and file implementation')) {
+    throw new Error('turn-router prompt must include implementation routing guidance');
+  }
+  if (!routerPrompt.includes('write`, `edit`, `go-write`, or `apply-patch`')) {
+    throw new Error('turn-router prompt must tell implementation turns to include write-capable skills');
+  }
+
   const weatherPhrasings = [
     'Hows the weather today',
     'Is it going to rain today?',
@@ -167,6 +176,39 @@ async function main() {
   if (durablePlan.executionMode !== 'persistent_delegation') throw new Error(`Expected persistent_delegation: ${JSON.stringify(durablePlan)}`);
   if (durablePlan.usesExistingWorkIntake !== true) throw new Error(`Expected usesExistingWorkIntake=true: ${JSON.stringify(durablePlan)}`);
   console.log('  Durable work constraint → ✅  mode=' + durablePlan.mode + ' skills=[' + durablePlan.skills.join(', ') + ']');
+
+  const implementationPlan = await planIntent({
+    userText: 'Go ahead and apply patches for the approved task status feature.',
+    historyMessages: [
+      { role: 'user', content: 'Implement successful/failed/pending task states in My Work List.' },
+      { role: 'assistant', content: 'I can do that once write tools are available.' },
+    ],
+    availableSkillIds: ['read', 'go-read', 'write', 'edit', 'go-write', 'apply-patch', 'search'],
+    availableSkillSummaries: [
+      { id: 'read', description: 'Read files from the workspace.' },
+      { id: 'go-read', description: 'Inspect local files and directories.' },
+      { id: 'write', description: 'Write files.' },
+      { id: 'edit', description: 'Edit existing files.' },
+      { id: 'go-write', description: 'Run allowlisted filesystem write operations.' },
+      { id: 'apply-patch', description: 'Apply code patches to files.' },
+      { id: 'search', description: 'Search the web.' },
+    ],
+    llmChat: async () => JSON.stringify({
+      mode: 'code',
+      skills: ['read', 'go-read', 'write', 'edit', 'go-write', 'apply-patch'],
+      executionMode: 'tool_use',
+      usesExistingWorkIntake: true,
+      plan: 'Continue the approved implementation by inspecting the repo, applying patches, and verifying the changed files.',
+      answer_style: 'short',
+    }),
+  });
+  for (const id of ['read', 'go-read', 'write', 'edit', 'go-write', 'apply-patch']) {
+    if (!implementationPlan.skills.includes(id)) {
+      throw new Error(`Implementation plan missing ${id}: ${JSON.stringify(implementationPlan)}`);
+    }
+  }
+  if (implementationPlan.mode !== 'code') throw new Error(`Expected implementation mode=code: ${JSON.stringify(implementationPlan)}`);
+  console.log('  Implementation routing constraint → ✅  skills=[' + implementationPlan.skills.join(', ') + ']');
 
   const rows = [];
   let failed = 0;

@@ -60,10 +60,23 @@ const checks = [
   },
   {
     name: 'router prompts preserve short grounded follow-ups',
-    ok: selfInspectionClassifier.includes('Short follow-up requests that inherit a recent self-inspection topic') &&
-      selfInspectionClassifier.includes('User: `what are top 5`') &&
+    ok: selfInspectionClassifier.includes('normal work done with a skill or project') &&
+      selfInspectionClassifier.includes('diagnose Pasture/CowCode behavior') &&
       turnRouter.includes('Use recent conversation to resolve short follow-ups') &&
       turnRouter.includes('rather than treating it as casual chat'),
+  },
+  {
+    name: 'router prompts keep implementation turns write-capable',
+    ok: selfInspectionClassifier.includes('writing, editing, cloning') &&
+      turnRouter.includes('Code and file implementation') &&
+      turnRouter.includes('apply patches') &&
+      turnRouter.includes('write`, `edit`, `go-write`, or `apply-patch`'),
+  },
+  {
+    name: 'final policy prevents ungrounded progress claims',
+    ok: policy.includes('Do not claim that code was written') &&
+      policy.includes('no write-capable tool was available in this turn') &&
+      policy.includes('current turn did not expose write tools'),
   },
 ];
 
