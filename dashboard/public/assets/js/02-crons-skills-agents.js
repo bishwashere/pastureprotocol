@@ -2912,7 +2912,7 @@ function renderSystemCronVariant(row) {
           ? 'Brain map failed'
           : totalFiles
             ? 'Processing ' + doneFiles + '/' + totalFiles + ' files'
-            : (fallbackLabel || 'Building brain map');
+            : (fallbackLabel || 'Generating brain graph');
       }
       if (detailEl) {
         var parts = [];
@@ -2927,7 +2927,7 @@ function renderSystemCronVariant(row) {
           progress && progress.phase === 'collecting' ? 'Collecting memory and history' :
           progress && progress.phase === 'quality' ? 'Refining graph quality' :
           progress && progress.phase === 'error' ? 'Request failed' :
-          'Preparing sources'
+          'Generate clicked: preparing sources'
         );
       }
     }
@@ -2937,11 +2937,11 @@ function renderSystemCronVariant(row) {
       stopBrainLoadingProgress();
       cloud.innerHTML =
         '<div class="brain-loading" role="status" aria-live="polite">' +
-          '<div class="brain-loading-label">' + escapeHtml(label || 'Building brain map') + '</div>' +
+          '<div class="brain-loading-label">' + escapeHtml(label || 'Generating brain graph') + '</div>' +
           '<div class="brain-loading-track" aria-hidden="true">' +
             '<span class="brain-loading-bar" style="width: 6%"></span>' +
           '</div>' +
-          '<div class="brain-loading-detail">Preparing sources</div>' +
+          '<div class="brain-loading-detail">Generate clicked: preparing sources</div>' +
         '</div>';
       if (!progressId) return;
       brainLoadingTimer = setInterval(async function () {
@@ -3879,7 +3879,7 @@ function renderSystemCronVariant(row) {
       if (!cloud) return;
       if (brainCloudAbortController) {
         var metaBusy = document.getElementById('brain-meta');
-        if (metaBusy) metaBusy.textContent = 'Brain map rebuild already running...';
+        if (metaBusy) metaBusy.textContent = 'Brain graph generation already running...';
         return;
       }
       var requestSeq = ++brainCloudRequestSeq;
@@ -3898,7 +3898,7 @@ function renderSystemCronVariant(row) {
         if (refresh) showBrainLoadingProgress(cloud, hasGraph ? 'Rebuilding brain map' : 'Generating brain map', progressId);
       }
       var meta = document.getElementById('brain-meta');
-      if (meta && !refresh) meta.textContent = 'Checking cached brain map...';
+      if (meta && !refresh) meta.textContent = 'Checking for saved brain graph...';
       try {
         saveBrainSettings();
         var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(progressId);
