@@ -255,56 +255,44 @@ function createStateDir(fakeLlmPort) {
   return stateDir;
 }
 
-function runTurn(message, stateDir) {
+function runLiveConversation(stateDir) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['index.js', '--test', message, '--test-jid', TEST_JID], {
+    const child = spawn(process.execPath, ['index.js', '--test-live', '--test-jid', TEST_JID], {
       cwd: ROOT,
       env: { ...process.env, PASTURE_STATE_DIR: stateDir },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '';
     let stderr = '';
+    let nextTurnIndex = 0;
+    let completedCycles = 0;
+    let finished = false;
     const timeout = setTimeout(() => {
       child.kill('SIGTERM');
       reject(new Error(`Timed out after ${TIMEOUT_MS / 1000}s`));
     }, TIMEOUT_MS);
+    function sendNextTurn() {
+      if (finished || nextTurnIndex >= TURNS.length) return;
+      child.stdin.write(`${TURNS[nextTurnIndex]}\n`);
+      nextTurnIndex += 1;
+      if (nextTurnIndex >= TURNS.length) child.stdin.end();
+    }
+    function countCycleEnds(chunk) {
+      let count = 0;
+      let idx = String(chunk).indexOf('[END CYCLE]');
+      while (idx >= 0) {
+        count += 1;
+        idx = String(chunk).indexOf('[END CYCLE]', idx + 1);
+      }
+      return count;
+    }
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    let stdoutLineBuffer = '';
-    let suppressE2EReply = false;
-    function shouldHideHarnessLine(line) {
-      const trimmed = line.trim();
-      if (trimmed.includes('E2E_REPLY_START')) {
-        suppressE2EReply = true;
-        return true;
-      }
-      if (trimmed.includes('E2E_REPLY_END')) {
-        suppressE2EReply = false;
-        return true;
-      }
-      if (suppressE2EReply) return true;
-      if (trimmed.includes('E2E_SKILLS_CALLED:')) return true;
-      if (trimmed.includes('] [test] ') || trimmed.startsWith('[test] ')) return true;
-      return false;
-    }
-    function writeLiveStdout(chunk) {
-      stdoutLineBuffer += chunk;
-      let newlineIndex = stdoutLineBuffer.indexOf('\n');
-      while (newlineIndex >= 0) {
-        const line = stdoutLineBuffer.slice(0, newlineIndex + 1);
-        stdoutLineBuffer = stdoutLineBuffer.slice(newlineIndex + 1);
-        if (!shouldHideHarnessLine(line)) process.stdout.write(line);
-        newlineIndex = stdoutLineBuffer.indexOf('\n');
-      }
-    }
-    function flushLiveStdout() {
-      if (!stdoutLineBuffer) return;
-      if (!shouldHideHarnessLine(stdoutLineBuffer)) process.stdout.write(stdoutLineBuffer);
-      stdoutLineBuffer = '';
-    }
     child.stdout.on('data', (chunk) => {
-      stdout += chunk;
-      writeLiveStdout(chunk);
+      process.stdout.write(chunk);
+      completedCycles += countCycleEnds(chunk);
+      if (completedCycles >= nextTurnIndex && nextTurnIndex < TURNS.length) {
+        setTimeout(sendNextTurn, 250);
+      }
     });
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
@@ -315,29 +303,19 @@ function runTurn(message, stateDir) {
       reject(err);
     });
     child.on('close', (code) => {
+      finished = true;
       clearTimeout(timeout);
-      flushLiveStdout();
-      const start = stdout.indexOf('E2E_REPLY_START');
-      const end = stdout.indexOf('E2E_REPLY_END');
-      if (start === -1 || end === -1 || end <= start) {
-        reject(new Error(`No E2E reply markers (exit ${code}). stderr: ${stderr.slice(-800)} stdout: ${stdout.slice(-1200)}`));
-        return;
-      }
-      const reply = stdout
-        .slice(start + 'E2E_REPLY_START'.length, end)
-        .split('\n')
-        .map((line) => line.trimEnd())
-        .filter((line) => !/^\[\d{4}-\d{2}-\d{2}T/.test(line.trim()))
-        .join('\n')
-        .trim();
-      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
-      const skillsCalled = skillsMatch ? skillsMatch[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
       if (code !== 0) {
-        reject(new Error(`Process exited ${code}. Reply: ${reply}`));
+        reject(new Error(`Process exited ${code}. stderr: ${stderr.slice(-800)}`));
         return;
       }
-      resolve({ reply, skillsCalled, stdout });
+      if (completedCycles < TURNS.length) {
+        reject(new Error(`Only completed ${completedCycles}/${TURNS.length} synthetic turns.`));
+        return;
+      }
+      resolve();
     });
+    sendNextTurn();
   });
 }
 
@@ -346,10 +324,7 @@ async function main() {
   const fakeLlm = await startFakeLlmServer(`http://127.0.0.1:${weather.port}`);
   const stateDir = createStateDir(fakeLlm.port);
   try {
-    for (let i = 0; i < TURNS.length; i += 1) {
-      const user = TURNS[i];
-      await runTurn(user, stateDir);
-    }
+    await runLiveConversation(stateDir);
   } finally {
     fakeLlm.server.close();
     weather.server.close();

@@ -560,7 +560,7 @@ async function main() {
   const needAuth = !existsSync(getAuthDir()) || !existsSync(credsPath);
 
   // E2E tests need the mock socket regardless of channel config.
-  if (process.argv.includes('--test')) {
+  if (process.argv.includes('--test') || process.argv.includes('--test-live')) {
     sock = {
       sendMessage: async () => ({ key: { id: 'test-' + Date.now() } }),
       sendPresenceUpdate: async () => {},
@@ -2176,7 +2176,7 @@ async function main() {
               }).catch((err) =>
                 console.error('[memory] auto-index failed:', err.message)
               );
-              if (process.argv.includes('--test')) await indexPromise;
+              if (process.argv.includes('--test') || process.argv.includes('--test-live')) await indexPromise;
             } else {
               const out = appendExchange(getWorkspaceDir(), exchange);
               logMeta = out;
@@ -2226,6 +2226,45 @@ async function main() {
 
   // --test / --test-group: run main code path once with mock socket (set above), then exit. No WhatsApp auth.
   // E2E tests capture stdout and parse E2E_REPLY_START...E2E_REPLY_END to assert on the reply.
+  const testLiveMode = process.argv.includes('--test-live');
+  if (testLiveMode) {
+    const argValue = (flag, fallback = '') => {
+      const idx = process.argv.indexOf(flag);
+      if (idx === -1) return fallback;
+      const next = process.argv[idx + 1];
+      if (!next || String(next).startsWith('--')) return fallback;
+      return next;
+    };
+    const testAgentId = argValue('--test-agent', '');
+    const testJid = argValue('--test-jid', 'test@s.whatsapp.net');
+    const lastSent = new Map();
+    const sentIds = { current: new Set() };
+    let stdinBuffer = '';
+    async function runLiveTestMessage(raw) {
+      const testMsg = String(raw || '').trim();
+      if (!testMsg) return;
+      try {
+        await runAgentWithSkills(sock, testJid, testMsg, lastSent, testJid, sentIds, {
+          ...(testAgentId ? { agentIdOverride: testAgentId } : {}),
+        });
+      } catch (err) {
+        console.error('[test-live] message failed:', getErrorMessageForLog(err));
+      }
+    }
+    for await (const chunk of process.stdin) {
+      stdinBuffer += String(chunk);
+      let newlineIdx = stdinBuffer.indexOf('\n');
+      while (newlineIdx >= 0) {
+        const line = stdinBuffer.slice(0, newlineIdx);
+        stdinBuffer = stdinBuffer.slice(newlineIdx + 1);
+        await runLiveTestMessage(line);
+        newlineIdx = stdinBuffer.indexOf('\n');
+      }
+    }
+    if (stdinBuffer.trim()) await runLiveTestMessage(stdinBuffer);
+    process.exit(0);
+  }
+
   const testGroupMode = process.argv.includes('--test-group');
   if (process.argv.includes('--test') || testGroupMode) {
     const testFlag = testGroupMode ? '--test-group' : '--test';
@@ -2650,7 +2689,7 @@ async function main() {
   }
 
   // Telegram-only or test: single run, no reconnect
-  if (telegramOnlyMode || process.argv.includes('--test')) {
+  if (telegramOnlyMode || process.argv.includes('--test') || process.argv.includes('--test-live')) {
     runBot(sock, {});
     return;
   }
