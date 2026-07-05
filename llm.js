@@ -140,11 +140,20 @@ let _dailyLimitReachedDate = null;
 
 function llmLogPrefix() {
   const step = getActiveTrace()?.flowStep;
-  return step ? `[LLM - ${step}]` : '[LLM]';
+  return step ? `[LLM] [${step}]` : '[LLM]';
 }
 
 function logLlm(...args) {
   console.log(llmLogPrefix(), ...args);
+}
+
+function llmEventLogPrefix() {
+  const step = getActiveTrace()?.flowStep;
+  return step ? `[${step}]` : '[llm]';
+}
+
+function logLlmEvent(...args) {
+  console.log(llmEventLogPrefix(), ...args);
 }
 
 /**
@@ -164,7 +173,7 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   }
   usage.count += 1;
   writeUsage(usage);
-  logLlm(`daily usage: ${usage.count}/${limit}`);
+  logLlmEvent('[llm-usage]', `${usage.count}/${limit}`);
 }
 
 /**
@@ -486,7 +495,7 @@ function loadConfig(options = {}) {
       const isLocal = m.baseUrl && /127\.0\.0\.1|localhost/i.test(m.baseUrl);
       if (isLocal) return true;
       const hasKey = m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '';
-      if (!hasKey) logLlm('skipping model (API key not set):', m.model || m.baseUrl);
+      if (!hasKey) logLlmEvent('[llm-config] skipping model (API key not set):', m.model || m.baseUrl);
       return hasKey;
     });
     // When any model has priority, try it first regardless of position in config.
@@ -645,11 +654,11 @@ export async function chat(messages, options = {}) {
       return content;
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        logLlm('local rate limit reached, rejecting request:', err.message);
+        logLlmEvent('[llm-rate-limit] local rate limit reached, rejecting request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        logLlm('cloud daily limit reached, skipping:', label);
+        logLlmEvent('[llm-rate-limit] cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
@@ -711,11 +720,11 @@ export async function chatWithTools(messages, tools, options = {}) {
       });
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        logLlm('local rate limit reached, rejecting request:', err.message);
+        logLlmEvent('[llm-rate-limit] local rate limit reached, rejecting request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        logLlm('cloud daily limit reached, skipping:', label);
+        logLlmEvent('[llm-rate-limit] cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
@@ -789,11 +798,11 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       return intent;
     } catch (err) {
       if (isLocalRateLimitError(err)) {
-        logLlm('local rate limit reached, rejecting intent request:', err.message);
+        logLlmEvent('[llm-rate-limit] local rate limit reached, rejecting intent request:', err.message);
         throw err;
       }
       if (isDailyLimitFallbackError(err)) {
-        logLlm('cloud daily limit reached, trying next model:', label);
+        logLlmEvent('[llm-rate-limit] cloud daily limit reached, trying next model:', label);
         lastError = err;
         continue;
       }
@@ -895,7 +904,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
-        logLlm('cloud daily limit reached, trying next model:', label);
+        logLlmEvent('[llm-rate-limit] cloud daily limit reached, trying next model:', label);
         lastError = err;
         continue;
       }

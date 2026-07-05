@@ -1274,7 +1274,6 @@ async function main() {
     console.log('[USER]');
     logFlow(FLOW_STEP.RECEIVE, 'message:', text);
     console.log('[AGENT]');
-    logFlow(FLOW_STEP.RECEIVE, '[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
