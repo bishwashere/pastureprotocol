@@ -103,6 +103,7 @@ import {
   delegationArgsFromDurability,
 } from './lib/context/work-durability.js';
 import {
+  classifyTaskFrameStatusAfterTurn,
   classifyTaskFrameTurn,
   clearTaskFrame,
   shouldUseTaskFrameFastPath,
@@ -1354,6 +1355,8 @@ async function main() {
       console.log('[task-frame]', JSON.stringify({
         action: taskFrameDecision.action,
         confidence: taskFrameDecision.confidence,
+        mustUseTool: taskFrameDecision.mustUseTool,
+        resemblance: taskFrameDecision.resemblance,
         kind: taskFrameDecision.kind,
         title: taskFrameDecision.title || '',
         activeFrameId: activeTaskFrame?.id || '',
@@ -1367,6 +1370,8 @@ async function main() {
         message: taskFrameDecision.reason || taskFrameDecision.plan || '',
         details: {
           confidence: taskFrameDecision.confidence,
+          mustUseTool: taskFrameDecision.mustUseTool,
+          resemblance: taskFrameDecision.resemblance,
           kind: taskFrameDecision.kind,
           title: taskFrameDecision.title,
           activeFrameId: activeTaskFrame?.id || '',
@@ -1488,6 +1493,7 @@ async function main() {
           mustUseTool: unifiedPlan.mustUseTool,
           fallbackToolPolicy: unifiedPlan.fallbackToolPolicy,
           taskFrameAction: unifiedPlan.taskFrameAction,
+          taskFrameSeedPolicy: unifiedPlan.taskFrameSeedPolicy,
           taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
           projectOrMissionIntent: unifiedPlan.projectOrMissionIntent,
           reason: unifiedPlan.reason,
@@ -1510,6 +1516,7 @@ async function main() {
             mustUseTool: unifiedPlan.mustUseTool,
             fallbackToolPolicy: unifiedPlan.fallbackToolPolicy,
             taskFrameAction: unifiedPlan.taskFrameAction,
+            taskFrameSeedPolicy: unifiedPlan.taskFrameSeedPolicy,
             taskFrameStatusHint: unifiedPlan.taskFrameStatusHint,
           },
         });
@@ -1537,9 +1544,10 @@ async function main() {
           console.log('[work-mode]', JSON.stringify({ mode: workMode, source: 'unified_planner' }));
         }
       } else {
+        const canUseActiveFrameFallback = activeTaskFrame && ['continue_fast', 'continue_replan'].includes(taskFrameDecision?.action || '');
         console.log('[unified-planner]', JSON.stringify({
           skipped: 'no_plan_safe_fallback',
-          fallback: activeTaskFrame && taskFrameDecision?.action !== 'new_candidate' ? 'active_frame_profile' : 'no_tools',
+          fallback: canUseActiveFrameFallback ? 'active_frame_profile' : 'no_tools',
         }));
       }
     }
@@ -1653,14 +1661,15 @@ async function main() {
         details: delegationDecision,
       });
     }
+    const canUseActiveFrameFallback = activeTaskFrame && ['continue_fast', 'continue_replan'].includes(taskFrameDecision?.action || '');
     const plannerFailureFallbackRoute = !taskFrameFastPath && !isGroupJid && !unifiedPlan
-      ? (activeTaskFrame && taskFrameDecision?.action !== 'new_candidate'
+      ? (canUseActiveFrameFallback
           ? {
               mode: activeTaskFrame.kind === 'repo_work' || activeTaskFrame.kind === 'feature_work' || activeTaskFrame.kind === 'debugging' ? 'code' : 'tool',
               skills: Array.isArray(activeTaskFrame.toolProfile) ? activeTaskFrame.toolProfile : [],
               executionMode: 'tool_use',
               usesExistingWorkIntake: true,
-              plan: `Planner failed; use active Task Frame profile for ${activeTaskFrame.objective || activeTaskFrame.title || activeTaskFrame.kind}.`,
+              plan: `Planner failed after Task Frame continuation precheck; use active Task Frame profile for ${activeTaskFrame.objective || activeTaskFrame.title || activeTaskFrame.kind}.`,
               answer_style: 'short',
               fallbackToolPolicy: 'active_frame_profile',
             }
@@ -1838,10 +1847,40 @@ async function main() {
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
-    const validPostTurnFrameStatuses = new Set(['continue', 'completed', 'blocked', 'mismatch']);
-    const postTurnTaskFrameStatus = validPostTurnFrameStatuses.has(rawTaskFrameStatus)
-      ? rawTaskFrameStatus
-      : (unifiedPlan?.taskFrameStatusHint && unifiedPlan.taskFrameStatusHint !== 'continue' ? unifiedPlan.taskFrameStatusHint : '');
+    const validPostTurnFrameStatuses = new Set(['continue', 'completed', 'blocked', 'mismatch', 'waiting_user']);
+    let postTurnTaskFrameStatus = validPostTurnFrameStatuses.has(rawTaskFrameStatus) ? rawTaskFrameStatus : '';
+    let postTurnTaskFrameReason = '';
+    const plannedFrameForStatus = unifiedPlan && ['new', 'update', 'replace', 'close'].includes(unifiedPlan.taskFrameAction)
+      ? {
+          ...(activeTaskFrame || {}),
+          ...(unifiedPlan.taskFrame || {}),
+          status: activeTaskFrame?.status || 'active',
+        }
+      : null;
+    const frameForStatus = activeTaskFrame || plannedFrameForStatus;
+    if (!postTurnTaskFrameStatus && !isGroupJid && frameForStatus && rawTextToSend) {
+      const statusDecision = await traceAsyncStep('task_frame_status', () => classifyTaskFrameStatusAfterTurn({
+        frame: frameForStatus,
+        userText: text,
+        assistantText: rawTextToSend,
+        skillsCalled: skillsCalledFromTurn,
+        agentId,
+      }));
+      if (validPostTurnFrameStatuses.has(statusDecision?.status) && Number(statusDecision?.confidence || 0) >= 0.55) {
+        postTurnTaskFrameStatus = statusDecision.status;
+        postTurnTaskFrameReason = statusDecision.reason || '';
+        console.log('[task-frame-status]', JSON.stringify(statusDecision));
+      }
+    }
+    if (!postTurnTaskFrameStatus && unifiedPlan?.taskFrameStatusHint && unifiedPlan.taskFrameStatusHint !== 'continue') {
+      postTurnTaskFrameStatus = unifiedPlan.taskFrameStatusHint;
+      postTurnTaskFrameReason = 'planner_status_hint';
+    }
+    const statusToStoredFrameStatus = (status) => {
+      if (status === 'blocked') return 'blocked';
+      if (status === 'mismatch' || status === 'waiting_user') return 'waiting_user';
+      return undefined;
+    };
     if (taskFrameFastPath && activeTaskFrame) {
       if (postTurnTaskFrameStatus === 'completed') {
         const closed = clearTaskFrame(sessionLogKey, { reason: 'post_turn_completed' });
@@ -1863,14 +1902,13 @@ async function main() {
           userText: text,
           assistantText: rawTextToSend,
           skillsCalled: skillsCalledFromTurn,
-          status: postTurnTaskFrameStatus === 'blocked'
-            ? 'blocked'
-            : (postTurnTaskFrameStatus === 'mismatch' ? 'waiting_user' : undefined),
+          status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
         });
         console.log('[task-frame] updated', JSON.stringify({
           frameId: updatedFrame?.id || activeTaskFrame.id || '',
           status: updatedFrame?.status || activeTaskFrame.status || '',
           postTurnStatus: postTurnTaskFrameStatus || 'continue',
+          postTurnReason: postTurnTaskFrameReason,
           skillsCalled: skillsCalledFromTurn,
         }));
         logTeamActivity({
@@ -1882,10 +1920,25 @@ async function main() {
           details: {
             frameId: updatedFrame?.id || activeTaskFrame.id || '',
             postTurnStatus: postTurnTaskFrameStatus || 'continue',
+            postTurnReason: postTurnTaskFrameReason,
             skillsCalled: skillsCalledFromTurn,
           },
         });
       }
+    } else if (!isGroupJid && postTurnTaskFrameStatus === 'completed' && (activeTaskFrame || ['new', 'update', 'replace'].includes(unifiedPlan?.taskFrameAction || ''))) {
+      const closed = activeTaskFrame
+        ? clearTaskFrame(sessionLogKey, { reason: postTurnTaskFrameReason || 'post_turn_completed' })
+        : null;
+      activeTaskFrame = null;
+      console.log('[task-frame] completed', JSON.stringify({ frameId: closed?.id || '', reason: postTurnTaskFrameReason || 'post_turn_completed' }));
+      logTeamActivity({
+        type: 'task_frame_completed',
+        agentId,
+        status: 'completed',
+        jid,
+        message: postTurnTaskFrameReason || 'Task frame completed after turn.',
+        details: { frameId: closed?.id || '', source: 'post_turn_status' },
+      });
     } else if (!isGroupJid && unifiedPlan?.taskFrameAction === 'close') {
       const closed = clearTaskFrame(sessionLogKey, { reason: unifiedPlan.reason || 'unified_planner_close' });
       activeTaskFrame = null;
@@ -1898,9 +1951,9 @@ async function main() {
         message: unifiedPlan.reason || 'Task frame closed by unified planner.',
         details: { frameId: closed?.id || '', source: 'unified_planner' },
       });
-    } else if (!isGroupJid && unifiedPlan && ['new', 'update'].includes(unifiedPlan.taskFrameAction)) {
+    } else if (!isGroupJid && unifiedPlan && ['new', 'update', 'replace'].includes(unifiedPlan.taskFrameAction)) {
       const frameDecision = {
-        action: unifiedPlan.taskFrameAction === 'new' ? 'new' : 'continue',
+        action: unifiedPlan.taskFrameAction === 'new' || unifiedPlan.taskFrameAction === 'replace' ? 'new_candidate' : 'continue_replan',
         confidence: 0.8,
         kind: unifiedPlan.taskFrame?.kind || 'general_task',
         title: unifiedPlan.taskFrame?.title || '',
@@ -1914,17 +1967,20 @@ async function main() {
       };
       activeTaskFrame = upsertTaskFrame(sessionLogKey, frameDecision, activeTaskFrame, {
         userText: text,
-        replace: unifiedPlan.taskFrameAction === 'new',
+        replace: unifiedPlan.taskFrameAction === 'new' || unifiedPlan.taskFrameAction === 'replace',
       });
       const updatedFrame = updateTaskFrameAfterTurn(sessionLogKey, {
         userText: text,
         assistantText: rawTextToSend,
         skillsCalled: skillsCalledFromTurn,
+        status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
       });
       console.log('[task-frame] updated', JSON.stringify({
         frameId: updatedFrame?.id || activeTaskFrame?.id || '',
         status: updatedFrame?.status || activeTaskFrame?.status || '',
         action: unifiedPlan.taskFrameAction,
+        postTurnStatus: postTurnTaskFrameStatus || 'continue',
+        postTurnReason: postTurnTaskFrameReason,
         skillsCalled: skillsCalledFromTurn,
         source: 'unified_planner',
       }));
@@ -1936,6 +1992,8 @@ async function main() {
         message: updatedFrame?.objective || activeTaskFrame?.objective || activeTaskFrame?.title || 'Task frame updated.',
         details: {
           frameId: updatedFrame?.id || activeTaskFrame?.id || '',
+          postTurnStatus: postTurnTaskFrameStatus || 'continue',
+          postTurnReason: postTurnTaskFrameReason,
           skillsCalled: skillsCalledFromTurn,
           source: 'unified_planner',
         },

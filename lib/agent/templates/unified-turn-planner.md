@@ -42,6 +42,16 @@ If an active frame clearly applies, use it as context. If the user starts a new 
 
 `taskFrame.toolProfile` must contain only available skill IDs. For code/repo implementation, include both inspection and write/patch skills when available.
 
+If `taskFramePrecheck.action` is `continue_replan`, treat `activeTaskFrame` as strong context unless the latest message clearly contradicts it.
+
+If `taskFrameCandidate` exists, treat it as the preferred seed for a new frame:
+
+- `taskFrameSeedPolicy: "accept_candidate"` when the candidate is already right.
+- `taskFrameSeedPolicy: "revise_candidate"` when the candidate is useful but needs better tools/route/durability/delegation.
+- `taskFrameSeedPolicy: "reject_candidate"` only when it is clearly wrong.
+
+Use `taskFrameAction: "replace"` when the user switches from an old active frame to a different new task in the same turn.
+
 ## Code and file implementation
 
 If the user asks to implement, edit, modify, write, patch, apply patches, fix code, clone into a local repo, or continue an approved code task:
@@ -112,7 +122,8 @@ Return this exact JSON shape:
   "fallbackToolPolicy": "no_tools | active_frame_profile | full_tools",
   "projectOrMissionIntent": "none | discover | continue | status",
   "githubSourceIntent": false,
-  "taskFrameAction": "none | new | update | close",
+  "taskFrameAction": "none | new | update | close | replace",
+  "taskFrameSeedPolicy": "accept_candidate | revise_candidate | reject_candidate",
   "taskFrameStatusHint": "continue | completed | blocked | mismatch",
   "taskFrame": {
     "kind": "repo_work | project_work | feature_work | debugging | general_task",

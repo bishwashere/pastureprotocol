@@ -25,6 +25,15 @@ Return JSON only. No prose, no markdown fences.
 - Do not invent paths, URLs, project names, or tools.
 - `toolProfile` must contain only skill IDs from `availableSkillIds`.
 - For repo/code/file work, include both inspection skills and write-capable skills when available.
+- `continue_fast` means “same frame + safe to skip the Unified Planner.” It does NOT automatically mean a tool must be used.
+- Set `mustUseTool: true` only when the turn cannot be answered correctly without a tool call.
+- Set `mustUseTool: false` for explanations, confirmations, summaries from already-known context, or casual continuations.
+
+## Resemblance
+
+- `strong`: latest message clearly belongs to the active frame.
+- `weak`: latest message may belong to the active frame but should be replanned or handled carefully.
+- `none`: latest message does not resemble the active frame.
 
 ## Frame kinds
 
@@ -42,6 +51,8 @@ Use one of:
 {
   "action": "continue_fast | continue_replan | new_candidate | exit | ignore",
   "confidence": 0.0,
+  "mustUseTool": false,
+  "resemblance": "strong | weak | none",
   "kind": "repo_work | project_work | feature_work | debugging | general_task",
   "title": "",
   "objective": "",
