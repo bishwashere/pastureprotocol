@@ -3462,7 +3462,7 @@ function renderSystemCronVariant(row) {
       var fadingInfluence = pointer.fadingLineInfluences && pointer.fadingLineInfluences[key];
       if (fadingInfluence && pointer.lineFadeStartedAt) {
         var elapsed = performance.now() - pointer.lineFadeStartedAt;
-        var duration = pointer.lineFadeDuration || 420;
+        var duration = pointer.lineFadeDuration || 1120;
         var fade = elapsed >= duration ? 0 : 1 - brainEase(elapsed / duration);
         influence = Math.max(influence, fadingInfluence * fade);
       }
@@ -3768,7 +3768,7 @@ function renderSystemCronVariant(row) {
         fadingLineInfluences: {},
         lastVisualLineInfluences: {},
         lineFadeStartedAt: 0,
-        lineFadeDuration: 560,
+        lineFadeDuration: 1120,
       };
       var lockedFocus = null;
       var currentFocusMode = 'word';
