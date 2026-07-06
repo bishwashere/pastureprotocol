@@ -39,7 +39,7 @@ scripts/test/e2e/real/<area>/test-name.js
 scripts/test/e2e/fake/<area>/test-name.js
 ```
 
-Fake counterparts must not silently use real providers. They either run a deterministic local fake backend, or explicitly print a fake-skip message until that backend exists.
+Fake counterparts must not silently use real providers and must not pass as placeholders. They must run a deterministic local fake backend. A missing fake backend is a failing E2E test.
 
 ## What we are testing
 
