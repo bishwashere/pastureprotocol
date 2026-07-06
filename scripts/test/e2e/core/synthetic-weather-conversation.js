@@ -9,16 +9,18 @@
 
 import { createServer } from 'http';
 import { spawn } from 'child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { appendFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { tmpdir } from 'os';
+import { homedir, tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const TIMEOUT_MS = 90_000;
 const TEST_JID = 'synthetic-weather@s.whatsapp.net';
 const KEEP_STATE = process.argv.includes('--keep-state');
+const WRITE_DAEMON_LOG = process.argv.includes('--write-daemon-log');
+const DAEMON_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
 
 const TURNS = [
   "What's the weather in Enola today?",
@@ -255,6 +257,12 @@ function createStateDir(fakeLlmPort) {
   return stateDir;
 }
 
+function writeDaemonLog(chunk) {
+  if (!WRITE_DAEMON_LOG) return;
+  mkdirSync(dirname(DAEMON_LOG_PATH), { recursive: true });
+  appendFileSync(DAEMON_LOG_PATH, chunk, 'utf8');
+}
+
 function runLiveConversation(stateDir) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['index.js', '--test-live', '--test-jid', TEST_JID], {
@@ -289,6 +297,7 @@ function runLiveConversation(stateDir) {
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
       process.stdout.write(chunk);
+      writeDaemonLog(chunk);
       completedCycles += countCycleEnds(chunk);
       if (completedCycles >= nextTurnIndex && nextTurnIndex < TURNS.length) {
         setTimeout(sendNextTurn, 250);
@@ -297,6 +306,7 @@ function runLiveConversation(stateDir) {
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
       process.stderr.write(chunk);
+      writeDaemonLog(chunk);
     });
     child.on('error', (err) => {
       clearTimeout(timeout);

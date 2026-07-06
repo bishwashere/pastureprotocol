@@ -394,16 +394,13 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
-} else if (sub === 'logs--test' || (sub === 'logs' && args.includes('--test'))) {
+} else if (sub === 'test' && args[1] === 'logs') {
   const script = join(INSTALL_DIR, 'scripts', 'test', 'e2e', 'core', 'synthetic-weather-conversation.js');
   if (!existsSync(script)) {
     console.error('pasture: synthetic logs test not found. Re-run from a current install or repo checkout.');
     process.exit(1);
   }
-  const testArgs = sub === 'logs--test'
-    ? args.slice(1)
-    : args.slice(1).filter((arg) => arg !== '--test');
-  const child = spawn(process.execPath, [script, ...testArgs], {
+  const child = spawn(process.execPath, [script, '--write-daemon-log', ...args.slice(2)], {
     stdio: 'inherit',
     env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     cwd: INSTALL_DIR,
