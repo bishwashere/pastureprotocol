@@ -16,6 +16,8 @@ Call **run_skill** with **skill: "read"**. Set **command** or **arguments.action
 - **arguments.from** (optional) - Start at 1-based line number.
 - **arguments.lines** (optional) - Max number of lines to return (default: all).
 
+Prefer full absolute paths from the system root for filesystem reads. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use when the user says things like:

@@ -37,6 +37,8 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 - **arguments.params** (optional for sql) - SQL bind parameters as an array or object.
 - **arguments.maxRows** or **arguments.limit** (optional for sql) - Maximum returned rows, capped at 1000. Default: 200.
 
+Prefer full absolute paths from the system root for all filesystem paths, SQLite `path`, JSON `path`, and `cwd`. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use when the user asks to list a directory, find files, show disk usage (du), show file contents (cat/less), inspect a SQLite DB, count database rows, or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "find files", "what's in Downloads", "cat this file", "how big is this folder", "what tables are in this DB", etc.

@@ -18,6 +18,8 @@ Call **run_skill** with **skill: "apply-patch"**. Set **command** or **arguments
   - **-** - line to remove
   - **+** - line to add
 
+Prefer a full absolute path from the system root for `arguments.path`. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 Example hunk:
 ```
   const x = 1;
