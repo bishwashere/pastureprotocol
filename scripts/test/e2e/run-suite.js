@@ -73,6 +73,13 @@ function parseMode() {
   return 'real';
 }
 
+function parseOnly() {
+  const index = process.argv.indexOf('--only');
+  if (index >= 0) return process.argv[index + 1] || '';
+  const arg = process.argv.find((value) => value.startsWith('--only='));
+  return arg ? arg.slice('--only='.length) : '';
+}
+
 function timestamp() {
   return new Date().toISOString().slice(0, 19);
 }
@@ -130,9 +137,14 @@ function runOne(mode, name, script) {
   });
 }
 
-async function runLane(mode, tests) {
+async function runLane(mode, tests, only = '') {
   let failed = 0;
-  for (const [name, script] of tests) {
+  const selected = only ? tests.filter(([name]) => name === only) : tests;
+  if (only && selected.length === 0) {
+    console.error(`No ${mode} E2E test named "${only}".`);
+    return 1;
+  }
+  for (const [name, script] of selected) {
     const code = await runOne(mode, name, script);
     if (code !== 0) failed += 1;
   }
@@ -141,12 +153,13 @@ async function runLane(mode, tests) {
 
 async function main() {
   const mode = parseMode();
+  const only = parseOnly();
   let failed = 0;
   if (mode === 'real' || mode === 'all') {
-    failed += await runLane('real', REAL_TESTS);
+    failed += await runLane('real', REAL_TESTS, only);
   }
   if (mode === 'fake' || mode === 'all') {
-    failed += await runLane('fake', FAKE_TESTS);
+    failed += await runLane('fake', FAKE_TESTS, only);
   }
   if (failed) {
     console.error(`E2E suite failed: ${failed} test file(s) failed.`);
