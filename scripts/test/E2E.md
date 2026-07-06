@@ -25,8 +25,10 @@ The live log/weather conversation follows this same split:
 
 | Lane | Command |
 |---|---|
-| Real | `pasture test logs --real` or `pnpm run test:logs-real-e2e` |
-| Fake | `pasture test logs --fake` or `pnpm run test:logs-fake-e2e` |
+| Real | `pasture logs --test-live --real` or `pnpm run test:logs-real-e2e` |
+| Fake | `pasture logs --test-live --fake` or `pnpm run test:logs-fake-e2e` |
+
+`pasture logs --test-live` is the single CLI trigger for the live-log E2E cycle. It defaults to the fake/sandboxed lane unless `--real` is passed, and writes the run into the normal daemon log while streaming it in the terminal.
 
 Every real E2E file must have a fake counterpart at the same relative path:
 

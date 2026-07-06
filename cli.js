@@ -28,6 +28,30 @@ const IS_WIN = process.platform === 'win32';
 
 maybeBeginCliSession(sub, args);
 
+function runLiveLogTest(rawArgs = []) {
+  const script = join(INSTALL_DIR, 'scripts', 'test', 'e2e', 'real', 'core', 'live-log-conversation.js');
+  if (!existsSync(script)) {
+    console.error('pasture: live logs test not found. Re-run from a current install or repo checkout.');
+    process.exit(1);
+  }
+
+  const passthrough = rawArgs.filter((arg) => arg !== '--test-live');
+  const hasFake = passthrough.includes('--fake') || passthrough.includes('--mock');
+  const hasReal = passthrough.includes('--real');
+  if (hasFake && hasReal) {
+    console.error('pasture: choose either --fake or --real for logs --test-live, not both.');
+    process.exit(1);
+  }
+
+  const modeArgs = hasFake || hasReal ? passthrough : ['--fake', ...passthrough];
+  const child = spawn(process.execPath, [script, '--write-daemon-log', ...modeArgs], {
+    stdio: 'inherit',
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
+}
+
 function installHint() {
   if (IS_WIN) {
     console.error('  iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex');
@@ -394,35 +418,27 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
-} else if (sub === 'test' && args[1] === 'logs') {
-  const script = join(INSTALL_DIR, 'scripts', 'test', 'e2e', 'real', 'core', 'live-log-conversation.js');
-  if (!existsSync(script)) {
-    console.error('pasture: live logs test not found. Re-run from a current install or repo checkout.');
-    process.exit(1);
-  }
-  const child = spawn(process.execPath, [script, '--write-daemon-log', ...args.slice(2)], {
-    stdio: 'inherit',
-    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
-    cwd: INSTALL_DIR,
-  });
-  child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'logs') {
-  const stateDir = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
-  const logPath = join(stateDir, 'daemon.log');
-  if (process.platform === 'win32') {
-    const child = spawn('pm2', ['logs', 'pasture'], {
-      stdio: 'inherit',
-      env: process.env,
-      cwd: INSTALL_DIR,
-    });
-    child.on('close', (code) => process.exit(code ?? 0));
+  if (args.slice(1).includes('--test-live')) {
+    runLiveLogTest(args.slice(1));
   } else {
-    if (!existsSync(logPath)) {
-      console.error('pasture: no log file yet. Start the bot with: pasture start');
-      process.exit(1);
+    const stateDir = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
+    const logPath = join(stateDir, 'daemon.log');
+    if (process.platform === 'win32') {
+      const child = spawn('pm2', ['logs', 'pasture'], {
+        stdio: 'inherit',
+        env: process.env,
+        cwd: INSTALL_DIR,
+      });
+      child.on('close', (code) => process.exit(code ?? 0));
+    } else {
+      if (!existsSync(logPath)) {
+        console.error('pasture: no log file yet. Start the bot with: pasture start');
+        process.exit(1);
+      }
+      const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
+      child.on('close', (code) => process.exit(code ?? 0));
     }
-    const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
-    child.on('close', (code) => process.exit(code ?? 0));
   }
 } else if (sub === 'tide') {
   const tideScript = join(INSTALL_DIR, 'scripts', 'tide-cli.js');
@@ -652,7 +668,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('Usage: pasture start | stop | status | restart');
   console.log('       pasture setup');
   console.log('       pasture logs');
-  console.log('       pasture test logs [--fake|--real]');
+  console.log('       pasture logs --test-live [--fake|--real]');
   console.log('       pasture dashboard');
   console.log('       pasture tide checklist list|add|remove|run|triggers|enable|disable');
   console.log('       pasture index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
