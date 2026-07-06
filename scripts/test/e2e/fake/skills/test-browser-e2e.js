@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { skipFakeCounterpart } from '../skip-fake-counterpart.js';
+import { runNamedFakeE2E } from '../fake-app-e2e.js';
 
-skipFakeCounterpart('browser-e2e', 'scripts/test/e2e/real/skills/test-browser-e2e.js');
+await runNamedFakeE2E('browser-e2e');

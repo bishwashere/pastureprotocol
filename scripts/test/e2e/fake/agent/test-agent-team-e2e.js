@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { skipFakeCounterpart } from '../skip-fake-counterpart.js';
+import { runNamedFakeE2E } from '../fake-app-e2e.js';
 
-skipFakeCounterpart('agent-team-e2e', 'scripts/test/e2e/real/agent/test-agent-team-e2e.js');
+await runNamedFakeE2E('agent-team-e2e');

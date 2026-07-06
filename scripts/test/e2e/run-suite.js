@@ -11,13 +11,16 @@ const LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.p
 
 const REAL_TESTS = [
   ['agent', 'scripts/test/e2e/real/agent/test-agent.js'],
+  ['agent-send', 'scripts/test/e2e/real/agent/test-agent-send.js'],
   ['agent-team-e2e', 'scripts/test/e2e/real/agent/test-agent-team-e2e.js'],
+  ['agent-title', 'scripts/test/e2e/real/agent/test-agent-title.js'],
   ['casual-greetings-e2e', 'scripts/test/e2e/real/agent/test-casual-greetings.js'],
   ['basic-e2e', 'scripts/test/e2e/real/core/test-basic-e2e.js'],
   ['project-workflow-e2e', 'scripts/test/e2e/real/core/test-project-workflow-e2e.js'],
   ['dashboard-browser-e2e', 'scripts/test/e2e/real/dashboard/test-dashboard-browser-e2e.js'],
   ['apply-patch-e2e', 'scripts/test/e2e/real/skills/test-apply-patch-e2e.js'],
   ['browser-e2e', 'scripts/test/e2e/real/skills/test-browser-e2e.js'],
+  ['browser', 'scripts/test/e2e/real/skills/test-browser.js'],
   ['core-e2e', 'scripts/test/e2e/real/skills/test-core-e2e.js'],
   ['cron-e2e', 'scripts/test/e2e/real/skills/test-cron-e2e.js'],
   ['edit-e2e', 'scripts/test/e2e/real/skills/test-edit-e2e.js'],
@@ -38,13 +41,16 @@ const REAL_TESTS = [
 
 const FAKE_TESTS = [
   ['agent', 'scripts/test/e2e/fake/agent/test-agent.js'],
+  ['agent-send', 'scripts/test/e2e/fake/agent/test-agent-send.js'],
   ['agent-team-e2e', 'scripts/test/e2e/fake/agent/test-agent-team-e2e.js'],
+  ['agent-title', 'scripts/test/e2e/fake/agent/test-agent-title.js'],
   ['casual-greetings-e2e', 'scripts/test/e2e/fake/agent/test-casual-greetings.js'],
   ['basic-e2e', 'scripts/test/e2e/fake/core/test-basic-e2e.js'],
   ['project-workflow-e2e', 'scripts/test/e2e/fake/core/test-project-workflow-e2e.js'],
   ['dashboard-browser-e2e', 'scripts/test/e2e/fake/dashboard/test-dashboard-browser-e2e.js'],
   ['apply-patch-e2e', 'scripts/test/e2e/fake/skills/test-apply-patch-e2e.js'],
   ['browser-e2e', 'scripts/test/e2e/fake/skills/test-browser-e2e.js'],
+  ['browser', 'scripts/test/e2e/fake/skills/test-browser.js'],
   ['core-e2e', 'scripts/test/e2e/fake/skills/test-core-e2e.js'],
   ['cron-e2e', 'scripts/test/e2e/fake/skills/test-cron-e2e.js'],
   ['edit-e2e', 'scripts/test/e2e/fake/skills/test-edit-e2e.js'],
