@@ -95,7 +95,7 @@ function latestText(messages) {
 
 function plannerJson(skills, userText) {
   const wantsWeather = /weather|umbrella|tomorrow|humid|humidity|rain|shower/i.test(userText);
-  const searchSkill = skills.includes('search') ? ['search'] : [];
+  const httpSkill = skills.includes('http') ? ['http'] : [];
   return {
     workModeToggle: 'no_change',
     needsMultiAgent: false,
@@ -105,7 +105,7 @@ function plannerJson(skills, userText) {
     delegationAction: 'none',
     targetAgentId: '',
     mode: wantsWeather ? 'tool' : 'chat',
-    skills: wantsWeather ? searchSkill : [],
+    skills: wantsWeather ? httpSkill : [],
     executionMode: wantsWeather ? 'tool_use' : 'direct_answer',
     usesExistingWorkIntake: false,
     mustUseTool: wantsWeather,
@@ -127,9 +127,9 @@ function plannerJson(skills, userText) {
       toolProfile: [],
       plan: '',
     },
-    plan: wantsWeather ? 'Use search to answer the weather follow-up compactly.' : 'Answer directly.',
+    plan: wantsWeather ? 'Use http_get against the synthetic weather endpoint and answer compactly.' : 'Answer directly.',
     answer_style: 'short',
-    reason: wantsWeather ? 'Weather and weather follow-ups need current data.' : 'Casual chat does not need tools.',
+    reason: wantsWeather ? 'Weather and weather follow-ups need current data from the synthetic weather endpoint.' : 'Casual chat does not need tools.',
   };
 }
 
@@ -210,9 +210,11 @@ function startFakeLlmServer(weatherBaseUrl) {
     }
 
     if (tools.length && !hasToolResult && /weather|umbrella|tomorrow|humid|humidity|rain|shower/i.test(userText)) {
-      const name = toolNames.find((n) => n.includes('navigate')) || toolNames.find((n) => n.includes('search')) || toolNames[0];
+      const name = toolNames.find((n) => n === 'http_get') || toolNames.find((n) => n.includes('http')) || toolNames[0];
       const path = /tomorrow/i.test(userText) ? '/tomorrow' : (/humid|humidity|tonight/i.test(userText) ? '/humidity' : '/today');
-      const args = name.includes('navigate')
+      const args = name.includes('http')
+        ? { url: `${weatherBaseUrl}${path}`, timeoutMs: 5000 }
+        : name.includes('navigate')
         ? { url: `${weatherBaseUrl}${path}` }
         : { query: `Enola PA weather ${userText}` };
       jsonResponse(res, {
@@ -239,7 +241,7 @@ function startFakeLlmServer(weatherBaseUrl) {
 function createStateDir(fakeLlmPort) {
   const stateDir = mkdtempSync(join(tmpdir(), 'pasture-weather-convo-'));
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
-  writeFileSync(join(stateDir, 'config.json'), JSON.stringify({
+  const config = {
     llm: {
       models: [{
         provider: 'lmstudio',
@@ -251,9 +253,15 @@ function createStateDir(fakeLlmPort) {
       maxTokens: 1000,
     },
     skills: {
-      enabled: ['search'],
+      enabled: ['http'],
     },
-  }, null, 2));
+    memory: {
+      enabled: false,
+    },
+  };
+  writeFileSync(join(stateDir, 'config.json'), JSON.stringify(config, null, 2));
+  mkdirSync(join(stateDir, 'agents', 'main'), { recursive: true });
+  writeFileSync(join(stateDir, 'agents', 'main', 'config.json'), JSON.stringify(config, null, 2));
   return stateDir;
 }
 
