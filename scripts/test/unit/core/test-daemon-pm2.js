@@ -23,6 +23,12 @@ function checkCliUsesPm2OnWindows() {
   if (!src.includes('update.ps1') || !src.includes('runWindowsUninstall')) {
     return { ok: false, detail: 'cli.js missing native Windows update/uninstall' };
   }
+  const uninstallIdx = src.indexOf("sub === 'uninstall'");
+  const windowsUninstallIdx = src.indexOf('runWindowsUninstall', uninstallIdx);
+  const shellUninstallIdx = src.indexOf('uninstall.sh', uninstallIdx);
+  if (uninstallIdx < 0 || windowsUninstallIdx < uninstallIdx || shellUninstallIdx < uninstallIdx || windowsUninstallIdx > shellUninstallIdx) {
+    return { ok: false, detail: 'cli.js must run native Windows uninstall before the bash uninstall.sh path' };
+  }
   return { ok: true, detail: 'cli.js routes win32 start/stop/update/uninstall without bash' };
 }
 

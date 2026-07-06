@@ -78,6 +78,21 @@ const SKILLS_DIR = join(INSTALL_DIR, 'skills');
 
 function getDaemonRunning() {
   return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      const child = spawn('pm2', ['describe', 'pasture', '--no-color'], {
+        cwd: INSTALL_DIR,
+        env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+        shell: true,
+      });
+      let out = '';
+      child.stdout.on('data', (c) => { out += c; });
+      child.stderr.on('data', (c) => { out += c; });
+      child.on('close', (code) => {
+        resolve(code === 0 && /\bstatus\b/i.test(out) && /\bonline\b/i.test(out));
+      });
+      child.on('error', () => resolve(false));
+      return;
+    }
     if (!existsSync(DAEMON_SCRIPT)) {
       resolve(false);
       return;
@@ -3742,7 +3757,8 @@ app.post('/api/llm/usage/reset', (_req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const payload = JSON.stringify({ date: today, count: 0 });
     const dest = getLlmUsagePath();
-    execSync(`printf '%s' ${JSON.stringify(payload)} > ${JSON.stringify(dest)}`, { shell: true });
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, payload, 'utf8');
     res.json({ ok: true, date: today, count: 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
