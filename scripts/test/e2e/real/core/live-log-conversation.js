@@ -409,7 +409,7 @@ function runLiveConversation(stateDir) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['index.js', '--test-live', '--test-jid', TEST_JID], {
       cwd: ROOT,
-      env: { ...process.env, PASTURE_STATE_DIR: stateDir },
+      env: { ...process.env, PASTURE_STATE_DIR: stateDir, PASTURE_E2E_LIVE_LOG: '' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stderr = '';

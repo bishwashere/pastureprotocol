@@ -54,6 +54,7 @@ function parseE2EStdout(stdout) {
  */
 export function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
+  env.PASTURE_E2E_LIVE_LOG = '1';
   if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   if (opts.secondMessage) env.TEST_MESSAGE_2 = opts.secondMessage;
   const timeoutMs = opts.timeoutMs || PER_TEST_TIMEOUT_MS;
@@ -102,6 +103,7 @@ export function runE2E(userMessage, opts = {}) {
  */
 export function runDashboardE2E(message, opts = {}) {
   const env = { ...process.env };
+  env.PASTURE_E2E_LIVE_LOG = '1';
   if (opts.stateDir) env.PASTURE_STATE_DIR = opts.stateDir;
   const timeoutMs = opts.timeoutMs || PER_TEST_TIMEOUT_MS;
   return new Promise((resolve, reject) => {

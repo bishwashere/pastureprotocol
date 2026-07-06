@@ -71,7 +71,8 @@ import {
 } from './lib/util/request-timing.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from 'fs';
+import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync, appendFileSync } from 'fs';
+import { homedir } from 'os';
 import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
@@ -233,6 +234,8 @@ const _consoleInfo = console.info;
 const _consoleDebug = console.debug;
 const _consoleWarn = console.warn;
 const _consoleError = console.error;
+const E2E_LIVE_LOG_ENABLED = process.env.PASTURE_E2E_LIVE_LOG === '1';
+const E2E_LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
 function tsPrefix() {
   return `[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}]`;
 }
@@ -246,11 +249,31 @@ function redactConsoleArgs(args) {
     return a;
   });
 }
-console.log = (...args) => _consoleLog(tsPrefix(), ...redactConsoleArgs(args));
-console.info = (...args) => _consoleInfo(tsPrefix(), ...redactConsoleArgs(args));
-console.debug = (...args) => _consoleDebug(tsPrefix(), ...redactConsoleArgs(args));
-console.warn = (...args) => _consoleWarn(tsPrefix(), ...redactConsoleArgs(args));
-console.error = (...args) => _consoleError(tsPrefix(), ...redactConsoleArgs(args));
+function formatConsolePart(value) {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+function appendE2ELiveConsoleLine(args) {
+  if (!E2E_LIVE_LOG_ENABLED) return;
+  try {
+    mkdirSync(dirname(E2E_LIVE_LOG_PATH), { recursive: true });
+    appendFileSync(E2E_LIVE_LOG_PATH, `${args.map(formatConsolePart).join(' ')}\n`, 'utf8');
+  } catch (_) {}
+}
+function writeConsole(write, args) {
+  const redacted = [tsPrefix(), ...redactConsoleArgs(args)];
+  write(...redacted);
+  appendE2ELiveConsoleLine(redacted);
+}
+console.log = (...args) => writeConsole(_consoleLog, args);
+console.info = (...args) => writeConsole(_consoleInfo, args);
+console.debug = (...args) => writeConsole(_consoleDebug, args);
+console.warn = (...args) => writeConsole(_consoleWarn, args);
+console.error = (...args) => writeConsole(_consoleError, args);
 
 const DISCONNECT_REASONS = {
   401: 'Logged out',

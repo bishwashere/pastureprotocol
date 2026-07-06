@@ -97,7 +97,12 @@ function runOne(mode, name, script) {
     logSuite(`@@@@@@ CMD node ${script} @@@@@@`);
     const child = spawn(process.execPath, [script], {
       cwd: ROOT,
-      env: { ...process.env, PASTURE_E2E_MODE: mode },
+      env: {
+        ...process.env,
+        PASTURE_E2E_MODE: mode,
+        PASTURE_E2E_LIVE_LOG: '1',
+        PASTURE_DAEMON_LOG_PATH: LIVE_LOG_PATH,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.setEncoding('utf8');
