@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { spawn } from 'child_process';
+import { appendFileSync, mkdirSync } from 'fs';
+import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..', '..');
+const LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
 
 const REAL_TESTS = [
   ['agent', 'scripts/test/e2e/real/agent/test-agent.js'],
@@ -70,24 +73,53 @@ function parseMode() {
   return 'real';
 }
 
+function timestamp() {
+  return new Date().toISOString().slice(0, 19);
+}
+
+function appendLiveLog(chunk) {
+  try {
+    mkdirSync(dirname(LIVE_LOG_PATH), { recursive: true });
+    appendFileSync(LIVE_LOG_PATH, chunk, 'utf8');
+  } catch (_) {
+    // Test output must still stream even if the user's daemon log is not writable.
+  }
+}
+
+function logSuite(line) {
+  console.log(line);
+  appendLiveLog(`[${timestamp()}] [E2E] ${line}\n`);
+}
+
 function runOne(mode, name, script) {
   return new Promise((resolve) => {
-    console.log(`@@@@@@ E2E_${mode.toUpperCase()}_START ${name} @@@@@@`);
-    console.log(`@@@@@@ CMD node ${script} @@@@@@`);
+    logSuite(`@@@@@@ E2E_${mode.toUpperCase()}_START ${name} @@@@@@`);
+    logSuite(`@@@@@@ CMD node ${script} @@@@@@`);
     const child = spawn(process.execPath, [script], {
       cwd: ROOT,
       env: { ...process.env, PASTURE_E2E_MODE: mode },
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      process.stdout.write(chunk);
+      appendLiveLog(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      process.stderr.write(chunk);
+      appendLiveLog(chunk);
     });
     child.on('close', (code) => {
-      console.log(`@@@@@@ EXIT ${code ?? 0} @@@@@@`);
-      console.log(`@@@@@@ E2E_${mode.toUpperCase()}_END ${name} @@@@@@`);
+      logSuite(`@@@@@@ EXIT ${code ?? 0} @@@@@@`);
+      logSuite(`@@@@@@ E2E_${mode.toUpperCase()}_END ${name} @@@@@@`);
       resolve(code ?? 0);
     });
     child.on('error', (err) => {
       console.error(err?.stack || err?.message || String(err));
-      console.log('@@@@@@ EXIT 1 @@@@@@');
-      console.log(`@@@@@@ E2E_${mode.toUpperCase()}_END ${name} @@@@@@`);
+      appendLiveLog(`${err?.stack || err?.message || String(err)}\n`);
+      logSuite('@@@@@@ EXIT 1 @@@@@@');
+      logSuite(`@@@@@@ E2E_${mode.toUpperCase()}_END ${name} @@@@@@`);
       resolve(1);
     });
   });
@@ -113,9 +145,10 @@ async function main() {
   }
   if (failed) {
     console.error(`E2E suite failed: ${failed} test file(s) failed.`);
+    appendLiveLog(`[${timestamp()}] [E2E] E2E suite failed: ${failed} test file(s) failed.\n`);
     process.exit(1);
   }
-  console.log(`E2E ${mode} suite passed.`);
+  logSuite(`E2E ${mode} suite passed.`);
 }
 
 main().catch((err) => {
