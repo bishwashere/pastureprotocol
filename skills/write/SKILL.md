@@ -15,6 +15,8 @@ Call **run_skill** with **skill: "write"**. Set **command** or **arguments.actio
 - **arguments.path** (required) - File path to create or overwrite. Relative to workspace or absolute (if allowed).
 - **arguments.content** (required) - Exact content to write. Replaces the entire file.
 
+Prefer full absolute paths from the system root for filesystem writes. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use this whenever your output would be a file-worthy artifact — source code, a multi-file project, a config, a document, an HTML or markdown page, or any block longer than a few lines. Save it to disk, then reply with the path(s) and one short sentence on what was created and how to run/open it. Do not paste the artifact into the chat.

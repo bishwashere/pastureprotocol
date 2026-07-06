@@ -48,8 +48,13 @@ const CHAT_SELF_INSPECTION_PHRASES = [
   'check your code',
 ];
 
+const FILESYSTEM_PATH_PHRASES = [
+  'full absolute paths from the system root',
+  'resolved absolute path',
+];
+
 // 1. RUNTIME_GROUNDING_BLOCK contains the required phrases
-for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES]) {
+for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES, ...FILESYSTEM_PATH_PHRASES]) {
   check(
     `RUNTIME_GROUNDING_BLOCK contains "${phrase}"`,
     RUNTIME_GROUNDING_BLOCK.toLowerCase().includes(phrase.toLowerCase()),
@@ -67,7 +72,7 @@ check(
 // 3. Main one-on-one system prompt embeds the grounding
 {
   const prompt = buildOneOnOneSystemPrompt();
-  for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES]) {
+  for (const phrase of [...REQUIRED_PHRASES, ...CHAT_SELF_INSPECTION_PHRASES, ...FILESYSTEM_PATH_PHRASES]) {
     check(
       `buildOneOnOneSystemPrompt() contains "${phrase}"`,
       prompt.toLowerCase().includes(phrase.toLowerCase()),

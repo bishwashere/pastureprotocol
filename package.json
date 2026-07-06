@@ -8,6 +8,9 @@
   "type": "module",
   "main": "index.js",
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.22.3 <23"
+  },
   "scripts": {
     "dev": "node scripts/dev-block.js",
     "dashboard": "node dashboard/server.js",

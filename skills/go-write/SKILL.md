@@ -31,6 +31,8 @@ Call `run_skill` with **skill: "go-write"**. Set **command** or **arguments.acti
 - **arguments.cwd** (optional) - Working directory. Defaults to workspace.
 - **arguments.fullCopy** (optional) - For **`cp`** of a directory with `-r` / `-a`: if true, copy the full tree (no default excludes). Same as leading **`--pasture-full-copy`** in `argv`.
 
+Prefer full absolute paths from the system root for all source, destination, target path, and `cwd` arguments. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use when the user asks to copy, move, delete, or create files or directories, or change permissions. For **filtered copies** (skip media, skip named globs anywhere under the tree), use **rsync** as above. Do not use for listing, disk usage, or reading-use **go-read** for that.

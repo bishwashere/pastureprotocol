@@ -16,6 +16,8 @@ Call **run_skill** with **skill: "edit"**. Set **command** or **arguments.action
 - **arguments.oldString** (required) - Exact string to find. Must match exactly (including spaces/newlines).
 - **arguments.newString** (required) - String to replace it with. Use empty string to delete the match.
 
+Prefer full absolute paths from the system root for filesystem edits. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use when the user says things like:

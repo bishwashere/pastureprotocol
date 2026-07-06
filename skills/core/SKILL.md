@@ -33,6 +33,8 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **arguments.cwd** (optional) - Working directory for the command. Defaults to workspace.
 - **arguments.fullCopy** (optional) - Same as go-write: full tree copy for recursive `cp` when true.
 
+Prefer full absolute paths from the system root for all path arguments and for `cwd`. If the user gives a relative path, resolve it from the known workspace, state dir, current directory, or discovered project path before calling the tool.
+
 ## When to use
 
 Use when the user asks to list a directory, disk usage (du), read a file (cat/less), copy/move/delete files, create a file (touch) or directory (mkdir), or change permissions (chmod). Prefer **read** skill for reading file contents with line ranges; use **core** cat/less when the user says "cat", "show file", or "list directory" (ls).
