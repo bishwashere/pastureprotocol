@@ -28,7 +28,14 @@ The live log/weather conversation follows this same split:
 | Real | `pasture test logs --real` or `pnpm run test:logs-real-e2e` |
 | Fake | `pasture test logs --fake` or `pnpm run test:logs-fake-e2e` |
 
-Real E2E is the default for existing user-path tests. Fake E2E files live under `scripts/test/e2e/fake/` and must opt into deterministic local doubles explicitly.
+Every real E2E file must have a fake counterpart at the same relative path:
+
+```text
+scripts/test/e2e/real/<area>/test-name.js
+scripts/test/e2e/fake/<area>/test-name.js
+```
+
+Fake counterparts must not silently use real providers. They either run a deterministic local fake backend, or explicitly print a fake-skip message until that backend exists.
 
 ## What we are testing
 
@@ -58,12 +65,12 @@ Shared runner: `scripts/test/support/skill-test-runner.js` (`runSkillTests`). Re
 
 ## Test layout
 
-- `scripts/test/e2e/real/skills/` — user prompt → app entry point → LLM → skill/tool → reply.
-- `scripts/test/e2e/real/agent/` — chat/delegation/team E2E flows.
-- `scripts/test/e2e/real/core/` — app-level E2E flows that are not tied to one skill.
-- `scripts/test/e2e/real/dashboard/` — browser/dashboard E2E flows.
-- `scripts/test/e2e/real/` — real-lane wrappers for E2Es that need a named real entry.
-- `scripts/test/e2e/fake/` — fake-lane E2Es with deterministic local LLM/tool doubles.
+- `scripts/test/e2e/real/` — real app route, real configured LLMs/tools, sandboxed state where needed.
+- `scripts/test/e2e/fake/` — matching fake-lane counterparts with deterministic local doubles or explicit fake-skip stubs.
+- `scripts/test/e2e/real/skills/` and `scripts/test/e2e/fake/skills/` — skill/tool E2E pairs.
+- `scripts/test/e2e/real/agent/` and `scripts/test/e2e/fake/agent/` — chat/delegation/team E2E pairs.
+- `scripts/test/e2e/real/core/` and `scripts/test/e2e/fake/core/` — app-level E2E pairs.
+- `scripts/test/e2e/real/dashboard/` and `scripts/test/e2e/fake/dashboard/` — dashboard E2E pairs.
 - `scripts/test/e2e/run-suite.js` — lane runner for `real`, `fake`, or `all`.
 - `scripts/test/unit/skills/` — direct executor and skill contract tests.
 - `scripts/test/unit/agent/` — agent planning, routing, prompt, and state contract tests.

@@ -4,9 +4,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = join(__dirname, '..', '..', '..', '..');
+const root = join(__dirname, '..', '..', '..', '..', '..');
 const child = spawn(process.execPath, [
-  'scripts/test/e2e/fake/core/live-log-conversation.js',
+  'scripts/test/e2e/real/core/live-log-conversation.js',
   '--fake',
   ...process.argv.slice(2),
 ], {

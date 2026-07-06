@@ -34,7 +34,29 @@ const REAL_TESTS = [
 ];
 
 const FAKE_TESTS = [
-  ['weather-chat-fake-e2e', 'scripts/test/e2e/fake/test-weather-chat-e2e.js'],
+  ['agent', 'scripts/test/e2e/fake/agent/test-agent.js'],
+  ['agent-team-e2e', 'scripts/test/e2e/fake/agent/test-agent-team-e2e.js'],
+  ['casual-greetings-e2e', 'scripts/test/e2e/fake/agent/test-casual-greetings.js'],
+  ['basic-e2e', 'scripts/test/e2e/fake/core/test-basic-e2e.js'],
+  ['project-workflow-e2e', 'scripts/test/e2e/fake/core/test-project-workflow-e2e.js'],
+  ['dashboard-browser-e2e', 'scripts/test/e2e/fake/dashboard/test-dashboard-browser-e2e.js'],
+  ['apply-patch-e2e', 'scripts/test/e2e/fake/skills/test-apply-patch-e2e.js'],
+  ['browser-e2e', 'scripts/test/e2e/fake/skills/test-browser-e2e.js'],
+  ['core-e2e', 'scripts/test/e2e/fake/skills/test-core-e2e.js'],
+  ['cron-e2e', 'scripts/test/e2e/fake/skills/test-cron-e2e.js'],
+  ['edit-e2e', 'scripts/test/e2e/fake/skills/test-edit-e2e.js'],
+  ['go-read-e2e', 'scripts/test/e2e/fake/skills/test-go-read-e2e.js'],
+  ['go-write-e2e', 'scripts/test/e2e/fake/skills/test-go-write-e2e.js'],
+  ['gog-e2e', 'scripts/test/e2e/fake/skills/test-gog-e2e.js'],
+  ['home-assistant-e2e', 'scripts/test/e2e/fake/skills/test-home-assistant-e2e.js'],
+  ['me-e2e', 'scripts/test/e2e/fake/skills/test-me-e2e.js'],
+  ['memory-e2e', 'scripts/test/e2e/fake/skills/test-memory-e2e.js'],
+  ['read-e2e', 'scripts/test/e2e/fake/skills/test-read-e2e.js'],
+  ['search-e2e', 'scripts/test/e2e/fake/skills/test-search-e2e.js'],
+  ['server-inspect-e2e', 'scripts/test/e2e/fake/skills/test-server-inspect-e2e.js'],
+  ['speech-e2e', 'scripts/test/e2e/fake/skills/test-speech-e2e.js'],
+  ['vision-e2e', 'scripts/test/e2e/fake/skills/test-vision-e2e.js'],
+  ['write-e2e', 'scripts/test/e2e/fake/skills/test-write-e2e.js'],
   ['live-log-conversation-fake', 'scripts/test/e2e/fake/test-live-log-conversation.js'],
 ];
 

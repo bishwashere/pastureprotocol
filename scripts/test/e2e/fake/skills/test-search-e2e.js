@@ -3,7 +3,7 @@
  * User-path E2E for weather phrasing:
  * user message -> index.js --test -> agent tool loop -> search skill -> reply.
  *
- * Fake-lane E2E: the LLM and weather endpoint are local fakes, so this does not send
+ * Fake-lane E2E for search/weather: the LLM and weather endpoint are local fakes, so this does not send
  * repository prompts to external providers. The search skill still runs through
  * the real chat tool path by navigating to a local weather page.
  */
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const TIMEOUT_MS = 90_000;
 
 const WEATHER_PHRASES = [
@@ -281,7 +281,7 @@ async function main() {
       assert(!/need your exact location|which location|where are you/i.test(reply), `${phrase}: should not ask location first: ${reply}`);
       assert(reply.length <= 180, `${phrase}: reply should be compact, got ${reply.length} chars: ${reply}`);
     }
-    console.log(`weather chat E2E passed (${WEATHER_PHRASES.length} phrasings)`);
+    console.log(`search fake E2E passed (${WEATHER_PHRASES.length} weather phrasings)`);
   } finally {
     fakeLlm.server.close();
     weather.server.close();
