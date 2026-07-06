@@ -1,7 +1,7 @@
 /**
- * E2E tests for the speech skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → speech skill → reply → judge.
- * Covers synthesize and reply_as_voice (no audio file for transcribe in --test).
+ * E2E tests for the go-write skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → go-write skill → reply → judge.
+ * Uses shared state: first test creates a file, second test copies it.
  */
 
 import { spawn } from 'child_process';
@@ -9,24 +9,19 @@ import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-const SPEECH_QUERIES = [
-  'Can you say this out loud: Hello from E2E speech test?',
-  'Send me a voice note that says E2E speech test OK.',
-];
-
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-speech-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-go-write-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -84,30 +79,52 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: speech skill (user message → LLM → speech → reply → judge).');
+  console.log('E2E tests: go-write skill (user message → LLM → go-write → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
   const stateDir = createTempStateDir();
 
-  const tests = SPEECH_QUERIES.map((query, i) => ({
-    name: `speech: "${query.slice(0, 50)}…"`,
-    expectMode: i === 0 ? 'actual' : 'behavior',
-    skill: i === 0 ? 'speech' : undefined,
-    run: async () => {
-      const result = await runE2E(query, { stateDir });
-      const reply = result.reply ?? result;
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'speech' });
-      if (!pass) {
-        const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-        err.reply = reply;
-        err.skillsCalled = result.skillsCalled;
-        throw err;
-      }
-      return { reply, skillsCalled: result.skillsCalled, stateDir };
+  const tests = [
+    {
+      name: 'go-write: create empty file',
+      expectMode: 'actual',
+      skill: 'go-write',
+      stateDir,
+      actualChecks: { fileExists: 'workspace/e2e-touch.txt' },
+      run: async () => {
+        const query = 'Create an empty file named e2e-touch.txt in the workspace.';
+        const result = await runE2E(query, { stateDir });
+        const reply = result.reply ?? result;
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
+        if (!pass) {
+          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
+          throw err;
+        }
+        return { reply, skillsCalled: result.skillsCalled, stateDir };
+      },
     },
-  }));
+    {
+      name: 'go-write: copy file',
+      expectMode: 'behavior',
+      run: async () => {
+        const query = 'Copy e2e-touch.txt to e2e-copy.txt in the workspace.';
+        const result = await runE2E(query, { stateDir });
+        const reply = result.reply ?? result;
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
+        if (!pass) {
+          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
+          throw err;
+        }
+        return { reply, skillsCalled: result.skillsCalled };
+      },
+    },
+  ];
 
-  const { failed } = await runSkillTests('speech', tests);
+  const { failed } = await runSkillTests('go-write', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

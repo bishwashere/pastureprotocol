@@ -26,12 +26,12 @@ import { readFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { skipSuiteIf } from '../../support/e2e-skip.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { skipSuiteIf } from '../../../support/e2e-skip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 const PER_TEST_TIMEOUT_MS = 120_000;
 

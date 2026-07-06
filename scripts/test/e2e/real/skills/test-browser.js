@@ -9,10 +9,10 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 
 // Delegate to the E2E script so test:browser and test:browser-e2e share the same flow.
-const child = spawn('node', ['scripts/test/e2e/skills/test-browser-e2e.js'], {
+const child = spawn('node', ['scripts/test/e2e/real/skills/test-browser-e2e.js'], {
   cwd: ROOT,
   env: process.env,
   stdio: 'inherit',

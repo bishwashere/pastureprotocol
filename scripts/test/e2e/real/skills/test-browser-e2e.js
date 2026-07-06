@@ -10,11 +10,11 @@ import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';

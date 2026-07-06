@@ -1,43 +1,28 @@
 /**
- * E2E tests for the go-read skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → go-read skill → reply → judge.
+ * E2E tests for the write skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → write skill → reply → judge.
+ * Uses fixed fixture state (fixtures/state) so the workspace has baseline data.
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { prepareStateFromFixture } from '../../../support/test-fixture-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
-const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-const GO_READ_QUERIES = [
-  'What files are in the workspace folder?',
-  'What directory are we in?',
-  "Show me what's in config.json in the workspace.",
+const WRITE_QUERIES = [
+  'Save a file called e2e-hello.txt with the text Hello from write E2E',
+  'Create notes.md with a heading # Test notes and a second line that says Line two.',
+  'Put the text saved by E2E into a file named e2e-saved.txt',
 ];
-
-function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-go-read-e2e-' + Date.now());
-  const workspaceDir = join(stateDir, 'workspace');
-  mkdirSync(workspaceDir, { recursive: true });
-  if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
-    copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
-    copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(workspaceDir, 'config.json'));
-  }
-  if (existsSync(join(DEFAULT_STATE_DIR, '.env'))) {
-    copyFileSync(join(DEFAULT_STATE_DIR, '.env'), join(stateDir, '.env'));
-  }
-  return stateDir;
-}
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
@@ -86,19 +71,27 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: go-read skill (user message → LLM → go-read → reply → judge).');
-  console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
+  console.log('E2E tests: write skill (user message → LLM → write → reply → judge).');
+  console.log('Using fixed fixture state. Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
-  const stateDir = createTempStateDir();
+  const stateDir = prepareStateFromFixture();
 
-  const tests = GO_READ_QUERIES.map((query, i) => ({
-    name: `go-read: "${query.slice(0, 50)}…"`,
+  const tests = WRITE_QUERIES.map((query, i) => ({
+    name: `write: "${query.slice(0, 50)}…"`,
     expectMode: i === 0 ? 'actual' : 'behavior',
-    skill: i === 0 ? 'go-read' : undefined,
+    skill: i === 0 ? 'write' : undefined,
+    stateDir,
+    actualChecks:
+      i === 0
+        ? {
+            fileExists: 'workspace/e2e-hello.txt',
+            fileContains: { path: 'workspace/e2e-hello.txt', text: 'Hello from write E2E' },
+          }
+        : undefined,
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-read' });
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
       if (!pass) {
         const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         err.reply = reply;
@@ -109,7 +102,7 @@ async function main() {
     },
   }));
 
-  const { failed } = await runSkillTests('go-read', tests);
+  const { failed } = await runSkillTests('write', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

@@ -9,9 +9,9 @@
  * Skip E2E: PASTURE_SKIP_GREETING_E2E=1 pnpm run test:casual-greetings
  */
 
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { createTempStateDir, runE2E } from '../../support/e2e-run.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { createTempStateDir, runE2E } from '../../../support/e2e-run.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 const INTERNAL_LEAK_PATTERNS = [
   /dictionary\.cambridge/i,

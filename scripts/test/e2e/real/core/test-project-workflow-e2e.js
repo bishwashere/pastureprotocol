@@ -26,9 +26,9 @@
  *   pnpm run test:project-workflow-e2e
  */
 
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { createTempStateDir, runE2E, isNoLlmError } from '../../support/e2e-run.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { createTempStateDir, runE2E, isNoLlmError } from '../../../support/e2e-run.js';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 

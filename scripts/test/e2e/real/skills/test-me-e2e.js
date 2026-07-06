@@ -1,42 +1,29 @@
 /**
- * E2E tests for the read skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → read skill → reply → judge.
+ * E2E tests for the me skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → me skill → reply → judge.
+ * Uses fixed fixture state (scripts/test/fixtures/state) so the bot has profile data to return.
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { prepareStateFromFixture } from '../../../support/test-fixture-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
-const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-const READ_QUERIES = [
-  "What's in config.json in the workspace?",
-  'Show me the first 15 lines of workspace/config.json.',
+const ME_QUERIES = [
+  'What do you know about me?',
+  'Summarize what you know about me',
+  'What have you learned about me?',
+  'Tell me about myself',
 ];
-
-function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-read-e2e-' + Date.now());
-  const workspaceDir = join(stateDir, 'workspace');
-  mkdirSync(workspaceDir, { recursive: true });
-  if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
-    copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
-    copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(workspaceDir, 'config.json'));
-  }
-  if (existsSync(join(DEFAULT_STATE_DIR, '.env'))) {
-    copyFileSync(join(DEFAULT_STATE_DIR, '.env'), join(stateDir, '.env'));
-  }
-  return stateDir;
-}
 
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
@@ -85,19 +72,22 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: read skill (user message → LLM → read → reply → judge).');
+  console.log('E2E tests: me skill (user message → LLM → me → reply → judge).');
+  console.log('Using fixed fixture state (fixtures/state) so the bot has profile data.\n');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
-  const stateDir = createTempStateDir();
+  const stateDir = prepareStateFromFixture();
 
-  const tests = READ_QUERIES.map((query, i) => ({
-    name: `read: "${query.slice(0, 50)}…"`,
+  const tests = ME_QUERIES.map((query, i) => ({
+    name: `me: "${query}"`,
     expectMode: i === 0 ? 'actual' : 'behavior',
-    skill: i === 0 ? 'read' : undefined,
+    skill: i === 0 ? 'me' : undefined,
+    stateDir,
+    actualChecks: i === 0 ? { replyIncludesAny: ['Test User'] } : undefined,
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'read' });
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'me' });
       if (!pass) {
         const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         err.reply = reply;
@@ -108,7 +98,7 @@ async function main() {
     },
   }));
 
-  const { failed } = await runSkillTests('read', tests);
+  const { failed } = await runSkillTests('me', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

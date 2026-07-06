@@ -395,9 +395,9 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'test' && args[1] === 'logs') {
-  const script = join(INSTALL_DIR, 'scripts', 'test', 'e2e', 'core', 'synthetic-weather-conversation.js');
+  const script = join(INSTALL_DIR, 'scripts', 'test', 'e2e', 'real', 'core', 'live-log-conversation.js');
   if (!existsSync(script)) {
-    console.error('pasture: synthetic logs test not found. Re-run from a current install or repo checkout.');
+    console.error('pasture: live logs test not found. Re-run from a current install or repo checkout.');
     process.exit(1);
   }
   const child = spawn(process.execPath, [script, '--write-daemon-log', ...args.slice(2)], {
@@ -652,6 +652,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('Usage: pasture start | stop | status | restart');
   console.log('       pasture setup');
   console.log('       pasture logs');
+  console.log('       pasture test logs [--fake|--real]');
   console.log('       pasture dashboard');
   console.log('       pasture tide checklist list|add|remove|run|triggers|enable|disable');
   console.log('       pasture index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');

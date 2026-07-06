@@ -7,10 +7,10 @@
  * Usage: node scripts/test/test-agent-team-e2e.js
  */
 
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { createTempStateDir, runE2E, runDashboardE2E, isNoLlmError } from '../../support/e2e-run.js';
-import { setupAgentTeamFixture, seedAgentTeamStatusFixture, patchAgentConfig, MARKETER_TAGLINE } from '../../support/agent-team-fixture.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { createTempStateDir, runE2E, runDashboardE2E, isNoLlmError } from '../../../support/e2e-run.js';
+import { setupAgentTeamFixture, seedAgentTeamStatusFixture, patchAgentConfig, MARKETER_TAGLINE } from '../../../support/agent-team-fixture.js';
 import { NEW_SESSION_ACK } from '../../../../lib/context/chat-session.js';
 
 /** Marketing topic — should route to marketer by specialization, not by name. */

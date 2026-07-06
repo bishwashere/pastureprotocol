@@ -4,7 +4,7 @@ Natural user messages only — see [E2E.md](../E2E.md).
 
 | | |
 |--|--|
-| **Test file** | `scripts/test/e2e/skills/test-server-inspect-e2e.js` |
+| **Test file** | `scripts/test/e2e/real/skills/test-server-inspect-e2e.js` |
 
 Requires `ssh-inspect` in `skills.enabled` and at least one registered server (`pasture server add ...`).
 

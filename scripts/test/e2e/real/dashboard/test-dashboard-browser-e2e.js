@@ -7,10 +7,10 @@ import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
-import { E2EReport } from '../../support/e2e-report.js';
+import { E2EReport } from '../../../support/e2e-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '../..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const report = new E2EReport('dashboard-browser-e2e');
 
 function pickPort() {

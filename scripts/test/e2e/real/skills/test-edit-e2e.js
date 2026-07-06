@@ -1,27 +1,31 @@
 /**
- * E2E tests for the write skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → write skill → reply → judge.
- * Uses fixed fixture state (fixtures/state) so the workspace has baseline data.
+ * E2E tests for the edit skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → edit skill → reply → judge.
+ * Uses fixed fixture state (fixtures/state) which includes workspace/e2e-edit-target.txt.
  */
 
 import { spawn } from 'child_process';
+import { writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { prepareStateFromFixture } from '../../support/test-fixture-state.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { prepareStateFromFixture } from '../../../support/test-fixture-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-const WRITE_QUERIES = [
-  'Save a file called e2e-hello.txt with the text Hello from write E2E',
-  'Create notes.md with a heading # Test notes and a second line that says Line two.',
-  'Put the text saved by E2E into a file named e2e-saved.txt',
+const EDIT_TARGET_FILE = 'e2e-edit-target.txt';
+const EDIT_INITIAL_CONTENT = 'Hello world\nEdit this line for E2E.\n';
+
+const EDIT_QUERIES = [
+  `In ${EDIT_TARGET_FILE} replace Hello with Hi`,
+  `In the file ${EDIT_TARGET_FILE} change world to planet`,
+  `In ${EDIT_TARGET_FILE}, replace "Edit this line" with "Edited line"`,
 ];
 
 function runE2E(userMessage, opts = {}) {
@@ -71,27 +75,31 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: write skill (user message → LLM → write → reply → judge).');
-  console.log('Using fixed fixture state. Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
+  console.log('E2E tests: edit skill (user message → LLM → edit → reply → judge).');
+  console.log('Using fixed fixture state; target file:', EDIT_TARGET_FILE, '. Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
   const stateDir = prepareStateFromFixture();
+  const workspaceDir = join(stateDir, 'workspace');
+  const targetPath = join(workspaceDir, EDIT_TARGET_FILE);
 
-  const tests = WRITE_QUERIES.map((query, i) => ({
-    name: `write: "${query.slice(0, 50)}…"`,
-    expectMode: i === 0 ? 'actual' : 'behavior',
-    skill: i === 0 ? 'write' : undefined,
+  function resetEditTarget() {
+    writeFileSync(targetPath, EDIT_INITIAL_CONTENT, 'utf8');
+  }
+
+  const tests = EDIT_QUERIES.map((query, index) => ({
+    name: `edit: "${query.slice(0, 45)}…"`,
+    expectMode: index === 0 ? 'actual' : 'behavior',
+    skill: index === 0 ? 'edit' : undefined,
     stateDir,
     actualChecks:
-      i === 0
-        ? {
-            fileExists: 'workspace/e2e-hello.txt',
-            fileContains: { path: 'workspace/e2e-hello.txt', text: 'Hello from write E2E' },
-          }
+      index === 0
+        ? { fileContains: { path: `workspace/${EDIT_TARGET_FILE}`, text: 'Hi world' } }
         : undefined,
     run: async () => {
+      resetEditTarget();
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'edit' });
       if (!pass) {
         const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         err.reply = reply;
@@ -102,7 +110,7 @@ async function main() {
     },
   }));
 
-  const { failed } = await runSkillTests('write', tests);
+  const { failed } = await runSkillTests('edit', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

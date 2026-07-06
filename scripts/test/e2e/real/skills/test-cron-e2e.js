@@ -13,8 +13,8 @@ import { readFileSync, mkdirSync, writeFileSync, existsSync, copyFileSync, rmSyn
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 /** JIDs that this suite uses for synthetic reminders. Anything written under these
  *  must NEVER survive a test run. We scrub them from the real state dir at suite
@@ -22,7 +22,7 @@ import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
 const TEST_JIDS = new Set(['test@s.whatsapp.net', 'test-e2e@s.whatsapp.net', '999888777']);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 /** Use system install (all-users) when PASTURE_INSTALL_DIR is set; otherwise run from repo. */
 const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
 const DEFAULT_STATE_DIR = join(homedir(), '.pasture');

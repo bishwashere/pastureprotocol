@@ -20,14 +20,14 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { skipSuiteIf } from '../../support/e2e-skip.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { skipSuiteIf } from '../../../support/e2e-skip.js';
 import dotenv from 'dotenv';
 import { getEnvPath } from '../../../../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 

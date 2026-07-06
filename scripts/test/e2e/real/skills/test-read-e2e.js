@@ -1,37 +1,41 @@
 /**
- * E2E tests for the apply-patch skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → apply-patch skill → reply → judge.
- * Uses a temp workspace with a target file.
+ * E2E tests for the read skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → read skill → reply → judge.
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, writeFileSync, existsSync, copyFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-function createTempStateDir(initialContent = 'line1\nline2\nline3\n') {
-  const stateDir = join(tmpdir(), 'pasture-apply-patch-e2e-' + Date.now());
+const READ_QUERIES = [
+  "What's in config.json in the workspace?",
+  'Show me the first 15 lines of workspace/config.json.',
+];
+
+function createTempStateDir() {
+  const stateDir = join(tmpdir(), 'pasture-read-e2e-' + Date.now());
   const workspaceDir = join(stateDir, 'workspace');
   mkdirSync(workspaceDir, { recursive: true });
-  writeFileSync(join(workspaceDir, 'e2e-patch-target.txt'), initialContent, 'utf8');
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
+    copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(workspaceDir, 'config.json'));
   }
   if (existsSync(join(DEFAULT_STATE_DIR, '.env'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, '.env'), join(stateDir, '.env'));
   }
-  return { stateDir, workspaceDir };
+  return stateDir;
 }
 
 function runE2E(userMessage, opts = {}) {
@@ -81,53 +85,30 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: apply-patch skill (user message → LLM → apply-patch → reply → judge).');
+  console.log('E2E tests: read skill (user message → LLM → read → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
-  const tests = [
-    {
-      name: 'apply-patch: add line at end',
-      expectMode: 'actual',
-      skill: 'apply-patch',
-      actualChecks: { fileContains: { path: 'workspace/e2e-patch-target.txt', text: 'c' } },
-      run: async () => {
-        const { stateDir } = createTempStateDir('a\nb\n');
-        const query =
-          'In e2e-patch-target.txt, add a new line "c" right after the line that says b.';
-        const result = await runE2E(query, { stateDir });
-        const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'apply-patch' });
-        if (!pass) {
-          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-          err.reply = reply;
-          err.skillsCalled = result.skillsCalled;
-          throw err;
-        }
-        return { reply, skillsCalled: result.skillsCalled, stateDir };
-      },
-    },
-    {
-      name: 'apply-patch: replace a line',
-      expectMode: 'behavior',
-      run: async () => {
-        const { stateDir } = createTempStateDir('old first\nold second\n');
-        const query =
-          'In e2e-patch-target.txt, change the line old second to new second.';
-        const result = await runE2E(query, { stateDir });
-        const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'apply-patch' });
-        if (!pass) {
-          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-          err.reply = reply;
-          err.skillsCalled = result.skillsCalled;
-          throw err;
-        }
-        return { reply, skillsCalled: result.skillsCalled };
-      },
-    },
-  ];
+  const stateDir = createTempStateDir();
 
-  const { failed } = await runSkillTests('apply-patch', tests);
+  const tests = READ_QUERIES.map((query, i) => ({
+    name: `read: "${query.slice(0, 50)}…"`,
+    expectMode: i === 0 ? 'actual' : 'behavior',
+    skill: i === 0 ? 'read' : undefined,
+    run: async () => {
+      const result = await runE2E(query, { stateDir });
+      const reply = result.reply ?? result;
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'read' });
+      if (!pass) {
+        const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        err.reply = reply;
+        err.skillsCalled = result.skillsCalled;
+        throw err;
+      }
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
+    },
+  }));
+
+  const { failed } = await runSkillTests('read', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

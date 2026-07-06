@@ -3,7 +3,7 @@
  * User-path E2E for weather phrasing:
  * user message -> index.js --test -> agent tool loop -> search skill -> reply.
  *
- * The only fake is a local OpenAI-compatible LLM server, so this does not send
+ * Fake-lane E2E: the LLM and weather endpoint are local fakes, so this does not send
  * repository prompts to external providers. The search skill still runs through
  * the real chat tool path by navigating to a local weather page.
  */
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..');
 const TIMEOUT_MS = 90_000;
 
 const WEATHER_PHRASES = [
@@ -56,6 +56,56 @@ function jsonResponse(res, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function latestUserText(messages) {
+  const users = messages.filter((m) => m.role === 'user').map((m) => String(m.content || ''));
+  for (let i = users.length - 1; i >= 0; i -= 1) {
+    try {
+      const parsed = JSON.parse(users[i]);
+      const text = parsed?.latestUserMessage || parsed?.userText;
+      if (typeof text === 'string' && text.trim()) return text;
+    } catch {}
+  }
+  return users.findLast((text) => text.trim()) || '';
+}
+
+function fakePlannerJson() {
+  return {
+    workModeToggle: 'no_change',
+    needsMultiAgent: false,
+    needsDurability: false,
+    needsDelegation: false,
+    teamRouting: 'none',
+    delegationAction: 'none',
+    targetAgentId: '',
+    mode: 'tool',
+    skills: ['search'],
+    executionMode: 'tool_use',
+    usesExistingWorkIntake: false,
+    mustUseTool: true,
+    fallbackToolPolicy: 'no_tools',
+    projectOrMissionIntent: 'none',
+    githubSourceIntent: false,
+    taskFrameAction: 'none',
+    taskFrameSeedPolicy: 'reject_candidate',
+    taskFrameStatusHint: 'continue',
+    taskFrame: {
+      kind: 'general_task',
+      title: '',
+      objective: '',
+      projectName: '',
+      repoUrl: '',
+      localPath: '',
+      ownerAgentId: '',
+      teamId: '',
+      toolProfile: [],
+      plan: '',
+    },
+    plan: 'Use search to navigate to the local fake weather page, then answer compactly.',
+    answer_style: 'short',
+    reason: 'Weather phrasing should route to search before answering.',
+  };
+}
+
 function startWeatherServer() {
   const server = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
@@ -75,16 +125,45 @@ function startFakeLlmServer(weatherUrl) {
     const body = await readJson(req);
     calls.push(body);
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    const system = String(messages.find((m) => m.role === 'system')?.content || '');
+    const promptText = messages.map((m) => String(m.content || '')).join('\n');
     const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
     const hasToolResult = messages.some((m) => m.role === 'tool');
 
-    if (system.includes('Work Mode Classifier') || system.includes('work-mode')) {
+    if (promptText.includes('Unified Turn Planner')) {
+      jsonResponse(res, { choices: [{ message: { role: 'assistant', content: JSON.stringify(fakePlannerJson()) } }] });
+      return;
+    }
+
+    if (promptText.includes('Task Frame Router')) {
+      jsonResponse(res, { choices: [{ message: { role: 'assistant', content: JSON.stringify({
+        action: 'ignore',
+        confidence: 0.9,
+        mustUseTool: false,
+        resemblance: 'none',
+        kind: 'general_task',
+        title: '',
+        objective: '',
+        projectName: '',
+        repoUrl: '',
+        localPath: '',
+        toolProfile: [],
+        plan: '',
+        reason: 'Standalone weather phrasing is not task-frame work.',
+      }) } }] });
+      return;
+    }
+
+    if (promptText.includes('Work-Mode Classifier') || promptText.includes('Work Mode Classifier') || promptText.includes('work-mode')) {
       jsonResponse(res, { choices: [{ message: { role: 'assistant', content: '{"toggle":"no_change","reason":"weather request"}' } }] });
       return;
     }
 
-    if (system.includes('self-inspection') || system.includes('Self-Inspection')) {
+    if (promptText.includes('Task Frame Status')) {
+      jsonResponse(res, { choices: [{ message: { role: 'assistant', content: '{"status":"continue","confidence":0.8,"reason":"Weather phrasing test can continue."}' } }] });
+      return;
+    }
+
+    if (promptText.includes('self-inspection') || promptText.includes('Self-Inspection')) {
       jsonResponse(res, { choices: [{ message: { role: 'assistant', content: '{"is_self_inspection":false,"needs_tools":false,"target":"none","starting_points":[],"reason":"Weather request."}' } }] });
       return;
     }
@@ -109,11 +188,13 @@ function startFakeLlmServer(weatherUrl) {
       return;
     }
 
+    const userText = latestUserText(messages);
+    const prefix = /umbrella/i.test(userText) ? 'Yes, keep an umbrella handy. ' : '';
     jsonResponse(res, {
       choices: [{
         message: {
           role: 'assistant',
-          content: 'Enola, PA today: high near 82F, with showers and thunderstorms possible after 2pm. Keep an umbrella handy.',
+          content: `${prefix}Enola, PA today: high near 82F, with showers and thunderstorms possible after 2pm. Keep an umbrella handy.`,
         },
       }],
     });
@@ -189,8 +270,11 @@ async function main() {
   const stateDir = createStateDir(fakeLlm.port);
   try {
     for (const phrase of WEATHER_PHRASES) {
-      const { reply, skillsCalled } = await runChat(phrase, stateDir);
-      assert(skillsCalled.includes('search'), `${phrase}: expected search skill, got [${skillsCalled.join(', ')}]`);
+      const { reply, skillsCalled, stdout } = await runChat(phrase, stateDir);
+      assert(
+        skillsCalled.includes('search'),
+        `${phrase}: expected search skill, got [${skillsCalled.join(', ')}]. stdout tail: ${stdout.slice(-1200)}`
+      );
       assert(/Enola, PA today/i.test(reply), `${phrase}: expected compact Enola answer, got: ${reply}`);
       assert(/umbrella/i.test(reply), `${phrase}: expected practical umbrella guidance, got: ${reply}`);
       assert(!/\?$/.test(reply.trim()), `${phrase}: reply should not end by asking a question: ${reply}`);

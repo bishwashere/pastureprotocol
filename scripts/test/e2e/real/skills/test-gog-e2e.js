@@ -1,27 +1,35 @@
 /**
- * E2E tests for the go-write skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → go-write skill → reply → judge.
- * Uses shared state: first test creates a file, second test copies it.
+ * E2E tests for the gog skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → gog skill → reply → judge.
+ * If gog is not configured, judge may accept a brief explanation.
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, existsSync, copyFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
+import { skipSuiteIf } from '../../../support/e2e-skip.js';
+import dotenv from 'dotenv';
+import { getEnvPath } from '../../../../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
+const GOG_QUERIES = [
+  'What are my next two calendar events?',
+  'How many emails did I get in the last week?',
+];
+
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-go-write-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-gog-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -79,52 +87,43 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  console.log('E2E tests: go-write skill (user message → LLM → go-write → reply → judge).');
+  skipSuiteIf('gog-e2e', () => {
+    dotenv.config({ path: getEnvPath() });
+    const configPath = join(DEFAULT_STATE_DIR, 'config.json');
+    let account = process.env.GOG_ACCOUNT || '';
+    if (!account && existsSync(configPath)) {
+      try {
+        account = JSON.parse(readFileSync(configPath, 'utf8'))?.skills?.gog?.account || '';
+      } catch (_) {}
+    }
+    if (!account?.trim()) return 'gog not configured (set skills.gog.account or GOG_ACCOUNT)';
+    return null;
+  });
+
+  console.log('E2E tests: gog skill (user message → LLM → gog → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
   const stateDir = createTempStateDir();
 
-  const tests = [
-    {
-      name: 'go-write: create empty file',
-      expectMode: 'actual',
-      skill: 'go-write',
-      stateDir,
-      actualChecks: { fileExists: 'workspace/e2e-touch.txt' },
-      run: async () => {
-        const query = 'Create an empty file named e2e-touch.txt in the workspace.';
-        const result = await runE2E(query, { stateDir });
-        const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
-        if (!pass) {
-          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-          err.reply = reply;
-          err.skillsCalled = result.skillsCalled;
-          throw err;
-        }
-        return { reply, skillsCalled: result.skillsCalled, stateDir };
-      },
+  const tests = GOG_QUERIES.map((query) => ({
+    name: `gog: "${query.slice(0, 50)}…"`,
+    expectMode: 'actual',
+    skill: 'gog',
+    run: async () => {
+      const result = await runE2E(query, { stateDir });
+      const reply = result.reply ?? result;
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'gog' });
+      if (!pass) {
+        const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        err.reply = reply;
+        err.skillsCalled = result.skillsCalled;
+        throw err;
+      }
+      return { reply, skillsCalled: result.skillsCalled, stateDir };
     },
-    {
-      name: 'go-write: copy file',
-      expectMode: 'behavior',
-      run: async () => {
-        const query = 'Copy e2e-touch.txt to e2e-copy.txt in the workspace.';
-        const result = await runE2E(query, { stateDir });
-        const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
-        if (!pass) {
-          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-          err.reply = reply;
-          err.skillsCalled = result.skillsCalled;
-          throw err;
-        }
-        return { reply, skillsCalled: result.skillsCalled };
-      },
-    },
-  ];
+  }));
 
-  const { failed } = await runSkillTests('go-write', tests);
+  const { failed } = await runSkillTests('gog', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

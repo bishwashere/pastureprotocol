@@ -17,11 +17,11 @@ import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
 import dotenv from 'dotenv';
-import { runSkillTests } from '../../support/skill-test-runner.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
 import { getEnvPath } from '../../../../lib/util/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const INSTALL_ROOT = process.env.PASTURE_INSTALL_DIR ? resolve(process.env.PASTURE_INSTALL_DIR) : ROOT;
 const DEFAULT_STATE_DIR = join(homedir(), '.pasture');
 

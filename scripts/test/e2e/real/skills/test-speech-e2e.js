@@ -1,35 +1,32 @@
 /**
- * E2E tests for the gog skill through the main chatting interface.
- * See scripts/test/E2E.md. Flow: user message → LLM → gog skill → reply → judge.
- * If gog is not configured, judge may accept a brief explanation.
+ * E2E tests for the speech skill through the main chatting interface.
+ * See scripts/test/E2E.md. Flow: user message → LLM → speech skill → reply → judge.
+ * Covers synthesize and reply_as_voice (no audio file for transcribe in --test).
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, existsSync, copyFileSync, readFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
-import { runSkillTests } from '../../support/skill-test-runner.js';
-import { judgeUserGotWhatTheyWanted } from '../../support/e2e-judge.js';
-import { skipSuiteIf } from '../../support/e2e-skip.js';
-import dotenv from 'dotenv';
-import { getEnvPath } from '../../../../lib/util/paths.js';
+import { runSkillTests } from '../../../support/skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from '../../../support/e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
+const ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const DEFAULT_STATE_DIR = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
-const GOG_QUERIES = [
-  'What are my next two calendar events?',
-  'How many emails did I get in the last week?',
+const SPEECH_QUERIES = [
+  'Can you say this out loud: Hello from E2E speech test?',
+  'Send me a voice note that says E2E speech test OK.',
 ];
 
 function createTempStateDir() {
-  const stateDir = join(tmpdir(), 'pasture-gog-e2e-' + Date.now());
+  const stateDir = join(tmpdir(), 'pasture-speech-e2e-' + Date.now());
   mkdirSync(join(stateDir, 'workspace'), { recursive: true });
   if (existsSync(join(DEFAULT_STATE_DIR, 'config.json'))) {
     copyFileSync(join(DEFAULT_STATE_DIR, 'config.json'), join(stateDir, 'config.json'));
@@ -87,32 +84,19 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
-  skipSuiteIf('gog-e2e', () => {
-    dotenv.config({ path: getEnvPath() });
-    const configPath = join(DEFAULT_STATE_DIR, 'config.json');
-    let account = process.env.GOG_ACCOUNT || '';
-    if (!account && existsSync(configPath)) {
-      try {
-        account = JSON.parse(readFileSync(configPath, 'utf8'))?.skills?.gog?.account || '';
-      } catch (_) {}
-    }
-    if (!account?.trim()) return 'gog not configured (set skills.gog.account or GOG_ACCOUNT)';
-    return null;
-  });
-
-  console.log('E2E tests: gog skill (user message → LLM → gog → reply → judge).');
+  console.log('E2E tests: speech skill (user message → LLM → speech → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 
   const stateDir = createTempStateDir();
 
-  const tests = GOG_QUERIES.map((query) => ({
-    name: `gog: "${query.slice(0, 50)}…"`,
-    expectMode: 'actual',
-    skill: 'gog',
+  const tests = SPEECH_QUERIES.map((query, i) => ({
+    name: `speech: "${query.slice(0, 50)}…"`,
+    expectMode: i === 0 ? 'actual' : 'behavior',
+    skill: i === 0 ? 'speech' : undefined,
     run: async () => {
       const result = await runE2E(query, { stateDir });
       const reply = result.reply ?? result;
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'gog' });
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'speech' });
       if (!pass) {
         const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         err.reply = reply;
@@ -123,7 +107,7 @@ async function main() {
     },
   }));
 
-  const { failed } = await runSkillTests('gog', tests);
+  const { failed } = await runSkillTests('speech', tests);
   process.exit(failed > 0 ? 1 : 0);
 }
 

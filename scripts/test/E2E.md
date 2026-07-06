@@ -9,7 +9,26 @@ E2E tests validate **user-visible behavior** through the real app entry point �
 | `node index.js --test "message"` | Telegram / WhatsApp private chat (`runAgentWithSkills`) |
 | `node scripts/chat-dashboard.js` (stdin JSON) | Web dashboard chat |
 
-Only **transport** is skipped (mock socket instead of Telegram send). Routing, planner, LLM, tools, delegation, and sub-agent turns are **not mocked**.
+Only **transport** is skipped (mock socket instead of Telegram send). In the **real** lane, routing, planner, LLM, tools, delegation, and sub-agent turns are not mocked. In the **fake** lane, any fake LLM/tool boundary must be explicit in the test file and the turn should still enter through `index.js --test`, `index.js --test-live`, or `chat-dashboard.js`.
+
+## Suite lanes
+
+The test suite is split first into **unit** and **E2E**. E2E is split again into two lanes:
+
+| Lane | Command | Meaning |
+|---|---|---|
+| Real E2E | `pnpm run test:e2e:real` | Real app route, real configured LLMs/tools, sandboxed state where needed. |
+| Fake E2E | `pnpm run test:e2e:fake` | Real app route with deterministic fake LLM/tool backends. No external provider dependency. |
+| Both | `pnpm run test:e2e` | Runs real then fake lanes. |
+
+The live log/weather conversation follows this same split:
+
+| Lane | Command |
+|---|---|
+| Real | `pasture test logs --real` or `pnpm run test:logs-real-e2e` |
+| Fake | `pasture test logs --fake` or `pnpm run test:logs-fake-e2e` |
+
+Real E2E is the default for existing user-path tests. Fake E2E files live under `scripts/test/e2e/fake/` and must opt into deterministic local doubles explicitly.
 
 ## What we are testing
 
@@ -39,10 +58,13 @@ Shared runner: `scripts/test/support/skill-test-runner.js` (`runSkillTests`). Re
 
 ## Test layout
 
-- `scripts/test/e2e/skills/` — user prompt → app entry point → LLM → skill/tool → reply.
-- `scripts/test/e2e/agent/` — chat/delegation/team E2E flows.
-- `scripts/test/e2e/core/` — app-level E2E flows that are not tied to one skill.
-- `scripts/test/e2e/dashboard/` — browser/dashboard E2E flows.
+- `scripts/test/e2e/real/skills/` — user prompt → app entry point → LLM → skill/tool → reply.
+- `scripts/test/e2e/real/agent/` — chat/delegation/team E2E flows.
+- `scripts/test/e2e/real/core/` — app-level E2E flows that are not tied to one skill.
+- `scripts/test/e2e/real/dashboard/` — browser/dashboard E2E flows.
+- `scripts/test/e2e/real/` — real-lane wrappers for E2Es that need a named real entry.
+- `scripts/test/e2e/fake/` — fake-lane E2Es with deterministic local LLM/tool doubles.
+- `scripts/test/e2e/run-suite.js` — lane runner for `real`, `fake`, or `all`.
 - `scripts/test/unit/skills/` — direct executor and skill contract tests.
 - `scripts/test/unit/agent/` — agent planning, routing, prompt, and state contract tests.
 - `scripts/test/unit/core/` — storage, config, migrations, utility, and process contract tests.
@@ -63,35 +85,35 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 
 | Folder | Test file | Entry |
 |--------|-----------|--------|
-| [cron/](cron/inputs.md) | `scripts/test/e2e/skills/test-cron-e2e.js` | `--test` |
-| [agent/](agent/inputs.md) | `scripts/test/e2e/agent/test-agent.js` | `--test` |
-| [agent-team/](agent-team/inputs.md) | `scripts/test/e2e/agent/test-agent-team-e2e.js` | `--test` + dashboard |
+| [cron/](cron/inputs.md) | `scripts/test/e2e/real/skills/test-cron-e2e.js` | `--test` |
+| [agent/](agent/inputs.md) | `scripts/test/e2e/real/agent/test-agent.js` | `--test` |
+| [agent-team/](agent-team/inputs.md) | `scripts/test/e2e/real/agent/test-agent-team-e2e.js` | `--test` + dashboard |
 | [evaluate-team-capability/](evaluate-team-capability/inputs.md) | `scripts/test/unit/agent/test-evaluate-team-capability.js` | direct (routing logic) |
 | - | `scripts/test/unit/agent/test-delegation-llm-router.js` | direct (LLM hybrid router; mock LLM) |
 | [agent-team/](agent-team/inputs.md) | `scripts/test/unit/agent/test-agent-config.js` | direct (config only; replaces deleted `test-agent-team-flow.js`) |
-| [basic/](basic/inputs.md) | `scripts/test/e2e/core/test-basic-e2e.js` | `--test` |
-| [casual-greetings/](casual-greetings/inputs.md) | `scripts/test/e2e/agent/test-casual-greetings.js` | unit + `--test` |
+| [basic/](basic/inputs.md) | `scripts/test/e2e/real/core/test-basic-e2e.js` | `--test` |
+| [casual-greetings/](casual-greetings/inputs.md) | `scripts/test/e2e/real/agent/test-casual-greetings.js` | unit + `--test` |
 | - | `scripts/test/unit/core/test-chat-session.js` | direct (session logic only) |
-| [edit/](edit/inputs.md) | `scripts/test/e2e/skills/test-edit-e2e.js` | `--test` |
-| [write/](write/inputs.md) | `scripts/test/e2e/skills/test-write-e2e.js` | `--test` |
-| [browser/](browser/inputs.md) | `scripts/test/e2e/skills/test-browser-e2e.js` | `--test` |
-| [memory/](memory/inputs.md) | `scripts/test/e2e/skills/test-memory-e2e.js` | `--test` |
-| [me/](me/inputs.md) | `scripts/test/e2e/skills/test-me-e2e.js` | `--test` |
-| [home-assistant/](home-assistant/inputs.md) | `scripts/test/e2e/skills/test-home-assistant-e2e.js` | `--test` |
-| [vision/](vision/inputs.md) | `scripts/test/e2e/skills/test-vision-e2e.js` | `--test` |
-| [apply-patch/](apply-patch/inputs.md) | `scripts/test/e2e/skills/test-apply-patch-e2e.js` | `--test` |
-| [read/](read/inputs.md) | `scripts/test/e2e/skills/test-read-e2e.js` | `--test` |
-| [go-read/](go-read/inputs.md) | `scripts/test/e2e/skills/test-go-read-e2e.js` | `--test` |
-| [core/](core/inputs.md) | `scripts/test/e2e/skills/test-core-e2e.js` | `--test` |
-| [go-write/](go-write/inputs.md) | `scripts/test/e2e/skills/test-go-write-e2e.js` | `--test` |
-| [search/](search/inputs.md) | `scripts/test/e2e/skills/test-search-e2e.js` | `--test` |
-| [server-inspect/](server-inspect/inputs.md) | `scripts/test/e2e/skills/test-server-inspect-e2e.js` | `--test` |
-| [speech/](speech/inputs.md) | `scripts/test/e2e/skills/test-speech-e2e.js` | `--test` |
-| [gog/](gog/inputs.md) | `scripts/test/e2e/skills/test-gog-e2e.js` | `--test` |
+| [edit/](edit/inputs.md) | `scripts/test/e2e/real/skills/test-edit-e2e.js` | `--test` |
+| [write/](write/inputs.md) | `scripts/test/e2e/real/skills/test-write-e2e.js` | `--test` |
+| [browser/](browser/inputs.md) | `scripts/test/e2e/real/skills/test-browser-e2e.js` | `--test` |
+| [memory/](memory/inputs.md) | `scripts/test/e2e/real/skills/test-memory-e2e.js` | `--test` |
+| [me/](me/inputs.md) | `scripts/test/e2e/real/skills/test-me-e2e.js` | `--test` |
+| [home-assistant/](home-assistant/inputs.md) | `scripts/test/e2e/real/skills/test-home-assistant-e2e.js` | `--test` |
+| [vision/](vision/inputs.md) | `scripts/test/e2e/real/skills/test-vision-e2e.js` | `--test` |
+| [apply-patch/](apply-patch/inputs.md) | `scripts/test/e2e/real/skills/test-apply-patch-e2e.js` | `--test` |
+| [read/](read/inputs.md) | `scripts/test/e2e/real/skills/test-read-e2e.js` | `--test` |
+| [go-read/](go-read/inputs.md) | `scripts/test/e2e/real/skills/test-go-read-e2e.js` | `--test` |
+| [core/](core/inputs.md) | `scripts/test/e2e/real/skills/test-core-e2e.js` | `--test` |
+| [go-write/](go-write/inputs.md) | `scripts/test/e2e/real/skills/test-go-write-e2e.js` | `--test` |
+| [search/](search/inputs.md) | `scripts/test/e2e/real/skills/test-search-e2e.js` | `--test` |
+| [server-inspect/](server-inspect/inputs.md) | `scripts/test/e2e/real/skills/test-server-inspect-e2e.js` | `--test` |
+| [speech/](speech/inputs.md) | `scripts/test/e2e/real/skills/test-speech-e2e.js` | `--test` |
+| [gog/](gog/inputs.md) | `scripts/test/e2e/real/skills/test-gog-e2e.js` | `--test` |
 | [tide/](tide/inputs.md) | `scripts/test/unit/agent/test-tide.js` | direct (payload) |
 | - | `scripts/test/unit/agent/test-work-mode.js` | direct (LLM-stubbed; chat-session storage + md-llm runner + work-mode classifier; pins "toggle takes effect next turn" contract) |
 | - | `scripts/test/unit/agent/test-autonomy-gating.js` | direct (mission engine + system pulse only start once the first mission is created or already on disk; idempotent) |
-| [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `scripts/test/e2e/core/test-project-workflow-e2e.js` | `--test` (multi-turn) |
+| [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `scripts/test/e2e/real/core/test-project-workflow-e2e.js` | `--test` (multi-turn) |
 
 ### Dashboard Tests panel (all `scripts/test/<id>/inputs.md` + matching script)
 
@@ -111,4 +133,4 @@ Discovery rule: folder `scripts/test/<id>/inputs.md` plus a matching script unde
 | project-workflow-e2e | E2E (multi-turn) | ✅ |
 | dashboard-boot, dashboard-browser | static + Playwright | — |
 
-Not in UI (wrappers only): `scripts/test/e2e/agent/test-agent-send.js`, `scripts/test/e2e/agent/test-agent-title.js` → run `scripts/test/e2e/agent/test-agent-team-e2e.js` via pnpm aliases.
+Not in UI (wrappers only): `scripts/test/e2e/real/agent/test-agent-send.js`, `scripts/test/e2e/real/agent/test-agent-title.js` → run `scripts/test/e2e/real/agent/test-agent-team-e2e.js` via pnpm aliases.
