@@ -107,8 +107,10 @@ function fakeTaskFrameJson() {
 }
 
 function finalReplyFor(scenario, messages) {
+  const toolText = stripToolDoc(latestToolText(messages));
+  if (toolText) scenario.toolResults.push(toolText);
   if (typeof scenario.finalReply === 'function') {
-    return scenario.finalReply(stripToolDoc(latestToolText(messages)), messages);
+    return scenario.finalReply(toolText, messages);
   }
   return scenario.finalReply || `${scenario.name} fake E2E completed.`;
 }
@@ -123,10 +125,11 @@ async function startTextServer(text) {
 }
 
 async function startHaServer() {
+  const requests = [];
   const states = [
     {
       entity_id: 'light.fake_living_room',
-      state: 'on',
+      state: 'off',
       attributes: { friendly_name: 'Fake Living Room Light' },
     },
     {
@@ -135,14 +138,21 @@ async function startHaServer() {
       attributes: { friendly_name: 'Fake Temperature', unit_of_measurement: 'F' },
     },
   ];
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
+    requests.push({ method: req.method, url: req.url });
     if (req.url === '/api/states') return jsonResponse(res, states);
     if (req.url === '/api/states/light.fake_living_room') return jsonResponse(res, states[0]);
+    if (req.method === 'POST' && req.url === '/api/services/light/turn_on') {
+      const body = await readJson(req);
+      requests[requests.length - 1].body = body;
+      if (body?.entity_id === 'light.fake_living_room') states[0].state = 'on';
+      return jsonResponse(res, [{ ...states[0] }]);
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{}');
   });
   const port = await listen(server);
-  return { server, url: `http://127.0.0.1:${port}` };
+  return { server, url: `http://127.0.0.1:${port}`, states, requests };
 }
 
 async function startFakeLlmServer(scenario) {
@@ -294,9 +304,16 @@ function makeScenarios() {
       skills: ['write'],
       toolCall: { name: 'write_file', arguments: { path: 'note.txt', content: 'fake write e2e' } },
       finalReply: 'Wrote note.txt with fake write e2e.',
-      assert: ({ reply, skillsCalled }) => {
+      assert: ({ reply, skillsCalled }, { stateDir, toolResults }) => {
         assert(skillsCalled.includes('write'), 'write skill was not called');
         assert(/note\.txt/.test(reply), 'reply did not mention note.txt');
+        const writtenPath = join(stateDir, 'workspace', 'note.txt');
+        assert(existsSync(writtenPath), `write did not create ${writtenPath}`);
+        assert(readFileSync(writtenPath, 'utf8') === 'fake write e2e', 'write created note.txt with unexpected content');
+        const parsed = JSON.parse(toolResults[0] || '{}');
+        assert(parsed.written === true && parsed.path === 'note.txt', `write tool result did not confirm write: ${toolResults[0] || '(none)'}`);
+        assert(parsed.verification?.verified === true && parsed.verification?.method === 'read_after_write', `write tool result did not include read-after-write verification: ${toolResults[0] || '(none)'}`);
+        console.log('verified write side effect: workspace/note.txt contains "fake write e2e"');
       },
     },
     'edit-e2e': {
@@ -306,6 +323,16 @@ function makeScenarios() {
       files: { 'edit.txt': 'color=red\n' },
       toolCall: { name: 'edit_file', arguments: { path: 'edit.txt', oldString: 'red', newString: 'blue' } },
       finalReply: 'Edited edit.txt from red to blue.',
+      assert: ({ reply, skillsCalled }, { stateDir, toolResults }) => {
+        assert(skillsCalled.includes('edit'), 'edit skill was not called');
+        assert(reply.includes('edit.txt'), 'reply did not mention edit.txt');
+        const editedPath = join(stateDir, 'workspace', 'edit.txt');
+        assert(readFileSync(editedPath, 'utf8') === 'color=blue\n', 'edit.txt content was not changed to blue');
+        const parsed = JSON.parse(toolResults[0] || '{}');
+        assert(parsed.replaced === true && parsed.count === 1, `edit tool result did not confirm replacement: ${toolResults[0] || '(none)'}`);
+        assert(parsed.verification?.verified === true && parsed.verification?.method === 'read_after_write', `edit tool result did not include read-after-write verification: ${toolResults[0] || '(none)'}`);
+        console.log('verified edit side effect: workspace/edit.txt contains "color=blue"');
+      },
     },
     'apply-patch-e2e': {
       name: 'apply-patch-e2e',
@@ -314,6 +341,16 @@ function makeScenarios() {
       files: { 'patch.txt': 'one\ntwo\nthree' },
       toolCall: { name: 'apply_patch_apply', arguments: { path: 'patch.txt', hunk: ' one\n-two\n+TWO\n three' } },
       finalReply: 'Applied the patch to patch.txt.',
+      assert: ({ reply, skillsCalled }, { stateDir, toolResults }) => {
+        assert(skillsCalled.includes('apply-patch'), 'apply-patch skill was not called');
+        assert(reply.includes('patch.txt'), 'reply did not mention patch.txt');
+        const patchedPath = join(stateDir, 'workspace', 'patch.txt');
+        assert(readFileSync(patchedPath, 'utf8') === 'one\nTWO\nthree', 'patch.txt content was not patched');
+        const parsed = JSON.parse(toolResults[0] || '{}');
+        assert(parsed.applied === true && parsed.path === 'patch.txt', `patch tool result did not confirm apply: ${toolResults[0] || '(none)'}`);
+        assert(parsed.verification?.verified === true && parsed.verification?.method === 'read_after_write', `patch tool result did not include read-after-write verification: ${toolResults[0] || '(none)'}`);
+        console.log('verified apply-patch side effect: workspace/patch.txt contains "TWO"');
+      },
     },
     'go-read-e2e': {
       name: 'go-read-e2e',
@@ -361,12 +398,22 @@ function makeScenarios() {
     },
     'home-assistant-e2e': {
       name: 'home-assistant-e2e',
-      message: 'List my fake lights.',
+      message: 'Turn on my fake living room light.',
       skills: ['home-assistant'],
-      toolCall: { name: 'home_assistant_run', arguments: { command: 'list light' } },
-      finalReply: 'Fake Living Room Light is on.',
+      toolCall: { name: 'home_assistant_run', arguments: { command: 'on light.fake_living_room' } },
+      finalReply: 'Fake Living Room Light was turned on.',
       setup: async () => ({ ha: await startHaServer() }),
       envFromSetup: ({ ha }) => ({ envFile: `HA_URL=${ha.url}\nHA_TOKEN=fake-token\n` }),
+      assert: ({ reply, skillsCalled }, { setup, toolResults }) => {
+        assert(skillsCalled.includes('home-assistant'), 'home-assistant skill was not called');
+        const serviceCall = setup.ha.requests.find((r) => r.method === 'POST' && r.url === '/api/services/light/turn_on');
+        assert(serviceCall, `fake HA server did not receive turn_on call. requests=${JSON.stringify(setup.ha.requests)}`);
+        assert(serviceCall.body?.entity_id === 'light.fake_living_room', `turn_on targeted wrong entity: ${JSON.stringify(serviceCall.body)}`);
+        assert(setup.ha.states[0].state === 'on', `fake HA state did not change to on: ${setup.ha.states[0].state}`);
+        assert(/turned on|on/i.test(reply), `reply did not report on state: ${reply}`);
+        assert(toolResults.some((text) => text.includes('Called light.turn_on')), `HA tool result missing service confirmation: ${toolResults.join('\n')}`);
+        console.log('verified fake HA side effect: POST /api/services/light/turn_on changed light.fake_living_room to on');
+      },
       cleanup: ({ ha }) => ha.server.close(),
     },
     'gog-e2e': {
@@ -399,6 +446,15 @@ function makeScenarios() {
       files: { 'pixel.png': Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=', 'base64') },
       toolCall: { name: 'vision_describe', arguments: { path: 'pixel.png', prompt: 'Describe this tiny image.' } },
       finalReply: 'The fake image is a tiny pixel fixture.',
+      afterStateDir: (stateDir, setup, scenario) => {
+        setup.pixelPath = join(stateDir, 'workspace', 'pixel.png');
+        scenario.toolCall.arguments.path = setup.pixelPath;
+      },
+      assert: ({ skillsCalled }, { setup, toolResults }) => {
+        assert(skillsCalled.includes('vision'), 'vision skill was not called');
+        assert(existsSync(setup.pixelPath), `vision fixture missing at ${setup.pixelPath}`);
+        assert(!toolResults.some((text) => /Image file not found|error/i.test(text)), `vision tool returned an error: ${toolResults.join('\n')}`);
+      },
     },
   };
 }
@@ -427,6 +483,7 @@ function scenarioFor(name) {
 export async function runNamedFakeE2E(name) {
   const scenario = scenarioFor(name);
   if (!scenario) throw new Error(`No fake E2E scenario registered for ${name}`);
+  scenario.toolResults = [];
   let setup = {};
   let fakeLlm;
   try {
@@ -435,6 +492,7 @@ export async function runNamedFakeE2E(name) {
     if (scenario.envFromSetup) Object.assign(scenario, scenario.envFromSetup(setup));
     fakeLlm = await startFakeLlmServer(scenario);
     const stateDir = createStateDir(scenario, fakeLlm.port);
+    if (scenario.afterStateDir) scenario.afterStateDir(stateDir, setup, scenario);
     const extraEnv = scenario.extraEnvFromSetup ? scenario.extraEnvFromSetup(setup) : {};
     const result = await runChat(scenario.message, stateDir, extraEnv);
     if (scenario.toolCall) {
@@ -444,7 +502,7 @@ export async function runNamedFakeE2E(name) {
         `expected skill ${expectedSkill}, got [${result.skillsCalled.join(', ')}]`
       );
     }
-    if (scenario.assert) scenario.assert(result);
+    if (scenario.assert) scenario.assert(result, { stateDir, setup, scenario, toolResults: scenario.toolResults });
     console.log(`${name} fake E2E passed`);
   } finally {
     fakeLlm?.server?.close();

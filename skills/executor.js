@@ -92,6 +92,25 @@ export function parseSkillResult(result) {
   return { ok: true, raw };
 }
 
+function logSkillVerification(skillId, result) {
+  const raw = typeof result === 'string' ? result.trim() : '';
+  if (!raw || !raw.startsWith('{')) return;
+  try {
+    const parsed = JSON.parse(raw);
+    const verification = parsed?.verification;
+    if (!verification || typeof verification !== 'object') return;
+    const path = parsed?.path ? ` path=${parsed.path}` : '';
+    const method = verification.method ? ` method=${verification.method}` : '';
+    const bytes = Number.isFinite(verification.actualBytes)
+      ? ` bytes=${verification.actualBytes}`
+      : Number.isFinite(verification.bytes)
+        ? ` bytes=${verification.bytes}`
+        : '';
+    const sha = verification.sha256 ? ` sha256=${String(verification.sha256).slice(0, 12)}` : '';
+    console.log(`[skills] ${skillId} verification:${path}${method} verified=${verification.verified === true}${bytes}${sha}`);
+  } catch (_) {}
+}
+
 /**
  * Skills disabled in group chats. Default-deny anything that mutates the host
  * workspace, talks to owner-only external services, or fans out into a nested
@@ -133,7 +152,9 @@ export async function executeSkill(skillId, ctx, args, toolName) {
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });
   try {
     const result = await run(ctx, args, toolName);
-    return typeof result === 'string' ? result : JSON.stringify(result);
+    const normalized = typeof result === 'string' ? result : JSON.stringify(result);
+    logSkillVerification(skillId, normalized);
+    return normalized;
   } catch (err) {
     console.error('[skills]', skillId, err.message);
     return JSON.stringify({ error: err.message });

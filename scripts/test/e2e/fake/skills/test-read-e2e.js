@@ -98,6 +98,7 @@ function latestToolText(messages) {
 
 function startFakeLlmServer() {
   const calls = [];
+  const toolResults = [];
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || !req.url.endsWith('/chat/completions')) {
       res.writeHead(404);
@@ -167,6 +168,7 @@ function startFakeLlmServer() {
     }
 
     const toolText = latestToolText(messages);
+    if (toolText) toolResults.push(toolText.split('\n\n---\n')[0]);
     let project = 'unknown';
     let purpose = 'unknown';
     try {
@@ -185,7 +187,7 @@ function startFakeLlmServer() {
       }],
     });
   });
-  return listen(server).then((port) => ({ server, port, calls }));
+  return listen(server).then((port) => ({ server, port, calls, toolResults }));
 }
 
 function createStateDir(fakeLlmPort) {
@@ -258,8 +260,13 @@ async function main() {
   try {
     const { reply, skillsCalled, stdout } = await runChat(USER_MESSAGE, stateDir);
     assert(skillsCalled.includes('read'), `expected read skill, got [${skillsCalled.join(', ')}]. stdout tail: ${stdout.slice(-1200)}`);
+    const toolResult = JSON.parse(fakeLlm.toolResults[0] || '{}');
+    assert(toolResult.path === 'config.json', `read tool read unexpected path: ${fakeLlm.toolResults[0] || '(none)'}`);
+    assert(toolResult.text && toolResult.text.includes('"project": "read-fake-e2e"'), `read tool result did not contain fixture text: ${fakeLlm.toolResults[0] || '(none)'}`);
+    assert(toolResult.verification?.verified === true && toolResult.verification?.method === 'read_file', `read tool result did not include read verification: ${fakeLlm.toolResults[0] || '(none)'}`);
     assert(/read-fake-e2e/i.test(reply), `expected fixture project in reply, got: ${reply}`);
     assert(/real read tool/i.test(reply), `expected fixture purpose in reply, got: ${reply}`);
+    console.log('verified read tool result: config.json contained project "read-fake-e2e"');
     console.log('read fake E2E passed');
   } finally {
     fakeLlm.server.close();
