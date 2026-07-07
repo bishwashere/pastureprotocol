@@ -21,7 +21,7 @@ The test suite is split first into **unit** and **E2E**. E2E is split again into
 | Fake E2E | `pnpm run test:e2e:fake` | Real app route with deterministic fake LLM/tool backends. No external provider dependency. |
 | Both | `pnpm run test:e2e` | Runs real then fake lanes. |
 
-All E2E lane runs stream to the terminal and are also appended live to the normal daemon log (`~/.pasture/daemon.log`, or `PASTURE_DAEMON_LOG_PATH` when set). This applies to both real and fake lanes, and to every test file run by `scripts/test/e2e/run-suite.js`.
+All E2E lane runs stream to the terminal and are also appended live to today's daemon log (`~/.pasture/daily-logs/YYYY-MM-DD.log`, or `PASTURE_DAEMON_LOG_PATH` when set). This applies to both real and fake lanes, and to every test file run by `scripts/test/e2e/run-suite.js`.
 
 The live log/weather conversation follows this same split:
 

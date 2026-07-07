@@ -29,6 +29,7 @@ import {
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
+import { getDailyDaemonLogPath } from '../../../../../lib/util/daemon-log-path.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..', '..', '..', '..');
@@ -39,7 +40,7 @@ const FAKE_MODE = process.argv.includes('--fake') || process.argv.includes('--mo
 const TEST_JID = process.env.PASTURE_TEST_LOGS_JID || (FAKE_MODE ? 'fake-log-test@s.whatsapp.net' : 'live-log-test@s.whatsapp.net');
 const KEEP_STATE = process.argv.includes('--keep-state');
 const WRITE_DAEMON_LOG = process.argv.includes('--write-daemon-log');
-const DAEMON_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
+const DAEMON_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || getDailyDaemonLogPath(join(homedir(), '.pasture'));
 
 const TURNS = [
   "What's the weather in Enola today?",

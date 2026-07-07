@@ -11,6 +11,7 @@ import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import readline from 'readline';
 import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
+import { getCurrentDaemonLogPath, getDailyDaemonLogPath } from './lib/util/daemon-log-path.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
 import { maybeBeginCliSession, envForNestedCliCall } from './lib/util/cli-banner.js';
@@ -423,7 +424,12 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     runLiveLogTest(args.slice(1));
   } else {
     const stateDir = process.env.PASTURE_STATE_DIR || join(homedir(), '.pasture');
-    const logPath = join(stateDir, 'daemon.log');
+    const currentLogPath = getCurrentDaemonLogPath(stateDir);
+    const todayLogPath = getDailyDaemonLogPath(stateDir);
+    const legacyLogPath = join(stateDir, 'daemon.log');
+    const logPath = existsSync(currentLogPath)
+      ? currentLogPath
+      : (existsSync(todayLogPath) ? todayLogPath : legacyLogPath);
     if (process.platform === 'win32') {
       const child = spawn('pm2', ['logs', 'pasture'], {
         stdio: 'inherit',
@@ -436,7 +442,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         console.error('pasture: no log file yet. Start the bot with: pasture start');
         process.exit(1);
       }
-      const child = spawn('tail', ['-f', logPath], { stdio: 'inherit' });
+      const child = spawn('tail', ['-F', logPath], { stdio: 'inherit' });
       child.on('close', (code) => process.exit(code ?? 0));
     }
   }

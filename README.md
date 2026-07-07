@@ -1001,8 +1001,11 @@ pasture tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 ├── config.json              # Main configuration
 ├── secrets.json             # Sensitive credentials (gitignored) - GitHub token, etc.
 ├── .env                     # API keys and env var overrides (gitignored)
-├── daemon.log               # Bot daemon stdout log
-├── daemon.err               # Bot daemon stderr log
+├── daily-logs/
+│   ├── YYYY-MM-DD.log       # Bot daemon stdout log, day-wise
+│   ├── YYYY-MM-DD.err       # Bot daemon stderr log, day-wise
+│   ├── current.log          # Symlink to today's stdout log
+│   └── current.err          # Symlink to today's stderr log
 ├── auth_info/               # WhatsApp session files (Baileys)
 │   ├── creds.json
 │   └── *.json
@@ -1080,12 +1083,13 @@ pastureprotocol/
 
 `pasture start` launches the bot as a background daemon using the platform's process manager so it survives terminal sessions.
 
-Logs are written to `~/.pasture/daemon.log` (stderr: `daemon.err`). Tail them with:
+Daemon logs are written day-wise under `~/.pasture/daily-logs/`.
+Tail today's log with:
 
 ```bash
 pasture logs
 # or:
-tail -f ~/.pasture/daemon.log
+tail -F ~/.pasture/daily-logs/current.log
 ```
 
 ---

@@ -5,6 +5,7 @@
 
 import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir, getAgentsDir, getMemoryIndexPath } from './lib/util/paths.js';
 import { beginCliSession } from './lib/util/cli-banner.js';
+import { getDailyDaemonLogPath } from './lib/util/daemon-log-path.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -31,7 +32,7 @@ function logFlow(step, ...args) {
   console.log(step, ...args);
 }
 
-// Log to daemon.log so "tail -f" shows when the process actually started (after pasture start/restart)
+// Log to the daemon output stream so "pasture logs" shows when the process actually started.
 console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] Pasture Protocol daemon started`);
 
 import * as Baileys from '@whiskeysockets/baileys';
@@ -235,7 +236,7 @@ const _consoleDebug = console.debug;
 const _consoleWarn = console.warn;
 const _consoleError = console.error;
 const E2E_LIVE_LOG_ENABLED = process.env.PASTURE_E2E_LIVE_LOG === '1';
-const E2E_LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
+const E2E_LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || getDailyDaemonLogPath(getStateDir());
 function tsPrefix() {
   return `[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}]`;
 }

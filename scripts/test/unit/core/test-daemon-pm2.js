@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 import { startReport, recordCase, endReport } from '../../support/e2e-report.js';
 import { runPm2DaemonAction, daemonLog, ensurePm2 } from '../../../../lib/util/daemon-pm2.js';
+import { getDailyDaemonLogPath } from '../../../../lib/util/daemon-log-path.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
@@ -124,11 +125,11 @@ function checkDaemonLog() {
   const dir = mkdtempSync(join(tmpdir(), 'pasture-daemon-log-'));
   try {
     daemonLog(dir, 'test');
-    const content = readFileSync(join(dir, 'daemon.log'), 'utf8');
+    const content = readFileSync(getDailyDaemonLogPath(dir), 'utf8');
     if (!content.includes('pasture test')) {
       return { ok: false, detail: 'daemonLog did not write expected line' };
     }
-    return { ok: true, detail: 'daemonLog writes control lines' };
+    return { ok: true, detail: 'daemonLog writes daily control lines' };
   } catch (e) {
     return { ok: false, detail: e.message };
   } finally {

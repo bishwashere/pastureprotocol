@@ -4,10 +4,11 @@ import { appendFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getDailyDaemonLogPath } from '../../../lib/util/daemon-log-path.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..', '..');
-const LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || join(homedir(), '.pasture', 'daemon.log');
+const LIVE_LOG_PATH = process.env.PASTURE_DAEMON_LOG_PATH || getDailyDaemonLogPath(join(homedir(), '.pasture'));
 
 const REAL_TESTS = [
   ['agent', 'scripts/test/e2e/real/agent/test-agent.js'],

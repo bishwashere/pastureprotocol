@@ -12,8 +12,15 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 [ -d "$STATE_DIR" ] || mkdir -p "$STATE_DIR"
 STATE_DIR="$(cd "$STATE_DIR" && pwd)"
-# Pre-create log files so "tail -f daemon.log" works immediately after start; launchd will append
-touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
+LOG_DIR="$STATE_DIR/daily-logs"
+TODAY="$(date '+%Y-%m-%d')"
+DAEMON_LOG="$LOG_DIR/$TODAY.log"
+DAEMON_ERR="$LOG_DIR/$TODAY.err"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+# Pre-create daily log files so "pasture logs" works immediately after start.
+touch "$DAEMON_LOG" "$DAEMON_ERR" 2>/dev/null || true
+ln -sfn "$TODAY.log" "$LOG_DIR/current.log" 2>/dev/null || true
+ln -sfn "$TODAY.err" "$LOG_DIR/current.err" 2>/dev/null || true
 NODE="$(command -v node 2>/dev/null || true)"
 [ -z "$NODE" ] && NODE="node"
 # Prefer full path for launchd (minimal PATH); fallback for when "node" is not in PATH
@@ -24,9 +31,13 @@ fi
 INDEX_JS="$INSTALL_DIR/index.js"
 RUN_WITH_ENV="$INSTALL_DIR/scripts/run-with-env.sh"
 
-# Append a control line to daemon.log so "tail -f daemon.log" shows start/stop/restart
+# Append a control line to today's daemon log so "pasture logs" shows start/stop/restart
 daemon_log() {
-  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] pasture $ACTION" >> "$STATE_DIR/daemon.log" 2>/dev/null || true
+  day="$(date '+%Y-%m-%d')"
+  mkdir -p "$LOG_DIR" 2>/dev/null || true
+  ln -sfn "$day.log" "$LOG_DIR/current.log" 2>/dev/null || true
+  ln -sfn "$day.err" "$LOG_DIR/current.err" 2>/dev/null || true
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] pasture $ACTION" >> "$LOG_DIR/$day.log" 2>/dev/null || true
 }
 
 # macOS launchd
@@ -104,6 +115,8 @@ ensure_plist() {
     <string>${STATE_DIR}</string>
     <key>PASTURE_INSTALL_DIR</key>
     <string>${INSTALL_DIR}</string>
+    <key>PASTURE_DAEMON_LOG_DIR</key>
+    <string>${LOG_DIR}</string>
     <key>NODE</key>
     <string>${NODE}</string>
   </dict>
@@ -112,9 +125,9 @@ ensure_plist() {
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${STATE_DIR}/daemon.log</string>
+  <string>${DAEMON_LOG}</string>
   <key>StandardErrorPath</key>
-  <string>${STATE_DIR}/daemon.err</string>
+  <string>${DAEMON_ERR}</string>
 </dict>
 </plist>
 EOF
@@ -136,7 +149,7 @@ After=network.target
 
 [Service]
 Type=simple
-Environment="PASTURE_STATE_DIR=${STATE_DIR}" "PASTURE_INSTALL_DIR=${INSTALL_DIR}"
+Environment="PASTURE_STATE_DIR=${STATE_DIR}" "PASTURE_INSTALL_DIR=${INSTALL_DIR}" "PASTURE_DAEMON_LOG_DIR=${LOG_DIR}"
 ExecStart=${EXEC_START}
 WorkingDirectory=${STATE_DIR}
 Restart=always
@@ -181,13 +194,13 @@ case "$OS" in
     case "$ACTION" in
       start)
         ensure_plist
-        touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
+        touch "$DAEMON_LOG" "$DAEMON_ERR" 2>/dev/null || true
         if launchctl list 2>/dev/null | grep -q "$LAUNCHD_LABEL"; then
-          echo "Daemon is already running. Logs: $STATE_DIR/daemon.log"
+          echo "Daemon is already running. Logs: $LOG_DIR/current.log"
           daemon_log
         else
           if launchctl load "$PLIST"; then
-            echo "Daemon started. Logs: $STATE_DIR/daemon.log"
+            echo "Daemon started. Logs: $LOG_DIR/current.log"
             daemon_log
             echo "  (tail the log to see 'Pasture Protocol daemon started' when the bot is up)"
           else
@@ -216,7 +229,7 @@ case "$OS" in
         launchctl load "$PLIST"
         echo "Daemon restarted."
         daemon_log
-        echo "  (tail $STATE_DIR/daemon.log to see 'Pasture Protocol daemon started' when the bot is up)"
+        echo "  (tail $LOG_DIR/current.log to see 'Pasture Protocol daemon started' when the bot is up)"
         ;;
       *) echo "Usage: pasture start|stop|status|restart"; exit 1 ;;
     esac
