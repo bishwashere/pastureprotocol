@@ -407,6 +407,10 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'uninstall') {
+  if (IS_WIN) {
+    runWindowsUninstall({ installDir: INSTALL_DIR });
+    process.exit(0);
+  }
   const script = join(INSTALL_DIR, 'uninstall.sh');
   if (!existsSync(script)) {
     console.error('pasture: uninstall.sh not found. Re-run the installer.');
