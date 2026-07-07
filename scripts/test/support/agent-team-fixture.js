@@ -3,8 +3,8 @@
  * Not part of the runtime path — only prepares state.
  */
 
-import { appendFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { appendFileSync, mkdirSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 
 export const MARKETER_TAGLINE = 'Ship faster, moo less.';
 
@@ -162,5 +162,7 @@ export async function seedAgentTeamStatusFixture(stateDir) {
     message: 'Needs attention: missing GitHub token for OAuth callback investigation.',
   });
 
-  appendFileSync(getTeamActivityLogPath(), rows.map((row) => JSON.stringify(row)).join('\n') + '\n', 'utf8');
+  const logPath = getTeamActivityLogPath();
+  mkdirSync(dirname(logPath), { recursive: true });
+  appendFileSync(logPath, rows.map((row) => JSON.stringify(row)).join('\n') + '\n', 'utf8');
 }

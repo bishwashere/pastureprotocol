@@ -12,7 +12,7 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 [ -d "$STATE_DIR" ] || mkdir -p "$STATE_DIR"
 STATE_DIR="$(cd "$STATE_DIR" && pwd)"
-LOG_DIR="$STATE_DIR/daily-logs"
+LOG_DIR="$STATE_DIR/daily-logs/runtime"
 TODAY="$(date '+%Y-%m-%d')"
 DAEMON_LOG="$LOG_DIR/$TODAY.log"
 DAEMON_ERR="$LOG_DIR/$TODAY.err"

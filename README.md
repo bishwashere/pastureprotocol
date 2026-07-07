@@ -1002,10 +1002,20 @@ pasture tide checklist triggers [--on-restart|--no-on-restart] [--on-cycle|--no-
 ├── secrets.json             # Sensitive credentials (gitignored) - GitHub token, etc.
 ├── .env                     # API keys and env var overrides (gitignored)
 ├── daily-logs/
-│   ├── YYYY-MM-DD.log       # Bot daemon stdout log, day-wise
-│   ├── YYYY-MM-DD.err       # Bot daemon stderr log, day-wise
-│   ├── current.log          # Symlink to today's stdout log
-│   └── current.err          # Symlink to today's stderr log
+│   ├── runtime/
+│   │   ├── YYYY-MM-DD.log   # Bot daemon stdout log, day-wise
+│   │   ├── YYYY-MM-DD.err   # Bot daemon stderr log, day-wise
+│   │   ├── current.log      # Symlink to today's stdout log
+│   │   └── current.err      # Symlink to today's stderr log
+│   ├── timing/
+│   │   ├── YYYY-MM-DD.jsonl # Request / LLM timing events, day-wise
+│   │   └── current.jsonl    # Symlink to today's timing log
+│   ├── team-activity/
+│   │   ├── YYYY-MM-DD.jsonl # Dashboard team activity events, day-wise
+│   │   └── current.jsonl    # Symlink to today's team activity log
+│   └── self-edits/
+│       ├── YYYY-MM-DD.log   # System Pulse self-edit audit, day-wise
+│       └── current.log      # Symlink to today's self-edit log
 ├── auth_info/               # WhatsApp session files (Baileys)
 │   ├── creds.json
 │   └── *.json
@@ -1083,13 +1093,13 @@ pastureprotocol/
 
 `pasture start` launches the bot as a background daemon using the platform's process manager so it survives terminal sessions.
 
-Daemon logs are written day-wise under `~/.pasture/daily-logs/`.
+Daemon logs are written day-wise under `~/.pasture/daily-logs/runtime/`.
 Tail today's log with:
 
 ```bash
 pasture logs
 # or:
-tail -F ~/.pasture/daily-logs/current.log
+tail -F ~/.pasture/daily-logs/runtime/current.log
 ```
 
 ---

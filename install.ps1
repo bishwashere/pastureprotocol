@@ -294,8 +294,8 @@ function Show-PasturePostInstallHelp {
     Write-Host "  pasture update       pull the latest version"
     Write-Host ""
     Write-Host "  Log files:"
-    Write-Host "    $stateDir\daemon.log"
-    Write-Host "    $stateDir\daemon.err"
+    Write-Host "    $stateDir\daily-logs\runtime\current.log"
+    Write-Host "    $stateDir\daily-logs\runtime\current.err"
     if ($Running) {
         Write-Host ""
         Write-Host "  [OK] Bot is running in the background. You can close this window."

@@ -10,7 +10,7 @@ export PASTURE_STATE_DIR="$STATE_DIR"
 export PASTURE_INSTALL_DIR="$INSTALL_DIR"
 
 if [ "${PASTURE_DAEMON_DAILY_LOGS:-1}" != "0" ]; then
-  LOG_DIR="${PASTURE_DAEMON_LOG_DIR:-$STATE_DIR/daily-logs}"
+  LOG_DIR="${PASTURE_DAEMON_LOG_DIR:-$STATE_DIR/daily-logs/runtime}"
   mkdir -p "$LOG_DIR" 2>/dev/null || true
 
   write_daily_daemon_line() {
