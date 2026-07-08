@@ -17,6 +17,7 @@ import { executeForcedDelegation } from '../../../../lib/agent/forced-delegation
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const internal = readFileSync(join(root, 'lib/agent/internal-agent-turn.js'), 'utf8');
+const agentSend = readFileSync(join(root, 'lib/agent/executors/agent-send.js'), 'utf8');
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +61,10 @@ check(
 check(
   'internal-agent-turn.js cites audit finding #9',
   /audit\s+finding\s+#9/i.test(internal)
+);
+check(
+  'agent-send persists delegated mission tasks only with an explicit task envelope',
+  /explicitTaskEnvelope/.test(agentSend) && /persistTask\s*=\s*explicitTaskEnvelope/.test(agentSend)
 );
 
 console.log(`\n[forced-delegation] passed=${passed} failed=${failed}`);

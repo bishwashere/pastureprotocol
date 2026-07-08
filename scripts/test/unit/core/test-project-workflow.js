@@ -220,13 +220,31 @@ async function main() {
         },
       },
       {
-        name: 'propose plan adds blocker template tasks for broad growth request',
+        name: 'propose plan does not auto-add blocker template tasks',
         input: 'propose_plan improve customer base',
         run: async () => {
           const preview = proposeProjectPlan({
             project: 'NextPostAI',
             title: 'Improve customer base',
             userText: 'How can I improve my customer base?',
+            tasks: [{ title: 'Review current positioning', status: 'todo' }],
+          });
+          if (!preview.ok) throw new Error('preview failed');
+          if (preview.blockerTemplate) throw new Error('blocker template should be opt-in');
+          if (preview.blockerTasksForDisplay.length) throw new Error('unexpected blocker display tasks');
+          if (preview.tasksForDisplay.length !== 1) throw new Error('unexpected auto-added tasks');
+          return `${preview.tasksForDisplay.length} implementation task`;
+        },
+      },
+      {
+        name: 'propose plan adds blocker template tasks when explicitly requested',
+        input: 'propose_plan includeBlockerTemplates=true',
+        run: async () => {
+          const preview = proposeProjectPlan({
+            project: 'NextPostAI',
+            title: 'Improve customer base',
+            userText: 'How can I improve my customer base?',
+            includeBlockerTemplates: true,
             tasks: [{ title: 'Review current positioning', status: 'todo' }],
           });
           if (!preview.ok || preview.blockerTemplate?.id !== 'digital-product-growth') throw new Error('missing blocker template');
@@ -314,6 +332,7 @@ async function main() {
             project: 'NextPostAI',
             title: 'Customer growth blockers',
             userText: 'Improve customer base',
+            includeBlockerTemplates: true,
             tasks: [{ title: 'Draft growth hypothesis', status: 'todo' }],
             userApproved: true,
             ownerAgentId: 'main',

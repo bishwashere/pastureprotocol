@@ -29,6 +29,8 @@ Call when the user:
 3. **`health_check`** — for configured projects, verify description, URL, setup notes, progress log, and linked mission. **Ask the user** for anything important that is missing (`update_project` can save answers).
 4. **`status`** — show current project + mission + task list.
 5. **`propose_plan`** — preview mission title, objective, and suggested tasks (does **not** write yet). Show **tasksForDisplay** and ask for yes/no.
+   - For concrete implementation work, propose only the implementation/QA tasks.
+   - For broad planning that truly needs missing user context, pass **`includeBlockerTemplates: true`** to add blocked missing-input tasks.
 6. **Wait for explicit yes** — a mission alone (e.g. "increase sign ups") is **not** approval. Wait for **yes / go ahead / create it**.
 7. **`apply_plan`** with **`userApproved: true`** — only after explicit yes; the tool verifies approval in the user's message.
 8. During work: **`log_progress`** after meaningful steps; **`update_task`** when a task moves (todo → doing → done).
@@ -102,6 +104,7 @@ project_workflow_propose_plan
     title: string
     objective: string
     tasks: array
+    includeBlockerTemplates: boolean
 
 project_workflow_apply_plan
   description: Create or update mission and tasks after user approval. Requires userApproved true.
@@ -111,6 +114,7 @@ project_workflow_apply_plan
     title: string
     objective: string
     tasks: array
+    includeBlockerTemplates: boolean
     userApproved: boolean
 
 project_workflow_update_task

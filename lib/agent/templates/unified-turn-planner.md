@@ -65,6 +65,8 @@ If the user asks to implement, edit, modify, write, patch, apply patches, fix co
 
 If recent conversation established an active repo/task, short follow-ups like “yes”, “do it”, “go ahead”, “apply patches”, or “continue” inherit that implementation context.
 
+For project/mission follow-ups where the user says to start or do a specific tracked task, include `project-workflow` and make the plan explicitly update that task to `doing` before doing implementation work, then update/log progress after meaningful work. Do not create a new placeholder task from the confirmation text itself.
+
 ## Self-inspection
 
 If the user asks about Pasture/CowCode itself, its local runtime, logs, tools, agents, source, dashboard, or project state, choose local inspection skills such as `read`, `go-read`, or `core`. Add write/patch skills only if the user is asking to change files.

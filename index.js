@@ -1953,7 +1953,7 @@ async function main() {
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
       }), { agentId, toolsCount: toolsForRequest.length });
     }
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus } = turnResult || {};
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus, hadWriteOp: turnHadWriteOp } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
@@ -1981,6 +1981,24 @@ async function main() {
         postTurnTaskFrameReason = statusDecision.reason || '';
         logFlow(FLOW_STEP.TASK_STATUS, '[task-frame-status]', JSON.stringify(statusDecision));
       }
+    }
+    const implementationFrameKinds = new Set(['repo_work', 'project_work', 'feature_work', 'debugging']);
+    const frameKind = String(frameForStatus?.kind || '').trim();
+    const usedProjectWorkflow = skillsCalledFromTurn.includes('project-workflow');
+    if (
+      postTurnTaskFrameStatus === 'completed'
+      && implementationFrameKinds.has(frameKind)
+      && !turnHadWriteOp
+      && !usedProjectWorkflow
+    ) {
+      postTurnTaskFrameStatus = 'continue';
+      postTurnTaskFrameReason = 'completion_without_write_or_project_update';
+      logFlow(FLOW_STEP.TASK_STATUS, '[task-frame-status-guard]', JSON.stringify({
+        status: postTurnTaskFrameStatus,
+        reason: postTurnTaskFrameReason,
+        frameKind,
+        skillsCalled: skillsCalledFromTurn,
+      }));
     }
     if (!postTurnTaskFrameStatus && unifiedPlan?.taskFrameStatusHint && unifiedPlan.taskFrameStatusHint !== 'continue') {
       postTurnTaskFrameStatus = unifiedPlan.taskFrameStatusHint;

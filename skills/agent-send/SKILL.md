@@ -8,7 +8,7 @@ description: Delegate a question or task to another configured agent and get its
 
 Send a message to **another agent** running in this same Pasture Protocol and get its reply, so you can act as a coordinator over a team of specialist agents (the "PM to PM" pattern). The target agent runs a full turn with its own persona, skills, and memory, then returns text to you. Nothing is sent to WhatsApp/Telegram - the exchange is internal.
 
-When a related **Mission** is active, delegations create a **persistent assigned task** on that mission (assignee, due date, expected output, status tracking). The target agent sees the assignment in their mission context; you can follow progress on the mission's task tree.
+When a related **Mission** is active, delegations can create a **persistent assigned task** on that mission (assignee, due date, expected output, status tracking). The target agent sees the assignment in their mission context; you can follow progress on the mission's task tree.
 
 Conversation history with each target agent is remembered across calls, so follow-up delegations build on the earlier ones.
 
@@ -34,7 +34,9 @@ Optional **persistent task assignment** fields (recommended when working on a Mi
 - **expectedOutput** - what the assignee should deliver (e.g. "3 blog headlines with rationale").
 - **dueInHours** - deadline in hours from now (default 48 when a mission is linked).
 - **missionId** - explicit mission id when multiple missions are active (otherwise inferred from context).
-- **persistTask** - set `false` to skip creating a tracked task (message-only delegation).
+- **persistTask** - set `true` only when this delegation should create a tracked mission task. Message-only delegations are not persisted unless you provide `taskTitle`, `expectedOutput`, or `persistTask: true`.
+
+Do not create a persistent task from user confirmation text such as "ok", "do it", or "go ahead". If the user is approving an existing mission task, update that existing task via `project-workflow` instead.
 
 After you get the reply, synthesize a single answer for the user. You may message multiple agents (subject to the per-turn limit) and combine their replies.
 
@@ -86,7 +88,7 @@ then `agent_send_send` with `{ "agent": "reviewer", "message": "Review this auth
 
 ```tool-schema
 agent_send_send
-  description: Delegate a message to another configured agent and return its reply. Creates a persistent assigned task on the active Mission when one is linked (assignee, due date, expected output). agent is the target agent id or display title (must be in your allow list); message is the full task/question (the target does not see your conversation with the user). Internal only - nothing is sent to any chat channel.
+  description: Delegate a message to another configured agent and return its reply. Can create a persistent assigned task on the active Mission when taskTitle/expectedOutput or persistTask=true is provided. agent is the target agent id or display title (must be in your allow list); message is the full task/question (the target does not see your conversation with the user). Internal only - nothing is sent to any chat channel.
   parameters:
     agent: string
     message: string
