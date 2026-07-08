@@ -73,7 +73,7 @@ function Install-PastureNodeRuntime {
             Write-Host "  [X] Managed Node.js install did not produce node.exe."
             return $false
         }
-        Write-Host "  [OK] Node.js runtime installed: $PastureNodeDir"
+        Write-Host "  [OK] Node.js runtime installed: $PastureNodeDir" -ForegroundColor Cyan
         return $true
     } catch {
         Write-Host "  [X] Managed Node.js install failed: $($_.Exception.Message)"
@@ -229,7 +229,7 @@ function Ensure-PasturePm2 {
         Write-Host "      npm install -g pm2"
         return $false
     }
-    Write-Host "  [OK] pm2 installed."
+    Write-Host "  [OK] pm2 installed." -ForegroundColor Cyan
     return $true
 }
 
@@ -271,7 +271,7 @@ function Enable-PasturePm2AutoRestart {
         Write-Host "  If pm2 printed an admin command above, run it in an elevated PowerShell, then: pm2 save"
     }
     & $pm2Cmd save 2>$null
-    Write-Host "  [OK] Auto-start configured (pm2 save)."
+    Write-Host "  [OK] Auto-start configured (pm2 save)." -ForegroundColor Cyan
     return $true
 }
 
@@ -298,7 +298,7 @@ function Show-PasturePostInstallHelp {
     Write-Host "    $stateDir\daily-logs\runtime\current.err"
     if ($Running) {
         Write-Host ""
-        Write-Host "  [OK] Bot is running in the background. You can close this window."
+        Write-Host "  [OK] Bot is running in the background. You can close this window." -ForegroundColor Cyan
     } else {
         Write-Host ""
         Write-Host "  Start the bot: pasture start"
@@ -528,7 +528,7 @@ try {
         Exit-Install 1
     }
     $Src = $SrcDir.FullName
-    Write-Host "  [OK] Done."
+    Write-Host "  [OK] Done." -ForegroundColor Cyan
     Write-Host ""
 
     # --- install code ---
@@ -544,9 +544,9 @@ try {
     $ver = Read-PackageJsonVersion $pkgPath
     Invoke-PastureBuildInfo -Root $InstallDir -Branch $Branch
     if ($ver) {
-        Write-Host "  [OK] Code installed (v$ver)."
+        Write-Host "  [OK] Code installed (v$ver)." -ForegroundColor Cyan
     } else {
-        Write-Host "  [OK] Code installed."
+        Write-Host "  [OK] Code installed." -ForegroundColor Cyan
     }
     Write-Host ""
 
@@ -594,7 +594,7 @@ node "$InstallDir\cli.js" %*
     try {
         $hasDotenv = Test-Path (Join-Path $InstallDir "node_modules\dotenv")
         if ($hasDotenv) {
-            Write-Host "  [OK] Dependencies already installed."
+            Write-Host "  [OK] Dependencies already installed." -ForegroundColor Cyan
         } else {
             if (Test-Path (Join-Path $InstallDir "node_modules")) {
                 Write-Host "  > Removing incomplete node_modules..."
@@ -602,10 +602,10 @@ node "$InstallDir\cli.js" %*
             }
             if ($hasPnpm) {
             Invoke-Native "pnpm install" { & $pnpmCmd install }
-            Write-Host "  [OK] Dependencies installed."
+            Write-Host "  [OK] Dependencies installed." -ForegroundColor Cyan
             } else {
             Invoke-Native "npm install" { & $npmCmd install }
-            Write-Host "  [OK] Dependencies installed."
+            Write-Host "  [OK] Dependencies installed." -ForegroundColor Cyan
             }
         }
         if (-not (Test-Path (Join-Path $InstallDir "node_modules\dotenv"))) {
@@ -619,7 +619,7 @@ node "$InstallDir\cli.js" %*
 
     # --- setup ---
     if ($SkipSetup) {
-        Write-Host "  [OK] Setup skipped."
+        Write-Host "  [OK] Setup skipped." -ForegroundColor Cyan
     } else {
         Write-Host "  > Setting up (config + WhatsApp link)..."
         Write-Host "  (When you are done and want to stop the bot, press Ctrl+C.)"

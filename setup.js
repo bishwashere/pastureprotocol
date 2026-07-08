@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
 import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/util/paths.js';
-import { beginCliSession } from './lib/util/cli-banner.js';
+import { beginCliSession, statusOk } from './lib/util/cli-banner.js';
 
 /** Default Tide checklist block — inlined so setup.js does not import tide-checklist.js (needs dotenv) before deps install. */
 function defaultTideChecklistBlock() {
@@ -238,23 +238,23 @@ function migrateFromRoot() {
   const rootCron = join(ROOT, 'cron', 'jobs.json');
   if (existsSync(rootConfig) && !existsSync(stateConfig)) {
     copyFileSync(rootConfig, stateConfig);
-    console.log(C.dim + '  ✓ Migrated config.json to ~/.pasture' + C.reset);
+    console.log(statusOk('  ✓ Migrated config.json to ~/.pasture'));
   }
   if (existsSync(rootEnv) && !existsSync(stateEnv)) {
     copyFileSync(rootEnv, stateEnv);
-    console.log(C.dim + '  ✓ Migrated .env to ~/.pasture' + C.reset);
+    console.log(statusOk('  ✓ Migrated .env to ~/.pasture'));
   }
   if (existsSync(rootAuth)) {
     const creds = join(rootAuth, 'creds.json');
     if (existsSync(creds) && !existsSync(join(stateAuth, 'creds.json'))) {
       cpSync(rootAuth, stateAuth, { recursive: true });
-      console.log(C.dim + '  ✓ Migrated auth_info to ~/.pasture' + C.reset);
+      console.log(statusOk('  ✓ Migrated auth_info to ~/.pasture'));
     }
   }
   if (existsSync(rootCron) && !existsSync(stateCron)) {
     mkdirSync(dirname(stateCron), { recursive: true });
     copyFileSync(rootCron, stateCron);
-    console.log(C.dim + '  ✓ Migrated cron/jobs.json to ~/.pasture' + C.reset);
+    console.log(statusOk('  ✓ Migrated cron/jobs.json to ~/.pasture'));
   }
 }
 
@@ -271,7 +271,7 @@ function ensureInstall() {
       process.exit(res.status ?? 1);
     }
     console.log('');
-    console.log(C.dim + '  ✓ Dependencies ready.' + C.reset);
+    console.log(statusOk('  ✓ Dependencies ready.'));
   }
 }
 
@@ -328,7 +328,7 @@ async function askBioAndSave() {
     } catch (_) {}
   }
   console.log('');
-  console.log(C.dim + '  ✓ Bio saved to config and WhoAmI.md.' + C.reset);
+  console.log(statusOk('  ✓ Bio saved to config and WhoAmI.md.'));
 }
 
 function loadConfig() {
@@ -389,7 +389,7 @@ function createSetupSession(initialEnv) {
       wireWhisperToOpenAiKey({ pendingEnv, saveConfigIfChanged });
     }
     if (savedThisRun) {
-      console.log(C.dim + '  ✓ Saved changes to ~/.pasture' + C.reset);
+      console.log(statusOk('  ✓ Saved changes to ~/.pasture'));
     }
   }
 
@@ -650,7 +650,7 @@ async function onboarding() {
     if (!hasBinary('gog')) {
       console.log(C.dim + '  ! gog CLI not found in PATH. Install from https://gogcli.sh and run setup again.' + C.reset);
     }
-    console.log(C.dim + '  ✓ gog skill enabled.' + C.reset);
+    console.log(statusOk('  ✓ gog skill enabled.'));
   }
 
   // Vision fallback: only ask when main model is text-only; skip step if main model already supports vision.
@@ -735,7 +735,7 @@ async function onboarding() {
   await setupPromptSecret(session, 'ELEVEN_LABS_API_KEY', q('11Labs API key (text to voice) – optional'), session.pendingEnv.ELEVEN_LABS_API_KEY || '');
 
   console.log('');
-  console.log(C.dim + '  ✓ Config and .env saved to ~/.pasture' + C.reset);
+  console.log(statusOk('  ✓ Config and .env saved to ~/.pasture'));
   } finally {
     activeSetupSession = null;
   }
@@ -817,7 +817,7 @@ async function main() {
           cfg.channels = cfg.channels || {};
           cfg.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
         });
-        console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
+        console.log(statusOk('  ✓ Telegram token saved.'));
       }
     } finally {
       activeSetupSession = null;
@@ -897,7 +897,7 @@ async function main() {
               cfg.channels = cfg.channels || {};
               cfg.channels.telegram = { enabled: true, botToken: 'TELEGRAM_BOT_TOKEN' };
             });
-            console.log(C.dim + '  ✓ Telegram token saved.' + C.reset);
+            console.log(statusOk('  ✓ Telegram token saved.'));
           }
         } finally {
           activeSetupSession = null;

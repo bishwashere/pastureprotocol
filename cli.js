@@ -15,7 +15,7 @@ import { getCurrentDaemonLogPath, getDailyDaemonLogPath } from './lib/util/daemo
 import { getStateDir } from './lib/util/paths.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
-import { maybeBeginCliSession, envForNestedCliCall } from './lib/util/cli-banner.js';
+import { maybeBeginCliSession, envForNestedCliCall, statusOk } from './lib/util/cli-banner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -84,7 +84,7 @@ function restartBotAfterSkillChange() {
     console.log('Restarting bot to apply skill changes...');
     const code = restartDaemonSync();
     if (code === 0) {
-      console.log('  ✓ Bot restarted.');
+      console.log(statusOk('  ✓ Bot restarted.'));
     } else {
       console.error('  ✗ Auto-restart failed. Run: pasture restart');
     }
@@ -153,7 +153,7 @@ function runPostUpdateRestartAndDashboard() {
   console.log('  Restarting bot and starting dashboard...');
   const restartCode = restartDaemonSync();
   if (restartCode === 0) {
-    console.log('  ✓ Restarted.');
+    console.log(statusOk('  ✓ Restarted.'));
   } else {
     console.error('  ✗ Restart had issues. You can run: pasture restart');
   }
@@ -165,7 +165,7 @@ function runPostUpdateRestartAndDashboard() {
       cwd: INSTALL_DIR,
     });
     if (dashResult.status === 0) {
-      console.log('  ✓ Dashboard started.');
+      console.log(statusOk('  ✓ Dashboard started.'));
     } else {
       console.error('  ✗ Dashboard failed to start. You can run: pasture dashboard');
     }
@@ -561,7 +561,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         }
         const result = mod.setActiveServer(name);
         if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
-        console.log('✓', result.message);
+        console.log(statusOk('✓ ' + result.message));
 
       } else if (serverSub === 'add') {
         const host = args[2];
@@ -584,7 +584,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         const alias = aliasIdx >= 0 ? args[aliasIdx + 1] : undefined;
         const result = mod.registerServer(name, host, { user, key, alias });
         if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
-        console.log('✓', result.message);
+        console.log(statusOk('✓ ' + result.message));
 
       } else if (serverSub === 'list') {
         const servers = mod.listServers();
@@ -610,7 +610,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
         }
         const result = mod.removeServer(name);
         if (!result.ok) { console.error('pasture:', result.message); process.exit(1); return; }
-        console.log('✓', result.message);
+        console.log(statusOk('✓ ' + result.message));
 
       } else {
         console.log('Usage: pasture server add <host> <name> [--user <user>]');

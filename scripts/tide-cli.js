@@ -16,7 +16,7 @@ import {
   setChecklistItemEnabled,
   setChecklistTriggers,
 } from '../lib/agent/tide-checklist.js';
-import { beginCliSession } from '../lib/util/cli-banner.js';
+import { beginCliSession, statusOk } from '../lib/util/cli-banner.js';
 
 function parseFlags(argv) {
   const flags = {};
@@ -159,7 +159,8 @@ async function main() {
     }
     const summary = await runTideChecklist({ manual: true, trigger: 'manual', onlyIds: onlyIds.length ? onlyIds : undefined });
     for (const r of summary.results || []) {
-      console.log((r.ok ? '✓' : '✗') + ' ' + r.id + ' — ' + (r.detail || '').slice(0, 200));
+      const line = (r.ok ? '✓' : '✗') + ' ' + r.id + ' — ' + (r.detail || '').slice(0, 200);
+      console.log(r.ok ? statusOk(line) : line);
       if (r.skillsCalled?.length) console.log('   skills:', r.skillsCalled.join(', '));
     }
     console.log('');

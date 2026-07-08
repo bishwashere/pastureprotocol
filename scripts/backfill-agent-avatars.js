@@ -15,6 +15,7 @@
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { statusOk } from '../lib/util/cli-banner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -44,7 +45,7 @@ async function main() {
     process.stdout.write(`[avatars]   ${id} (${title}) … `);
     const result = await generateAndSaveAgentAvatar(id, title);
     if (result) {
-      process.stdout.write('✓\n');
+      process.stdout.write(statusOk('✓') + '\n');
     } else {
       process.stdout.write('skipped (no key or error)\n');
     }

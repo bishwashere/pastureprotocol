@@ -371,9 +371,9 @@ try {
     $nowVer = Read-PackageJsonVersion (Join-Path $Root "package.json")
     Write-Host ""
     if ($nowVer) {
-        Write-Host "  [OK] Update complete. Now at v$nowVer"
+        Write-Host "  [OK] Update complete. Now at v$nowVer" -ForegroundColor Cyan
     } else {
-        Write-Host "  [OK] Update complete."
+        Write-Host "  [OK] Update complete." -ForegroundColor Cyan
     }
     Write-Host "  Start the bot:  pasture start"
     Write-Host "  If already running, restart:  pasture restart"
