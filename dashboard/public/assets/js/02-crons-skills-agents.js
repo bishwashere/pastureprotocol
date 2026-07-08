@@ -4185,6 +4185,7 @@ function renderSystemCronVariant(row) {
     function guessBrainImportProvider(fileName) {
       var name = String(fileName || '').toLowerCase();
       if (name.indexOf('chatgpt') >= 0 || name.indexOf('openai') >= 0) return 'chatgpt';
+      if (/^conversations(?:-\d+)?\.json$/.test(name)) return 'chatgpt';
       if (name.indexOf('grok') >= 0 || name.indexOf('xai') >= 0) return 'grok';
       if (name.indexOf('claude') >= 0 || name.indexOf('anthropic') >= 0) return 'claude';
       if (name.indexOf('gemini') >= 0 || name.indexOf('google') >= 0) return 'gemini';
