@@ -29,6 +29,13 @@ command -v node >/dev/null 2>&1 || {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+THEME_CYAN="$(printf '\033[36m')"
+ANSI_RESET="$(printf '\033[0m')"
+
+ok() {
+  printf '%s%s%s\n' "$THEME_CYAN" "$1" "$ANSI_RESET"
+}
+
 download_with_retries() {
   local url="$1"
   local out="$2"
@@ -60,7 +67,7 @@ download_with_retries "$TARBALL" "$WORK/archive.tar.gz" "Download release"
 tar xzf "$WORK/archive.tar.gz" -C "$WORK"
 EXTRACTED=$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -1)
 [ -n "$EXTRACTED" ] || { echo "  ✖ Archive extract failed."; exit 1; }
-echo "  ✓ Done."
+ok "  ✓ Done."
 echo ""
 
 # --- install code --------------------------------------------------
@@ -80,7 +87,7 @@ INSTALL_BUILD=$(node --input-type=module -e "
   if (b) { writeBuild('$INSTALL_DIR', b); console.log(b); }
 " 2>/dev/null || true)
 
-echo "  ✓ Code installed.${INSTALL_BUILD:+ (build $INSTALL_BUILD)}"
+ok "  ✓ Code installed.${INSTALL_BUILD:+ (build $INSTALL_BUILD)}"
 echo ""
 
 # --- launcher ------------------------------------------------------
@@ -128,7 +135,7 @@ install_deps() {
   echo "  ► Installing dependencies..."
 
   if [ -d node_modules ] && [ -d node_modules/dotenv ]; then
-    echo "  ✓ Dependencies already installed."
+    ok "  ✓ Dependencies already installed."
     return
   fi
 
@@ -141,7 +148,7 @@ install_deps() {
     exit 1
   fi
 
-  echo "  ✓ Dependencies installed."
+  ok "  ✓ Dependencies installed."
 }
 
 install_deps
@@ -150,7 +157,7 @@ echo ""
 # --- setup ---------------------------------------------------------
 
 if [ -n "$POST_INSTALL_CMD" ]; then
-  echo "  ✓ Setup skipped (non-interactive -c mode)."
+  ok "  ✓ Setup skipped (non-interactive -c mode)."
   echo ""
   echo "  ------------------------------------------------"
   echo "  To start the bot:  pasture start"

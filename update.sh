@@ -20,6 +20,13 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+THEME_CYAN="$(printf '\033[36m')"
+ANSI_RESET="$(printf '\033[0m')"
+
+ok() {
+  printf '%s%s%s\n' "$THEME_CYAN" "$1" "$ANSI_RESET"
+}
+
 download_with_retries() {
   local url="$1"
   local out="$2"
@@ -197,9 +204,9 @@ chmod +x "$BIN_DIR/pasture"
 
 echo ""
 if [ -n "$NOW_VER" ]; then
-  echo "  ✓ Update complete. Now at $(format_version_label "$NOW_VER" "$NOW_BUILD")"
+  ok "  ✓ Update complete. Now at $(format_version_label "$NOW_VER" "$NOW_BUILD")"
 else
-  echo "  ✓ Update complete."
+  ok "  ✓ Update complete."
 fi
 echo "  Start the bot:  pasture start"
 echo "  If already running, restart to use new version:  pasture restart"
