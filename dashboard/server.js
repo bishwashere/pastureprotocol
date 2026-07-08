@@ -60,7 +60,7 @@ const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || DEFAULT_DASHBOARD_POR
 const HOST = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
 
 const app = express();
-app.use(express.json({ limit: '260mb' }));
+app.use(express.json({ limit: Infinity }));
 ensureMainAgentInitialized();
 
 // Block dashboard UI when accessed via Tailscale (*.ts.net) — API only over Tailscale.
@@ -1925,10 +1925,10 @@ const BRAIN_LLM_CHUNK_CHARS = 45_000;
 const BRAIN_LLM_CHUNK_OVERLAP_CHARS = 3_000;
 const BRAIN_LLM_CACHE_VERSION = 12;
 const BRAIN_RESPONSE_CACHE_VERSION = 11;
-const BRAIN_IMPORT_MAX_INPUT_CHARS = 90 * 1024 * 1024;
-const BRAIN_IMPORT_MAX_TEXT_INPUT_BYTES = 180 * 1024 * 1024;
-const BRAIN_IMPORT_MAX_ZIP_INPUT_BYTES = 4 * 1024 * 1024 * 1024;
-const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = 256 * 1024 * 1024;
+const BRAIN_IMPORT_MAX_INPUT_CHARS = Infinity;
+const BRAIN_IMPORT_MAX_TEXT_INPUT_BYTES = Infinity;
+const BRAIN_IMPORT_MAX_ZIP_INPUT_BYTES = Infinity;
+const BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS = Infinity;
 const BRAIN_IMPORT_TEXT_EXTENSIONS = new Set(['.json', '.txt', '.md', '.csv', '.html', '.htm']);
 const BRAIN_IMPORT_PROVIDERS = new Set(['chatgpt', 'grok', 'claude', 'gemini', 'perplexity', 'copilot', 'other']);
 const BRAIN_INPUT_STOP_WORDS = new Set([
@@ -3654,7 +3654,7 @@ function importBrainPayload(payload) {
   }
 }
 
-app.post('/api/brain/import-chat-file', express.raw({ type: 'application/octet-stream', limit: '4096mb' }), (req, res) => {
+app.post('/api/brain/import-chat-file', express.raw({ type: 'application/octet-stream', limit: Infinity }), (req, res) => {
   try {
     const filename = String(req.query.filename || '').trim().slice(0, 180);
     const provider = normalizeBrainImportProvider(req.query.provider);
