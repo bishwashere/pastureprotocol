@@ -34,6 +34,8 @@ function test(name, fn) {
 console.log('\nCLI banner tests\n');
 
 test('CLI_BANNER includes PASTURE art and PROTOCOL subtitle', () => {
+  if (!CLI_BANNER.startsWith('\x1b[36m')) throw new Error('banner should use onboarding cyan');
+  if (!CLI_BANNER.endsWith('\x1b[0m')) throw new Error('banner should reset ANSI color');
   if (!CLI_BANNER.includes('██████╗')) throw new Error('missing PASTURE block letters');
   if (!CLI_BANNER.includes('P R O T O C O L')) throw new Error('missing PROTOCOL subtitle');
   if (!CLI_BANNER.includes('Agent ↔ Delegation ↔ State ↔ Autonomy')) {
