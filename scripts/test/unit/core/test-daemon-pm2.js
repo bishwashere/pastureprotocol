@@ -3,19 +3,35 @@
  * Unit tests for lib/daemon-pm2.js (Windows daemon without bash).
  */
 
-import { readFileSync, rmSync, mkdtempSync } from 'fs';
+import { existsSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
-import { startReport, recordCase, endReport } from '../../support/e2e-report.js';
 import { runPm2DaemonAction, daemonLog, ensurePm2 } from '../../../../lib/util/daemon-pm2.js';
-import { getDailyDaemonLogPath } from '../../../../lib/util/daemon-log-path.js';
+import { getCurrentDaemonErrPath, getCurrentDaemonLogPath, getDailyDaemonLogPath } from '../../../../lib/util/daemon-log-path.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const cases = [];
+
+function startReport(name) {
+  console.log(`\n${name}`);
+}
+
+function recordCase(row) {
+  cases.push(row);
+  const mark = row.status === 'pass' ? 'PASS' : 'FAIL';
+  console.log(`[${mark}] ${row.name}: ${row.output}`);
+}
+
+function endReport() {
+  const passed = cases.filter((c) => c.status === 'pass').length;
+  const failed = cases.length - passed;
+  console.log(`\n[daemon-pm2] passed=${passed} failed=${failed}`);
+}
 
 function checkCliUsesPm2OnWindows() {
   const src = readFileSync(join(ROOT, 'cli.js'), 'utf8');
-  if (!src.includes("from './lib/daemon-pm2.js'")) {
+  if (!src.includes("from './lib/util/daemon-pm2.js'")) {
     return { ok: false, detail: 'cli.js does not import daemon-pm2.js' };
   }
   if (!src.includes('runPm2DaemonAction') || !src.includes('IS_WIN')) {
@@ -98,8 +114,8 @@ function checkWindowsPs1(filename, opts) {
   if (opts.pastureRepo && !src.includes('bishwashere/pastureprotocol')) {
     return { ok: false, detail: `${filename} must download from pastureprotocol repo` };
   }
-  if (opts.pastureRepo && !src.includes('pastureprotocol-$Branch')) {
-    return { ok: false, detail: `${filename} must expect pastureprotocol archive root` };
+  if (opts.pastureRepo && !src.includes('Archive extract failed (no top-level folder)')) {
+    return { ok: false, detail: `${filename} must validate extracted archive root` };
   }
   if (opts.pastureRepo && src.includes('bishwashere/Pasture')) {
     return { ok: false, detail: `${filename} must not download from legacy Pasture repo` };
@@ -135,12 +151,32 @@ function checkDaemonLog() {
     if (!content.includes('pasture test')) {
       return { ok: false, detail: 'daemonLog did not write expected line' };
     }
+    if (!existsSync(getCurrentDaemonLogPath(dir))) {
+      return { ok: false, detail: 'current.log was not created' };
+    }
+    if (!existsSync(getCurrentDaemonErrPath(dir))) {
+      return { ok: false, detail: 'current.err was not created' };
+    }
     return { ok: true, detail: 'daemonLog writes daily control lines' };
   } catch (e) {
     return { ok: false, detail: e.message };
   } finally {
     try { rmSync(dir, { recursive: true, force: true }); } catch (_) {}
   }
+}
+
+function checkWindowsPm2Quoting() {
+  const src = readFileSync(join(ROOT, 'lib', 'util', 'daemon-pm2.js'), 'utf8');
+  if (!src.includes('quoteWindowsShellArg')) {
+    return { ok: false, detail: 'missing Windows shell argument quoting helper' };
+  }
+  if (!src.includes('pm2ShellArgs(args)')) {
+    return { ok: false, detail: 'pm2Args must route args through Windows shell quoting' };
+  }
+  if (!src.includes('dailyLogPath') || !src.includes("'--output'")) {
+    return { ok: false, detail: 'pm2 start must include daily output/error log paths' };
+  }
+  return { ok: true, detail: 'pm2 args preserve Windows paths with spaces' };
 }
 
 function checkMissingInstallDir() {
@@ -166,6 +202,9 @@ async function main() {
   const log = checkDaemonLog();
   recordCase({ name: 'daemonLog', input: 'write line', output: log.detail, status: log.ok ? 'pass' : 'fail' });
 
+  const quoting = checkWindowsPm2Quoting();
+  recordCase({ name: 'pm2 quoting', input: 'paths with spaces', output: quoting.detail, status: quoting.ok ? 'pass' : 'fail' });
+
   const missing = checkMissingInstallDir();
   recordCase({ name: 'runPm2DaemonAction', input: 'missing install dir', output: missing.detail, status: missing.ok ? 'pass' : 'fail' });
 
@@ -179,7 +218,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(cli.ok && ps1.ok && upd.ok && log.ok && missing.ok && fnOk ? 0 : 1);
+  process.exit(cli.ok && ps1.ok && upd.ok && log.ok && quoting.ok && missing.ok && fnOk ? 0 : 1);
 }
 
 main();

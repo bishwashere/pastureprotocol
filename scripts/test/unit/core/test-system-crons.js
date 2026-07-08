@@ -14,9 +14,18 @@ import { humanizeCronExpr } from '../../../../lib/util/cron-expr-humanize.js';
 import { deriveCronName, derivePurpose } from '../../../../lib/util/cron-entry-present.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_SCRIPT = join(__dirname, 'fixtures/cron-sample.sh');
+const FIXTURE_SCRIPT = join(mkdtempSync(join(tmpdir(), 'pasture-cron-fixture-')), 'cron-sample.sh');
+mkdirSync(dirname(FIXTURE_SCRIPT), { recursive: true });
+writeFileSync(
+  FIXTURE_SCRIPT,
+  '#!/bin/bash\n# DB Master Pipeline - runs the database-backed video pipeline once.\nnode worker.js\n',
+  'utf8',
+);
 
 function check(label, ok, detail = '') {
   const status = ok ? '✅ Pass' : '❌ Fail';
@@ -87,6 +96,8 @@ check('blocks crontab when read skill off', readSystemCrontabForConfig({ skills:
 check('allows crontab when read skill on', readSystemCrontabForConfig({ skills: { enabled: ['read'] } }).skillRequired == null, 'no gate');
 
 check('extractScriptPath sh wrapper', extractScriptPath('sh /tmp/foo.sh arg') === '/tmp/foo.sh', '/tmp/foo.sh');
+check('extractScriptPath Windows absolute', extractScriptPath('node "C:\\Users\\Binit KC\\jobs\\sync.js" --once') === 'C:\\Users\\Binit KC\\jobs\\sync.js', 'C:\\Users\\Binit KC\\jobs\\sync.js');
+check('deriveCronName Windows script basename', deriveCronName('', null, 'powershell "C:\\Users\\Binit KC\\jobs\\nightly.ps1"') === 'Nightly', 'Nightly');
 check('describe fixture header comments', /DB Master Pipeline/i.test(describeScriptContent('#!/bin/bash\n# DB Master Pipeline - runs the database-backed video pipeline once.\n', FIXTURE_SCRIPT) || ''), 'comments');
 
 const enriched = enrichCrontabEntries([{ id: '1', expr: '* * * * *', command: `sh ${FIXTURE_SCRIPT} 1`, enabled: true, crontabNote: 'DB Master Pipeline' }])[0];

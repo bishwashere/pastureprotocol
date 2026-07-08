@@ -3,7 +3,7 @@
  * Run: node scripts/test/test-workspace-path.js
  */
 
-import { join } from 'path';
+import { isAbsolute, join, resolve } from 'path';
 import { resolveWorkspacePath } from '../../../../lib/util/workspace-path.js';
 
 let passed = 0;
@@ -20,18 +20,25 @@ function test(name, fn) {
   }
 }
 
-const ws = '/tmp/pasture-ws';
+const ws = resolve('tmp', 'pasture-ws');
 
 console.log('\nworkspace-path tests\n');
 
 test('strips workspace/ prefix', () => {
   const { resolved } = resolveWorkspacePath(ws, 'workspace/e2e-patch-target.txt');
-  if (resolved !== join(ws, 'e2e-patch-target.txt')) throw new Error(resolved);
+  if (resolved !== resolve(join(ws, 'e2e-patch-target.txt'))) throw new Error(resolved);
 });
 
 test('keeps plain relative path', () => {
   const { resolved } = resolveWorkspacePath(ws, 'notes.md');
-  if (resolved !== join(ws, 'notes.md')) throw new Error(resolved);
+  if (resolved !== resolve(join(ws, 'notes.md'))) throw new Error(resolved);
+});
+
+test('keeps Windows absolute path absolute on Windows', () => {
+  const absolute = 'C:\\Users\\Binit KC\\.pasture\\notes.md';
+  const { resolved } = resolveWorkspacePath(ws, absolute);
+  const expected = isAbsolute(absolute) ? absolute : join(ws, absolute);
+  if (resolved !== expected) throw new Error(resolved);
 });
 
 console.log(`\nPassed: ${passed}, Failed: ${failed}\n`);
