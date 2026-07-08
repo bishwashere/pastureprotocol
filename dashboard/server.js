@@ -11,7 +11,7 @@ import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 import { spawn, execSync, execFileSync } from 'child_process';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, renameSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, renameSync, createWriteStream, copyFileSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
 import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent/agent-avatar.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText, CHAT_LOG_DAY_PREFIX } from '../lib/context/chat-log.js';
@@ -2395,6 +2395,50 @@ function decodeBrainImportPayload(body) {
   };
 }
 
+function extractBrainZipTextEntriesFromPath(zipPath) {
+  const listing = execFileSync('unzip', ['-Z1', zipPath], {
+    encoding: 'utf8',
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const allNames = listing.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+  const ordered = focusBrainZipEntryNames(allNames);
+  const structuredOnly = ordered.length > 0 && ordered.every((name) => isGrokBackendJsonName(name) || isChatGptConversationJsonName(name));
+  const entries = [];
+  let remaining = BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS;
+  for (let i = 0; i < ordered.length; i++) {
+    const name = ordered[i];
+    if (remaining <= 0) {
+      if (structuredOnly) {
+        const sizeMb = Math.round(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS / 1024 / 1024);
+        const err = new Error(`Chat export text is too large after extraction. Try a split export under ${sizeMb} MB of conversation JSON.`);
+        err.statusCode = 413;
+        throw err;
+      }
+      break;
+    }
+    const buf = execFileSync('unzip', ['-p', zipPath, name], {
+      encoding: 'buffer',
+      maxBuffer: Math.min(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS + 1024 * 1024, remaining + 1024 * 1024),
+    });
+    let text = buf.toString('utf8').replace(/\u0000/g, '').trim();
+    if (!text) continue;
+    if (/\.html?$/i.test(name)) text = stripHtmlForBrainImport(text);
+    if (!text) continue;
+    if (text.length > remaining) {
+      if (structuredOnly || isChatGptConversationJsonName(name) || isGrokBackendJsonName(name)) {
+        const sizeMb = Math.round(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS / 1024 / 1024);
+        const err = new Error(`Chat export text is too large after extraction. Try a split export under ${sizeMb} MB of conversation JSON.`);
+        err.statusCode = 413;
+        throw err;
+      }
+      text = text.slice(0, remaining);
+    }
+    entries.push({ name, text });
+    remaining -= text.length;
+  }
+  return entries;
+}
+
 function extractBrainZipTextEntries(zipBuffer) {
   const tmpRoot = join(getStateDir(), 'tmp');
   if (!existsSync(tmpRoot)) mkdirSync(tmpRoot, { recursive: true });
@@ -2402,47 +2446,7 @@ function extractBrainZipTextEntries(zipBuffer) {
   const zipPath = join(tmpDir, 'import.zip');
   try {
     writeFileSync(zipPath, zipBuffer);
-    const listing = execFileSync('unzip', ['-Z1', zipPath], {
-      encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
-    });
-    const allNames = listing.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
-    const ordered = focusBrainZipEntryNames(allNames);
-    const structuredOnly = ordered.length > 0 && ordered.every((name) => isGrokBackendJsonName(name) || isChatGptConversationJsonName(name));
-    const entries = [];
-    let remaining = BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS;
-    for (let i = 0; i < ordered.length; i++) {
-      const name = ordered[i];
-      if (remaining <= 0) {
-        if (structuredOnly) {
-          const sizeMb = Math.round(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS / 1024 / 1024);
-          const err = new Error(`Chat export text is too large after extraction. Try a split export under ${sizeMb} MB of conversation JSON.`);
-          err.statusCode = 413;
-          throw err;
-        }
-        break;
-      }
-      const buf = execFileSync('unzip', ['-p', zipPath, name], {
-        encoding: 'buffer',
-        maxBuffer: Math.min(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS + 1024 * 1024, remaining + 1024 * 1024),
-      });
-      let text = buf.toString('utf8').replace(/\u0000/g, '').trim();
-      if (!text) continue;
-      if (/\.html?$/i.test(name)) text = stripHtmlForBrainImport(text);
-      if (!text) continue;
-      if (text.length > remaining) {
-        if (structuredOnly || isChatGptConversationJsonName(name) || isGrokBackendJsonName(name)) {
-          const sizeMb = Math.round(BRAIN_IMPORT_MAX_ZIP_TEXT_CHARS / 1024 / 1024);
-          const err = new Error(`Chat export text is too large after extraction. Try a split export under ${sizeMb} MB of conversation JSON.`);
-          err.statusCode = 413;
-          throw err;
-        }
-        text = text.slice(0, remaining);
-      }
-      entries.push({ name, text });
-      remaining -= text.length;
-    }
-    return entries;
+    return extractBrainZipTextEntriesFromPath(zipPath);
   } finally {
     try {
       rmSync(tmpDir, { recursive: true, force: true });
@@ -2451,8 +2455,15 @@ function extractBrainZipTextEntries(zipBuffer) {
 }
 
 function buildBrainImportTextFromPayload(payload) {
-  if (payload.rawKind !== 'zip') return payload.rawText || payload.rawBuffer.toString('utf8');
-  const entries = extractBrainZipTextEntries(payload.rawBuffer);
+  if (payload.rawKind !== 'zip') {
+    if (payload.rawText != null) return payload.rawText;
+    if (payload.rawBuffer) return payload.rawBuffer.toString('utf8');
+    if (payload.rawPath) return readFileSync(payload.rawPath, 'utf8');
+    return '';
+  }
+  const entries = payload.rawPath
+    ? extractBrainZipTextEntriesFromPath(payload.rawPath)
+    : extractBrainZipTextEntries(payload.rawBuffer);
   if (!entries.length) {
     const err = new Error('No readable chat export files were found inside that ZIP.');
     err.statusCode = 400;
@@ -3483,7 +3494,7 @@ function importBrainPayload(payload) {
     importId,
     rawKind: payload.rawKind,
     filename: originalName || '',
-    bytes: payload.rawBuffer ? payload.rawBuffer.length : 0,
+    bytes: payload.rawBytes != null ? payload.rawBytes : payload.rawBuffer ? payload.rawBuffer.length : 0,
   });
   let conversations;
   try {
@@ -3555,7 +3566,8 @@ function importBrainPayload(payload) {
   try {
     const rawBase = safeBrainPathPart(originalName || `${provider}-export`, 'export');
     const rawName = payload.rawKind === 'zip' ? `${rawBase}.zip` : `${rawBase}.raw.txt`;
-    writeFileSync(join(rawDir, rawName), payload.rawBuffer);
+    if (payload.rawPath) copyFileSync(payload.rawPath, join(rawDir, rawName));
+    else writeFileSync(join(rawDir, rawName), payload.rawBuffer);
 
     let extractedChars = 0;
     const files = [];
@@ -3654,30 +3666,67 @@ function importBrainPayload(payload) {
   }
 }
 
-app.post('/api/brain/import-chat-file', express.raw({ type: 'application/octet-stream', limit: Infinity }), (req, res) => {
+function saveBrainImportRequestToFile(req, destPath) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    let bytes = 0;
+    const out = createWriteStream(destPath);
+    let settled = false;
+
+    function finish(err) {
+      if (settled) return;
+      settled = true;
+      if (err) reject(err);
+      else resolve({ bytes, contentHash: hash.digest('hex') });
+    }
+
+    req.on('data', (chunk) => {
+      bytes += chunk.length;
+      hash.update(chunk);
+    });
+    req.on('error', finish);
+    out.on('error', finish);
+    out.on('finish', () => finish());
+    req.pipe(out);
+  });
+}
+
+app.post('/api/brain/import-chat-file', async (req, res) => {
+  let tmpDir = null;
   try {
     const filename = String(req.query.filename || '').trim().slice(0, 180);
     const provider = normalizeBrainImportProvider(req.query.provider);
     const contentType = String(req.query.contentType || '');
     const rawKind = isBrainZipFileName(filename) || contentType.toLowerCase().includes('zip') ? 'zip' : 'binary';
-    const rawBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    if (!rawBuffer.length) {
+    const tmpRoot = join(getStateDir(), 'tmp');
+    if (!existsSync(tmpRoot)) mkdirSync(tmpRoot, { recursive: true });
+    tmpDir = mkdtempSync(join(tmpRoot, 'brain-upload-'));
+    const uploadPath = join(tmpDir, rawKind === 'zip' ? 'upload.zip' : 'upload.raw');
+    const saved = await saveBrainImportRequestToFile(req, uploadPath);
+    if (!saved.bytes) {
       res.status(400).json({ error: 'Choose an export file or paste a transcript first.' });
       return;
     }
-    if (rawBuffer.length > maxBrainImportInputBytes(rawKind)) {
+    if (saved.bytes > maxBrainImportInputBytes(rawKind)) {
       res.status(413).json({ error: 'Import is too large for the dashboard. Try a smaller export file.' });
       return;
     }
     res.json(importBrainPayload({
       provider,
       filename,
-      rawBuffer,
+      rawPath: uploadPath,
+      rawBytes: saved.bytes,
       rawKind,
-      contentHash: brainHashBuffer(rawBuffer),
+      contentHash: saved.contentHash,
     }));
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
+  } finally {
+    if (tmpDir) {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true });
+      } catch (_) {}
+    }
   }
 });
 
