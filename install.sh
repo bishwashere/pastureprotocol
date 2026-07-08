@@ -29,10 +29,34 @@ command -v node >/dev/null 2>&1 || {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+download_with_retries() {
+  local url="$1"
+  local out="$2"
+  local label="${3:-Download}"
+  local attempts="${PASTURE_DOWNLOAD_RETRIES:-3}"
+  local delay="${PASTURE_DOWNLOAD_RETRY_DELAY:-3}"
+  local n=1
+
+  while [ "$n" -le "$attempts" ]; do
+    rm -f "$out"
+    if curl -fsSL --connect-timeout "${PASTURE_CURL_CONNECT_TIMEOUT:-30}" --max-time "${PASTURE_CURL_MAX_TIME:-900}" "$url" -o "$out"; then
+      return 0
+    fi
+    if [ "$n" -lt "$attempts" ]; then
+      echo "  [WARN] $label failed (attempt $n/$attempts). Retrying in ${delay}s..."
+      sleep "$delay"
+    fi
+    n=$((n + 1))
+  done
+
+  echo "  ✖ $label failed after $attempts attempts."
+  return 1
+}
+
 # --- download ------------------------------------------------------
 
 echo "  ► Downloading..."
-curl -fsSL "$TARBALL" -o "$WORK/archive.tar.gz"
+download_with_retries "$TARBALL" "$WORK/archive.tar.gz" "Download release"
 tar xzf "$WORK/archive.tar.gz" -C "$WORK"
 EXTRACTED=$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -1)
 [ -n "$EXTRACTED" ] || { echo "  ✖ Archive extract failed."; exit 1; }

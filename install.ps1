@@ -63,7 +63,26 @@ function Install-PastureNodeRuntime {
         New-Item -ItemType Directory -Path $work -Force | Out-Null
         $zip = Join-Path $work "node.zip"
         $url = "https://nodejs.org/dist/$PastureNodeVersion/$PastureNodeZipName.zip"
-        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 600
+        $nodeDownloadOk = $false
+        $nodeDownloadDetail = $null
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 600
+                $nodeDownloadOk = $true
+                break
+            } catch {
+                $nodeDownloadDetail = $_.Exception.Message
+                if ($attempt -lt 3) {
+                    Write-Host "  [WARN] Node.js runtime download failed (attempt $attempt/3): $nodeDownloadDetail Retrying in 3s..."
+                    Start-Sleep -Seconds 3
+                }
+            }
+        }
+        if (-not $nodeDownloadOk) {
+            Write-Host "  [X] Node.js runtime download failed after 3 attempts: $nodeDownloadDetail"
+            return $false
+        }
         if (Test-Path -LiteralPath $PastureNodeDir) {
             Remove-Item -LiteralPath $PastureNodeDir -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -339,33 +358,44 @@ function Save-PastureDownload {
         [Parameter(Mandatory = $true)][string]$OutFile,
         [Parameter(Mandatory = $true)][string]$Label,
         [int]$TimeoutSec = 600,
-        [int]$MinBytes = 64
+        [int]$MinBytes = 64,
+        [int]$Retries = 3,
+        [int]$RetryDelaySec = 3
     )
     $parent = Split-Path -Parent $OutFile
     if ($parent -and -not (Test-Path $parent)) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
-    try {
-        $null = Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing `
-            -Headers (Get-PastureRequestHeaders) -TimeoutSec $TimeoutSec
-    } catch {
-        $status = $null
-        if ($_.Exception -and $_.Exception.Response) {
-            try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+    $detail = $null
+    for ($attempt = 1; $attempt -le $Retries; $attempt++) {
+        Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+        try {
+            $null = Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing `
+                -Headers (Get-PastureRequestHeaders) -TimeoutSec $TimeoutSec
+            if (-not (Test-Path -LiteralPath $OutFile)) {
+                $detail = "output file missing."
+            } else {
+                $len = (Get-Item -LiteralPath $OutFile).Length
+                if ($len -lt $MinBytes) {
+                    $detail = "download too small ($len bytes)."
+                } else {
+                    return
+                }
+            }
+        } catch {
+            $status = $null
+            if ($_.Exception -and $_.Exception.Response) {
+                try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+            }
+            $detail = if ($status) { "HTTP $status" } else { $_.Exception.Message }
         }
-        $detail = if ($status) { "HTTP $status" } else { $_.Exception.Message }
-        Write-Host "  [X] $Label failed: $detail"
-        Exit-Install 1
+        if ($attempt -lt $Retries) {
+            Write-Host "  [WARN] $Label failed (attempt $attempt/$Retries): $detail Retrying in ${RetryDelaySec}s..."
+            Start-Sleep -Seconds $RetryDelaySec
+        }
     }
-    if (-not (Test-Path -LiteralPath $OutFile)) {
-        Write-Host "  [X] $Label failed: output file missing."
-        Exit-Install 1
-    }
-    $len = (Get-Item -LiteralPath $OutFile).Length
-    if ($len -lt $MinBytes) {
-        Write-Host "  [X] $Label failed: download too small ($len bytes)."
-        Exit-Install 1
-    }
+    Write-Host "  [X] $Label failed after $Retries attempts: $detail"
+    Exit-Install 1
 }
 
 function Read-PackageJsonVersion {

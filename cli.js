@@ -351,7 +351,16 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     // Run latest update.sh from GitHub so --force works even when installed script is old
     const url = `https://raw.githubusercontent.com/bishwashere/pastureprotocol/${branch}/update.sh?t=${Date.now()}`;
     const tmpScript = join(tmpdir(), `pasture-update-${Date.now()}.sh`);
-    const curl = spawnSync('curl', ['-fsSL', '-H', 'Cache-Control: no-cache', url, '-o', tmpScript], {
+    const curl = spawnSync('curl', [
+      '-fsSL',
+      '--connect-timeout', '30',
+      '--max-time', '900',
+      '--retry', '3',
+      '--retry-delay', '3',
+      '-H', 'Cache-Control: no-cache',
+      url,
+      '-o', tmpScript,
+    ], {
       encoding: 'utf8',
       stdio: 'inherit',
     });

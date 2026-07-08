@@ -146,46 +146,48 @@ function Save-PastureDownload {
         [Parameter(Mandatory = $true)][string]$Label,
         [int]$TimeoutSec = 600,
         [int]$MinBytes = 64,
+        [int]$Retries = 3,
+        [int]$RetryDelaySec = 3,
         [switch]$AllowFail
     )
     $parent = Split-Path -Parent $OutFile
     if ($parent -and -not (Test-Path $parent)) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
-    try {
-        $null = Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing `
-            -Headers (Get-PastureRequestHeaders) -TimeoutSec $TimeoutSec
-    } catch {
-        $status = $null
-        if ($_.Exception -and $_.Exception.Response) {
-            try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+    $detail = $null
+    for ($attempt = 1; $attempt -le $Retries; $attempt++) {
+        Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+        try {
+            $null = Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing `
+                -Headers (Get-PastureRequestHeaders) -TimeoutSec $TimeoutSec
+            if (-not (Test-Path -LiteralPath $OutFile)) {
+                $detail = "output file missing."
+            } else {
+                $len = (Get-Item -LiteralPath $OutFile).Length
+                if ($len -lt $MinBytes) {
+                    $detail = "download too small ($len bytes)."
+                } else {
+                    return $true
+                }
+            }
+        } catch {
+            $status = $null
+            if ($_.Exception -and $_.Exception.Response) {
+                try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+            }
+            $detail = if ($status) { "HTTP $status" } else { $_.Exception.Message }
         }
-        $detail = if ($status) { "HTTP $status" } else { $_.Exception.Message }
-        if ($AllowFail) {
-            Write-Host "  [WARN] $Label failed: $detail"
-            return $false
+        if ($attempt -lt $Retries) {
+            Write-Host "  [WARN] $Label failed (attempt $attempt/$Retries): $detail Retrying in ${RetryDelaySec}s..."
+            Start-Sleep -Seconds $RetryDelaySec
         }
-        Write-Host "  [X] $Label failed: $detail"
-        Exit-Update 1
     }
-    if (-not (Test-Path -LiteralPath $OutFile)) {
-        if ($AllowFail) {
-            Write-Host "  [WARN] $Label failed: output file missing."
-            return $false
-        }
-        Write-Host "  [X] $Label failed: output file missing."
-        Exit-Update 1
+    if ($AllowFail) {
+        Write-Host "  [WARN] $Label failed after $Retries attempts: $detail"
+        return $false
     }
-    $len = (Get-Item -LiteralPath $OutFile).Length
-    if ($len -lt $MinBytes) {
-        if ($AllowFail) {
-            Write-Host "  [WARN] $Label failed: download too small ($len bytes)."
-            return $false
-        }
-        Write-Host "  [X] $Label failed: download too small ($len bytes)."
-        Exit-Update 1
-    }
-    return $true
+    Write-Host "  [X] $Label failed after $Retries attempts: $detail"
+    Exit-Update 1
 }
 
 function Read-PackageJsonVersion {
