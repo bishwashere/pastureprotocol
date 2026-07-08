@@ -3155,6 +3155,25 @@ app.get('/api/brain/cloud', async (req, res) => {
       progressId,
     });
 
+    const activeProgress = getActiveBrainBuildProgress();
+    if (activeProgress && !hard && !cacheOnly) {
+      brainDebugLog('cloud_active_build_shared', {
+        requestedProgressId: progressId,
+        progressId: activeProgress.id,
+        phase: activeProgress.phase,
+        doneChunks: activeProgress.doneChunks || 0,
+        totalChunks: activeProgress.totalChunks || 0,
+      });
+      res.set('Cache-Control', 'no-store');
+      res.status(409).json({
+        error: 'Brain graph generation is already running.',
+        inProgress: true,
+        progressId: activeProgress.id,
+        progress: activeProgress,
+      });
+      return;
+    }
+
     if (cacheOnly && !refresh) {
       const fallback = readLatestCompatibleBrainResponseCache();
       const fallbackPayload = brainFallbackPayloadForResponse(fallback);
@@ -3167,7 +3186,6 @@ app.get('/api/brain/cloud', async (req, res) => {
         res.json({ ...fallbackPayload, cached: true, cacheOnly: true });
         return;
       }
-      const activeProgress = getActiveBrainBuildProgress();
       if (activeProgress) {
         brainDebugLog('cloud_cache_only_in_progress', {
           progressId: activeProgress.id,

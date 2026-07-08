@@ -4115,6 +4115,13 @@ function renderSystemCronVariant(row) {
         renderBrainCloud(d);
       } catch (e) {
         if (requestSeq !== brainCloudRequestSeq) return;
+        if (refresh && e && e.name === 'AbortError') {
+          setBrainActionMode(hasGraph);
+          showBrainLoadingProgress(cloud, hasGraph ? 'Rebuilding brain map' : 'Generating brain map', progressId);
+          var metaStillRunning = document.getElementById('brain-meta');
+          if (metaStillRunning) metaStillRunning.textContent = 'Brain graph generation is still running...';
+          return;
+        }
         stopBrainLoadingProgress();
         if (e && e.inProgress) {
           setBrainActionMode(false);
