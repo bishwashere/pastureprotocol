@@ -3,7 +3,7 @@
  * State dir: verify getStateDir() resolves to ~/.pasture (or PASTURE_STATE_DIR override).
  */
 
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync, rmSync } from 'fs';
 
@@ -15,11 +15,13 @@ async function main() {
   const fakeHome = mkdtempSync(join(tmpdir(), 'pasture-state-'));
   const saved = {
     HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
     PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR,
   };
 
   try {
     process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
     delete process.env.PASTURE_STATE_DIR;
 
     const mod = await import('../../../../lib/util/paths.js');
@@ -32,6 +34,12 @@ async function main() {
     process.env.PASTURE_STATE_DIR = custom;
     assert(mod.getStateDir() === custom, `getStateDir should respect PASTURE_STATE_DIR override`);
     console.log('[PASS] getStateDir respects PASTURE_STATE_DIR override');
+
+    const winAbs = 'C:\\Users\\Test User\\.pasture';
+    process.env.PASTURE_STATE_DIR = winAbs;
+    const expectedWinAbs = isAbsolute(winAbs) ? winAbs : join(fakeHome, winAbs);
+    assert(mod.getStateDir() === expectedWinAbs, `getStateDir should not corrupt Windows absolute override, got ${mod.getStateDir()}`);
+    console.log('[PASS] getStateDir handles Windows absolute override');
 
     console.log('\nAll state dir checks passed.');
   } finally {

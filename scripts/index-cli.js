@@ -22,7 +22,8 @@ dotenv.config({ path: getEnvPath() });
 
 function expandRoot(p) {
   const s = String(p).trim();
-  if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) return join(homedir(), s.slice(1).replace(/\\/g, '/'));
+  if (s === '~') return homedir();
+  if (s.startsWith('~/') || s.startsWith('~\\')) return join(homedir(), s.slice(2));
   return s;
 }
 
