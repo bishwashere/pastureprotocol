@@ -78,6 +78,13 @@ const checks = [
       policy.includes('no write-capable tool was available in this turn') &&
       policy.includes('current turn did not expose write tools'),
   },
+  {
+    name: 'final policy suppresses internal tool payloads',
+    ok: policy.includes('Never include internal tool invocations') &&
+      policy.includes('tool-call JSON') &&
+      policy.includes('patch-application payloads') &&
+      policy.includes('action was not completed'),
+  },
 ];
 
 let failed = 0;

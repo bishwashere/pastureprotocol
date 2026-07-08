@@ -59,9 +59,11 @@ If the user asks to implement, edit, modify, write, patch, apply patches, fix co
 
 - choose `mode: "code"`
 - choose `executionMode: "tool_use"` or persistent variants if durable/delegated
+- set `mustUseTool: true`
 - include read/inspection skills such as `read`, `go-read`, or `core` when available
 - include write/patch skills such as `write`, `edit`, `go-write`, or `apply-patch` when available
 - never downgrade implementation requests to read-only self-inspection
+- the planned outcome must be a real tool-backed change or a tool-backed failure, not a status-only answer
 
 If recent conversation established an active repo/task, short follow-ups like “yes”, “do it”, “go ahead”, “apply patches”, or “continue” inherit that implementation context.
 
@@ -103,6 +105,8 @@ When the user is asking for a one-turn answer, leave `needsDurability: false`.
 ## Tool use
 
 Set `mustUseTool: true` only when the answer would be invalid without calling at least one planned tool, such as inspecting files, applying patches, reading live state, or sending a delegation. For chat, acknowledgements, explanations, or answers based only on conversation context, set `false`.
+
+When `mustUseTool` is true, the final reply is valid only after the agent has called the required tool(s). Do not plan a response that merely describes the tool call, includes a structured tool invocation, or asks the user to repeat permission that is already available in the current tool list.
 
 ## Fallback policy
 

@@ -30,6 +30,7 @@ Return JSON only. No prose, no markdown fences.
 - `continue_fast` means “same frame + safe to skip the Unified Planner.” It does NOT automatically mean a tool must be used.
 - Set `mustUseTool: true` only when the turn cannot be answered correctly without a tool call.
 - Set `mustUseTool: false` for explanations, confirmations, summaries from already-known context, or casual continuations.
+- For active code/repo/file frames, set `mustUseTool: true` when the user is asking for the next implementation/change step rather than asking for a status explanation.
 
 ## Resemblance
 

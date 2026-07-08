@@ -25,6 +25,8 @@ For implementation turns, include read skills needed to inspect the project (`re
 
 If recent conversation established an active project/repo/task, short follow-ups like "yes", "go ahead", "ok proceed", "do it", "working?", or "apply patches" inherit that implementation context.
 
+Implementation plans must require real tool execution before the final answer. The final answer should summarize the outcome of tool execution, not contain a tool invocation, patch payload, or code meant for internal execution.
+
 ## Live and local answers
 
 For current, recent, or live information, including weather, choose the relevant live-data skill such as `search` when available. For weather or other location-sensitive live queries, do not ask for a location before acting if the user has a known/default location in profile, memory, identity, or recent conversation. Plan to use that default location, answer first, and optionally ask a follow-up correction at the end.

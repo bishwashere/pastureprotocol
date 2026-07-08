@@ -9,6 +9,7 @@ async function main() {
     formatUserFacingReply,
     unwrapFakeSkillMarkup,
     looksLikeFakeSkillMarkup,
+    looksLikeInternalToolArtifact,
   } = await import('../../../../lib/agent/user-facing-reply.js');
 
   const fakeSpeech =
@@ -25,6 +26,20 @@ async function main() {
   assert(
     formatUserFacingReply('[Pasture] ' + fakeSpeech) === 'Alright Bishwas, here is what is still remaining.',
     'formatUserFacingReply should strip prefix and unwrap fake skill markup',
+  );
+
+  const fakeToolUses = '{"tool_uses":[{"recipient_name":"functions.apply_patch_apply","parameters":{"path":"server.js"}}]}';
+  assert(
+    looksLikeInternalToolArtifact(fakeToolUses),
+    'tool_uses JSON should be detected as an internal tool artifact',
+  );
+  assert(
+    formatUserFacingReply(fakeToolUses) === '',
+    'pure tool_uses JSON should be suppressed',
+  );
+  assert(
+    looksLikeInternalToolArtifact('```json\n' + fakeToolUses + '\n```'),
+    'fenced tool_uses JSON should be detected as an internal tool artifact',
   );
 
   const cases = [
@@ -47,6 +62,10 @@ async function main() {
     {
       input: '{"recipient_name":"functions.go_read_run","parameters":{"command":"sql"}}\nNodes: 2,875',
       expect: 'Nodes: 2,875',
+    },
+    {
+      input: '```json\n{"recipient_name":"functions.write_file","parameters":{"path":"x","content":"y"}}\n```\nDone.',
+      expect: 'Done.',
     },
     {
       input: 'No tags here.',

@@ -134,7 +134,7 @@ import {
   updateTaskFrameAfterTurn,
   upsertTaskFrame,
 } from './lib/context/task-frame.js';
-import { formatUserFacingReply, logOutboundReplyDecorations } from './lib/agent/user-facing-reply.js';
+import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeInternalToolArtifact } from './lib/agent/user-facing-reply.js';
 import { toLogJid, getOwnerLogJid } from './lib/util/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/channels/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/channels/telegram-group-handler.js';
@@ -1953,10 +1953,47 @@ async function main() {
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
       }), { agentId, toolsCount: toolsForRequest.length });
     }
+    const routeIncludesWriteSkill = Array.isArray(turnRoute?.skills)
+      && turnRoute.skills.some((id) => ['write', 'edit', 'go-write', 'apply-patch'].includes(id));
+    if (
+      plannedMustUseTool
+      && turnRoute?.mode === 'code'
+      && routeIncludesWriteSkill
+      && Array.isArray(toolsForRequest)
+      && toolsForRequest.length > 0
+      && turnResult?.hadWriteOp !== true
+    ) {
+      logFlow(FLOW_STEP.RETRY, '[code-write] retrying because code route completed without a write operation');
+      const writeRecoveryPrompt = systemPromptWithPlan +
+        '\n\n--- Code Write Requirement ---\n' +
+        'This turn was routed as code implementation with write-capable tools available. If the requested change is feasible, call an available write/patch/edit tool before final answering. If no write is possible after tool-backed inspection, answer with the concrete blocker. Do not output a proposed tool call or patch payload as chat text.\n' +
+        '---';
+      turnResult = await traceAsyncStep('planned_code_write_retry', () => runAgentTurn({
+        userText: text,
+        ctx,
+        systemPrompt: writeRecoveryPrompt,
+        tools: toolsForRequest,
+        historyMessages,
+        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+        resolveToolName: skillContext?.resolveToolName ?? (() => null),
+      }), { agentId, toolsCount: toolsForRequest.length });
+    }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus, hadWriteOp: turnHadWriteOp } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
+    logFlow(FLOW_STEP.RUN_AGENT, '[outcome]', JSON.stringify({
+      mode: turnRoute?.mode || '',
+      executionMode: turnRoute?.executionMode || '',
+      plannedMustUseTool,
+      toolsExposed: Array.isArray(toolsForRequest) ? toolsForRequest.length : 0,
+      skillsCalledCount: skillsCalledFromTurn.length,
+      skillsCalled: skillsCalledFromTurn,
+      hadWriteOp: turnHadWriteOp === true,
+      routeIncludesWriteSkill,
+      noToolUseAfterMandatoryRoute: plannedMustUseTool && Array.isArray(toolsForRequest) && toolsForRequest.length > 0 && skillsCalledFromTurn.length === 0,
+      noWriteAfterCodeWriteRoute: plannedMustUseTool && turnRoute?.mode === 'code' && routeIncludesWriteSkill && turnHadWriteOp !== true,
+    }));
     const validPostTurnFrameStatuses = new Set(['continue', 'completed', 'blocked', 'mismatch', 'waiting_user']);
     let postTurnTaskFrameStatus = validPostTurnFrameStatuses.has(rawTaskFrameStatus) ? rawTaskFrameStatus : '';
     let postTurnTaskFrameReason = '';
@@ -2143,6 +2180,15 @@ async function main() {
         : '[Pasture] ' + workModeAck;
     }
     const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
+    const rawReplyHadInternalArtifact = looksLikeInternalToolArtifact(rawTextToSend);
+    if (rawReplyHadInternalArtifact || (rawTextToSend && !cleanedTextToSend)) {
+      logFlow(FLOW_STEP.REPLY, '[safety]', JSON.stringify({
+        internalArtifactDetected: rawReplyHadInternalArtifact,
+        rawLength: rawTextToSend.length,
+        cleanedLength: cleanedTextToSend.length,
+        sanitizedToEmpty: !cleanedTextToSend,
+      }));
+    }
     logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');
     const textForSend = cleanedTextToSend;
