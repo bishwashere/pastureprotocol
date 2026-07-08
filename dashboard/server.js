@@ -3142,6 +3142,51 @@ async function buildLlmBrainGraph(corpus, { onProgress, force = false, chunks: p
   return { terms, connections, llmStats: stats };
 }
 
+function completeBrainCloudBuild({ responseCacheKey, dense, stats, progressId }) {
+  const payload = {
+    updatedAtMs: Date.now(),
+    terms: dense.terms || [],
+    connections: dense.connections || [],
+    denseTerms: dense.terms || [],
+    denseConnections: dense.connections || [],
+    stats: {
+      ...stats,
+      llmChunks: dense.llmStats?.chunks || 0,
+      llmCacheHits: dense.llmStats?.cacheHits || 0,
+      llmGenerated: dense.llmStats?.generated || 0,
+      llmEmpty: dense.llmStats?.empty || 0,
+      llmFailed: dense.llmStats?.failed || 0,
+      rawTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
+      rawConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
+      finalTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
+      finalConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
+    },
+  };
+  brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload });
+  writeBrainResponseCache(responseCacheKey, payload);
+  brainDebugLog('cloud_response_complete', {
+    rawTerms: payload.stats.rawTerms,
+    rawConnections: payload.stats.rawConnections,
+    finalTerms: payload.stats.finalTerms,
+    finalConnections: payload.stats.finalConnections,
+    llmChunks: payload.stats.llmChunks,
+    llmCacheHits: payload.stats.llmCacheHits,
+    llmGenerated: payload.stats.llmGenerated,
+    llmEmpty: payload.stats.llmEmpty,
+    llmFailed: payload.stats.llmFailed,
+  });
+  finishBrainBuildProgress(progressId, {
+    phase: 'complete',
+    doneChunks: dense.llmStats?.chunks || 0,
+    totalChunks: dense.llmStats?.chunks || 0,
+    remainingFiles: 0,
+    cacheHits: dense.llmStats?.cacheHits || 0,
+    generated: dense.llmStats?.generated || 0,
+    failed: dense.llmStats?.failed || 0,
+  });
+  return payload;
+}
+
 app.get('/api/brain/cloud', async (req, res) => {
   try {
     const hard = req.query.hard === '1' || req.query.hard === 'true';
@@ -3337,6 +3382,34 @@ app.get('/api/brain/cloud', async (req, res) => {
       });
       brainCloudBuilds.set(responseCacheKey, denseBuild);
     }
+    if (refresh) {
+      denseBuild
+        .then((dense) => completeBrainCloudBuild({ responseCacheKey, dense, stats, progressId }))
+        .catch((err) => {
+          brainDebugLog('cloud_background_error', {
+            progressId,
+            error: err.message,
+            stack: String(err?.stack || '').slice(0, 4000),
+          });
+          finishBrainBuildProgress(progressId, {
+            phase: 'error',
+            error: err.message,
+          });
+        });
+      const progress = progressId ? brainBuildProgress.get(progressId) : null;
+      brainDebugLog('cloud_build_started', {
+        progressId,
+        chunks: chunks.length,
+        corpusItems: corpus.length,
+      });
+      res.set('Cache-Control', 'no-store');
+      res.status(202).json({
+        inProgress: true,
+        progressId,
+        progress,
+      });
+      return;
+    }
     const dense = await denseBuild;
     const responseStillOpen = !(req.aborted || req.destroyed || res.destroyed);
     const denseHasTerms = Array.isArray(dense?.terms) && dense.terms.length > 0;
@@ -3368,47 +3441,7 @@ app.get('/api/brain/cloud', async (req, res) => {
         return;
       }
     }
-    const payload = {
-      updatedAtMs: Date.now(),
-      terms: dense.terms || [],
-      connections: dense.connections || [],
-      denseTerms: dense.terms || [],
-      denseConnections: dense.connections || [],
-      stats: {
-        ...stats,
-        llmChunks: dense.llmStats?.chunks || 0,
-        llmCacheHits: dense.llmStats?.cacheHits || 0,
-        llmGenerated: dense.llmStats?.generated || 0,
-        llmEmpty: dense.llmStats?.empty || 0,
-        llmFailed: dense.llmStats?.failed || 0,
-        rawTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
-        rawConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
-        finalTerms: Array.isArray(dense.terms) ? dense.terms.length : 0,
-        finalConnections: Array.isArray(dense.connections) ? dense.connections.length : 0,
-      },
-    };
-    brainCloudCache.set(responseCacheKey, { cachedAtMs: Date.now(), payload });
-    writeBrainResponseCache(responseCacheKey, payload);
-    brainDebugLog('cloud_response_complete', {
-      rawTerms: payload.stats.rawTerms,
-      rawConnections: payload.stats.rawConnections,
-      finalTerms: payload.stats.finalTerms,
-      finalConnections: payload.stats.finalConnections,
-      llmChunks: payload.stats.llmChunks,
-      llmCacheHits: payload.stats.llmCacheHits,
-      llmGenerated: payload.stats.llmGenerated,
-      llmEmpty: payload.stats.llmEmpty,
-      llmFailed: payload.stats.llmFailed,
-    });
-    finishBrainBuildProgress(progressId, {
-      phase: 'complete',
-      doneChunks: dense.llmStats?.chunks || 0,
-      totalChunks: dense.llmStats?.chunks || 0,
-      remainingFiles: 0,
-      cacheHits: dense.llmStats?.cacheHits || 0,
-      generated: dense.llmStats?.generated || 0,
-      failed: dense.llmStats?.failed || 0,
-    });
+    const payload = completeBrainCloudBuild({ responseCacheKey, dense, stats, progressId });
     if (!responseStillOpen) {
       brainDebugLog('cloud_response_skipped', {
         reason: 'client_closed_after_cache_write',

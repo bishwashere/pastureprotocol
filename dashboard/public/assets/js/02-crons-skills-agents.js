@@ -4087,17 +4087,10 @@ function renderSystemCronVariant(row) {
         var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(progressId);
         if (!refresh) url += '&cacheOnly=1';
         if (refresh) url += '&refresh=1&ts=' + Date.now();
-        var timeoutId = null;
-        if (brainCloudAbortController) {
-          timeoutId = setTimeout(function () {
-            try { brainCloudAbortController.abort(); } catch (_) {}
-          }, 90000);
-        }
         var r = await fetch(url, {
           cache: refresh ? 'no-store' : 'default',
           signal: brainCloudAbortController ? brainCloudAbortController.signal : undefined,
         });
-        if (timeoutId) clearTimeout(timeoutId);
         var d = await r.json().catch(function () { return {}; });
         if (!r.ok) {
           var err = new Error(d.error || 'Brain cloud failed');
@@ -4149,7 +4142,7 @@ function renderSystemCronVariant(row) {
           }
         }
         var meta = document.getElementById('brain-meta');
-        if (meta) meta.textContent = e && e.name === 'AbortError' ? 'Brain map request timed out' : (e && e.message ? e.message : 'Request failed');
+        if (meta) meta.textContent = e && e.name === 'AbortError' ? 'Brain map request was interrupted' : (e && e.message ? e.message : 'Request failed');
       } finally {
         if (requestSeq === brainCloudRequestSeq) brainCloudAbortController = null;
       }
