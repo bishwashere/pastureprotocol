@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI entry: auth, start/stop/status/restart, update, and skill add/remove.
- * Usage: pasture auth | pasture setup | pasture start|stop|status|restart | pasture logs | pasture add <skill-id> | pasture remove <skill-id> | pasture update [--force]
+ * Usage: pasture auth | pasture llm list|use|auth | pasture setup | pasture start|stop|status|restart | pasture logs | pasture add <skill-id> | pasture remove <skill-id> | pasture update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -467,6 +467,18 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     process.exit(1);
   }
   const child = spawn(process.execPath, [tideScript, ...args.slice(1)], {
+    stdio: 'inherit',
+    env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
+} else if (sub === 'llm') {
+  const llmScript = join(INSTALL_DIR, 'scripts', 'llm-cli.js');
+  if (!existsSync(llmScript)) {
+    console.error('pasture: scripts/llm-cli.js not found.');
+    process.exit(1);
+  }
+  const child = spawn(process.execPath, [llmScript, ...args.slice(1)], {
     stdio: 'inherit',
     env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
     cwd: INSTALL_DIR,

@@ -39,6 +39,7 @@
     "test:agent-delegation-router": "node scripts/test/unit/agent/test-agent-delegation-router.js",
     "test:delegation-llm-router": "node scripts/test/unit/agent/test-delegation-llm-router.js",
     "test:llm-daily-limit": "node scripts/test/unit/agent/test-llm-daily-limit.js",
+    "test:llm-auth": "node scripts/test/unit/agent/test-llm-auth.js",
     "test:llm-cloud-retry": "node scripts/test/unit/agent/test-llm-cloud-retry.js",
     "test:llm-priority-mode": "node scripts/test/unit/agent/test-llm-priority-mode.js",
     "test:evaluate-team-capability": "node scripts/test/unit/agent/test-evaluate-team-capability.js",

@@ -1666,6 +1666,7 @@ function renderSystemCronVariant(row) {
     })();
     var configToggleWired = false;
     var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
+    var CONFIG_LLM_AUTH_TYPES = ['none', 'api_key', 'bearer_token', 'oauth', 'device_code'];
 
     function configNum(val, fallback) {
       var n = Number(val);
@@ -1776,6 +1777,41 @@ function renderSystemCronVariant(row) {
         (placeholder ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></div>';
     }
 
+    function configModelAuth(model, index) {
+      model = model || {};
+      var provider = String(model.provider || '').toLowerCase();
+      var isLocal = provider === 'lmstudio' || provider === 'ollama';
+      if (model.auth && typeof model.auth === 'object') {
+        var auth = JSON.parse(JSON.stringify(model.auth));
+        auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
+        if (!auth.cache) auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
+        return auth;
+      }
+      if (model.apiKey) return { type: 'api_key', env: model.apiKey };
+      return { type: isLocal ? 'none' : 'api_key', env: isLocal ? '' : 'LLM_1_API_KEY' };
+    }
+
+    function configAuthFieldsHtml(auth, index) {
+      auth = auth || { type: 'api_key' };
+      var type = String(auth.type || 'api_key').toLowerCase();
+      var typeSelect = '<div class="field"><label>Auth type</label><select data-f="authType">' +
+        CONFIG_LLM_AUTH_TYPES.map(function (t) {
+          return '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' + t + '</option>';
+        }).join('') +
+        '</select></div>';
+      var apiFields =
+        '<div class="field"><label>Auth env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
+        '<div class="field"><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
+      var oauthFields =
+        '<div class="field"><label>Token cache</label><input type="text" data-f="authCache" value="' + escapeHtml(auth.cache || auth.account || ('llm-' + (index + 1))) + '" placeholder="openai-main"></div>' +
+        '<div class="field"><label>OAuth client ID</label><input type="text" data-f="authClientId" value="' + escapeHtml(auth.clientId || '') + '" placeholder="client id"></div>' +
+        '<div class="field"><label>OAuth authorize URL</label><input type="text" data-f="authAuthorizationUrl" value="' + escapeHtml(auth.authorizationUrl || '') + '" placeholder="https://provider.example/oauth/authorize"></div>' +
+        '<div class="field"><label>OAuth token URL</label><input type="text" data-f="authTokenUrl" value="' + escapeHtml(auth.tokenUrl || '') + '" placeholder="https://provider.example/oauth/token"></div>' +
+        '<div class="field"><label>OAuth scope</label><input type="text" data-f="authScope" value="' + escapeHtml(auth.scope || (Array.isArray(auth.scopes) ? auth.scopes.join(' ') : '')) + '" placeholder="openid profile"></div>' +
+        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Login once</button>';
+      return typeSelect + apiFields + oauthFields;
+    }
+
     function configTileCard(title, bodyHtml, wide) {
       return '<div class="config-tile-card' + (wide ? ' config-tile-card-wide' : '') + '">' +
         (title ? '<h4 class="config-tile-card-title">' + escapeHtml(title) + '</h4>' : '') +
@@ -1839,6 +1875,7 @@ function renderSystemCronVariant(row) {
       var modelsHtml = models.map(function (m, i) {
         var provider = (m && m.provider) || '';
         var priorityChecked = i === priorityIdx ? ' checked' : '';
+        var auth = configModelAuth(m, i);
         return '<div class="config-tile-card config-model-card" data-config-model="' + i + '">' +
           '<h4 class="config-tile-card-title">Model ' + (i + 1) + '</h4>' +
           '<div class="form-row"><div class="field"><label>Provider</label><select data-f="provider">' +
@@ -1848,7 +1885,7 @@ function renderSystemCronVariant(row) {
           '</select></div></div>' +
           '<div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div>' +
           '<div class="field"><label>Base URL (local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(m.baseUrl || '') + '" placeholder="http://127.0.0.1:1234/v1"></div>' +
-          '<div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(m.apiKey || '') + '" placeholder="LLM_1_API_KEY"></div>' +
+          configAuthFieldsHtml(auth, i) +
           '<div class="form-row config-priority-row"><label><input type="radio" name="config-llm-priority" value="' + i + '"' + priorityChecked + '> Priority (use first)</label></div>' +
           '<button type="button" class="config-model-remove link-btn" data-remove-model="' + i + '">Remove model</button>' +
           '</div>';
@@ -2039,7 +2076,7 @@ function renderSystemCronVariant(row) {
           var merged = collectConfigFromUi(base);
           merged.llm = merged.llm || {};
           var models = Array.isArray(merged.llm.models) ? merged.llm.models.slice() : [];
-          models.push({ provider: 'openai', model: 'gpt-4o', apiKey: 'LLM_1_API_KEY' });
+          models.push({ provider: 'openai', model: 'gpt-4o', auth: { type: 'api_key', env: 'LLM_1_API_KEY' } });
           merged.llm.models = models;
           configCache = merged;
           renderConfigUi(merged);
@@ -2058,6 +2095,83 @@ function renderSystemCronVariant(row) {
           merged.llm.models = models;
           configCache = merged;
           renderConfigUi(merged);
+        });
+      });
+      document.querySelectorAll('.config-model-card [data-f="authType"]').forEach(function (select) {
+        if (select.dataset.wired) return;
+        select.dataset.wired = '1';
+        select.addEventListener('change', function () {
+          var card = select.closest('.config-model-card');
+          var login = card && card.querySelector('.config-llm-login');
+          if (login) login.hidden = select.value !== 'oauth' && select.value !== 'device_code';
+        });
+      });
+      document.querySelectorAll('.config-llm-login').forEach(function (btn) {
+        if (btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', async function () {
+          var savedEl = document.getElementById('config-saved');
+          var errEl = document.getElementById('config-error');
+          if (savedEl) savedEl.style.display = 'none';
+          if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+          }
+          try {
+            var config = collectConfigFromUi(configCache || {});
+            var save = await fetch(API + '/api/config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(config)
+            });
+            if (!save.ok) throw new Error('Save failed before login.');
+            configCache = await save.json();
+            var modelIndex = Number(btn.getAttribute('data-login-model'));
+            var r = await fetch(API + '/api/llm-auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ modelIndex: modelIndex })
+            });
+            var d = await r.json().catch(function () { return {}; });
+            if (!r.ok) throw new Error(d.error || 'Login failed');
+            window.open(d.url, '_blank', 'noopener');
+            if (savedEl) {
+              savedEl.textContent = d.method === 'device_code'
+                ? ('Login opened. Enter code ' + d.userCode + ' in the new tab.')
+                : 'Login opened. Finish it in the new tab.';
+              savedEl.style.display = 'inline';
+            }
+            if (d.method === 'device_code' && d.id) {
+              var polls = 0;
+              var timer = setInterval(async function () {
+                polls += 1;
+                try {
+                  var sr = await fetch(API + '/api/llm-auth/device/' + encodeURIComponent(d.id));
+                  var sd = await sr.json().catch(function () { return {}; });
+                  if (sd.status === 'complete') {
+                    clearInterval(timer);
+                    if (savedEl) {
+                      savedEl.textContent = 'LLM login complete.';
+                      savedEl.style.display = 'inline';
+                    }
+                  } else if (sd.status === 'error') {
+                    clearInterval(timer);
+                    if (errEl) {
+                      errEl.textContent = sd.error || 'Device login failed.';
+                      errEl.style.display = 'inline';
+                    }
+                  } else if (polls > 120) {
+                    clearInterval(timer);
+                  }
+                } catch (_) {}
+              }, 3000);
+            }
+          } catch (e) {
+            if (errEl) {
+              errEl.textContent = e.message || 'Login failed.';
+              errEl.style.display = 'inline';
+            }
+          }
         });
       });
       wireConfigTideActions();
@@ -2096,11 +2210,32 @@ function renderSystemCronVariant(row) {
         var providerEl = card.querySelector('[data-f="provider"]');
         var modelEl = card.querySelector('[data-f="model"]');
         var baseUrlEl = card.querySelector('[data-f="baseUrl"]');
-        var apiKeyEl = card.querySelector('[data-f="apiKey"]');
+        var authTypeEl = card.querySelector('[data-f="authType"]');
+        var authEnvEl = card.querySelector('[data-f="authEnv"]');
+        var authFileEl = card.querySelector('[data-f="authFile"]');
+        var authCacheEl = card.querySelector('[data-f="authCache"]');
+        var authClientIdEl = card.querySelector('[data-f="authClientId"]');
+        var authAuthorizationUrlEl = card.querySelector('[data-f="authAuthorizationUrl"]');
+        var authTokenUrlEl = card.querySelector('[data-f="authTokenUrl"]');
+        var authScopeEl = card.querySelector('[data-f="authScope"]');
+        var authType = authTypeEl ? authTypeEl.value : 'api_key';
+        var auth = { type: authType };
+        if (authType === 'api_key') {
+          auth.env = authEnvEl ? authEnvEl.value.trim() || 'LLM_1_API_KEY' : 'LLM_1_API_KEY';
+        } else if (authType === 'bearer_token') {
+          if (authEnvEl && authEnvEl.value.trim()) auth.env = authEnvEl.value.trim();
+          if (authFileEl && authFileEl.value.trim()) auth.file = authFileEl.value.trim();
+        } else if (authType === 'oauth' || authType === 'device_code') {
+          auth.cache = authCacheEl ? authCacheEl.value.trim() || ('llm-' + (i + 1)) : ('llm-' + (i + 1));
+          if (authClientIdEl && authClientIdEl.value.trim()) auth.clientId = authClientIdEl.value.trim();
+          if (authAuthorizationUrlEl && authAuthorizationUrlEl.value.trim()) auth.authorizationUrl = authAuthorizationUrlEl.value.trim();
+          if (authTokenUrlEl && authTokenUrlEl.value.trim()) auth.tokenUrl = authTokenUrlEl.value.trim();
+          if (authScopeEl && authScopeEl.value.trim()) auth.scope = authScopeEl.value.trim();
+        }
         var o = {
           provider: providerEl ? providerEl.value.trim() || 'openai' : 'openai',
           model: modelEl ? modelEl.value.trim() || 'gpt-4o' : 'gpt-4o',
-          apiKey: apiKeyEl ? apiKeyEl.value.trim() || 'LLM_1_API_KEY' : 'LLM_1_API_KEY',
+          auth: auth,
         };
         var baseUrl = baseUrlEl ? baseUrlEl.value.trim() : '';
         if (baseUrl) o.baseUrl = baseUrl;
@@ -2823,11 +2958,13 @@ function renderSystemCronVariant(row) {
       minFont: 10,
       maxFont: 46,
     };
+    var BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER = 3;
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
     var brainLoadingTimer = null;
     var brainCloudAbortController = null;
     var brainCloudRequestSeq = 0;
+    var brainFullscreenResizeTimer = null;
 
     function clampBrainNumber(value, fallback, min, max) {
       var n = Number(value);
@@ -2859,6 +2996,33 @@ function renderSystemCronVariant(row) {
     function rerenderBrainCloud() {
       if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
     }
+
+    function syncBrainFullscreenControls() {
+      var on = document.body.classList.contains('brain-fullscreen-mode');
+      var toggle = document.getElementById('brain-fullscreen-toggle');
+      var exit = document.getElementById('brain-fullscreen-exit');
+      if (toggle) {
+        toggle.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
+        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      if (exit) exit.hidden = !on;
+    }
+
+    function setBrainFullscreenMode(on) {
+      var next = !!on;
+      if (document.body.classList.contains('brain-fullscreen-mode') === next) {
+        syncBrainFullscreenControls();
+        return;
+      }
+      document.body.classList.toggle('brain-fullscreen-mode', next);
+      if (next) toggleBrainSettingsPanel(false);
+      syncBrainFullscreenControls();
+      requestAnimationFrame(function () {
+        if (brainCloudLastData) renderBrainCloud(brainCloudLastData);
+      });
+    }
+
+    window.setBrainFullscreenMode = setBrainFullscreenMode;
 
     function brainLastGoodKey() {
       return 'brainMeshLastGood:all:v2';
@@ -3378,6 +3542,8 @@ function renderSystemCronVariant(row) {
         candidates[text] = {
           presence: presence,
           distance: Math.sqrt(dx * dx + dy * dy),
+          dx: dx,
+          dy: dy,
         };
       });
 
@@ -3391,6 +3557,45 @@ function renderSystemCronVariant(row) {
           selectedText: selectedText,
         },
       };
+    }
+
+    function brainPushedFocusPositions(positions, focusNeighborhood, width, height) {
+      var list = Array.isArray(positions) ? positions : [];
+      var candidates = focusNeighborhood && focusNeighborhood.candidates ? focusNeighborhood.candidates : {};
+      var zone = focusNeighborhood && focusNeighborhood.zone;
+      if (!zone || !Object.keys(candidates).length) return list;
+      var rx = Math.max(1, zone.rx || 1);
+      var ry = Math.max(1, zone.ry || 1);
+      var safeW = Math.max(320, width || 900);
+      var safeH = Math.max(260, height || 520);
+      return list.map(function (pos) {
+        var text = String(pos.term?.text || '');
+        var local = candidates[text];
+        if (!local) return pos;
+        var dx = Number(local.dx) || 0;
+        var dy = Number(local.dy) || 0;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var ux;
+        var uy;
+        if (distance > 0.001) {
+          ux = dx / distance;
+          uy = dy / distance;
+        } else {
+          var seed = brainHash(text + ':focus-push');
+          var angle = brainSeededRandom(seed) * Math.PI * 2;
+          ux = Math.cos(angle);
+          uy = Math.sin(angle);
+        }
+        var normalized = Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
+        var edgeDistance = Math.max(rx, ry) * Math.max(0, 1 - normalized);
+        var push = Math.max(18, edgeDistance + 22) * Math.max(0, Math.min(1, Number(local.presence) || 0)) * BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER;
+        var marginX = Math.max(30, (pos.cellW || 56) * 0.5 + 8);
+        var marginY = Math.max(20, (pos.cellH || 18) * 0.5 + 8);
+        return Object.assign({}, pos, {
+          x: Math.max(marginX, Math.min(safeW - marginX, pos.x + ux * push)),
+          y: Math.max(marginY, Math.min(safeH - marginY, pos.y + uy * push)),
+        });
+      });
     }
 
     function brainLocalPopFont(pos, localState) {
@@ -3588,7 +3793,7 @@ function renderSystemCronVariant(row) {
         : brainRelationMap(relationSelectedText, visibleConnections);
       var focusNeighborhood = brainFocusNeighborhood(basePositions, relationSelectedText, selectedLinks, focusMode, focusPresence, width);
       var localCandidates = focusNeighborhood.candidates || {};
-      var positions = basePositions;
+      var positions = brainPushedFocusPositions(basePositions, focusNeighborhood, width, height);
       var byText = {};
       positions.forEach(function (pos) { byText[pos.term.text] = pos; });
       canvas.setAttribute('data-brain-word-count', String(positions.length));
@@ -3840,7 +4045,9 @@ function renderSystemCronVariant(row) {
       brainCloudLastData = data;
       saveBrainLastGood(data);
       var rect = cloud.getBoundingClientRect();
-      cloud.style.minHeight = Math.max(520, Math.round(rect.height || 520)) + 'px';
+      cloud.style.minHeight = document.body.classList.contains('brain-fullscreen-mode')
+        ? '100%'
+        : Math.max(520, Math.round(rect.height || 520)) + 'px';
       cloud.innerHTML = '<canvas class="brain-mesh-canvas" aria-label="Brain word mesh"></canvas>';
       var meshCanvas = cloud.querySelector('.brain-mesh-canvas');
       drawBrainMeshCanvas(meshCanvas, terms, connections, '');
@@ -4372,6 +4579,26 @@ function renderSystemCronVariant(row) {
     }
 
     wireEl('brain-refresh', 'click', function () { fetchBrainCloud(true); });
+    wireEl('brain-fullscreen-toggle', 'click', function () {
+      setBrainFullscreenMode(!document.body.classList.contains('brain-fullscreen-mode'));
+    });
+    wireEl('brain-fullscreen-exit', 'click', function () {
+      setBrainFullscreenMode(false);
+    });
+    syncBrainFullscreenControls();
+    window.addEventListener('resize', function () {
+      if (!brainCloudLastData) return;
+      if (brainFullscreenResizeTimer) clearTimeout(brainFullscreenResizeTimer);
+      brainFullscreenResizeTimer = setTimeout(function () {
+        brainFullscreenResizeTimer = null;
+        rerenderBrainCloud();
+      }, 120);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && document.body.classList.contains('brain-fullscreen-mode')) {
+        setBrainFullscreenMode(false);
+      }
+    });
     setBrainSettingsInputs();
     wireEl('brain-settings-toggle', 'click', function (e) {
       if (e) e.stopPropagation();

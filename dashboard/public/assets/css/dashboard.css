@@ -81,6 +81,49 @@
       border: none;
       height: 100%;
     }
+    body.brain-fullscreen-mode {
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
+      padding: 0;
+      background: var(--bg);
+    }
+    body.brain-fullscreen-mode > .dashboard-ascii-logo,
+    body.brain-fullscreen-mode #dashboard-nav-root,
+    body.brain-fullscreen-mode #page-brain .brain-toolbar,
+    body.brain-fullscreen-mode #page-brain .brain-focus {
+      display: none !important;
+    }
+    body.brain-fullscreen-mode #page-fragments-root {
+      flex: 1 1 0;
+      display: flex;
+      min-height: 0;
+    }
+    body.brain-fullscreen-mode #page-brain.active {
+      flex: 1 1 0;
+      display: flex;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+    body.brain-fullscreen-mode .brain-shell {
+      flex: 1 1 0;
+      gap: 0;
+      min-height: 0;
+    }
+    body.brain-fullscreen-mode .brain-stage {
+      height: 100dvh;
+      min-height: 0;
+      border: none;
+      border-radius: 0;
+      margin: 0;
+      padding: 0;
+      grid-template-rows: 1fr;
+    }
+    body.brain-fullscreen-mode .brain-cloud {
+      height: 100%;
+      min-height: 100%;
+    }
     #page-home.active,
     #page-team.active {
       flex: 1 1 0;
@@ -2269,6 +2312,7 @@
       gap: 1rem;
       padding: 1rem;
       overflow: hidden;
+      position: relative;
     }
     .brain-cloud {
       width: 100%;
@@ -2320,6 +2364,20 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
+    }
+    .brain-fullscreen-exit {
+      display: none;
+      position: fixed;
+      top: 0.75rem;
+      right: 0.75rem;
+      z-index: 30;
+      border: 1px solid rgba(148, 163, 184, 0.36);
+      background: rgba(5, 8, 22, 0.74);
+      color: var(--text);
+      backdrop-filter: blur(10px);
+    }
+    body.brain-fullscreen-mode .brain-fullscreen-exit:not([hidden]) {
+      display: inline-flex;
     }
     .brain-focus {
       display: flex;

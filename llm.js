@@ -9,6 +9,7 @@ import { dirname, join } from 'path';
 import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/util/paths.js';
 import { DEFAULT_AGENT_ID } from './lib/agent/agent-config.js';
 import { beginLlmCall, endLlmCall, getActiveTrace } from './lib/util/request-timing.js';
+import { normalizeLlmAuth, hasUsableLlmAuth, resolveLlmAuthHeaders } from './lib/llm/auth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -413,11 +414,13 @@ function parseVisionFallback(config) {
   const baseUrl = isLocal
     ? (fromEnv(entry.baseUrl) || entry.baseUrl || (provider && PRESETS[provider]))
     : (entry.provider && PRESETS[provider]);
-  const apiKey = fromEnv(entry.apiKey) ?? fromEnv('LLM_API_KEY');
+  const auth = normalizeLlmAuth(entry, 0);
+  if (auth.type === 'missing') auth.type = 'api_key';
+  if (entry.apiKey != null && !auth.env && !auth.value) auth.env = String(entry.apiKey).trim();
   const modelRaw = entry.model != null ? fromEnv(entry.model) : undefined;
   const model = modelRaw || (isLocal ? 'local' : fromEnv(cloudModelEnv(provider))) || fromEnv('LLM_MODEL') || (provider && DEFAULT_CLOUD_MODELS[provider]);
   const maxTokens = Number(fromEnv(entry.maxTokens)) || 1024;
-  return { baseUrl: baseUrl || PRESETS.lmstudio, apiKey: apiKey ?? 'not-needed', model: model || 'local', maxTokens };
+  return { baseUrl: baseUrl || PRESETS.lmstudio, auth, model: model || 'local', maxTokens };
 }
 
 function resolveConfigPath(agentId) {
@@ -467,13 +470,7 @@ function loadConfig(options = {}) {
       const baseUrl = isLocal
         ? (fromEnv(entry.baseUrl) || entry.baseUrl || (provider && PRESETS[provider]))
         : (entry.provider && PRESETS[provider]);
-      // Resolve apiKey: if the config value is an env var name that isn't set, treat as absent.
-      const rawApiKey = entry.apiKey != null ? String(entry.apiKey).trim() : null;
-      const isEnvVarName = rawApiKey && /^[A-Z][A-Z0-9_]{2,}$/.test(rawApiKey);
-      const resolvedApiKey = isEnvVarName
-        ? (process.env[rawApiKey] || null)              // env var name not set → null
-        : (rawApiKey || null);                          // literal value (e.g. "not-needed", "sk-...")
-      const apiKey = resolvedApiKey ?? (i === 0 ? fromEnv('LLM_API_KEY') : undefined);
+      const auth = normalizeLlmAuth(entry, i);
       const modelRaw = entry.model != null ? fromEnv(entry.model) : undefined;
       let model = modelRaw || (isLocal ? 'local' : fromEnv(cloudModelEnv(provider))) || (i === 0 ? fromEnv('LLM_MODEL') : undefined);
       if (!isLocal && (!model || model === cloudModelEnv(provider))) {
@@ -483,20 +480,20 @@ function loadConfig(options = {}) {
       const priority = priorityMode === LLM_PRIORITY_CUSTOM && entryHasPriority(entry);
       return {
         baseUrl: baseUrl || PRESETS.lmstudio,
-        apiKey: apiKey ?? 'not-needed',
+        auth,
         model: model || 'local',
         maxTokens,
         priority,
       };
     });
-    // Drop cloud models whose API key is missing — don't attempt and get a 401.
+    // Drop cloud models whose auth is missing — don't attempt and get a 401.
     // Local models (lmstudio/ollama on 127.x) are always kept; they don't need a key.
     models = models.filter((m) => {
       const isLocal = m.baseUrl && /127\.0\.0\.1|localhost/i.test(m.baseUrl);
       if (isLocal) return true;
-      const hasKey = m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '';
-      if (!hasKey) logLlmEvent('[llm-config] skipping model (API key not set):', m.model || m.baseUrl);
-      return hasKey;
+      const hasAuth = hasUsableLlmAuth(m.auth, m);
+      if (!hasAuth) logLlmEvent('[llm-config] skipping model (auth not configured):', m.model || m.baseUrl);
+      return hasAuth;
     });
     // When any model has priority, try it first regardless of position in config.
     const priorityIndex = models.findIndex((m) => m.priority);
@@ -512,7 +509,7 @@ function loadConfig(options = {}) {
   }
 
   const baseUrl = fromEnv('LLM_BASE_URL') || fromEnv(llm.baseUrl);
-  const apiKey = fromEnv('LLM_API_KEY') ?? fromEnv(llm.apiKey);
+  const auth = normalizeLlmAuth({ ...llm, apiKey: llm.apiKey ?? 'LLM_API_KEY', baseUrl }, 0);
   const model = fromEnv('LLM_MODEL') || fromEnv(llm.model);
   const maxTokens = Number(fromEnv(llm.maxTokens)) || 2048;
   const visionFallback = parseVisionFallback(config);
@@ -522,7 +519,7 @@ function loadConfig(options = {}) {
     models: [
       {
         baseUrl: baseUrl || PRESETS.lmstudio,
-        apiKey: apiKey ?? 'not-needed',
+        auth,
         model: model || 'local',
         maxTokens,
       },
@@ -535,8 +532,10 @@ function loadConfig(options = {}) {
 }
 
 /** Call Anthropic Messages API and return a Response-like with OpenAI-shaped JSON. */
-async function callAnthropic(messages, { apiKey, model, maxTokens }, tools, purpose) {
-  if (!apiKey || apiKey === 'not-needed' || String(apiKey).trim() === '') {
+async function callAnthropic(messages, opts, tools, purpose) {
+  const headersFromAuth = await resolveLlmAuthHeaders(opts.auth, opts);
+  const apiKey = headersFromAuth['x-api-key'] || '';
+  if (!apiKey || String(apiKey).trim() === '') {
     return { ok: false, status: 401, text: () => Promise.resolve(JSON.stringify({ error: { message: 'Anthropic API key not set (set LLM_3_API_KEY in ~/.pasture/.env)' } })) };
   }
   const url = 'https://api.anthropic.com/v1/messages';
@@ -586,7 +585,8 @@ function openaiUsesMaxCompletionTokens(model) {
   return typeof model === 'string' && /^gpt-5/.test(model);
 }
 
-function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '', localRpm = DEFAULT_LOCAL_RPM, callOpts = {}) {
+async function callOne(messages, opts, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '', localRpm = DEFAULT_LOCAL_RPM, callOpts = {}) {
+  const { baseUrl, model, maxTokens } = opts || {};
   const isLocal = /127\.0\.0\.1|localhost/i.test(baseUrl || '');
   const countUsage = callOpts.countUsage !== false;
   if (!isLocal) {
@@ -597,7 +597,7 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
 
   const isAnthropic = (baseUrl || '').includes('anthropic.com');
   if (isAnthropic) {
-    return callAnthropic(messages, { apiKey, model, maxTokens }, tools, purpose);
+    return callAnthropic(messages, opts, tools, purpose);
   }
   const url = (baseUrl || '').replace(/\/$/, '') + '/chat/completions';
   const isOpenAINew = (baseUrl || '').includes('openai.com') && openaiUsesMaxCompletionTokens(model);
@@ -615,7 +615,7 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
   };
   const headers = {
     'Content-Type': 'application/json',
-    ...(apiKey && apiKey !== 'not-needed' && { Authorization: `Bearer ${apiKey}` }),
+    ...(await resolveLlmAuthHeaders(opts.auth, opts)),
   };
   return fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
 }
@@ -860,7 +860,8 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
   for (const opts of candidates) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     const isAnthropic = (opts.baseUrl || '').includes('anthropic.com');
-    if (isAnthropic && (!opts.apiKey || opts.apiKey === 'not-needed' || String(opts.apiKey || '').trim() === '')) continue;
+    const authHeaders = await resolveLlmAuthHeaders(opts.auth, opts);
+    if (isAnthropic && !authHeaders['x-api-key']) continue;
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
@@ -878,7 +879,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': opts.apiKey || '',
+            'x-api-key': authHeaders['x-api-key'] || '',
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify(body),

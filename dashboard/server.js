@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { spawn, execSync, execFileSync } from 'child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, renameSync, createWriteStream, copyFileSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/util/paths.js';
@@ -25,6 +25,15 @@ import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospect
 import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
 import { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } from '../lib/util/dashboard-url.js';
 import { syncMainAgentIdentityFileFromWorkspace } from '../lib/agent/identity-sync.js';
+import {
+  beginDeviceCodeLogin,
+  completeDeviceCodeLogin,
+  createOAuthLoginRequest,
+  exchangeOAuthCode,
+  getLlmAuthStatus,
+  normalizeLlmAuth,
+  writeLlmAuthToken,
+} from '../lib/llm/auth.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -62,6 +71,8 @@ const HOST = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
 const app = express();
 app.use(express.json({ limit: Infinity }));
 ensureMainAgentInitialized();
+const pendingLlmOAuth = new Map();
+const pendingLlmDeviceAuth = new Map();
 
 // Block dashboard UI when accessed via Tailscale (*.ts.net) — API only over Tailscale.
 app.use((req, res, next) => {
@@ -1327,6 +1338,125 @@ app.get('/api/config', (_req, res) => {
     res.json(config);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/llm-auth/status', (_req, res) => {
+  try {
+    const config = loadConfig();
+    const models = Array.isArray(config?.llm?.models) ? config.llm.models : [];
+    res.json({
+      models: models.map((entry, index) => ({
+        index,
+        provider: entry?.provider || '',
+        model: entry?.model || '',
+        auth: getLlmAuthStatus(normalizeLlmAuth(entry, index), entry),
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/llm-auth/login', (req, res) => {
+  try {
+    const config = loadConfig();
+    const models = Array.isArray(config?.llm?.models) ? config.llm.models : [];
+    const requestedIndex = Number(req.body?.modelIndex);
+    const cache = req.body?.cache ? String(req.body.cache) : '';
+    let index = Number.isInteger(requestedIndex) ? requestedIndex : -1;
+    if (index < 0 && cache) {
+      index = models.findIndex((entry, i) => String(normalizeLlmAuth(entry, i).cache || '') === cache);
+    }
+    if (index < 0 || index >= models.length) {
+      res.status(404).json({ error: 'LLM model not found' });
+      return;
+    }
+    const entry = models[index];
+    const auth = normalizeLlmAuth(entry, index);
+    if (auth.type !== 'oauth' && auth.type !== 'device_code') {
+      res.status(400).json({ error: 'Selected LLM auth type is not oauth or device_code' });
+      return;
+    }
+    if (auth.type === 'device_code') {
+      beginDeviceCodeLogin({ ...auth, provider: entry.provider }).then((device) => {
+        const id = randomBytes(12).toString('hex');
+        const pending = { status: 'pending', cache: device.cache, createdAt: Date.now(), device };
+        pendingLlmDeviceAuth.set(id, pending);
+        completeDeviceCodeLogin({ ...auth, provider: entry.provider }, device)
+          .then((result) => {
+            pending.status = 'complete';
+            pending.path = result.path;
+          })
+          .catch((err) => {
+            pending.status = 'error';
+            pending.error = err?.message || String(err);
+          });
+        res.json({
+          method: 'device_code',
+          id,
+          url: device.verificationUriComplete || device.verificationUri,
+          verificationUri: device.verificationUri,
+          userCode: device.userCode,
+          expiresInMs: device.expiresInMs,
+        });
+      }).catch((err) => {
+        res.status(500).json({ error: err.message });
+      });
+      return;
+    }
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `${HOST}:${PORT}`;
+    const login = createOAuthLoginRequest({ ...auth, provider: entry.provider }, `${proto}://${host}`);
+    pendingLlmOAuth.set(login.state, {
+      auth: { ...auth, provider: entry.provider },
+      verifier: login.verifier,
+      redirectUri: login.redirectUri,
+      cache: auth.cache || auth.account || entry.provider || `model-${index + 1}`,
+      createdAt: Date.now(),
+    });
+    res.json({ url: login.url, state: login.state });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/llm-auth/device/:id', (req, res) => {
+  const pending = pendingLlmDeviceAuth.get(String(req.params.id || ''));
+  if (!pending) {
+    res.status(404).json({ error: 'Device login not found' });
+    return;
+  }
+  res.json({
+    status: pending.status,
+    cache: pending.cache,
+    error: pending.error || null,
+    path: pending.path || null,
+  });
+  if (pending.status === 'complete' || pending.status === 'error') {
+    setTimeout(() => pendingLlmDeviceAuth.delete(String(req.params.id || '')), 30_000);
+  }
+});
+
+app.get('/api/llm-auth/callback', async (req, res) => {
+  try {
+    const state = String(req.query.state || '');
+    const code = String(req.query.code || '');
+    const pending = pendingLlmOAuth.get(state);
+    pendingLlmOAuth.delete(state);
+    if (!pending || !code) {
+      res.status(400).send('OAuth callback is missing or expired.');
+      return;
+    }
+    if (Date.now() - pending.createdAt > 10 * 60_000) {
+      res.status(400).send('OAuth callback expired.');
+      return;
+    }
+    const token = await exchangeOAuthCode(pending.auth, code, pending.verifier, pending.redirectUri);
+    writeLlmAuthToken(pending.cache, token);
+    res.type('html').send('<!doctype html><title>Pasture LLM auth</title><p>Login complete. You can close this tab.</p>');
+  } catch (err) {
+    res.status(500).send(err?.message || 'OAuth login failed.');
   }
 });
 

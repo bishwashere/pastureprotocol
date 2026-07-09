@@ -92,6 +92,7 @@ const API = '';
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
       document.body.classList.toggle('dashboard-team-active', pageId === 'team');
+      if (name !== 'brain' && typeof setBrainFullscreenMode === 'function') setBrainFullscreenMode(false);
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'teams' && typeof fetchTeamsPage === 'function') fetchTeamsPage();
