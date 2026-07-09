@@ -1780,7 +1780,6 @@ function renderSystemCronVariant(row) {
       model = model || {};
       var provider = String(model.provider || '').toLowerCase();
       var isLocal = configIsLocalLlmProvider(provider);
-      var isSubscriptionLoginProvider = configIsSubscriptionLoginProvider(provider);
       if (model.auth && typeof model.auth === 'object') {
         var auth = JSON.parse(JSON.stringify(model.auth));
         auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
@@ -1790,7 +1789,6 @@ function renderSystemCronVariant(row) {
       }
       if (model.apiKey) return { type: 'api_key', env: model.apiKey };
       if (isLocal) return { type: 'none' };
-      if (isSubscriptionLoginProvider) return { type: 'device_code', cache: provider + '-main' };
       return { type: 'api_key', env: 'LLM_1_API_KEY' };
     }
 
@@ -5104,7 +5102,16 @@ function renderSystemCronVariant(row) {
         return [{ value: 'none', label: 'No login (local)' }];
       }
       if (configIsSubscriptionLoginProvider(provider)) {
-        return [{ value: 'device_code', label: 'Browser login' }];
+        return [
+          { value: 'api_key', label: 'API key' },
+          { value: 'device_code', label: 'Browser login' }
+        ];
+      }
+      if (String(provider || '').toLowerCase() === 'openai') {
+        return [
+          { value: 'api_key', label: 'API key' },
+          { value: 'oauth', label: 'Browser login' }
+        ];
       }
       var options = [{ value: 'api_key', label: 'API key' }];
       if (currentType === 'oauth') options.push({ value: 'oauth', label: 'Browser login' });
@@ -5112,6 +5119,9 @@ function renderSystemCronVariant(row) {
     }
 
     function configNormalizeAuthTypeForProvider(type, provider) {
+      var p = String(provider || '').toLowerCase();
+      if (configIsSubscriptionLoginProvider(p) && (type === 'oauth' || type === 'xai_oauth')) type = 'device_code';
+      if (p === 'openai' && type === 'device_code') type = 'oauth';
       var options = configAuthOptionsForProvider(provider, type);
       return options.some(function (item) { return item.value === type; }) ? type : options[0].value;
     }
