@@ -1666,7 +1666,13 @@ function renderSystemCronVariant(row) {
     })();
     var configToggleWired = false;
     var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
-    var CONFIG_LLM_AUTH_TYPES = ['none', 'api_key', 'bearer_token', 'oauth', 'device_code'];
+    var CONFIG_LLM_AUTH_TYPES = [
+      { value: 'device_code', label: 'Login with subscription' },
+      { value: 'api_key', label: 'API key' },
+      { value: 'none', label: 'No auth (local)' },
+      { value: 'oauth', label: 'Advanced: browser OAuth' },
+      { value: 'bearer_token', label: 'Advanced: bearer token' }
+    ];
 
     function configNum(val, fallback) {
       var n = Number(val);
@@ -1781,6 +1787,7 @@ function renderSystemCronVariant(row) {
       model = model || {};
       var provider = String(model.provider || '').toLowerCase();
       var isLocal = provider === 'lmstudio' || provider === 'ollama';
+      var isSubscriptionLoginProvider = provider === 'grok' || provider === 'xai';
       if (model.auth && typeof model.auth === 'object') {
         var auth = JSON.parse(JSON.stringify(model.auth));
         auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
@@ -1788,26 +1795,40 @@ function renderSystemCronVariant(row) {
         return auth;
       }
       if (model.apiKey) return { type: 'api_key', env: model.apiKey };
-      return { type: isLocal ? 'none' : 'api_key', env: isLocal ? '' : 'LLM_1_API_KEY' };
+      if (isLocal) return { type: 'none' };
+      if (isSubscriptionLoginProvider) return { type: 'device_code', cache: provider + '-main' };
+      return { type: 'api_key', env: 'LLM_1_API_KEY' };
+    }
+
+    function configAuthFieldHidden(type, fieldType) {
+      if (fieldType === 'api') return type !== 'api_key';
+      if (fieldType === 'bearer') return type !== 'bearer_token';
+      if (fieldType === 'cache') return type !== 'oauth' && type !== 'device_code';
+      if (fieldType === 'oauth') return type !== 'oauth';
+      return false;
+    }
+
+    function configHiddenAttr(hidden) {
+      return hidden ? ' hidden' : '';
     }
 
     function configAuthFieldsHtml(auth, index) {
       auth = auth || { type: 'api_key' };
       var type = String(auth.type || 'api_key').toLowerCase();
-      var typeSelect = '<div class="field"><label>Auth type</label><select data-f="authType">' +
-        CONFIG_LLM_AUTH_TYPES.map(function (t) {
-          return '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' + t + '</option>';
+      var typeSelect = '<div class="field"><label>Auth method</label><select data-f="authType">' +
+        CONFIG_LLM_AUTH_TYPES.map(function (item) {
+          return '<option value="' + item.value + '"' + (item.value === type ? ' selected' : '') + '>' + escapeHtml(item.label) + '</option>';
         }).join('') +
         '</select></div>';
       var apiFields =
-        '<div class="field"><label>Auth env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
-        '<div class="field"><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
+        '<div class="field" data-auth-field="api"' + configHiddenAttr(configAuthFieldHidden(type, 'api')) + '><label>API key env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
+        '<div class="field" data-auth-field="bearer"' + configHiddenAttr(configAuthFieldHidden(type, 'bearer')) + '><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
       var oauthFields =
-        '<div class="field"><label>Token cache</label><input type="text" data-f="authCache" value="' + escapeHtml(auth.cache || auth.account || ('llm-' + (index + 1))) + '" placeholder="openai-main"></div>' +
-        '<div class="field"><label>OAuth client ID</label><input type="text" data-f="authClientId" value="' + escapeHtml(auth.clientId || '') + '" placeholder="client id"></div>' +
-        '<div class="field"><label>OAuth authorize URL</label><input type="text" data-f="authAuthorizationUrl" value="' + escapeHtml(auth.authorizationUrl || '') + '" placeholder="https://provider.example/oauth/authorize"></div>' +
-        '<div class="field"><label>OAuth token URL</label><input type="text" data-f="authTokenUrl" value="' + escapeHtml(auth.tokenUrl || '') + '" placeholder="https://provider.example/oauth/token"></div>' +
-        '<div class="field"><label>OAuth scope</label><input type="text" data-f="authScope" value="' + escapeHtml(auth.scope || (Array.isArray(auth.scopes) ? auth.scopes.join(' ') : '')) + '" placeholder="openid profile"></div>' +
+        '<div class="field" data-auth-field="cache"' + configHiddenAttr(configAuthFieldHidden(type, 'cache')) + '><label>Login name</label><input type="text" data-f="authCache" value="' + escapeHtml(auth.cache || auth.account || ('llm-' + (index + 1))) + '" placeholder="grok-main"></div>' +
+        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth client ID</label><input type="text" data-f="authClientId" value="' + escapeHtml(auth.clientId || '') + '" placeholder="client id"></div>' +
+        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth authorize URL</label><input type="text" data-f="authAuthorizationUrl" value="' + escapeHtml(auth.authorizationUrl || '') + '" placeholder="https://provider.example/oauth/authorize"></div>' +
+        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth token URL</label><input type="text" data-f="authTokenUrl" value="' + escapeHtml(auth.tokenUrl || '') + '" placeholder="https://provider.example/oauth/token"></div>' +
+        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth scope</label><input type="text" data-f="authScope" value="' + escapeHtml(auth.scope || (Array.isArray(auth.scopes) ? auth.scopes.join(' ') : '')) + '" placeholder="openid profile"></div>' +
         '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Login once</button>';
       return typeSelect + apiFields + oauthFields;
     }
@@ -2104,6 +2125,12 @@ function renderSystemCronVariant(row) {
           var card = select.closest('.config-model-card');
           var login = card && card.querySelector('.config-llm-login');
           if (login) login.hidden = select.value !== 'oauth' && select.value !== 'device_code';
+          if (card) {
+            card.querySelectorAll('[data-auth-field]').forEach(function (field) {
+              var fieldType = field.getAttribute('data-auth-field');
+              field.hidden = configAuthFieldHidden(select.value, fieldType);
+            });
+          }
         });
       });
       document.querySelectorAll('.config-llm-login').forEach(function (btn) {
