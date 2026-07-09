@@ -135,6 +135,7 @@ Search code across GitHub.
 - **Never** save raw GitHub file contents or issue bodies to `MEMORY.md` unless the user explicitly asks.
 - **Scope tokens to minimum necessary.** Prefer fine-grained tokens with specific repo + permission access.
 - **Confirmation is required** for all write actions. Always show what will happen before calling with `confirm: true`.
+- Confirmed write actions return a `verification` object from a GitHub read-back. Do not tell the user a branch, comment, PR, or merge is complete if `verification.verified` is not true; retry when appropriate or say the change was not verified.
 - For `merge_pr`, always display the PR title and target branch to the user before confirming.
 
 ---

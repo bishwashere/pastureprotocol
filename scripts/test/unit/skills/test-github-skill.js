@@ -10,6 +10,8 @@ import { join } from 'path';
 import { tmpdir, homedir } from 'os';
 import { executeGithub } from '../../../../lib/agent/executors/github.js';
 
+const githubExecutorSource = readFileSync(new URL('../../../../lib/agent/executors/github.js', import.meta.url), 'utf8');
+
 let passed = 0;
 let failed = 0;
 
@@ -195,6 +197,21 @@ await test('create_pr requires confirm:true', async () => {
   if (!liveToken) return;
   const result = await executeGithub({}, { repo: 'a/b', title: 'My PR', head: 'feat/x' }, 'github_create_pr');
   assertConfirmRequired(result);
+});
+
+await test('write actions include read-back verification metadata', async () => {
+  for (const expected of [
+    'verifyGithubMutation',
+    'read_after_create_branch',
+    'read_after_post_comment',
+    'read_after_create_pr',
+    'read_after_merge_pr',
+    'verification',
+  ]) {
+    if (!githubExecutorSource.includes(expected)) {
+      throw new Error(`Missing GitHub write verification marker: ${expected}`);
+    }
+  }
 });
 
 // merge_pr also requires confirm (API call needed to fetch PR title — skip if no token)

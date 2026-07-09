@@ -79,6 +79,15 @@ const checks = [
       policy.includes('current turn did not expose write tools'),
   },
   {
+    name: 'final policy requires filesystem/git persistence evidence',
+    ok: policy.includes('For filesystem or git changes') &&
+      policy.includes('post-action persistence evidence') &&
+      policy.includes('read/list/status check after the write') &&
+      policy.includes('Git/GitHub evidence') &&
+      policy.includes('retry with tools when available') &&
+      policy.includes('change was not verified'),
+  },
+  {
     name: 'final policy suppresses internal tool payloads',
     ok: policy.includes('Never include internal tool invocations') &&
       policy.includes('tool-call JSON') &&
