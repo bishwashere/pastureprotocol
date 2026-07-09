@@ -1666,13 +1666,6 @@ function renderSystemCronVariant(row) {
     })();
     var configToggleWired = false;
     var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
-    var CONFIG_LLM_AUTH_TYPES = [
-      { value: 'device_code', label: 'Login with subscription' },
-      { value: 'api_key', label: 'API key' },
-      { value: 'none', label: 'No auth (local)' },
-      { value: 'oauth', label: 'Advanced: browser OAuth' },
-      { value: 'bearer_token', label: 'Advanced: bearer token' }
-    ];
 
     function configNum(val, fallback) {
       var n = Number(val);
@@ -1786,11 +1779,12 @@ function renderSystemCronVariant(row) {
     function configModelAuth(model, index) {
       model = model || {};
       var provider = String(model.provider || '').toLowerCase();
-      var isLocal = provider === 'lmstudio' || provider === 'ollama';
-      var isSubscriptionLoginProvider = provider === 'grok' || provider === 'xai';
+      var isLocal = configIsLocalLlmProvider(provider);
+      var isSubscriptionLoginProvider = configIsSubscriptionLoginProvider(provider);
       if (model.auth && typeof model.auth === 'object') {
         var auth = JSON.parse(JSON.stringify(model.auth));
         auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
+        auth.type = configNormalizeAuthTypeForProvider(auth.type, provider);
         if (!auth.cache) auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
         return auth;
       }
@@ -1812,13 +1806,11 @@ function renderSystemCronVariant(row) {
       return hidden ? ' hidden' : '';
     }
 
-    function configAuthFieldsHtml(auth, index) {
+    function configAuthFieldsHtml(auth, index, provider) {
       auth = auth || { type: 'api_key' };
-      var type = String(auth.type || 'api_key').toLowerCase();
+      var type = configNormalizeAuthTypeForProvider(String(auth.type || 'api_key').toLowerCase(), provider);
       var typeSelect = '<div class="field"><label>Auth method</label><select data-f="authType">' +
-        CONFIG_LLM_AUTH_TYPES.map(function (item) {
-          return '<option value="' + item.value + '"' + (item.value === type ? ' selected' : '') + '>' + escapeHtml(item.label) + '</option>';
-        }).join('') +
+        configAuthOptionsHtml(provider, type) +
         '</select></div>';
       var apiFields =
         '<div class="field" data-auth-field="api"' + configHiddenAttr(configAuthFieldHidden(type, 'api')) + '><label>API key env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
@@ -1906,7 +1898,7 @@ function renderSystemCronVariant(row) {
           '</select></div></div>' +
           '<div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div>' +
           '<div class="field"><label>Base URL (local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(m.baseUrl || '') + '" placeholder="http://127.0.0.1:1234/v1"></div>' +
-          configAuthFieldsHtml(auth, i) +
+          configAuthFieldsHtml(auth, i, provider) +
           '<div class="form-row config-priority-row"><label><input type="radio" name="config-llm-priority" value="' + i + '"' + priorityChecked + '> Priority (use first)</label></div>' +
           '<button type="button" class="config-model-remove link-btn" data-remove-model="' + i + '">Remove model</button>' +
           '</div>';
@@ -2133,6 +2125,25 @@ function renderSystemCronVariant(row) {
           }
         });
       });
+      document.querySelectorAll('.config-model-card [data-f="provider"]').forEach(function (select) {
+        if (select.dataset.authWired) return;
+        select.dataset.authWired = '1';
+        select.addEventListener('change', function () {
+          var card = select.closest('.config-model-card');
+          if (!card) return;
+          var authSelect = card.querySelector('[data-f="authType"]');
+          if (!authSelect) return;
+          authSelect.innerHTML = configAuthOptionsHtml(select.value, authSelect.value);
+          var normalized = configNormalizeAuthTypeForProvider(authSelect.value, select.value);
+          authSelect.value = normalized;
+          var login = card.querySelector('.config-llm-login');
+          if (login) login.hidden = normalized !== 'oauth' && normalized !== 'device_code';
+          card.querySelectorAll('[data-auth-field]').forEach(function (field) {
+            var fieldType = field.getAttribute('data-auth-field');
+            field.hidden = configAuthFieldHidden(normalized, fieldType);
+          });
+        });
+      });
       document.querySelectorAll('.config-llm-login').forEach(function (btn) {
         if (btn.dataset.wired) return;
         btn.dataset.wired = '1';
@@ -2245,7 +2256,8 @@ function renderSystemCronVariant(row) {
         var authAuthorizationUrlEl = card.querySelector('[data-f="authAuthorizationUrl"]');
         var authTokenUrlEl = card.querySelector('[data-f="authTokenUrl"]');
         var authScopeEl = card.querySelector('[data-f="authScope"]');
-        var authType = authTypeEl ? authTypeEl.value : 'api_key';
+        var provider = providerEl ? providerEl.value.trim() || 'openai' : 'openai';
+        var authType = configNormalizeAuthTypeForProvider(authTypeEl ? authTypeEl.value : 'api_key', provider);
         var auth = { type: authType };
         if (authType === 'api_key') {
           auth.env = authEnvEl ? authEnvEl.value.trim() || 'LLM_1_API_KEY' : 'LLM_1_API_KEY';
@@ -2260,7 +2272,7 @@ function renderSystemCronVariant(row) {
           if (authScopeEl && authScopeEl.value.trim()) auth.scope = authScopeEl.value.trim();
         }
         var o = {
-          provider: providerEl ? providerEl.value.trim() || 'openai' : 'openai',
+          provider: provider,
           model: modelEl ? modelEl.value.trim() || 'gpt-4o' : 'gpt-4o',
           auth: auth,
         };
@@ -5076,4 +5088,37 @@ function renderSystemCronVariant(row) {
     var identityEditorCard = document.querySelector('#identity-editor-modal .modal-card');
     if (identityEditorCard) {
       identityEditorCard.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+    function configIsLocalLlmProvider(provider) {
+      var p = String(provider || '').toLowerCase();
+      return p === 'lmstudio' || p === 'ollama';
+    }
+
+    function configIsSubscriptionLoginProvider(provider) {
+      var p = String(provider || '').toLowerCase();
+      return p === 'grok' || p === 'xai';
+    }
+
+    function configAuthOptionsForProvider(provider, currentType) {
+      if (configIsLocalLlmProvider(provider)) {
+        return [{ value: 'none', label: 'No login (local)' }];
+      }
+      if (configIsSubscriptionLoginProvider(provider)) {
+        return [{ value: 'device_code', label: 'Browser login' }];
+      }
+      var options = [{ value: 'api_key', label: 'API key' }];
+      if (currentType === 'oauth') options.push({ value: 'oauth', label: 'Browser login' });
+      return options;
+    }
+
+    function configNormalizeAuthTypeForProvider(type, provider) {
+      var options = configAuthOptionsForProvider(provider, type);
+      return options.some(function (item) { return item.value === type; }) ? type : options[0].value;
+    }
+
+    function configAuthOptionsHtml(provider, type) {
+      var normalized = configNormalizeAuthTypeForProvider(type, provider);
+      return configAuthOptionsForProvider(provider, normalized).map(function (item) {
+        return '<option value="' + item.value + '"' + (item.value === normalized ? ' selected' : '') + '>' + escapeHtml(item.label) + '</option>';
+      }).join('');
     }
