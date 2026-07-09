@@ -357,15 +357,24 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       '--max-time', '900',
       '--retry', '3',
       '--retry-delay', '3',
+      '--write-out', '\n%{http_code}',
       '-H', 'Cache-Control: no-cache',
       url,
       '-o', tmpScript,
     ], {
       encoding: 'utf8',
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (curl.status !== 0) {
-      console.error('pasture: failed to fetch update script from GitHub.');
+      const curlOutput = String(curl.stdout || '');
+      const curlError = String(curl.stderr || '');
+      const statusMatch = curlOutput.match(/(?:^|\n)(\d{3})\s*$/);
+      const httpStatus = statusMatch ? statusMatch[1] : '';
+      if (httpStatus === '429' || /\b429\b/.test(curlError)) {
+        console.error('pasture: GitHub has rate limited the update download. Please try again after some time.');
+      } else {
+        console.error('pasture: failed to fetch update script from GitHub.');
+      }
       process.exit(1);
     }
     const child = spawn('bash', [tmpScript, '--force'], {

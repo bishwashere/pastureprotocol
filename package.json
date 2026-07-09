@@ -2,6 +2,7 @@
   "name": "pastureprotocol",
   "version": "2.0.0",
   "description": "Pasture Protocol — private local AI agent crew with missions, dashboard, and WhatsApp/Telegram.",
+  "license": "MIT",
   "bin": {
     "pasture": "./cli.js"
   },
