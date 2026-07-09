@@ -41,7 +41,11 @@ check('retry calls onAgentSkillError on failure', /tcRetryIsError[\s\S]{0,200}?o
 check('retry sets lastToolError on failure', /lastToolError\s*=\s*skillErrMsg/.test(block));
 check('retry sets lastRoundHadToolError on failure', /lastRoundHadToolError\s*=\s*true/.test(block));
 check('retry tracks lastToolResult on success', /lastToolResult\s*=\s*tcResult/.test(block));
-check('retry tracks write ops for post-write verification', /isWriteToolCall\(tcSkillId,\s*tc\.name\)/.test(block) && /writtenDirs\.add\(d\)/.test(block));
+check('retry tracks write ops for persistence verification', /isWriteToolCall\(tcSkillId,\s*tc\.name\)/.test(block) &&
+  /pendingPostWriteSynthesis\s*=\s*true/.test(block) &&
+  /collectWriteVerificationTargets\(tcSkillId,\s*tcRunArgs\)/.test(block) &&
+  /addWriteVerificationTarget\(writeVerificationTargets,\s*target\)/.test(block) &&
+  /addWriteVerificationTarget\(pendingWriteVerificationTargets,\s*target\)/.test(block));
 check('retry uses skillDocsInjected dedupe set (same as main loop)', /!skillDocsInjected\.has\(tcSkillId\)[\s\S]{0,300}?skillDocsInjected\.add\(tcSkillId\)/.test(block));
 check('Comment cites audit finding #10', /audit\s+finding\s+#10/i.test(agent));
 
