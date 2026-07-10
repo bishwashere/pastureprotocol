@@ -11,7 +11,7 @@ import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import readline from 'readline';
 import { runPm2DaemonAction } from './lib/util/daemon-pm2.js';
-import { getCurrentDaemonLogPath, getDailyDaemonLogPath } from './lib/util/daemon-log-path.js';
+import { ensureDailyDaemonLogFiles, getCurrentDaemonLogPath, getDailyDaemonLogPath } from './lib/util/daemon-log-path.js';
 import { getStateDir } from './lib/util/paths.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
@@ -219,6 +219,11 @@ function runDaemonAction(action) {
  * re-check, then continue.
  */
 async function runStartPreflight(action) {
+  if (IS_WIN) {
+    try {
+      ensureDailyDaemonLogFiles(getStateDir());
+    } catch (_) {}
+  }
   if (process.env.PASTURE_SKIP_PREFLIGHT === '1') return;
   console.log(`pasture: preflight checks before ${action}...`);
   let { results, hasFatal } = await runPreflight({ installDir: INSTALL_DIR });
