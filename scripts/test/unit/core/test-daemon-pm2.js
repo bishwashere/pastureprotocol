@@ -176,7 +176,10 @@ function checkWindowsPm2Quoting() {
   if (!src.includes('dailyLogPath') || !src.includes("'--output'")) {
     return { ok: false, detail: 'pm2 start must include daily output/error log paths' };
   }
-  return { ok: true, detail: 'pm2 args preserve Windows paths with spaces' };
+  if (!src.includes("pm2Args(['delete', PM2_NAME], env)") || src.includes("pm2Args(['restart', PM2_NAME], env)")) {
+    return { ok: false, detail: 'pm2 restart must recreate the process so log paths are refreshed' };
+  }
+  return { ok: true, detail: 'pm2 args preserve Windows paths and refresh log files on restart' };
 }
 
 function checkMissingInstallDir() {
