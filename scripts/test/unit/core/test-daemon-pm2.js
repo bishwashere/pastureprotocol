@@ -37,6 +37,9 @@ function checkCliUsesPm2OnWindows() {
   if (!src.includes('runPm2DaemonAction') || !src.includes('IS_WIN')) {
     return { ok: false, detail: 'cli.js missing win32 pm2 daemon routing' };
   }
+  if (!src.includes('ensureDailyDaemonLogFiles') || src.indexOf('ensureDailyDaemonLogFiles(getStateDir())') < src.indexOf('runPreflight')) {
+    return { ok: false, detail: 'cli.js must create Windows runtime logs before start preflight can abort' };
+  }
   if (!src.includes('update.ps1') || !src.includes('runWindowsUninstall')) {
     return { ok: false, detail: 'cli.js missing native Windows update/uninstall' };
   }
