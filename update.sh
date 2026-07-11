@@ -182,7 +182,18 @@ done
 echo "  ► Installing dependencies..."
 # Prefer pnpm (project uses it); avoid running npm over pnpm node_modules (causes "matches" error).
 rm -rf "$ROOT/node_modules"
-(cd "$ROOT" && (pnpm install --silent 2>/dev/null || npm install --silent 2>/dev/null || true))
+if command -v pnpm >/dev/null 2>&1; then
+  (cd "$ROOT" && pnpm install --silent)
+elif command -v npm >/dev/null 2>&1; then
+  (cd "$ROOT" && npm install --silent)
+else
+  echo "  ✖ Neither pnpm nor npm found. Install Node.js properly."
+  exit 1
+fi
+[ -f "$ROOT/node_modules/@openai/codex/bin/codex.js" ] || {
+  echo "  ✖ OpenAI browser-login runtime is missing after dependency install."
+  exit 1
+}
 
 # Record build id and show final version
 if [ -z "$AFTER_BUILD" ]; then

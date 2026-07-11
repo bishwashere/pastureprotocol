@@ -364,6 +364,10 @@ try {
         } else {
             Invoke-Native "npm install" { & $npmCmd install --silent }
         }
+        if (-not (Test-Path (Join-Path $Root "node_modules\@openai\codex\bin\codex.js"))) {
+            Write-Host "  [X] OpenAI browser-login runtime missing after install (@openai/codex)."
+            Exit-Update 1
+        }
     } finally {
         Pop-Location
     }

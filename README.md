@@ -293,13 +293,36 @@ When multiple models are configured, Pasture Protocol selects in this order:
 2. Local providers (`lmstudio`, `ollama`) - used next as a privacy-preserving fallback.
 3. Other cloud models - used in order of appearance as further fallbacks.
 
+### ChatGPT browser login
+
+In the dashboard, open **Config → LLM**, choose **OpenAI**, then choose
+**ChatGPT login**. Pasture opens the ChatGPT sign-in page immediately and shows
+**ChatGPT login complete** when the browser flow finishes. No client ID, token
+endpoint, authorization URL, scope, or token copy/paste is required.
+The OAuth callback uses Codex App Server's local success page, so no desktop
+`codex://` URL handler or Codex app installation is required.
+
+Browser login uses Codex-managed ChatGPT authentication and is stored as
+`"auth": { "type": "chatgpt" }`. Choose **API key** instead when you want
+usage billed through an OpenAI Platform API key. In browser-login mode, Codex
+automatically chooses a ChatGPT-compatible model; the Platform model name is
+only used when API-key auth is selected.
+
+Pasture runs Codex with a private `CODEX_HOME` at
+`~/.pasture/codex` (or `<PASTURE_STATE_DIR>/codex`) and forces file-based
+credential storage there. This keeps Pasture sign-in, sign-out, configuration,
+SQLite state, and ephemeral sessions separate from the user's normal
+`~/.codex` login. Pasture also ignores inherited Codex/OpenAI credentials for
+this child process. Model requests still count toward the signed-in ChatGPT
+account's Codex usage limits.
+
 ### Supported providers
 
 | Provider | `"provider"` value | Notes |
 |---|---|---|
 | LM Studio | `lmstudio` | Local; default `baseUrl`: `http://127.0.0.1:1234/v1` |
 | Ollama | `ollama` | Local; default `baseUrl`: `http://127.0.0.1:11434/v1` |
-| OpenAI | `openai` | Cloud; default model: `gpt-5.2` |
+| OpenAI | `openai` | Cloud; ChatGPT login or API key; default API model: `gpt-5.2` |
 | Anthropic | `anthropic` | Cloud; default model: `claude-sonnet-4-5-20250929` |
 | Grok / xAI | `grok` or `xai` | Cloud; default model: `grok-4-1-fast-reasoning` |
 | Together AI | `together` | Cloud; default model: `Llama-3.3-70B-Instruct-Turbo` |
