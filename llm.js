@@ -9,7 +9,13 @@ import { dirname, join } from 'path';
 import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/util/paths.js';
 import { DEFAULT_AGENT_ID } from './lib/agent/agent-config.js';
 import { beginLlmCall, endLlmCall, getActiveTrace } from './lib/util/request-timing.js';
-import { normalizeLlmAuth, hasUsableLlmAuth, resolveLlmAuthHeaders } from './lib/llm/auth.js';
+import {
+  normalizeLlmAuth,
+  hasUsableLlmAuth,
+  isCodexManagedChatgptAuth,
+  resolveLlmAuthHeaders,
+} from './lib/llm/auth.js';
+import { callCodexChatgpt } from './lib/llm/codex-provider.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -593,6 +599,28 @@ async function callOne(messages, opts, tools = null, dailyLimit = DEFAULT_DAILY_
     if (countUsage) checkAndTrackCloudLimit(dailyLimit);
   } else {
     checkLocalRateLimit(baseUrl, localRpm, getActiveTrace()?.id ?? null);
+  }
+
+  if (isCodexManagedChatgptAuth(opts?.auth, { provider: 'openai' })) {
+    const result = await callCodexChatgpt({ messages, tools });
+    const data = {
+      choices: [{
+        message: {
+          content: result.content || '',
+          tool_calls: result.toolCalls.map((call) => ({
+            id: call.id,
+            type: 'function',
+            function: { name: call.name, arguments: call.arguments },
+          })),
+        },
+      }],
+    };
+    return {
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(data),
+      text: () => Promise.resolve(JSON.stringify(data)),
+    };
   }
 
   const isAnthropic = (baseUrl || '').includes('anthropic.com');

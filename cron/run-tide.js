@@ -13,6 +13,7 @@ import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/util/paths
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
+import { closeCodexAppServerClient } from '../lib/llm/codex-app-server.js';
 import { getSchedulingTimeContext } from '../lib/util/timezone.js';
 import { buildOneOnOneSystemPrompt } from '../lib/agent/system-prompt.js';
 import { buildSessionBootstrapContext } from '../lib/agent/session-bootstrap.js';
@@ -34,7 +35,8 @@ async function main() {
   const jid = payload.jid && String(payload.jid).trim();
   if (!jid) {
     process.stdout.write(JSON.stringify({ error: 'jid required' }) + '\n');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const storePath = payload.storePath && String(payload.storePath).trim() || getCronStorePath();
   const workspaceDir = payload.workspaceDir && String(payload.workspaceDir).trim() || getWorkspaceDir();
@@ -66,7 +68,12 @@ async function main() {
   process.stdout.write(JSON.stringify({ textToSend: textToSend || '' }) + '\n');
 }
 
-main().catch((err) => {
-  process.stdout.write(JSON.stringify({ error: err.message || String(err) }) + '\n');
-  process.exit(1);
-});
+await main()
+  .catch((err) => {
+    process.stdout.write(JSON.stringify({ error: err.message || String(err) }) + '\n');
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    // This is a one-shot process; do not leave the shared Codex child alive after output.
+    try { await closeCodexAppServerClient(); } catch (_) {}
+  });

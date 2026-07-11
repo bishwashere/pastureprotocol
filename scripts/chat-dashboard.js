@@ -15,6 +15,7 @@ import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
+import { closeCodexAppServerClient } from '../lib/llm/codex-app-server.js';
 import { routeTurn, turnRouteToSystemBlock, buildCasualChatTurnRoute } from '../lib/agent/turn-router.js';
 import { classifyTurnIntent, buildCasualPlanFromTurnIntent } from '../lib/agent/turn-intent.js';
 import { isNonTaskMessage } from '../lib/agent/evaluate-team-capability.js';
@@ -93,7 +94,8 @@ async function main() {
   loadAgentConfig(agentId);
   if (!message) {
     writeNdjsonLine({ type: 'error', error: 'message is required' });
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   // Append voice hint so the agent knows to reply as voice when available
   if (voiceInput) {
@@ -436,8 +438,11 @@ async function main() {
     writeNdjsonLine({ type: 'done', reply, ...(speakText ? { voiceReplyText: speakText } : {}) });
   } catch (err) {
     writeNdjsonLine({ type: 'error', error: err.message || String(err) });
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
-main();
+await main().finally(async () => {
+  // Dashboard chat runs in a disposable child; close its shared Codex transport before exit.
+  try { await closeCodexAppServerClient(); } catch (_) {}
+});

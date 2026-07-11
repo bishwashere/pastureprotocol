@@ -134,7 +134,7 @@ echo ""
 install_deps() {
   echo "  ► Installing dependencies..."
 
-  if [ -d node_modules ] && [ -d node_modules/dotenv ]; then
+  if [ -d node_modules ] && [ -d node_modules/dotenv ] && [ -f node_modules/@openai/codex/bin/codex.js ]; then
     ok "  ✓ Dependencies already installed."
     return
   fi
@@ -145,6 +145,11 @@ install_deps() {
     npm install
   else
     echo "  ✖ Neither pnpm nor npm found. Install Node.js properly."
+    exit 1
+  fi
+
+  if [ ! -f node_modules/@openai/codex/bin/codex.js ]; then
+    echo "  ✖ OpenAI browser-login runtime is missing after dependency install."
     exit 1
   fi
 

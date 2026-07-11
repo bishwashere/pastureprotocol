@@ -623,7 +623,8 @@ node "$InstallDir\cli.js" %*
     Push-Location $InstallDir
     try {
         $hasDotenv = Test-Path (Join-Path $InstallDir "node_modules\dotenv")
-        if ($hasDotenv) {
+        $hasCodex = Test-Path (Join-Path $InstallDir "node_modules\@openai\codex\bin\codex.js")
+        if ($hasDotenv -and $hasCodex) {
             Write-Host "  [OK] Dependencies already installed." -ForegroundColor Cyan
         } else {
             if (Test-Path (Join-Path $InstallDir "node_modules")) {
@@ -640,6 +641,10 @@ node "$InstallDir\cli.js" %*
         }
         if (-not (Test-Path (Join-Path $InstallDir "node_modules\dotenv"))) {
             Write-Host "  [X] Dependencies missing after install (node_modules/dotenv)."
+            Exit-Install 1
+        }
+        if (-not (Test-Path (Join-Path $InstallDir "node_modules\@openai\codex\bin\codex.js"))) {
+            Write-Host "  [X] OpenAI browser-login runtime missing after install (@openai/codex)."
             Exit-Install 1
         }
     } finally {

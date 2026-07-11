@@ -11,6 +11,7 @@ import { getEnvPath, getCronStorePath, getWorkspaceDir } from '../lib/util/paths
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
+import { closeCodexAppServerClient } from '../lib/llm/codex-app-server.js';
 import { getTimezoneContextLine } from '../lib/util/timezone.js';
 import { runConditionalJob } from './conditional.js';
 
@@ -36,7 +37,8 @@ async function main() {
   const jid = payload.jid && String(payload.jid).trim();
   if (!message || !jid) {
     console.error(JSON.stringify({ error: 'message and jid required' }));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const storePath = payload.storePath && String(payload.storePath).trim() || getCronStorePath();
   const workspaceDir = payload.workspaceDir && String(payload.workspaceDir).trim() || getWorkspaceDir();
@@ -61,8 +63,13 @@ async function main() {
   process.stdout.write(JSON.stringify({ textToSend }) + '\n');
 }
 
-main().catch((err) => {
-  // Write error as JSON to stdout so parent can parse it; stderr may have noisy logs from deps
-  process.stdout.write(JSON.stringify({ error: err.message || String(err) }) + '\n');
-  process.exit(1);
-});
+await main()
+  .catch((err) => {
+    // Write error as JSON to stdout so parent can parse it; stderr may have noisy logs from deps
+    process.stdout.write(JSON.stringify({ error: err.message || String(err) }) + '\n');
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    // This is a one-shot process; do not leave the shared Codex child alive after output.
+    try { await closeCodexAppServerClient(); } catch (_) {}
+  });

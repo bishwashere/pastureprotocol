@@ -260,7 +260,11 @@ function migrateFromRoot() {
 
 function ensureInstall() {
   const nodeModules = join(ROOT, 'node_modules');
-  if (!existsSync(nodeModules) || !existsSync(join(nodeModules, '@whiskeysockets', 'baileys'))) {
+  const requiredDependencies = [
+    join(nodeModules, '@whiskeysockets', 'baileys'),
+    join(nodeModules, '@openai', 'codex', 'bin', 'codex.js'),
+  ];
+  if (!existsSync(nodeModules) || requiredDependencies.some((path) => !existsSync(path))) {
     const pm = getPackageManager();
     section('Installing dependencies');
     console.log('  Running: ' + pm + ' install');
@@ -269,6 +273,10 @@ function ensureInstall() {
     if (res.status !== 0) {
       console.error('  ' + pm + ' install failed.');
       process.exit(res.status ?? 1);
+    }
+    if (requiredDependencies.some((path) => !existsSync(path))) {
+      console.error('  Required dependencies are still missing after install.');
+      process.exit(1);
     }
     console.log('');
     console.log(statusOk('  ✓ Dependencies ready.'));

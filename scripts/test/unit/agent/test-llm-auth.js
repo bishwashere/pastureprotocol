@@ -13,8 +13,11 @@ try {
     beginDeviceCodeLogin,
     completeDeviceCodeLogin,
     getLlmAuthStatus,
+    hasUsableLlmAuth,
+    isCodexManagedChatgptAuth,
     normalizeLlmAuth,
     readLlmAuthToken,
+    resolveLlmAuthHeaders,
     writeLlmAuthToken,
   } = authMod;
 
@@ -25,6 +28,27 @@ try {
 
   delete process.env.LLM_1_API_KEY;
   assert.strictEqual(getLlmAuthStatus(legacy).configured, false);
+
+  const chatgpt = normalizeLlmAuth({
+    provider: 'openai',
+    auth: {
+      type: 'chatgpt',
+      cache: 'must-not-be-used',
+      clientId: 'must-not-be-used',
+      authorizationUrl: 'https://example.test/authorize',
+      tokenUrl: 'https://example.test/token',
+    },
+  }, 0);
+  assert.deepStrictEqual(chatgpt, { type: 'chatgpt', provider: 'openai' });
+  assert.strictEqual(isCodexManagedChatgptAuth(chatgpt, { provider: 'openai' }), true);
+  assert.strictEqual(hasUsableLlmAuth(chatgpt, { provider: 'openai' }), true);
+  assert.deepStrictEqual(await resolveLlmAuthHeaders(chatgpt, { provider: 'openai' }), {});
+  assert.deepStrictEqual(getLlmAuthStatus(chatgpt), {
+    type: 'chatgpt',
+    configured: false,
+    managed: 'codex',
+    label: 'ChatGPT browser login',
+  });
 
   const local = normalizeLlmAuth({ provider: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1' }, 0);
   assert.strictEqual(local.type, 'none');
