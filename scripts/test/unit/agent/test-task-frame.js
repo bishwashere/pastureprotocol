@@ -102,6 +102,11 @@ async function main() {
   assert(route.mustUseTool === true, 'fast path route requires a tool');
   assert(route.skills.includes('apply-patch'), 'route uses stored frame tools');
   assert(taskFrameToSystemBlock(frame, cont.decision).includes('Active Task Frame'), 'system block is generated');
+  assert(taskFrameToSystemBlock({ ...frame, status: 'blocked' }, cont.decision).includes('Status: blocked'), 'system block includes frame status');
+  assert(
+    taskFrameToSystemBlock({ ...frame, status: 'blocked' }, cont.decision).includes('historical context'),
+    'system block tells the agent not to repeat stale blockers'
+  );
 
   const updated = updateTaskFrameAfterTurn(logKey, {
     userText: 'done?',
@@ -115,6 +120,9 @@ async function main() {
   assert(getActiveTaskFrame(logKey) === null, 'closed frame is not active');
 
   const { classifyTaskFrameStatusAfterTurn } = await import('../../../../lib/context/task-frame.js');
+  const statusPrompt = loadPrompt('task-frame-status');
+  assert(statusPrompt.includes('after only read/inspection skills'), 'status prompt guards against unsupported read-only blockers');
+
   const status = await classifyTaskFrameStatusAfterTurn({
     frame,
     userText: 'is it done?',

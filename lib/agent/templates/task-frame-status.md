@@ -19,7 +19,8 @@ Return ONLY valid JSON. No prose, no markdown fences.
 - Do not mark `completed` merely because the user asked "Done?" and the assistant replied yes.
 - Do not mark `completed` when the reply says status is still todo, progress is 0%, no patch/write occurred, work is next, or the turn only inspected/read state.
 - For code, repo, project, or feature work, prefer `continue` unless the skills called and assistant reply show that the requested implementation/tracking action actually happened.
-- Use `blocked` for hard blockers.
+- Use `blocked` for hard blockers that are supported by current-turn evidence, such as a failed relevant tool call, missing dependency, or unavailable capability.
+- Do not mark a frame `blocked` just because the assistant claimed read-only or missing access after only read/inspection skills. If no relevant write-capable skill was attempted, prefer `continue` unless the reply identifies a specific unavailable capability.
 - Use `mismatch` when the active frame no longer matches the user's intent.
 - Use `waiting_user` when the next useful step requires user input.
 
