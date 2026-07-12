@@ -18,6 +18,8 @@ async function main() {
   assert(prompt.includes('never downgrade implementation requests to read-only self-inspection'),
     'prompt preserves implementation tools');
   assert(prompt.includes('Task Frames'), 'prompt covers task frames');
+  assert(prompt.includes('command-execution/package-manager capability'),
+    'prompt distinguishes package-manager commands from filesystem writes');
 
   const availableSkillIds = ['read', 'go-read', 'write', 'edit', 'apply-patch', 'project-workflow', 'agent-send', 'search'];
   const implementationPlan = await planUnifiedTurn({

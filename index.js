@@ -1966,7 +1966,7 @@ async function main() {
       logFlow(FLOW_STEP.RETRY, '[code-write] retrying because code route completed without a write operation');
       const writeRecoveryPrompt = systemPromptWithPlan +
         '\n\n--- Code Write Requirement ---\n' +
-        'This turn was routed as code implementation with write-capable tools available. If the requested change is feasible, call an available write/patch/edit tool before final answering. If no write is possible after tool-backed inspection, answer with the concrete blocker. Do not output a proposed tool call or patch payload as chat text.\n' +
+        'This turn was routed as code implementation with write-capable tools available. If the requested change is feasible, call an available write/patch/edit tool before final answering. If no write is possible after tool-backed inspection, answer with the concrete blocker. Do not claim read-only access merely because an earlier task frame or chat message mentioned missing access; current write tools are available, so only report an access blocker after a current write/patch/edit attempt fails or tool evidence proves the path is unwritable. Do not output a proposed tool call or patch payload as chat text.\n' +
         '---';
       turnResult = await traceAsyncStep('planned_code_write_retry', () => runAgentTurn({
         userText: text,

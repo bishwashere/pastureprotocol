@@ -105,6 +105,9 @@ async function main() {
   if (!routerPrompt.includes('write`, `edit`, `go-write`, or `apply-patch`')) {
     throw new Error('turn-router prompt must tell implementation turns to include write-capable skills');
   }
+  if (!routerPrompt.includes('command-execution/package-manager capability')) {
+    throw new Error('turn-router prompt must distinguish package-manager commands from filesystem writes');
+  }
 
   const weatherPhrasings = [
     'Hows the weather today',

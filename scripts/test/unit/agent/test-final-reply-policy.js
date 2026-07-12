@@ -76,7 +76,10 @@ const checks = [
     name: 'final policy prevents ungrounded progress claims',
     ok: policy.includes('Do not claim that code was written') &&
       policy.includes('no write-capable tool was available in this turn') &&
-      policy.includes('current turn did not expose write tools'),
+      policy.includes('current turn did not expose write tools') &&
+      policy.includes('command-execution/package-manager tool was available') &&
+      policy.includes('do not describe it as read-only filesystem access') &&
+      policy.includes('write-capable tools were available'),
   },
   {
     name: 'final policy requires filesystem/git persistence evidence',

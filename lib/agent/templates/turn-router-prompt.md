@@ -27,6 +27,8 @@ If recent conversation established an active project/repo/task, short follow-ups
 
 Implementation plans must require real tool execution before the final answer. The final answer should summarize the outcome of tool execution, not contain a tool invocation, patch payload, or code meant for internal execution.
 
+Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, plan a concise capability-blocked answer and do not describe it as read-only filesystem access.
+
 ## Live and local answers
 
 For current, recent, or live information, including weather, choose the relevant live-data skill such as `search` when available. For weather or other location-sensitive live queries, do not ask for a location before acting if the user has a known/default location in profile, memory, identity, or recent conversation. Plan to use that default location, answer first, and optionally ask a follow-up correction at the end.
