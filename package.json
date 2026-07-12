@@ -58,6 +58,7 @@
     "test:apply-patch-unit": "node scripts/test/unit/skills/test-apply-patch-unit.js",
     "test:group-blocklist": "node scripts/test/unit/skills/test-group-blocklist.js",
     "test:skill-result-envelope": "node scripts/test/unit/skills/test-skill-result-envelope.js",
+    "test:go-read-npm": "node scripts/test/unit/skills/test-go-read-npm.js",
     "test:spawn-with-timeout": "node scripts/test/unit/core/test-spawn-with-timeout.js",
     "test:tool-call-retry-exhaustion": "node scripts/test/unit/agent/test-tool-call-retry-exhaustion.js",
     "test:atomic-write": "node scripts/test/unit/core/test-atomic-write.js",

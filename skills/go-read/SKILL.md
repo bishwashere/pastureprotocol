@@ -1,12 +1,12 @@
 ---
 id: go-read
 name: Go read
-description: Read and inspect local filesystem resources. Commands: ls, find, cd, pwd, cat, less, du, json, sql, sql_schema, dashboard_url. Use for listing directories, finding files, disk usage, showing file contents, structured JSON summaries, read-only SQLite queries, resolving paths and Pasture dashboard URLs. Structured reads surface primary text/label/value and measure fields before transient metadata like ids and paths. Enable in config (skills.enabled).
+description: Read and inspect local filesystem resources and run npm package commands. Commands: ls, find, cd, pwd, cat, less, du, json, sql, sql_schema, dashboard_url, npm. Use for listing directories, finding files, disk usage, showing file contents, structured JSON summaries, read-only SQLite queries, npm install/test/build/script commands, resolving paths and Pasture dashboard URLs. Structured reads surface primary text/label/value and measure fields before transient metadata like ids and paths. Enable in config (skills.enabled).
 ---
 
 # Go read
 
-Read-only local inspection commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, and query SQLite databases without modifying them. Filesystem commands are implemented by Pasture directly; do not treat them as raw shell access.
+Local inspection commands and npm package-manager commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, query SQLite databases, and run project npm commands. Filesystem commands are implemented by Pasture directly; do not treat them as raw shell access.
 
 Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.action** to the command name. Set **arguments.argv** to an array of arguments (e.g. paths, flags).
 
@@ -23,10 +23,11 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 - **sql_schema** - Inspect a SQLite database before writing SQL. Defaults to Pasture memory index `~/.pasture/memory/index.db` when no path is provided. Returns tables, columns, create SQL, and small sample rows. Arguments: **path** optional, **sampleRows** optional.
 - **sql** - Run a read-only SQL query against a SQLite database. Defaults to Pasture memory index `~/.pasture/memory/index.db` when no path is provided. The executor loads available SQLite extensions such as sqlite-vec and enforces read-only/query-only mode. Arguments: **path** optional, **sql** or **query** required, **params** optional, **maxRows** or **limit** optional.
 - **dashboard_url** - Resolve Pasture dashboard base URL or a route URL from process env, `~/.pasture/.env`, optional dashboard config, then source defaults. Use before probing Pasture UI routes such as `/brain`. Argument: **route** optional, e.g. `"/brain"`.
+- **npm** - Run npm package-manager commands in a project directory. argv examples: `["install"]`, `["test"]`, `["run", "build"]`, `["run", "dev"]`, `["create", "vite@latest", "my-app", "--", "--template", "react"]`. Set **arguments.cwd** to the target project directory. This command may modify `package-lock.json`, `node_modules`, build artifacts, or generated project files. It returns command output and is not a background process manager; long-running dev servers may time out unless the surrounding runtime manages them separately.
 
 ## Arguments
 
-- **arguments.command** or **arguments.action** (required) - One of: ls, find, cd, pwd, cat, less, du, json, sql_schema, sql, dashboard_url
+- **arguments.command** or **arguments.action** (required) - One of: ls, find, cd, pwd, cat, less, du, json, sql_schema, sql, dashboard_url, npm
 - **arguments.argv** (required) - Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) - Working directory. Defaults to workspace.
 - **arguments.route** (optional) - For dashboard_url only, a dashboard route such as `/brain`.
@@ -39,7 +40,7 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 
 ## When to use
 
-Use when the user asks to list a directory, find files, show disk usage (du), show file contents (cat/less), inspect a SQLite DB, count database rows, or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "find files", "what's in Downloads", "cat this file", "how big is this folder", "what tables are in this DB", etc.
+Use when the user asks to list a directory, find files, show disk usage (du), show file contents (cat/less), inspect a SQLite DB, count database rows, resolve a path, install dependencies, create an npm-based project, or run npm scripts. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "find files", "what's in Downloads", "cat this file", "how big is this folder", "what tables are in this DB", "run npm install", etc.
 
 ## SQL reasoning policy
 
@@ -74,7 +75,7 @@ List Downloads:
 
 ```tool-schema
 go_read_run
-  description: Run a read-only local inspection command. Set command to ls, find, cd, pwd, cat, less, du, json, sql_schema, or sql; never set command to go_read_run. argv is only for filesystem commands. For json, provide path or argv[0] plus optional maxItems; it returns primaryData arrays with text/label/value and weights/ranks before metadata. For sql_schema, provide optional path/sampleRows. For sql, provide sql/query and optional path/params/maxRows. Structured rows surface primary fields before transient metadata such as ids, paths, chunks, embeddings, and vectors. For top Brain items/words/nodes/terms, do not query chunks for ids/paths/stopwords; run find on ~/.pasture/brain-response-cache with -name *.json because filenames are hashes, use exact returned paths only, prefer larger v2 files, call json on candidates until payload.terms or payload.denseTerms is non-empty, then use the text labels.
+  description: Run a local inspection or npm package command. Set command to ls, find, cd, pwd, cat, less, du, json, sql_schema, sql, or npm; never set command to go_read_run. argv is for filesystem and npm commands. For npm, set argv to npm arguments such as ["install"], ["test"], or ["run", "build"] and set cwd to the project directory. For json, provide path or argv[0] plus optional maxItems; it returns primaryData arrays with text/label/value and weights/ranks before metadata. For sql_schema, provide optional path/sampleRows. For sql, provide sql/query and optional path/params/maxRows. Structured rows surface primary fields before transient metadata such as ids, paths, chunks, embeddings, and vectors. For top Brain items/words/nodes/terms, do not query chunks for ids/paths/stopwords; run find on ~/.pasture/brain-response-cache with -name *.json because filenames are hashes, use exact returned paths only, prefer larger v2 files, call json on candidates until payload.terms or payload.denseTerms is non-empty, then use the text labels.
   parameters:
     command: string
     argv: array
