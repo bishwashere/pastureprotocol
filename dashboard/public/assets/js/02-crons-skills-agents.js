@@ -1812,7 +1812,7 @@ function renderSystemCronVariant(row) {
         '<div class="field" data-auth-field="api"' + configHiddenAttr(configAuthFieldHidden(type, 'api')) + '><label>API key env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
         '<div class="field" data-auth-field="bearer"' + configHiddenAttr(configAuthFieldHidden(type, 'bearer')) + '><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
       var oauthFields =
-        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Login once</button>';
+        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Connect</button>';
       return typeSelect + apiFields + oauthFields;
     }
 
