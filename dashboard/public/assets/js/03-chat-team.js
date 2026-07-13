@@ -263,7 +263,7 @@
       var nh = layout.nodeH || T_NODE_H;
       var defs = '<defs>' +
         '<marker id="' + markerPrefix + '-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
-          '<polygon points="0 0, 7 3, 0 6" fill="#a78bfa" opacity="0.8"/>' +
+          '<polygon points="0 0, 7 3, 0 6" fill="#00ffff" opacity="0.8"/>' +
         '</marker>' +
         '<marker id="' + markerPrefix + '-tree-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
           '<polygon points="0 0, 7 3, 0 6" fill="#71717a" opacity="0.95"/>' +
@@ -274,7 +274,7 @@
       '</defs>';
       var shapes = [];
 
-      // Outbound delegation (purple) + reply return (green). No grey org-tree connectors.
+      // Outbound delegation (cyan) + reply return (green). No grey org-tree connectors.
       (agents || []).forEach(function(a) {
         var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
         if (!allow.length) return;

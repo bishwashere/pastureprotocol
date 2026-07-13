@@ -8,7 +8,7 @@
   width: 1.68rem;
   height: 1.68rem;
   border-radius: 50%;
-  background: rgba(167,139,250,0.18);
+  background: rgba(0, 255, 255,0.18);
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -100,7 +100,7 @@
 
 .mc-agents-subtab.active {
   color: #fff;
-  background: rgba(167, 139, 250, 0.24);
+  background: rgba(0, 255, 255, 0.24);
 }
 
 .mc-agents-subpanel {
@@ -115,7 +115,7 @@
   gap: 0.45rem;
   min-height: 0;
   padding-top: 0.2rem;
-  border-top: 1px solid rgba(99, 102, 241, 0.16);
+  border-top: 1px solid rgba(8, 145, 178, 0.16);
 }
 
 .mc-agents-workspace-grid {
@@ -139,7 +139,7 @@
 .mc-agents-workspace-head {
   flex: 0 0 auto;
   padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.14);
+  border-bottom: 1px solid rgba(8, 145, 178, 0.14);
 }
 
 .mc-agents-workspace-head .mc-section-title {
@@ -240,7 +240,7 @@
 .mc-agent-avatar {
   background:
     radial-gradient(circle at 38% 30%, rgba(251, 191, 36, 0.4), transparent 0.5rem),
-    linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(30, 64, 175, 0.85));
+    linear-gradient(135deg, rgba(0, 255, 255, 0.85), rgba(8, 145, 178, 0.85));
   color: #fff;
 }
 
@@ -283,7 +283,7 @@
   position: absolute;
   right: 0.65rem;
   bottom: 0.36rem;
-  color: #60a5fa;
+  color: #67e8f9;
   opacity: 0.35;
   letter-spacing: -0.12em;
 }
@@ -328,7 +328,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow:
     0 0 0 2px rgba(15, 23, 42, 0.82),
-    0 0 15px rgba(124, 58, 237, 0.28);
+    0 0 15px rgba(0, 255, 255, 0.28);
 }
 
 @media (max-width: 1180px) {

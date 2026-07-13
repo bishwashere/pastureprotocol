@@ -1665,11 +1665,6 @@ function renderSystemCronVariant(row) {
       try { return localStorage.getItem('pasture-config-section') || 'general'; } catch (_) { return 'general'; }
     })();
     var configToggleWired = false;
-    var configLlmLoginInFlight = {};
-    var configSavedNoticeTimer = null;
-    var CONFIG_LLM_LOGIN_POLL_MS = 3000;
-    var CONFIG_LLM_LOGIN_MAX_POLLS = 120;
-    var CONFIG_LLM_POPUP_CHECK_MS = 250;
     var CONFIG_LLM_PROVIDERS = ['lmstudio', 'ollama', 'openai', 'anthropic', 'grok', 'xai', 'together', 'deepseek'];
 
     function configNum(val, fallback) {
@@ -1788,14 +1783,8 @@ function renderSystemCronVariant(row) {
       if (model.auth && typeof model.auth === 'object') {
         var auth = JSON.parse(JSON.stringify(model.auth));
         auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
-        if (provider === 'openai' && auth.type === 'codex_chatgpt') auth.type = 'chatgpt';
-        if (provider === 'openai' && auth.type === 'oauth' && !configHasCustomOAuthSettings(auth)) {
-          auth.type = 'chatgpt';
-        }
         auth.type = configNormalizeAuthTypeForProvider(auth.type, provider);
-        if (auth.type !== 'chatgpt' && !auth.cache) {
-          auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
-        }
+        if (!auth.cache) auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
         return auth;
       }
       if (model.apiKey) return { type: 'api_key', env: model.apiKey };
@@ -1806,10 +1795,6 @@ function renderSystemCronVariant(row) {
     function configAuthFieldHidden(type, fieldType) {
       if (fieldType === 'api') return type !== 'api_key';
       if (fieldType === 'bearer') return type !== 'bearer_token';
-      if (fieldType === 'cache') return type !== 'oauth' && type !== 'device_code';
-      if (fieldType === 'oauth') return type !== 'oauth';
-      if (fieldType === 'login') return type !== 'oauth' && type !== 'device_code';
-      if (fieldType === 'chatgpt') return type !== 'chatgpt';
       return false;
     }
 
@@ -1827,20 +1812,8 @@ function renderSystemCronVariant(row) {
         '<div class="field" data-auth-field="api"' + configHiddenAttr(configAuthFieldHidden(type, 'api')) + '><label>API key env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
         '<div class="field" data-auth-field="bearer"' + configHiddenAttr(configAuthFieldHidden(type, 'bearer')) + '><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
       var oauthFields =
-        '<div class="field" data-auth-field="cache"' + configHiddenAttr(configAuthFieldHidden(type, 'cache')) + '><label>Login name</label><input type="text" data-f="authCache" value="' + escapeHtml(auth.cache || auth.account || ('llm-' + (index + 1))) + '" placeholder="grok-main"></div>' +
-        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth client ID</label><input type="text" data-f="authClientId" value="' + escapeHtml(auth.clientId || '') + '" placeholder="client id"></div>' +
-        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth authorize URL</label><input type="text" data-f="authAuthorizationUrl" value="' + escapeHtml(auth.authorizationUrl || '') + '" placeholder="https://provider.example/oauth/authorize"></div>' +
-        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth token URL</label><input type="text" data-f="authTokenUrl" value="' + escapeHtml(auth.tokenUrl || '') + '" placeholder="https://provider.example/oauth/token"></div>' +
-        '<div class="field" data-auth-field="oauth"' + configHiddenAttr(configAuthFieldHidden(type, 'oauth')) + '><label>OAuth scope</label><input type="text" data-f="authScope" value="' + escapeHtml(auth.scope || (Array.isArray(auth.scopes) ? auth.scopes.join(' ') : '')) + '" placeholder="openid profile"></div>' +
-        '<div data-auth-field="login"' + configHiddenAttr(configAuthFieldHidden(type, 'login')) + '>' +
-        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '">Login once</button></div>';
-      var chatGptFields =
-        '<div class="field config-llm-chatgpt-auth" data-auth-field="chatgpt"' + configHiddenAttr(configAuthFieldHidden(type, 'chatgpt')) + '>' +
-        '<label>OpenAI account</label>' +
-        '<div class="form-row"><span class="skill-meta config-llm-auth-status" data-chatgpt-status="' + index + '" data-state="checking">Checking connection…</span>' +
-        '<button type="button" class="config-llm-login config-llm-chatgpt-login link-btn" data-login-model="' + index + '">Sign in</button></div>' +
-        '</div>';
-      return typeSelect + apiFields + oauthFields + chatGptFields;
+        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Login once</button>';
+      return typeSelect + apiFields + oauthFields;
     }
 
     function configTileCard(title, bodyHtml, wide) {
@@ -2090,219 +2063,29 @@ function renderSystemCronVariant(row) {
       setConfigSection(activeSection);
       renderConfigAgentsList();
       wireConfigUiActions();
-      refreshConfigLlmAuthStatus();
       if (tideChecklistCache) renderTideChecklistItems(tideChecklistCache.items || []);
     }
 
-    function configModelCardIndex(card) {
-      if (!card) return -1;
-      var value = card.getAttribute('data-config-model');
-      return value == null ? -1 : Number(value);
-    }
-
-    function configModelCardUsesChatGpt(card) {
-      if (!card) return false;
-      var provider = card.querySelector('[data-f="provider"]');
-      var authType = card.querySelector('[data-f="authType"]');
-      return String(provider && provider.value || '').toLowerCase() === 'openai' &&
-        String(authType && authType.value || '').toLowerCase() === 'chatgpt';
-    }
-
-    function syncConfigModelAuthUi(card, type) {
-      if (!card) return;
-      card.querySelectorAll('[data-auth-field]').forEach(function (field) {
-        var fieldType = field.getAttribute('data-auth-field');
-        field.hidden = configAuthFieldHidden(type, fieldType);
-      });
-    }
-
-    function clearConfigSavedNotice() {
-      if (configSavedNoticeTimer) clearTimeout(configSavedNoticeTimer);
-      configSavedNoticeTimer = null;
-      var savedEl = document.getElementById('config-saved');
-      if (savedEl) savedEl.style.display = 'none';
-    }
-
-    function showConfigSavedNotice(message, hideAfterMs) {
-      clearConfigSavedNotice();
-      var savedEl = document.getElementById('config-saved');
-      if (!savedEl) return;
-      savedEl.textContent = message || 'Saved.';
-      savedEl.style.display = 'inline';
-      if (hideAfterMs) {
-        configSavedNoticeTimer = setTimeout(function () {
-          savedEl.style.display = 'none';
-          configSavedNoticeTimer = null;
-        }, hideAfterMs);
+    async function runConfigLlmBrowserLogin(modelIndex, opts) {
+      opts = opts || {};
+      var savedEl = opts.savedEl || document.getElementById('config-saved');
+      var errEl = opts.errEl || document.getElementById('config-error');
+      if (savedEl && !opts.keepSavedMessage) savedEl.style.display = 'none';
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
       }
-    }
-
-    function clearConfigLlmError() {
-      var errEl = document.getElementById('config-error');
-      if (!errEl) return;
-      errEl.style.display = 'none';
-      errEl.textContent = '';
-    }
-
-    function showConfigLlmError(message) {
-      clearConfigSavedNotice();
-      var errEl = document.getElementById('config-error');
-      if (!errEl) return;
-      errEl.textContent = message || 'Login failed. Try again.';
-      errEl.style.display = 'inline';
-    }
-
-    function setConfigChatGptStatus(modelIndex, state, message) {
-      var card = document.querySelector('.config-model-card[data-config-model="' + modelIndex + '"]');
-      if (!card) return;
-      var status = card.querySelector('[data-chatgpt-status]');
-      var button = card.querySelector('.config-llm-chatgpt-login');
-      if (status) {
-        status.dataset.state = state || 'disconnected';
-        status.textContent = message || 'Not connected';
-      }
-      if (button) {
-        if (state === 'connected') button.textContent = 'Sign in again';
-        else if (state === 'failed') button.textContent = 'Try again';
-        else button.textContent = 'Sign in';
-      }
-    }
-
-    function setConfigLlmLoginBusy(modelIndex, busy) {
-      var card = document.querySelector('.config-model-card[data-config-model="' + modelIndex + '"]');
-      if (!card) return;
-      card.querySelectorAll('[data-f="provider"], [data-f="authType"], .config-llm-login').forEach(function (control) {
-        control.disabled = !!busy;
-      });
-      if (busy && configModelCardUsesChatGpt(card)) {
-        setConfigChatGptStatus(modelIndex, 'pending', 'Waiting for OpenAI sign-in…');
-      }
-    }
-
-    function configChatGptAuthIsConnected(item) {
-      var auth = item && item.auth;
-      return !!(auth && String(auth.type || '').toLowerCase() === 'chatgpt' && auth.configured);
-    }
-
-    async function refreshConfigLlmAuthStatus() {
       try {
-        var r = await fetch(API + '/api/llm-auth/status');
-        var d = await r.json().catch(function () { return {}; });
-        if (!r.ok) throw new Error('Status unavailable');
-        var models = Array.isArray(d.models) ? d.models : [];
-        document.querySelectorAll('.config-model-card').forEach(function (card) {
-          var index = configModelCardIndex(card);
-          if (!configModelCardUsesChatGpt(card) || configLlmLoginInFlight[index]) return;
-          var item = models.find(function (entry) { return Number(entry && entry.index) === index; });
-          var connected = configChatGptAuthIsConnected(item);
-          setConfigChatGptStatus(index, connected ? 'connected' : 'disconnected', connected ? 'Connected' : 'Not connected');
-        });
-      } catch (_) {
-        document.querySelectorAll('.config-model-card').forEach(function (card) {
-          var index = configModelCardIndex(card);
-          if (!configModelCardUsesChatGpt(card) || configLlmLoginInFlight[index]) return;
-          setConfigChatGptStatus(index, 'disconnected', 'Status unavailable');
-        });
-      }
-    }
-
-    function configOpenLlmLoginPopup() {
-      var popup = window.open('', '_blank', 'popup,width=720,height=760');
-      if (!popup) return null;
-      try {
-        popup.opener = null;
-        popup.document.title = 'Pasture LLM login';
-        popup.document.body.textContent = 'Opening sign in…';
-      } catch (_) {}
-      return popup;
-    }
-
-    function configDelay(ms) {
-      return new Promise(function (resolve) { setTimeout(resolve, ms); });
-    }
-
-    function configLoginPopupClosedError() {
-      var error = new Error('Login window was closed.');
-      error.code = 'LLM_LOGIN_POPUP_CLOSED';
-      return error;
-    }
-
-    function assertConfigLoginPopupOpen(popup) {
-      if (!popup || popup.closed) throw configLoginPopupClosedError();
-    }
-
-    async function waitForConfigLlmPoll(popup) {
-      var remaining = CONFIG_LLM_LOGIN_POLL_MS;
-      while (remaining > 0) {
-        if (popup && popup.closed) return false;
-        var waitMs = Math.min(CONFIG_LLM_POPUP_CHECK_MS, remaining);
-        await configDelay(waitMs);
-        remaining -= waitMs;
-      }
-      return !(popup && popup.closed);
-    }
-
-    async function readConfigLlmLoginStatus(url) {
-      var r = await fetch(url);
-      var d = await r.json().catch(function () { return {}; });
-      if (!r.ok) throw new Error(d.error || 'Login status unavailable.');
-      return d;
-    }
-
-    function resolveConfigLlmLoginStatus(d) {
-      if (d.status === 'complete') return d;
-      if (d.status === 'error') throw new Error(d.error || 'Login failed.');
-      return null;
-    }
-
-    async function finalConfigLlmStatusAfterPopupClose(url) {
-      var finalStatus = await readConfigLlmLoginStatus(url);
-      var completed = resolveConfigLlmLoginStatus(finalStatus);
-      if (completed) return completed;
-      throw configLoginPopupClosedError();
-    }
-
-    async function pollConfigLlmLogin(url, popup) {
-      for (var polls = 0; polls < CONFIG_LLM_LOGIN_MAX_POLLS; polls += 1) {
-        if (popup && popup.closed) return finalConfigLlmStatusAfterPopupClose(url);
-        var d = await readConfigLlmLoginStatus(url);
-        var completed = resolveConfigLlmLoginStatus(d);
-        if (completed) return completed;
-        var popupStillOpen = await waitForConfigLlmPoll(popup);
-        if (!popupStillOpen) return finalConfigLlmStatusAfterPopupClose(url);
-      }
-      throw new Error('Login timed out.');
-    }
-
-    function cancelConfigChatGptLogin(loginId) {
-      if (!loginId) return Promise.resolve();
-      return fetch(API + '/api/llm-auth/chatgpt/' + encodeURIComponent(loginId), {
-        method: 'DELETE'
-      }).catch(function () { return null; });
-    }
-
-    function finishConfigLlmPopup(popup) {
-      try { if (popup && !popup.closed) popup.close(); } catch (_) {}
-      try { window.focus(); } catch (_) {}
-    }
-
-    async function startConfigLlmLogin(card, popup) {
-      var modelIndex = configModelCardIndex(card);
-      var isChatGpt = configModelCardUsesChatGpt(card);
-      var chatGptLoginId = '';
-      clearConfigSavedNotice();
-      clearConfigLlmError();
-      setConfigLlmLoginBusy(modelIndex, true);
-      try {
-        var config = collectConfigFromUi(configCache || {});
-        var save = await fetch(API + '/api/config', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        });
-        if (!save.ok) throw new Error('Save failed before login.');
-        configCache = await save.json();
-
+        if (opts.saveFirst) {
+          var config = collectConfigFromUi(configCache || {});
+          var save = await fetch(API + '/api/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+          });
+          if (!save.ok) throw new Error('Save failed before login.');
+          configCache = await save.json();
+        }
         var r = await fetch(API + '/api/llm-auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2310,54 +2093,67 @@ function renderSystemCronVariant(row) {
         });
         var d = await r.json().catch(function () { return {}; });
         if (!r.ok) throw new Error(d.error || 'Login failed');
-        if (isChatGpt && d.method === 'chatgpt' && d.id) chatGptLoginId = String(d.id);
-        if (isChatGpt && (d.method !== 'chatgpt' || !d.id)) throw new Error('OpenAI login did not start.');
-        if (!d.url) throw new Error('Login URL is missing.');
-        assertConfigLoginPopupOpen(popup);
-        popup.location.href = d.url;
-
-        if (d.method === 'chatgpt') {
-          showConfigSavedNotice('Finish signing in to ChatGPT in the new window.');
-          await pollConfigLlmLogin(API + '/api/llm-auth/chatgpt/' + encodeURIComponent(d.id), popup);
-          chatGptLoginId = '';
-          finishConfigLlmPopup(popup);
-          setConfigChatGptStatus(modelIndex, 'connected', 'Connected');
-          showConfigSavedNotice('ChatGPT login complete.');
-        } else if (d.method === 'device_code' && d.id) {
-          showConfigSavedNotice('Login opened. Enter code ' + d.userCode + ' in the new window.');
-          await pollConfigLlmLogin(API + '/api/llm-auth/device/' + encodeURIComponent(d.id));
-          finishConfigLlmPopup(popup);
-          showConfigSavedNotice('LLM login complete.');
-        } else {
-          showConfigSavedNotice('Login opened. Finish it in the new window.');
+        if (d.url) window.open(d.url, '_blank', 'noopener');
+        if (savedEl) {
+          savedEl.textContent = d.method === 'device_code'
+            ? ('Login opened. Enter code ' + d.userCode + ' in the new tab.')
+            : (d.method === 'imported' ? 'LLM login complete.' : 'Login opened. Finish it in the new tab.');
+          savedEl.style.display = 'inline';
         }
+        if (d.method === 'device_code' && d.id) {
+          var polls = 0;
+          var timer = setInterval(async function () {
+            polls += 1;
+            try {
+              var sr = await fetch(API + '/api/llm-auth/device/' + encodeURIComponent(d.id));
+              var sd = await sr.json().catch(function () { return {}; });
+              if (sd.status === 'complete') {
+                clearInterval(timer);
+                if (savedEl) {
+                  savedEl.textContent = 'LLM login complete.';
+                  savedEl.style.display = 'inline';
+                }
+              } else if (sd.status === 'error') {
+                clearInterval(timer);
+                if (errEl) {
+                  errEl.textContent = sd.error || 'Device login failed.';
+                  errEl.style.display = 'inline';
+                }
+              } else if (polls > 120) {
+                clearInterval(timer);
+              }
+            } catch (_) {}
+          }, 3000);
+        }
+        return true;
       } catch (e) {
-        if (isChatGpt && chatGptLoginId) cancelConfigChatGptLogin(chatGptLoginId);
-        finishConfigLlmPopup(popup);
-        if (isChatGpt) {
-          setConfigChatGptStatus(modelIndex, 'failed', 'Login failed');
-          showConfigLlmError('ChatGPT login failed. Try again.');
-        } else {
-          showConfigLlmError(e.message || 'Login failed.');
+        if (errEl) {
+          errEl.textContent = e.message || 'Login failed.';
+          errEl.style.display = 'inline';
         }
-      } finally {
-        delete configLlmLoginInFlight[modelIndex];
-        setConfigLlmLoginBusy(modelIndex, false);
+        return false;
       }
     }
 
-    function beginConfigLlmLoginFromUserGesture(card) {
-      var modelIndex = configModelCardIndex(card);
-      if (!Number.isInteger(modelIndex) || configLlmLoginInFlight[modelIndex]) return;
-      configLlmLoginInFlight[modelIndex] = true;
-      var popup = configOpenLlmLoginPopup();
-      if (!popup) {
-        delete configLlmLoginInFlight[modelIndex];
-        if (configModelCardUsesChatGpt(card)) setConfigChatGptStatus(modelIndex, 'failed', 'Pop-up blocked');
-        showConfigLlmError('Allow pop-ups for this dashboard, then try again.');
-        return;
+    async function runFirstMissingConfigLlmBrowserLogin(config, savedEl, errEl) {
+      var models = Array.isArray(config && config.llm && config.llm.models) ? config.llm.models : [];
+      var browserLoginIndexes = [];
+      models.forEach(function (m, i) {
+        var type = String(m && m.auth && m.auth.type || '').toLowerCase();
+        if (type === 'oauth' || type === 'device_code') browserLoginIndexes.push(i);
+      });
+      if (!browserLoginIndexes.length) return false;
+      var r = await fetch(API + '/api/llm-auth/status');
+      var d = await r.json().catch(function () { return {}; });
+      var statuses = Array.isArray(d.models) ? d.models : [];
+      for (var i = 0; i < browserLoginIndexes.length; i++) {
+        var idx = browserLoginIndexes[i];
+        var status = statuses.find(function (s) { return Number(s.index) === idx; });
+        if (!status || !status.auth || !status.auth.configured) {
+          return await runConfigLlmBrowserLogin(idx, { savedEl: savedEl, errEl: errEl, keepSavedMessage: true });
+        }
       }
-      startConfigLlmLogin(card, popup);
+      return false;
     }
 
     function wireConfigUiActions() {
@@ -2400,13 +2196,13 @@ function renderSystemCronVariant(row) {
         select.dataset.wired = '1';
         select.addEventListener('change', function () {
           var card = select.closest('.config-model-card');
-          if (!card) return;
-          var provider = card.querySelector('[data-f="provider"]');
-          var normalized = configNormalizeAuthTypeForProvider(select.value, provider && provider.value);
-          select.value = normalized;
-          syncConfigModelAuthUi(card, normalized);
-          if (String(provider && provider.value || '').toLowerCase() === 'openai' && normalized === 'chatgpt') {
-            beginConfigLlmLoginFromUserGesture(card);
+          var login = card && card.querySelector('.config-llm-login');
+          if (login) login.hidden = select.value !== 'oauth' && select.value !== 'device_code';
+          if (card) {
+            card.querySelectorAll('[data-auth-field]').forEach(function (field) {
+              var fieldType = field.getAttribute('data-auth-field');
+              field.hidden = configAuthFieldHidden(select.value, fieldType);
+            });
           }
         });
       });
@@ -2421,14 +2217,19 @@ function renderSystemCronVariant(row) {
           authSelect.innerHTML = configAuthOptionsHtml(select.value, authSelect.value);
           var normalized = configNormalizeAuthTypeForProvider(authSelect.value, select.value);
           authSelect.value = normalized;
-          syncConfigModelAuthUi(card, normalized);
+          var login = card.querySelector('.config-llm-login');
+          if (login) login.hidden = normalized !== 'oauth' && normalized !== 'device_code';
+          card.querySelectorAll('[data-auth-field]').forEach(function (field) {
+            var fieldType = field.getAttribute('data-auth-field');
+            field.hidden = configAuthFieldHidden(normalized, fieldType);
+          });
         });
       });
       document.querySelectorAll('.config-llm-login').forEach(function (btn) {
         if (btn.dataset.wired) return;
         btn.dataset.wired = '1';
-        btn.addEventListener('click', function () {
-          beginConfigLlmLoginFromUserGesture(btn.closest('.config-model-card'));
+        btn.addEventListener('click', async function () {
+          await runConfigLlmBrowserLogin(Number(btn.getAttribute('data-login-model')), { saveFirst: true });
         });
       });
       wireConfigTideActions();
@@ -2470,27 +2271,18 @@ function renderSystemCronVariant(row) {
         var authTypeEl = card.querySelector('[data-f="authType"]');
         var authEnvEl = card.querySelector('[data-f="authEnv"]');
         var authFileEl = card.querySelector('[data-f="authFile"]');
-        var authCacheEl = card.querySelector('[data-f="authCache"]');
-        var authClientIdEl = card.querySelector('[data-f="authClientId"]');
-        var authAuthorizationUrlEl = card.querySelector('[data-f="authAuthorizationUrl"]');
-        var authTokenUrlEl = card.querySelector('[data-f="authTokenUrl"]');
-        var authScopeEl = card.querySelector('[data-f="authScope"]');
         var provider = providerEl ? providerEl.value.trim() || 'openai' : 'openai';
         var authType = configNormalizeAuthTypeForProvider(authTypeEl ? authTypeEl.value : 'api_key', provider);
         var auth = { type: authType };
-        if (authType === 'chatgpt') {
-          auth = { type: 'chatgpt' };
-        } else if (authType === 'api_key') {
+        if (authType === 'api_key') {
           auth.env = authEnvEl ? authEnvEl.value.trim() || 'LLM_1_API_KEY' : 'LLM_1_API_KEY';
         } else if (authType === 'bearer_token') {
           if (authEnvEl && authEnvEl.value.trim()) auth.env = authEnvEl.value.trim();
           if (authFileEl && authFileEl.value.trim()) auth.file = authFileEl.value.trim();
         } else if (authType === 'oauth' || authType === 'device_code') {
-          auth.cache = authCacheEl ? authCacheEl.value.trim() || ('llm-' + (i + 1)) : ('llm-' + (i + 1));
-          if (authClientIdEl && authClientIdEl.value.trim()) auth.clientId = authClientIdEl.value.trim();
-          if (authAuthorizationUrlEl && authAuthorizationUrlEl.value.trim()) auth.authorizationUrl = authAuthorizationUrlEl.value.trim();
-          if (authTokenUrlEl && authTokenUrlEl.value.trim()) auth.tokenUrl = authTokenUrlEl.value.trim();
-          if (authScopeEl && authScopeEl.value.trim()) auth.scope = authScopeEl.value.trim();
+          var existingModels = Array.isArray(base && base.llm && base.llm.models) ? base.llm.models : [];
+          var existingAuth = existingModels[i] && existingModels[i].auth && typeof existingModels[i].auth === 'object' ? existingModels[i].auth : {};
+          auth.cache = existingAuth.cache || existingAuth.account || (provider + '-main');
         }
         var o = {
           provider: provider,
@@ -2741,9 +2533,11 @@ function renderSystemCronVariant(row) {
 
     wireEl('config-save', 'click', async function () {
       var textarea = document.getElementById('full-config');
+      var savedEl = document.getElementById('config-saved');
       var errEl = document.getElementById('config-error');
-      clearConfigSavedNotice();
-      clearConfigLlmError();
+      savedEl.style.display = 'none';
+      errEl.style.display = 'none';
+      errEl.textContent = '';
       var config;
       try {
         if (configViewMode === 'ui') {
@@ -2797,7 +2591,14 @@ function renderSystemCronVariant(row) {
         textarea.value = JSON.stringify(d, null, 2);
         renderConfigUi(d);
         await fetchTideChecklistForConfig();
-        showConfigSavedNotice('Saved.', 2500);
+        var startedLogin = false;
+        if (configViewMode === 'ui') {
+          startedLogin = await runFirstMissingConfigLlmBrowserLogin(d, savedEl, errEl);
+        }
+        if (errEl.style.display === 'inline') return;
+        savedEl.style.display = 'inline';
+        if (!startedLogin) savedEl.textContent = 'Saved.';
+        if (!startedLogin) setTimeout(function () { savedEl.style.display = 'none'; }, 2500);
       } catch (e) {
         errEl.textContent = e.message || 'Failed to save config.';
         errEl.style.display = 'inline';
@@ -3555,7 +3356,7 @@ function renderSystemCronVariant(row) {
       if (!clusters.length) return;
       var palette = [
         { edge: '125,211,252', core: '56,189,248' },
-        { edge: '167,139,250', core: '139,92,246' },
+        { edge: '0,255,255', core: '8,145,178' },
         { edge: '110,231,183', core: '34,197,94' },
         { edge: '226,232,240', core: '148,163,184' },
       ];
@@ -5312,35 +5113,26 @@ function renderSystemCronVariant(row) {
       return p === 'lmstudio' || p === 'ollama';
     }
 
-    function configIsSubscriptionLoginProvider(provider) {
+    function configUsesDeviceCodeLogin(provider) {
       var p = String(provider || '').toLowerCase();
       return p === 'grok' || p === 'xai';
-    }
-
-    function configHasCustomOAuthSettings(auth) {
-      return !!(auth && (
-        auth.clientId || auth.clientSecret || auth.clientSecretEnv || auth.authorizationUrl ||
-        auth.tokenUrl || auth.scope || (Array.isArray(auth.scopes) && auth.scopes.length)
-      ));
     }
 
     function configAuthOptionsForProvider(provider, currentType) {
       if (configIsLocalLlmProvider(provider)) {
         return [{ value: 'none', label: 'No login (local)' }];
       }
-      if (configIsSubscriptionLoginProvider(provider)) {
+      if (configUsesDeviceCodeLogin(provider)) {
         return [
           { value: 'api_key', label: 'API key' },
           { value: 'device_code', label: 'Browser login' }
         ];
       }
       if (String(provider || '').toLowerCase() === 'openai') {
-        var openAiOptions = [
+        return [
           { value: 'api_key', label: 'API key' },
-          { value: 'chatgpt', label: 'ChatGPT login' }
+          { value: 'oauth', label: 'Browser login' }
         ];
-        if (currentType === 'oauth') openAiOptions.push({ value: 'oauth', label: 'Legacy OAuth' });
-        return openAiOptions;
       }
       var options = [{ value: 'api_key', label: 'API key' }];
       if (currentType === 'oauth') options.push({ value: 'oauth', label: 'Browser login' });
@@ -5349,7 +5141,8 @@ function renderSystemCronVariant(row) {
 
     function configNormalizeAuthTypeForProvider(type, provider) {
       var p = String(provider || '').toLowerCase();
-      if (configIsSubscriptionLoginProvider(p) && (type === 'oauth' || type === 'xai_oauth')) type = 'device_code';
+      if (configUsesDeviceCodeLogin(p) && (type === 'oauth' || type === 'xai_oauth')) type = 'device_code';
+      if (p === 'openai' && type === 'device_code') type = 'oauth';
       var options = configAuthOptionsForProvider(provider, type);
       return options.some(function (item) { return item.value === type; }) ? type : options[0].value;
     }

@@ -27,7 +27,7 @@
 .mc-progress-card {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(167,139,250,0.06), rgba(0,0,0,0.12));
+  background: linear-gradient(180deg, rgba(0, 255, 255,0.06), rgba(0,0,0,0.12));
   padding: 0.65rem 0.75rem;
 }
 
@@ -61,7 +61,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  background: linear-gradient(90deg, #00ffff, #00ffff);
   transition: width 0.4s ease;
 }
 
@@ -103,11 +103,11 @@ button.mc-stat-card-action {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 button.mc-stat-card-action:hover {
-  border-color: #60a5fa;
+  border-color: #67e8f9;
   background: rgba(30, 41, 92, 0.42);
 }
 button.mc-stat-card-action:focus-visible {
-  outline: 2px solid #60a5fa;
+  outline: 2px solid #67e8f9;
   outline-offset: 2px;
 }
 
@@ -128,8 +128,8 @@ button.mc-stat-card-action:focus-visible {
 .mc-stat-value.active  { color: #22c55e; }
 .mc-stat-value.waiting { color: #eab308; }
 .mc-stat-value.blocked { color: #ef4444; }
-.mc-stat-value.proposed { color: #a78bfa; }
-.mc-stat-value.done    { color: #60a5fa; }
+.mc-stat-value.proposed { color: #00ffff; }
+.mc-stat-value.done    { color: #67e8f9; }
 .mc-stat-value.pace    { color: var(--accent); }
 
 /* ── Kanban columns ───────────────────────────────────────────────────── */
@@ -251,7 +251,7 @@ button.mc-stat-card-action:focus-visible {
   font-weight: 600;
 }
 .mc-kanban-card-tag.blocked { background: rgba(239,68,68,0.15); color: #ef4444; }
-.mc-kanban-card-tag.discovery { background: rgba(124, 58, 237, 0.15); color: var(--accent); }
+.mc-kanban-card-tag.discovery { background: rgba(0, 255, 255, 0.15); color: var(--accent); }
 
 .mc-kanban-card-completed .mc-kanban-card-title { color: #86efac; }
 .mc-kanban-card-completed .mc-kanban-card-when { color: var(--muted); }
@@ -259,8 +259,8 @@ button.mc-stat-card-action:focus-visible {
 .mc-kanban-card-attention.error { border-color: rgba(239, 68, 68, 0.35); background: rgba(127, 29, 29, 0.12); }
 .mc-kanban-card-attention.warning { border-color: rgba(234, 179, 8, 0.28); background: rgba(113, 63, 18, 0.12); }
 
-.mc-kanban-card-discovery { border-color: rgba(124, 58, 237, 0.25); }
-.mc-kanban-card-discovery .mc-kanban-card-title { color: #ddd6fe; }
+.mc-kanban-card-discovery { border-color: rgba(0, 255, 255, 0.25); }
+.mc-kanban-card-discovery .mc-kanban-card-title { color: #dffcff; }
 
 .mc-kanban-empty {
   color: var(--muted);
@@ -274,7 +274,7 @@ button.mc-stat-card-action:focus-visible {
   width: 100%;
   margin-top: 0.35rem;
   padding: 0.38rem 0.45rem;
-  border: 1px dashed rgba(129, 140, 248, 0.28);
+  border: 1px dashed rgba(0, 255, 255, 0.28);
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.35);
   color: var(--muted);
@@ -288,13 +288,13 @@ button.mc-stat-card-action:focus-visible {
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 .mc-kanban-expand:hover {
-  border-color: rgba(129, 140, 248, 0.5);
+  border-color: rgba(0, 255, 255, 0.5);
   color: var(--text);
   background: rgba(30, 41, 59, 0.55);
 }
 .mc-kanban-expand.mc-kanban-collapse {
   border-style: solid;
-  border-color: rgba(129, 140, 248, 0.18);
+  border-color: rgba(0, 255, 255, 0.18);
 }
 
 /* ── Visual polish overrides — home view ─────────────────────────────── */
@@ -335,12 +335,12 @@ button.mc-stat-card-action:focus-visible {
   max-width: 19rem;
   height: 0.48rem;
   background: rgba(15, 23, 42, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(0, 255, 255, 0.1);
 }
 
 .mc-progress-bar > span {
-  background: linear-gradient(90deg, #7c3aed, #9333ea, #a855f7);
-  box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
+  background: linear-gradient(90deg, #00ffff, #22d3ee, #67e8f9);
+  box-shadow: 0 0 18px rgba(103, 232, 249, 0.55);
 }
 
 .mc-stat-grid {
@@ -355,9 +355,9 @@ button.mc-stat-card.mc-stat-card-action {
   min-height: 4.9rem;
   padding: 0.5rem 0.55rem;
   overflow: hidden;
-  border-color: rgba(129, 140, 248, 0.15);
+  border-color: rgba(0, 255, 255, 0.15);
   background:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18), transparent 3.8rem),
+    radial-gradient(circle at 50% 0%, rgba(8, 145, 178, 0.18), transparent 3.8rem),
     rgba(10, 17, 34, 0.94);
   box-sizing: border-box;
   display: flex;
@@ -406,7 +406,7 @@ button.mc-stat-card.mc-stat-card-action {
 .mc-kanban-col {
   min-height: 13.7rem;
   padding: 0.45rem;
-  border: 1px solid rgba(129, 140, 248, 0.08);
+  border: 1px solid rgba(0, 255, 255, 0.08);
   border-radius: 0.65rem;
   background: rgba(9, 15, 31, 0.62);
 }
@@ -417,7 +417,7 @@ button.mc-stat-card.mc-stat-card-action {
 }
 
 .mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-green); }
-.mc-kanban-col:nth-child(2) .mc-kanban-col-head { color: #60a5fa; }
+.mc-kanban-col:nth-child(2) .mc-kanban-col-head { color: #67e8f9; }
 .mc-kanban-col:nth-child(3) .mc-kanban-col-head { color: var(--accent); }
 .mc-kanban-col:nth-child(4) .mc-kanban-col-head { color: var(--mc-red); }
 
@@ -449,9 +449,9 @@ button.mc-stat-card.mc-stat-card-action {
 .mc-kanban-card {
   position: relative;
   min-height: 5.85rem;
-  border-color: rgba(129, 140, 248, 0.12);
+  border-color: rgba(0, 255, 255, 0.12);
   background:
-    radial-gradient(circle at 18% 0%, rgba(99, 102, 241, 0.12), transparent 5rem),
+    radial-gradient(circle at 18% 0%, rgba(8, 145, 178, 0.12), transparent 5rem),
     linear-gradient(180deg, rgba(19, 29, 56, 0.96), rgba(13, 20, 39, 0.96));
 }
 
@@ -460,7 +460,7 @@ button.mc-stat-card.mc-stat-card-action {
   position: absolute;
   top: 0.48rem;
   right: 0.48rem;
-  color: #7f8eaa;
+  color: #86aeb8;
   font-size: 0.8rem;
 }
 
@@ -471,7 +471,7 @@ button.mc-stat-card.mc-stat-card-action {
 .mc-kanban-col {
   min-height: 14.9rem;
   padding: 0.55rem;
-  border-color: rgba(99, 102, 241, 0.12);
+  border-color: rgba(8, 145, 178, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
@@ -518,11 +518,11 @@ button.mc-stat-card.mc-stat-card-action {
 }
 
 .mc-progress-current::first-letter {
-  color: #8b5cf6;
+  color: #00ffff;
 }
 
 .mc-progress-percent {
-  color: #dbeafe;
+  color: #dffcff;
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -570,7 +570,7 @@ button.mc-stat-card.mc-stat-card-action {
 }
 
 .mc-stat-label {
-  color: #dbeafe;
+  color: #dffcff;
   text-transform: none;
   letter-spacing: 0;
 }

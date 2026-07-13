@@ -31,17 +31,10 @@ import {
   createOAuthLoginRequest,
   exchangeOAuthCode,
   getLlmAuthStatus,
-  isCodexManagedChatgptAuth,
+  importOpenAiBrowserAuth,
   normalizeLlmAuth,
   writeLlmAuthToken,
 } from '../lib/llm/auth.js';
-import {
-  cancelCodexChatGptLogin,
-  closeCodexAppServerClient,
-  getCodexChatGptLoginStatus,
-  readCodexChatGptAccount,
-  startCodexChatGptLogin,
-} from '../lib/llm/codex-app-server.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -1349,50 +1342,16 @@ app.get('/api/config', (_req, res) => {
   }
 });
 
-function codexChatGptDashboardStatus(accountState, accountError = null) {
-  const account = accountState?.account && typeof accountState.account === 'object'
-    ? accountState.account
-    : null;
-  const configured = account?.type === 'chatgpt';
-  return {
-    type: 'chatgpt',
-    configured,
-    managed: 'codex',
-    label: configured ? 'ChatGPT connected' : 'ChatGPT browser login',
-    account: account ? {
-      type: account.type || null,
-      planType: account.planType || null,
-    } : null,
-    requiresOpenaiAuth: accountState?.requiresOpenaiAuth !== false,
-    error: accountError ? (accountError?.message || String(accountError)) : null,
-  };
-}
-
-app.get('/api/llm-auth/status', async (_req, res) => {
+app.get('/api/llm-auth/status', (_req, res) => {
   try {
     const config = loadConfig();
     const models = Array.isArray(config?.llm?.models) ? config.llm.models : [];
-    const normalized = models.map((entry, index) => normalizeLlmAuth(entry, index));
-    const needsCodexAccount = models.some((entry, index) => (
-      isCodexManagedChatgptAuth(normalized[index], entry)
-    ));
-    let codexAccount = null;
-    let codexAccountError = null;
-    if (needsCodexAccount) {
-      try {
-        codexAccount = await readCodexChatGptAccount({ refreshToken: false, timeoutMs: 10_000 });
-      } catch (err) {
-        codexAccountError = err;
-      }
-    }
     res.json({
       models: models.map((entry, index) => ({
         index,
         provider: entry?.provider || '',
         model: entry?.model || '',
-        auth: isCodexManagedChatgptAuth(normalized[index], entry)
-          ? codexChatGptDashboardStatus(codexAccount, codexAccountError)
-          : getLlmAuthStatus(normalized[index], entry),
+        auth: getLlmAuthStatus(normalizeLlmAuth(entry, index), entry),
       })),
     });
   } catch (err) {
@@ -1400,7 +1359,7 @@ app.get('/api/llm-auth/status', async (_req, res) => {
   }
 });
 
-app.post('/api/llm-auth/login', async (req, res) => {
+app.post('/api/llm-auth/login', (req, res) => {
   try {
     const config = loadConfig();
     const models = Array.isArray(config?.llm?.models) ? config.llm.models : [];
@@ -1416,11 +1375,6 @@ app.post('/api/llm-auth/login', async (req, res) => {
     }
     const entry = models[index];
     const auth = normalizeLlmAuth(entry, index);
-    if (isCodexManagedChatgptAuth(auth, entry)) {
-      const login = await startCodexChatGptLogin();
-      res.json({ method: 'chatgpt', id: login.id, url: login.url });
-      return;
-    }
     if (auth.type !== 'oauth' && auth.type !== 'device_code') {
       res.status(400).json({ error: 'Selected LLM auth type is not oauth or device_code' });
       return;
@@ -1452,6 +1406,15 @@ app.post('/api/llm-auth/login', async (req, res) => {
       });
       return;
     }
+    if (String(entry.provider || '').toLowerCase() === 'openai') {
+      const result = importOpenAiBrowserAuth({ ...auth, provider: entry.provider });
+      res.json({
+        method: 'imported',
+        cache: result.cache,
+        path: result.path,
+      });
+      return;
+    }
     const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const host = req.headers['x-forwarded-host'] || req.headers.host || `${HOST}:${PORT}`;
     const login = createOAuthLoginRequest({ ...auth, provider: entry.provider }, `${proto}://${host}`);
@@ -1465,33 +1428,6 @@ app.post('/api/llm-auth/login', async (req, res) => {
     res.json({ url: login.url, state: login.state });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/llm-auth/chatgpt/:id', (req, res) => {
-  const status = getCodexChatGptLoginStatus(String(req.params.id || ''));
-  if (!status) {
-    res.status(404).json({ error: 'ChatGPT login not found' });
-    return;
-  }
-  res.json(status);
-});
-
-app.delete('/api/llm-auth/chatgpt/:id', async (req, res) => {
-  const id = String(req.params.id || '');
-  const status = getCodexChatGptLoginStatus(id);
-  if (!status) {
-    res.status(404).json({ error: 'ChatGPT login not found' });
-    return;
-  }
-  if (status.status !== 'pending') {
-    res.json(status);
-    return;
-  }
-  try {
-    res.json(await cancelCodexChatGptLogin(id));
-  } catch (err) {
-    res.status(500).json({ error: err?.message || String(err) });
   }
 });
 
@@ -2173,7 +2109,6 @@ function brainDebugLog(event, details = {}) {
 }
 
 let dashboardProcessExitLogged = false;
-let dashboardShutdownStarted = false;
 
 function logDashboardProcessExit(event, details = {}) {
   if (dashboardProcessExitLogged && event === 'dashboard_process_exit') return;
@@ -2184,22 +2119,14 @@ function logDashboardProcessExit(event, details = {}) {
   });
 }
 
-function exitDashboardAfterCleanup(code) {
-  if (dashboardShutdownStarted) return;
-  dashboardShutdownStarted = true;
-  Promise.resolve(closeCodexAppServerClient())
-    .catch((err) => console.error('[dashboard] Codex App Server cleanup failed:', err?.message || err))
-    .finally(() => process.exit(code));
-}
-
 process.on('SIGTERM', () => {
   logDashboardProcessExit('dashboard_process_signal', { signal: 'SIGTERM' });
-  exitDashboardAfterCleanup(0);
+  process.exit(0);
 });
 
 process.on('SIGINT', () => {
   logDashboardProcessExit('dashboard_process_signal', { signal: 'SIGINT' });
-  exitDashboardAfterCleanup(0);
+  process.exit(0);
 });
 
 process.on('uncaughtException', (err) => {
@@ -2208,7 +2135,7 @@ process.on('uncaughtException', (err) => {
     stack: String(err?.stack || '').slice(0, 4000),
   });
   console.error(err);
-  exitDashboardAfterCleanup(1);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -2220,7 +2147,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 process.on('exit', (code) => {
-  void closeCodexAppServerClient();
   logDashboardProcessExit('dashboard_process_exit', { code });
 });
 

@@ -570,15 +570,15 @@
     var MC2_AGENT_COLORS = [
       '#ef4444', //  0°  red
       '#22c55e', // 137° green
-      '#a855f7', // 275° purple
+      '#67e8f9', // 275° cyan
       '#f59e0b', //  52° amber
       '#0ea5e9', // 190° sky
       '#f43f5e', // 328° rose
       '#84cc16', // 105° lime
-      '#6366f1', // 242° indigo
+      '#0891b2', // 242° teal
       '#f97316', //  20° orange
       '#10b981', // 157° emerald
-      '#d946ef', // 295° fuchsia
+      '#06b6d4', // 295° cyan
       '#eab308', //  72° yellow
     ];
 

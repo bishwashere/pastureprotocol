@@ -48,6 +48,18 @@ async function main() {
   const du = await executeGoRead(ctx, { action: 'du', argv: ['-sh', '.'] });
   assert(du.includes(workspaceDir), `expected du to include workspace path, got ${du}`);
 
+  const npmVersion = await executeGoRead(ctx, { action: 'npm', argv: ['--version'] });
+  assert(/^\d+\.\d+\.\d+/.test(npmVersion.trim()), `expected npm --version output, got ${npmVersion}`);
+
+  const npmInstall = JSON.parse(await executeGoRead(ctx, { action: 'npm', argv: ['install'] }));
+  assert(/not allowed/i.test(npmInstall.error || ''), `expected npm install to be refused, got ${JSON.stringify(npmInstall)}`);
+
+  const npmVersionPatch = JSON.parse(await executeGoRead(ctx, { action: 'npm', argv: ['version', 'patch'] }));
+  assert(/read-only/i.test(npmVersionPatch.error || ''), `expected npm version patch to be refused, got ${JSON.stringify(npmVersionPatch)}`);
+
+  const pnpmRun = JSON.parse(await executeGoRead(ctx, { action: 'pnpm', argv: ['run', 'test'] }));
+  assert(/not allowed/i.test(pnpmRun.error || ''), `expected pnpm run to be refused, got ${JSON.stringify(pnpmRun)}`);
+
   const missing = JSON.parse(await executeGoRead(ctx, { action: 'ls', argv: ['missing'] }));
   assert(/not found/i.test(missing.error || ''), `expected missing path error, got ${JSON.stringify(missing)}`);
 

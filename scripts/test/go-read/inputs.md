@@ -11,3 +11,5 @@ Natural user messages only — see [E2E.md](../E2E.md).
 - What files are in the workspace folder?
 - What directory are we in?
 - Show me what's in config.json in the workspace.
+- What npm version is installed?
+- What pnpm version is installed?

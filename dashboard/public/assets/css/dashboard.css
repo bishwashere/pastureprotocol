@@ -167,7 +167,7 @@
     .team-top-tab.active {
       color: var(--text);
       border-color: var(--accent);
-      background: rgba(167, 139, 250, 0.08);
+      background: rgba(0, 255, 255, 0.08);
     }
     .team-page-body {
       flex: 1 1 0;
@@ -238,7 +238,7 @@
     .team-view-tab.active {
       color: var(--text);
       border-color: var(--accent);
-      background: rgba(167, 139, 250, 0.08);
+      background: rgba(0, 255, 255, 0.08);
     }
     .team-cards-view {
       flex-shrink: 0;
@@ -254,7 +254,7 @@
       padding: 0.5rem 0.65rem 0.45rem;
       border: 1px solid var(--border);
       border-radius: 6px;
-      background: rgba(167, 139, 250, 0.04);
+      background: rgba(0, 255, 255, 0.04);
       font-size: 0.68rem;
       line-height: 1.4;
     }
@@ -336,9 +336,9 @@
       border-radius: 4px;
     }
     .team-task-badge.completed {
-      border-color: rgba(99, 102, 241, 0.45);
+      border-color: rgba(8, 145, 178, 0.45);
       color: var(--accent);
-      background: rgba(99, 102, 241, 0.08);
+      background: rgba(8, 145, 178, 0.08);
     }
     .team-task-summary-line {
       margin: 0 0 0.18rem 0;
@@ -531,14 +531,14 @@
     }
     .agent-card-menu-item:hover,
     .agent-card-menu-item:focus-visible {
-      background: rgba(167, 139, 250, 0.12);
+      background: rgba(0, 255, 255, 0.12);
     }
     .team-agent-card:hover {
       border-color: var(--muted);
     }
     .team-agent-card.selected {
       border-color: var(--accent);
-      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25);
+      box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.25);
     }
     .team-agent-card-head {
       font-size: 0.74rem;
@@ -668,7 +668,7 @@
     }
     .team-mission-status.active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
     .team-mission-status.paused { background: rgba(113, 113, 122, 0.2); color: var(--muted); }
-    .team-mission-status.completed { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .team-mission-status.completed { background: rgba(0, 255, 255, 0.15); color: #67e8f9; }
     .team-mission-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
     .team-mission-progress {
       margin: 0.35rem 0;
@@ -773,8 +773,8 @@
       color: #ef4444;
     }
     .team-mission-blocker-type-badge.need_access   { background: rgba(251, 146, 60, 0.15); color: #fb923c; }
-    .team-mission-blocker-type-badge.need_content  { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
-    .team-mission-blocker-type-badge.need_approval { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .team-mission-blocker-type-badge.need_content  { background: rgba(103, 232, 249, 0.15); color: #67e8f9; }
+    .team-mission-blocker-type-badge.need_approval { background: rgba(0, 255, 255, 0.15); color: #67e8f9; }
     .team-mission-blocker-type-badge.need_direction { background: rgba(239, 68, 68, 0.13); color: #ef4444; }
     .team-suggestedTasks-main {
       flex: 1 1 0;
@@ -819,7 +819,7 @@
       color: var(--muted);
     }
     .team-suggestedTask-status.open { color: #facc15; }
-    .team-suggestedTask-status.accepted { color: #60a5fa; }
+    .team-suggestedTask-status.accepted { color: #67e8f9; }
     .team-suggestedTask-status.rejected { color: #ef4444; }
     .team-suggestedTask-status.completed { color: #22c55e; }
     .team-suggestedTask-detail {
@@ -848,7 +848,7 @@
       padding: 0.1rem 0.35rem;
       border-radius: 4px;
       background: rgba(96, 165, 250, 0.2);
-      color: #93c5fd;
+      color: #67e8f9;
       vertical-align: middle;
       margin-right: 0.25rem;
     }
@@ -1026,7 +1026,7 @@
     .team-agent-panel-range.active {
       color: var(--text);
       border-color: var(--accent);
-      background: rgba(99, 102, 241, 0.12);
+      background: rgba(8, 145, 178, 0.12);
     }
     .team-agent-panel-body {
       flex: 1 1 0;
@@ -1510,7 +1510,7 @@
     .agent-map-node:hover { border-color: var(--muted); }
     .agent-map-node.selected {
       border-color: var(--accent);
-      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
+      box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35);
     }
     .agent-map-node-id {
       font-size: 0.85rem;
@@ -1549,7 +1549,7 @@
     .agent-map-node:hover .agent-map-node-edit { opacity: 1; }
     .agent-map-node-edit:hover {
       color: var(--accent);
-      background: rgba(167, 139, 250, 0.12);
+      background: rgba(0, 255, 255, 0.12);
     }
     .agent-team-ext-btn {
       background: none;
@@ -1565,7 +1565,7 @@
     .agent-team-ext-btn:hover {
       color: var(--accent);
       border-color: var(--accent);
-      background: rgba(167, 139, 250, 0.08);
+      background: rgba(0, 255, 255, 0.08);
       opacity: 1;
     }
     .agent-team-ext-btn svg {
@@ -2020,7 +2020,7 @@
       display: flex; align-items: center; padding: 0.38rem 0.75rem;
       cursor: pointer; gap: 0.45rem; transition: background 0.1s; position: relative;
     }
-    .test-sidebar-item:hover { background: rgba(167,139,250,0.07); }
+    .test-sidebar-item:hover { background: rgba(0, 255, 255,0.07); }
     .test-sidebar-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
     .test-status-icon {
       font-size: 0.68rem; width: 0.85rem; text-align: center; flex-shrink: 0; line-height: 1;
@@ -2072,7 +2072,7 @@
       display: flex; align-items: center; gap: 0.5rem;
       padding: 0.32rem 1rem; cursor: pointer; transition: background 0.1s;
     }
-    .test-case-row:hover { background: rgba(167,139,250,0.06); }
+    .test-case-row:hover { background: rgba(0, 255, 255,0.06); }
     .test-case-row.active { background: color-mix(in srgb, var(--accent) 10%, transparent); }
     .test-case-row-num {
       font-size: 0.72rem; color: var(--muted); min-width: 1.2rem; flex-shrink: 0; text-align: right;
@@ -2387,7 +2387,7 @@
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #7dd3fc, #c4b5fd, #86efac);
+      background: linear-gradient(90deg, #7dd3fc, #67e8f9, #86efac);
       box-shadow: 0 0 18px rgba(125, 211, 252, 0.28);
       transition: width 180ms ease;
     }
@@ -2454,7 +2454,7 @@
       font: inherit;
     }
     .memory-tile:hover { border-color: var(--accent); }
-    .memory-tile.active { border-color: var(--accent); background: rgba(99,102,241,0.07); }
+    .memory-tile.active { border-color: var(--accent); background: rgba(8, 145, 178,0.07); }
     .memory-tile-icon { font-size: 1.3rem; line-height: 1; margin-bottom: 0.2rem; }
     .memory-tile-title { font-weight: 600; font-size: 0.92rem; }
     .memory-tile-stat { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; min-height: 0.9rem; }
@@ -2664,7 +2664,7 @@
     .agent-edit-md-btn.active {
       color: var(--accent);
       border-color: var(--accent);
-      background: rgba(167, 139, 250, 0.08);
+      background: rgba(0, 255, 255, 0.08);
     }
     #agent-edit-modal-md-saved {
       margin-left: 0.75rem;
@@ -2820,11 +2820,11 @@
       transition: border-color 0.3s, background 0.3s;
     }
     .team-user-input-composer--recording {
-      border-color: rgba(109, 77, 242, 0.5);
-      background: rgba(109, 77, 242, 0.05);
+      border-color: rgba(0, 255, 255, 0.5);
+      background: rgba(0, 255, 255, 0.05);
     }
     .team-user-input-composer--transcribing {
-      border-color: rgba(109, 77, 242, 0.35);
+      border-color: rgba(0, 255, 255, 0.35);
     }
     .team-user-input-textarea {
       width: 100%;
@@ -2867,7 +2867,7 @@
       max-width: 3px;
       min-height: 2px;
       border-radius: 999px;
-      background: var(--accent, #6d4df2);
+      background: var(--accent, #00ffff);
     }
     .team-user-input-listening {
       display: none;
@@ -2878,7 +2878,7 @@
       pointer-events: none;
       font-size: 0.82rem;
       font-weight: 500;
-      color: var(--accent, #6d4df2);
+      color: var(--accent, #00ffff);
       opacity: 0.6;
     }
     .team-user-input-composer--recording .team-user-input-listening {
@@ -2901,8 +2901,8 @@
     .team-user-input-transcribing-spinner {
       width: 0.95rem;
       height: 0.95rem;
-      border: 2px solid rgba(109, 77, 242, 0.2);
-      border-top-color: var(--accent, #6d4df2);
+      border: 2px solid rgba(0, 255, 255, 0.2);
+      border-top-color: var(--accent, #00ffff);
       border-radius: 50%;
       animation: team-voice-spin 0.8s linear infinite;
     }
@@ -2919,18 +2919,18 @@
       border: none;
       cursor: pointer;
       padding: 0;
-      background: var(--accent, #6d4df2);
+      background: var(--accent, #00ffff);
       color: #fff;
       transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(109, 77, 242, 0.28);
+      box-shadow: 0 2px 8px rgba(0, 255, 255, 0.28);
     }
-    .team-mic-btn:hover { background: #5a3fd4; box-shadow: 0 4px 12px rgba(109,77,242,0.35); }
+    .team-mic-btn:hover { background: #0891b2; box-shadow: 0 4px 12px rgba(0, 255, 255,0.35); }
     .team-mic-btn--recording {
-      background: var(--accent, #6d4df2);
-      box-shadow: 0 4px 14px rgba(109, 77, 242, 0.35);
+      background: var(--accent, #00ffff);
+      box-shadow: 0 4px 14px rgba(0, 255, 255, 0.35);
     }
-    .team-mic-btn--recording:hover { background: #5a3fd4; }
+    .team-mic-btn--recording:hover { background: #0891b2; }
     .team-mic-btn--transcribing { opacity: 0.6; cursor: not-allowed; }
     .team-mic-btn svg { width: 1.15rem; height: 1.15rem; display: block; pointer-events: none; }
     .team-mic-btn .team-mic-icon { display: block; }
@@ -2984,8 +2984,8 @@
     .agent-edit-tile:hover { border-color: var(--muted); }
     .agent-edit-tile:has(input:checked) {
       border-color: var(--accent);
-      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
-      background: rgba(167, 139, 250, 0.07);
+      box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35);
+      background: rgba(0, 255, 255, 0.07);
     }
     .agent-edit-tile-input {
       position: absolute;
@@ -3448,7 +3448,7 @@
     .crons-expr {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 0.82rem;
-      color: #c4b5fd;
+      color: #67e8f9;
     }
     .crons-source-badge {
       display: inline-block;
@@ -3458,9 +3458,9 @@
       text-transform: lowercase;
       padding: 0.12rem 0.45rem;
       border-radius: 999px;
-      background: rgba(167, 139, 250, 0.12);
-      color: #c4b5fd;
-      border: 1px solid rgba(167, 139, 250, 0.22);
+      background: rgba(0, 255, 255, 0.12);
+      color: #67e8f9;
+      border: 1px solid rgba(0, 255, 255, 0.22);
     }
     .crons-table-system td:nth-child(2) {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
