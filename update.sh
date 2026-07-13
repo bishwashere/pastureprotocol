@@ -178,6 +178,9 @@ for f in "$SRC"/*; do
   rm -rf "$ROOT/$name"
   cp -R "$f" "$ROOT/"
 done
+for stale in pnpm-workspace.yaml pnpm-workspace.yml; do
+  [ -e "$SRC/$stale" ] || rm -f "$ROOT/$stale"
+done
 
 echo "  ► Installing dependencies..."
 # Prefer pnpm (project uses it); avoid running npm over pnpm node_modules (causes "matches" error).
@@ -194,10 +197,6 @@ fi
   echo "  ✖ OpenAI browser-login runtime is missing after dependency install."
   exit 1
 }
-
-echo "  ► Running startup smoke test..."
-(cd "$ROOT" && node scripts/test/unit/core/test-module-imports.js)
-(cd "$ROOT" && node scripts/test/unit/skills/test-skill-executor-map.js)
 
 # Record build id and show final version
 if [ -z "$AFTER_BUILD" ]; then

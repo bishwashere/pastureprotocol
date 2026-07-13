@@ -106,6 +106,28 @@ function checkPastureLauncherNotLegacyShim() {
   return { ok: true, detail: 'pasture launcher is the sole CLI entry point; no legacy name references' };
 }
 
+function checkInstallUpdateDoNotRunUnitTests() {
+  const files = [
+    ['install.sh', readFileSync(INSTALL_SH, 'utf8')],
+    ['update.sh', readFileSync(UPDATE_SH, 'utf8')],
+    ['install.ps1', readFileSync(join(ROOT, 'install.ps1'), 'utf8')],
+    ['update.ps1', readFileSync(join(ROOT, 'update.ps1'), 'utf8')],
+  ];
+  const checks = [];
+  for (const [label, src] of files) {
+    if (src.includes('scripts/test/')) {
+      checks.push(`${label} must not run repo unit tests during install/update`);
+    }
+  }
+  for (const [label, src] of files) {
+    if (!src.includes('pnpm-workspace.yaml') || !src.includes('pnpm-workspace.yml')) {
+      checks.push(`${label} must remove stale pnpm workspace metadata from older installs`);
+    }
+  }
+  if (checks.length) return { ok: false, detail: checks.join('; ') };
+  return { ok: true, detail: 'install/update skip unit tests and clean stale pnpm workspace metadata' };
+}
+
 function checkCliSetupCommand() {
   const cli = readFileSync(join(ROOT, 'cli.js'), 'utf8');
   const checks = [];
@@ -190,6 +212,14 @@ async function main() {
     status: launcher.ok ? 'pass' : 'fail',
   });
 
+  const installPolicy = checkInstallUpdateDoNotRunUnitTests();
+  recordCase({
+    name: 'install/update policy',
+    input: 'runtime install path vs repo tests',
+    output: installPolicy.detail,
+    status: installPolicy.ok ? 'pass' : 'fail',
+  });
+
   const setupCmd = checkCliSetupCommand();
   recordCase({
     name: 'pasture setup command',
@@ -222,7 +252,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && setupCmd.ok && cloudPriority.ok && shellOk ? 0 : 1);
+  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && installPolicy.ok && setupCmd.ok && cloudPriority.ok && shellOk ? 0 : 1);
 }
 
 main();

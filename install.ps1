@@ -564,6 +564,11 @@ try {
     # --- install code ---
     Write-Host "  > Installing to $InstallDir ..."
     Copy-PastureTree -SourceDir $Src -DestDir $InstallDir
+    foreach ($stale in @("pnpm-workspace.yaml", "pnpm-workspace.yml")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Src $stale))) {
+            Remove-Item -LiteralPath (Join-Path $InstallDir $stale) -Force -ErrorAction SilentlyContinue
+        }
+    }
 
     $pkgPath = Join-Path $InstallDir "package.json"
     if (-not (Test-Path -LiteralPath $pkgPath) -or -not (Test-Path -LiteralPath (Join-Path $InstallDir "index.js"))) {
@@ -647,9 +652,6 @@ node "$InstallDir\cli.js" %*
             Write-Host "  [X] OpenAI browser-login runtime missing after install (@openai/codex)."
             Exit-Install 1
         }
-        Write-Host "  > Running startup smoke test..."
-        Invoke-Native "startup smoke test" { node scripts/test/unit/core/test-module-imports.js }
-        Invoke-Native "skill/executor unit map" { node scripts/test/unit/skills/test-skill-executor-map.js }
     } finally {
         Pop-Location
     }

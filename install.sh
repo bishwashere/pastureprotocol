@@ -77,6 +77,9 @@ mkdir -p "$INSTALL_DIR"
 
 rsync -a --exclude=node_modules "$EXTRACTED/" "$INSTALL_DIR/" 2>/dev/null \
   || cp -R "$EXTRACTED/"* "$INSTALL_DIR/"
+for stale in pnpm-workspace.yaml pnpm-workspace.yml; do
+  [ -e "$EXTRACTED/$stale" ] || rm -f "$INSTALL_DIR/$stale"
+done
 
 cd "$INSTALL_DIR"
 
@@ -157,11 +160,6 @@ install_deps() {
 }
 
 install_deps
-echo ""
-
-echo "  ► Running startup smoke test..."
-node scripts/test/unit/core/test-module-imports.js
-node scripts/test/unit/skills/test-skill-executor-map.js
 echo ""
 
 # --- setup ---------------------------------------------------------
