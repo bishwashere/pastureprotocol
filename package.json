@@ -87,6 +87,8 @@
     "test:update-build": "node scripts/test/unit/core/test-update-build.js",
     "test:install": "node scripts/test/unit/core/test-install.js",
     "test:daemon-pm2": "node scripts/test/unit/core/test-daemon-pm2.js",
+    "test:module-imports": "node scripts/test/unit/core/test-module-imports.js",
+    "test:skill-executor-map": "node scripts/test/unit/skills/test-skill-executor-map.js",
     "test:install-update-win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/unit/core/test-install-update-win.ps1",
     "test:dry-run": "node scripts/test/unit/core/test-dry-run.js",
     "test:intent-planner": "node scripts/test/unit/agent/test-intent-planner.js",
@@ -143,7 +145,7 @@
     "test:preflight": "node scripts/test/unit/core/test-preflight.js",
     "test:system-prompt-grounding": "node scripts/test/unit/agent/test-system-prompt-grounding.js",
     "test:skill-migration": "node scripts/test/unit/skills/test-skill-migration.js",
-    "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner && pnpm run test:http-skill && pnpm run test:preflight && pnpm run test:system-prompt-grounding && pnpm run test:skill-migration"
+    "test:all": "pnpm run test:module-imports && pnpm run test:skill-executor-map && pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner && pnpm run test:http-skill && pnpm run test:preflight && pnpm run test:system-prompt-grounding && pnpm run test:skill-migration"
   },
   "dependencies": {
     "@inquirer/select": "^5.0.4",

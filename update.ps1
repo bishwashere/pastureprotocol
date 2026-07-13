@@ -368,6 +368,9 @@ try {
             Write-Host "  [X] OpenAI browser-login runtime missing after install (@openai/codex)."
             Exit-Update 1
         }
+        Write-Host "  > Running startup smoke test..."
+        Invoke-Native "startup smoke test" { node scripts/test/unit/core/test-module-imports.js }
+        Invoke-Native "skill/executor unit map" { node scripts/test/unit/skills/test-skill-executor-map.js }
     } finally {
         Pop-Location
     }

@@ -195,6 +195,10 @@ fi
   exit 1
 }
 
+echo "  ► Running startup smoke test..."
+(cd "$ROOT" && node scripts/test/unit/core/test-module-imports.js)
+(cd "$ROOT" && node scripts/test/unit/skills/test-skill-executor-map.js)
+
 # Record build id and show final version
 if [ -z "$AFTER_BUILD" ]; then
   AFTER_BUILD=$(fetch_remote_build)

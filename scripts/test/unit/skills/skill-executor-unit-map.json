@@ -1,0 +1,234 @@
+{
+  "executors": {
+    "lib/agent/executors/agent-send.js": {
+      "skillIds": ["agent-send"],
+      "unitTests": ["scripts/test/unit/agent/test-forced-delegation.js", "scripts/test/unit/agent/test-delegation-routing-details.js", "scripts/test/unit/skills/test-group-blocklist.js"]
+    },
+    "lib/agent/executors/apply-patch.js": {
+      "skillIds": ["apply-patch"],
+      "unitTests": ["scripts/test/unit/skills/test-apply-patch.js", "scripts/test/unit/skills/test-apply-patch-unit.js"]
+    },
+    "lib/agent/executors/background-tasks.js": {
+      "skillIds": ["background-tasks"],
+      "unitTests": ["scripts/test/unit/agent/test-background-tasks.js"]
+    },
+    "lib/agent/executors/browse.js": {
+      "skillIds": ["browse"],
+      "unitTests": ["scripts/test/unit/skills/test-browse-session-key.js"]
+    },
+    "lib/agent/executors/browser.js": {
+      "skillIds": ["search"],
+      "unitTests": ["scripts/test/unit/core/test-weather-answer-policy.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/calendar.js": {
+      "skillIds": ["calendar"],
+      "unitTests": ["scripts/test/unit/skills/test-calendar-skill.js"]
+    },
+    "lib/agent/executors/core.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/cron.js": {
+      "skillIds": ["cron"],
+      "unitTests": ["scripts/test/unit/core/test-cron-conditional.js", "scripts/test/unit/core/test-system-crons.js"]
+    },
+    "lib/agent/executors/edit.js": {
+      "skillIds": ["edit"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/evaluate-team-capability.js": {
+      "skillIds": ["evaluate-team-capability"],
+      "unitTests": ["scripts/test/unit/agent/test-evaluate-team-capability.js"]
+    },
+    "lib/agent/executors/file-verification.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/skills/test-apply-patch.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/github.js": {
+      "skillIds": ["github"],
+      "unitTests": ["scripts/test/unit/skills/test-github-skill.js", "scripts/test/unit/core/test-github-context.js"]
+    },
+    "lib/agent/executors/gmail.js": {
+      "skillIds": ["gmail"],
+      "unitTests": ["scripts/test/unit/skills/test-gmail-skill.js"]
+    },
+    "lib/agent/executors/go-read.js": {
+      "skillIds": ["go-read"],
+      "unitTests": ["scripts/test/unit/core/test-go-read-fs.js", "scripts/test/unit/core/test-go-read-sql.js"]
+    },
+    "lib/agent/executors/go-write.js": {
+      "skillIds": ["go-write"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/gog.js": {
+      "skillIds": ["gog"],
+      "unitTests": ["scripts/test/unit/core/test-credential-utils.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/home-assistant.js": {
+      "skillIds": ["home-assistant"],
+      "unitTests": ["scripts/test/unit/skills/test-home-assistant-format.js"]
+    },
+    "lib/agent/executors/http.js": {
+      "skillIds": ["http"],
+      "unitTests": ["scripts/test/unit/skills/test-http-skill.js"]
+    },
+    "lib/agent/executors/me.js": {
+      "skillIds": ["me"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/memory.js": {
+      "skillIds": ["memory"],
+      "unitTests": ["scripts/test/unit/core/test-memory-index-files.js", "scripts/test/unit/core/test-chat-history.js"]
+    },
+    "lib/agent/executors/mongodb.js": {
+      "skillIds": ["mongodb"],
+      "unitTests": ["scripts/test/unit/core/test-mongodb.js"]
+    },
+    "lib/agent/executors/project-tree-copy.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/project-workflow.js": {
+      "skillIds": ["project-workflow"],
+      "unitTests": ["scripts/test/unit/core/test-project-workflow.js", "scripts/test/unit/core/test-projects-db.js"]
+    },
+    "lib/agent/executors/read.js": {
+      "skillIds": ["read"],
+      "unitTests": ["scripts/test/unit/core/test-workspace-path.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/rsync-allowlisted.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/run-allowlisted.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/core/test-go-read-fs.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/spawn-with-timeout.js": {
+      "skillIds": [],
+      "unitTests": ["scripts/test/unit/core/test-spawn-with-timeout.js"]
+    },
+    "lib/agent/executors/speech.js": {
+      "skillIds": ["speech"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/ssh-inspect.js": {
+      "skillIds": ["ssh-inspect"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/vision.js": {
+      "skillIds": ["vision"],
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "lib/agent/executors/write.js": {
+      "skillIds": ["write"],
+      "unitTests": ["scripts/test/unit/core/test-atomic-write.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    }
+  },
+  "skills": {
+    "skills/agent-send/SKILL.md": {
+      "executor": "lib/agent/executors/agent-send.js",
+      "unitTests": ["scripts/test/unit/agent/test-forced-delegation.js", "scripts/test/unit/agent/test-delegation-routing-details.js"]
+    },
+    "skills/apply-patch/SKILL.md": {
+      "executor": "lib/agent/executors/apply-patch.js",
+      "unitTests": ["scripts/test/unit/skills/test-apply-patch.js", "scripts/test/unit/skills/test-apply-patch-unit.js"]
+    },
+    "skills/background-tasks/SKILL.md": {
+      "executor": "lib/agent/executors/background-tasks.js",
+      "unitTests": ["scripts/test/unit/agent/test-background-tasks.js"]
+    },
+    "skills/browse/SKILL.md": {
+      "executor": "lib/agent/executors/browse.js",
+      "unitTests": ["scripts/test/unit/skills/test-browse-session-key.js"]
+    },
+    "skills/calendar/SKILL.md": {
+      "executor": "lib/agent/executors/calendar.js",
+      "unitTests": ["scripts/test/unit/skills/test-calendar-skill.js"]
+    },
+    "skills/core/SKILL.md": {
+      "executor": null,
+      "unitTests": ["scripts/test/unit/skills/test-group-blocklist.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/cron/SKILL.md": {
+      "executor": "lib/agent/executors/cron.js",
+      "unitTests": ["scripts/test/unit/core/test-cron-conditional.js", "scripts/test/unit/core/test-system-crons.js"]
+    },
+    "skills/edit/SKILL.md": {
+      "executor": "lib/agent/executors/edit.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/evaluate-team-capability/SKILL.md": {
+      "executor": "lib/agent/executors/evaluate-team-capability.js",
+      "unitTests": ["scripts/test/unit/agent/test-evaluate-team-capability.js"]
+    },
+    "skills/github/SKILL.md": {
+      "executor": "lib/agent/executors/github.js",
+      "unitTests": ["scripts/test/unit/skills/test-github-skill.js", "scripts/test/unit/core/test-github-context.js"]
+    },
+    "skills/gmail/SKILL.md": {
+      "executor": "lib/agent/executors/gmail.js",
+      "unitTests": ["scripts/test/unit/skills/test-gmail-skill.js"]
+    },
+    "skills/go-read/SKILL.md": {
+      "executor": "lib/agent/executors/go-read.js",
+      "unitTests": ["scripts/test/unit/core/test-go-read-fs.js", "scripts/test/unit/core/test-go-read-sql.js"]
+    },
+    "skills/go-write/SKILL.md": {
+      "executor": "lib/agent/executors/go-write.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/gog/SKILL.md": {
+      "executor": "lib/agent/executors/gog.js",
+      "unitTests": ["scripts/test/unit/core/test-credential-utils.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/home-assistant/SKILL.md": {
+      "executor": "lib/agent/executors/home-assistant.js",
+      "unitTests": ["scripts/test/unit/skills/test-home-assistant-format.js"]
+    },
+    "skills/http/SKILL.md": {
+      "executor": "lib/agent/executors/http.js",
+      "unitTests": ["scripts/test/unit/skills/test-http-skill.js"]
+    },
+    "skills/me/SKILL.md": {
+      "executor": "lib/agent/executors/me.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/memory/SKILL.md": {
+      "executor": "lib/agent/executors/memory.js",
+      "unitTests": ["scripts/test/unit/core/test-memory-index-files.js", "scripts/test/unit/core/test-chat-history.js"]
+    },
+    "skills/mongodb/SKILL.md": {
+      "executor": "lib/agent/executors/mongodb.js",
+      "unitTests": ["scripts/test/unit/core/test-mongodb.js"]
+    },
+    "skills/project-workflow/SKILL.md": {
+      "executor": "lib/agent/executors/project-workflow.js",
+      "unitTests": ["scripts/test/unit/core/test-project-workflow.js", "scripts/test/unit/core/test-projects-db.js"]
+    },
+    "skills/read/SKILL.md": {
+      "executor": "lib/agent/executors/read.js",
+      "unitTests": ["scripts/test/unit/core/test-workspace-path.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/search/SKILL.md": {
+      "executor": "lib/agent/executors/browser.js",
+      "unitTests": ["scripts/test/unit/core/test-weather-answer-policy.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/speech/SKILL.md": {
+      "executor": "lib/agent/executors/speech.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/ssh-inspect/SKILL.md": {
+      "executor": "lib/agent/executors/ssh-inspect.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/vision/SKILL.md": {
+      "executor": "lib/agent/executors/vision.js",
+      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/write/SKILL.md": {
+      "executor": "lib/agent/executors/write.js",
+      "unitTests": ["scripts/test/unit/core/test-atomic-write.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
+    }
+  }
+}
