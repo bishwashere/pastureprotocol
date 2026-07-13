@@ -1784,7 +1784,7 @@ function renderSystemCronVariant(row) {
         var auth = JSON.parse(JSON.stringify(model.auth));
         auth.type = String(auth.type || (isLocal ? 'none' : 'api_key')).toLowerCase();
         auth.type = configNormalizeAuthTypeForProvider(auth.type, provider);
-        if (!auth.cache) auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
+        if (auth.type !== 'chatgpt' && !auth.cache) auth.cache = auth.account || ((provider || 'llm') + '-' + (index + 1));
         return auth;
       }
       if (model.apiKey) return { type: 'api_key', env: model.apiKey };
@@ -1812,7 +1812,7 @@ function renderSystemCronVariant(row) {
         '<div class="field" data-auth-field="api"' + configHiddenAttr(configAuthFieldHidden(type, 'api')) + '><label>API key env var</label><input type="text" data-f="authEnv" value="' + escapeHtml(auth.env || '') + '" placeholder="LLM_1_API_KEY"></div>' +
         '<div class="field" data-auth-field="bearer"' + configHiddenAttr(configAuthFieldHidden(type, 'bearer')) + '><label>Bearer token file</label><input type="text" data-f="authFile" value="' + escapeHtml(auth.file || '') + '" placeholder="/path/to/token"></div>';
       var oauthFields =
-        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Connect</button>';
+        '<button type="button" class="config-llm-login link-btn" data-login-model="' + index + '"' + (type === 'chatgpt' || type === 'oauth' || type === 'device_code' ? '' : ' hidden') + '>Connect</button>';
       return typeSelect + apiFields + oauthFields;
     }
 
@@ -2097,15 +2097,15 @@ function renderSystemCronVariant(row) {
         if (savedEl) {
           savedEl.textContent = d.method === 'device_code'
             ? ('Login opened. Enter code ' + d.userCode + ' in the new tab.')
-            : (d.method === 'imported' ? 'LLM login complete.' : 'Login opened. Finish it in the new tab.');
+            : 'Login opened. Finish it in the new tab.';
           savedEl.style.display = 'inline';
         }
-        if (d.method === 'device_code' && d.id) {
+        if ((d.method === 'device_code' || d.method === 'chatgpt') && d.id) {
           var polls = 0;
           var timer = setInterval(async function () {
             polls += 1;
             try {
-              var sr = await fetch(API + '/api/llm-auth/device/' + encodeURIComponent(d.id));
+              var sr = await fetch(API + (d.method === 'chatgpt' ? '/api/llm-auth/chatgpt/' : '/api/llm-auth/device/') + encodeURIComponent(d.id));
               var sd = await sr.json().catch(function () { return {}; });
               if (sd.status === 'complete') {
                 clearInterval(timer);
@@ -2140,7 +2140,7 @@ function renderSystemCronVariant(row) {
       var browserLoginIndexes = [];
       models.forEach(function (m, i) {
         var type = String(m && m.auth && m.auth.type || '').toLowerCase();
-        if (type === 'oauth' || type === 'device_code') browserLoginIndexes.push(i);
+        if (type === 'chatgpt' || type === 'oauth' || type === 'device_code') browserLoginIndexes.push(i);
       });
       if (!browserLoginIndexes.length) return false;
       var r = await fetch(API + '/api/llm-auth/status');
@@ -2197,7 +2197,7 @@ function renderSystemCronVariant(row) {
         select.addEventListener('change', function () {
           var card = select.closest('.config-model-card');
           var login = card && card.querySelector('.config-llm-login');
-          if (login) login.hidden = select.value !== 'oauth' && select.value !== 'device_code';
+          if (login) login.hidden = select.value !== 'chatgpt' && select.value !== 'oauth' && select.value !== 'device_code';
           if (card) {
             card.querySelectorAll('[data-auth-field]').forEach(function (field) {
               var fieldType = field.getAttribute('data-auth-field');
@@ -2218,7 +2218,7 @@ function renderSystemCronVariant(row) {
           var normalized = configNormalizeAuthTypeForProvider(authSelect.value, select.value);
           authSelect.value = normalized;
           var login = card.querySelector('.config-llm-login');
-          if (login) login.hidden = normalized !== 'oauth' && normalized !== 'device_code';
+          if (login) login.hidden = normalized !== 'chatgpt' && normalized !== 'oauth' && normalized !== 'device_code';
           card.querySelectorAll('[data-auth-field]').forEach(function (field) {
             var fieldType = field.getAttribute('data-auth-field');
             field.hidden = configAuthFieldHidden(normalized, fieldType);
@@ -2279,6 +2279,8 @@ function renderSystemCronVariant(row) {
         } else if (authType === 'bearer_token') {
           if (authEnvEl && authEnvEl.value.trim()) auth.env = authEnvEl.value.trim();
           if (authFileEl && authFileEl.value.trim()) auth.file = authFileEl.value.trim();
+        } else if (authType === 'chatgpt') {
+          auth = { type: 'chatgpt' };
         } else if (authType === 'oauth' || authType === 'device_code') {
           var existingModels = Array.isArray(base && base.llm && base.llm.models) ? base.llm.models : [];
           var existingAuth = existingModels[i] && existingModels[i].auth && typeof existingModels[i].auth === 'object' ? existingModels[i].auth : {};
@@ -5131,7 +5133,7 @@ function renderSystemCronVariant(row) {
       if (String(provider || '').toLowerCase() === 'openai') {
         return [
           { value: 'api_key', label: 'API key' },
-          { value: 'oauth', label: 'Browser login' }
+          { value: 'chatgpt', label: 'Browser login' }
         ];
       }
       var options = [{ value: 'api_key', label: 'API key' }];
@@ -5142,7 +5144,7 @@ function renderSystemCronVariant(row) {
     function configNormalizeAuthTypeForProvider(type, provider) {
       var p = String(provider || '').toLowerCase();
       if (configUsesDeviceCodeLogin(p) && (type === 'oauth' || type === 'xai_oauth')) type = 'device_code';
-      if (p === 'openai' && type === 'device_code') type = 'oauth';
+      if (p === 'openai' && (type === 'device_code' || type === 'oauth' || type === 'codex_chatgpt')) type = 'chatgpt';
       var options = configAuthOptionsForProvider(provider, type);
       return options.some(function (item) { return item.value === type; }) ? type : options[0].value;
     }

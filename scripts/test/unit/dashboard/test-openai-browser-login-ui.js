@@ -22,14 +22,14 @@ assert.deepStrictEqual(
   authHelpers.configAuthOptionsForProvider('openai', 'api_key'),
   [
     { value: 'api_key', label: 'API key' },
-    { value: 'oauth', label: 'Browser login' },
+    { value: 'chatgpt', label: 'Browser login' },
   ],
-  'OpenAI offers API key and browser-login auth',
+  'OpenAI offers API key and isolated browser-login auth',
 );
 assert.strictEqual(
   authHelpers.configNormalizeAuthTypeForProvider('oauth', 'openai'),
-  'oauth',
-  'OpenAI browser-login selection remains oauth for saved-auth import',
+  'chatgpt',
+  'OpenAI browser-login selection uses Pasture-managed ChatGPT auth',
 );
 assert.deepStrictEqual(
   authHelpers.configAuthOptionsForProvider('xai', 'device_code').map((item) => item.value),
@@ -41,13 +41,14 @@ assert(!dashboardJs.includes('Login once'), 'dashboard no longer says Login once
 assert(dashboardJs.includes('>Connect</button>'), 'browser auth action uses neutral Connect wording');
 
 assert(
-  dashboardServer.includes('importOpenAiBrowserAuth') &&
-    !dashboardServer.includes('startCodexChatGptLogin'),
-  'OpenAI browser-login route imports existing saved auth instead of starting a fresh popup flow',
+  dashboardServer.includes('startCodexChatGptLogin') &&
+    dashboardServer.includes('readCodexChatGptAccount') &&
+    !dashboardServer.includes('importOpenAiBrowserAuth'),
+  'OpenAI browser-login route starts isolated Pasture Codex auth instead of importing system Codex auth',
 );
 assert(
-  dashboardServer.includes("method: 'imported'"),
-  'OpenAI saved-auth import reports imported login status',
+  dashboardServer.includes("method: 'chatgpt'"),
+  'OpenAI browser-login route reports ChatGPT login status',
 );
 
 const collectStart = dashboardJs.indexOf('function collectConfigFromUi(');
@@ -56,6 +57,7 @@ assert(collectStart >= 0 && collectEnd > collectStart, 'config serialization hel
 const collectSource = dashboardJs.slice(collectStart, collectEnd);
 assert(collectSource.includes('var priorityRadio = document.querySelector'), 'priority is read from the selected radio');
 assert(collectSource.includes('if (i === priorityIdx) o.priority = true;'), 'only the selected model receives priority');
+assert(collectSource.includes("auth = { type: 'chatgpt' };"), 'OpenAI Browser login saves Pasture-managed chatgpt auth');
 assert(
   collectSource.indexOf('if (i === priorityIdx) o.priority = true;') > collectSource.indexOf('auth: auth'),
   'priority is applied independently from auth serialization',

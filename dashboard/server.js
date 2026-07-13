@@ -31,10 +31,15 @@ import {
   createOAuthLoginRequest,
   exchangeOAuthCode,
   getLlmAuthStatus,
-  importOpenAiBrowserAuth,
   normalizeLlmAuth,
   writeLlmAuthToken,
 } from '../lib/llm/auth.js';
+import {
+  cancelCodexChatGptLogin,
+  getCodexChatGptLoginStatus,
+  readCodexChatGptAccount,
+  startCodexChatGptLogin,
+} from '../lib/llm/codex-app-server.js';
 
 // Use same state dir as main app (e.g. PASTURE_STATE_DIR from ~/.pasture/.env)
 dotenv.config({ path: getEnvPath() });
@@ -1359,17 +1364,44 @@ app.get('/api/config', (_req, res) => {
   }
 });
 
-app.get('/api/llm-auth/status', (_req, res) => {
+async function dashboardLlmAuthStatus(entry, index) {
+  const auth = normalizeLlmAuth(entry, index);
+  const status = getLlmAuthStatus(auth, entry);
+  if (auth.type !== 'chatgpt') return status;
+  try {
+    const account = await readCodexChatGptAccount({ refreshToken: true, timeoutMs: 20_000 });
+    const isConnected = account?.account?.type === 'chatgpt';
+    return {
+      ...status,
+      configured: isConnected,
+      account: isConnected
+        ? {
+            type: account.account.type,
+            planType: account.account.planType || account.account.plan_type || null,
+          }
+        : null,
+    };
+  } catch (err) {
+    return {
+      ...status,
+      configured: false,
+      error: err?.message || String(err),
+    };
+  }
+}
+
+app.get('/api/llm-auth/status', async (_req, res) => {
   try {
     const config = loadConfig();
     const models = Array.isArray(config?.llm?.models) ? config.llm.models : [];
+    const statuses = await Promise.all(models.map(async (entry, index) => ({
+      index,
+      provider: entry?.provider || '',
+      model: entry?.model || '',
+      auth: await dashboardLlmAuthStatus(entry, index),
+    })));
     res.json({
-      models: models.map((entry, index) => ({
-        index,
-        provider: entry?.provider || '',
-        model: entry?.model || '',
-        auth: getLlmAuthStatus(normalizeLlmAuth(entry, index), entry),
-      })),
+      models: statuses,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1392,8 +1424,20 @@ app.post('/api/llm-auth/login', (req, res) => {
     }
     const entry = models[index];
     const auth = normalizeLlmAuth(entry, index);
-    if (auth.type !== 'oauth' && auth.type !== 'device_code') {
-      res.status(400).json({ error: 'Selected LLM auth type is not oauth or device_code' });
+    if (auth.type !== 'chatgpt' && auth.type !== 'oauth' && auth.type !== 'device_code') {
+      res.status(400).json({ error: 'Selected LLM auth type is not browser-login capable' });
+      return;
+    }
+    if (auth.type === 'chatgpt') {
+      startCodexChatGptLogin().then((login) => {
+        res.json({
+          method: 'chatgpt',
+          id: login.id,
+          url: login.url,
+        });
+      }).catch((err) => {
+        res.status(500).json({ error: err.message });
+      });
       return;
     }
     if (auth.type === 'device_code') {
@@ -1423,15 +1467,6 @@ app.post('/api/llm-auth/login', (req, res) => {
       });
       return;
     }
-    if (String(entry.provider || '').toLowerCase() === 'openai') {
-      const result = importOpenAiBrowserAuth({ ...auth, provider: entry.provider });
-      res.json({
-        method: 'imported',
-        cache: result.cache,
-        path: result.path,
-      });
-      return;
-    }
     const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const host = req.headers['x-forwarded-host'] || req.headers.host || `${HOST}:${PORT}`;
     const login = createOAuthLoginRequest({ ...auth, provider: entry.provider }, `${proto}://${host}`);
@@ -1446,6 +1481,32 @@ app.post('/api/llm-auth/login', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/llm-auth/chatgpt/:id', (req, res) => {
+  try {
+    const status = getCodexChatGptLoginStatus(req.params.id);
+    if (!status) {
+      res.status(404).json({ error: 'ChatGPT login not found' });
+      return;
+    }
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/llm-auth/chatgpt/:id', (req, res) => {
+  const existing = getCodexChatGptLoginStatus(req.params.id);
+  if (!existing) {
+    res.status(404).json({ error: 'ChatGPT login not found' });
+    return;
+  }
+  cancelCodexChatGptLogin(req.params.id)
+    .then((status) => res.json(status))
+    .catch((err) => {
+      res.status(500).json({ error: err.message });
+    });
 });
 
 app.get('/api/llm-auth/device/:id', (req, res) => {
