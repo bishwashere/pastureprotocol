@@ -62,6 +62,31 @@ assert(
 );
 assert(!collectSource.includes('configured'), 'config save does not infer priority from login/configured state');
 
+const normalizeStart = dashboardServer.indexOf('function normalizeProjectLlmPriority(');
+const normalizeEnd = dashboardServer.indexOf('function saveConfig(', normalizeStart);
+assert(normalizeStart >= 0 && normalizeEnd > normalizeStart, 'project config priority normalizer is present');
+const normalizeProjectLlmPriority = new Function(
+  `${dashboardServer.slice(normalizeStart, normalizeEnd)}\nreturn normalizeProjectLlmPriority;`,
+)();
+const normalizedPriorityConfig = normalizeProjectLlmPriority({
+  llm: {
+    models: [
+      { provider: 'lmstudio', model: 'local', priority: true },
+      { provider: 'openai', model: 'gpt-4o', priority: 'true' },
+      { provider: 'anthropic', model: 'claude' },
+    ],
+  },
+});
+assert.deepStrictEqual(
+  normalizedPriorityConfig.llm.models.map((m) => !!m.priority),
+  [true, false, false],
+  'JSON config save keeps one canonical priority flag',
+);
+assert(
+  dashboardServer.includes('const normalized = normalizeProjectLlmPriority(config || {});'),
+  'all root config saves normalize the same priority field used by UI and JSON modes',
+);
+
 assert(dashboardHtml.includes('assets/js/02-crons-skills-agents.js?v=39'), 'dashboard cachebuster is current');
 
 console.log('test-openai-browser-login-ui passed');

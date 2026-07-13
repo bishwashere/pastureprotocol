@@ -133,10 +133,27 @@ function loadConfig() {
   return loadAgentConfig(DEFAULT_AGENT_ID);
 }
 
+function normalizeProjectLlmPriority(config) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return config;
+  const models = config.llm && Array.isArray(config.llm.models) ? config.llm.models : null;
+  if (!models) return config;
+  const priorityIndex = models.findIndex((entry) =>
+    entry && typeof entry === 'object' &&
+      (entry.priority === true || entry.priority === 1 || String(entry.priority).toLowerCase() === 'true'));
+  config.llm.models = models.map((entry, i) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    if (i === priorityIndex) return { ...entry, priority: true };
+    const { priority, ...rest } = entry;
+    return rest;
+  });
+  return config;
+}
+
 function saveConfig(config) {
   ensureMainAgentInitialized();
-  saveAgentConfig(DEFAULT_AGENT_ID, config || {});
-  writeFileSync(getConfigPath(), JSON.stringify(config || {}, null, 2), 'utf8');
+  const normalized = normalizeProjectLlmPriority(config || {});
+  saveAgentConfig(DEFAULT_AGENT_ID, normalized);
+  writeFileSync(getConfigPath(), JSON.stringify(normalized, null, 2), 'utf8');
 }
 
 function loadGroupConfig(groupId) {
