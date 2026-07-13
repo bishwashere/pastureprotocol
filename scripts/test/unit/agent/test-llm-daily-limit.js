@@ -213,10 +213,36 @@ async function runDailyLimitUserMessage() {
   console.log('test-llm-daily-limit-user-message passed');
 }
 
+async function runAllModelsFailedUserMessage() {
+  const { toUserMessage } = await import('../../../../lib/util/user-error.js');
+  const err = new Error('All configured LLM models failed');
+  err.code = 'LLM_ALL_MODELS_FAILED';
+  err.llmFailures = [
+    {
+      model: 'gpt-4o',
+      local: false,
+      message: 'LLM request failed 429: {"error":{"type":"insufficient_quota","message":"You exceeded your current quota"}}',
+    },
+    {
+      model: 'local',
+      local: true,
+      message: 'LLM request failed 400: {"error":{"message":"No models loaded. Please load a model in the developer page or use the lms load command."}}',
+    },
+  ];
+
+  assert(
+    toUserMessage(err) === "I couldn't answer because gpt-4o hit its API quota, and the local fallback has no model loaded.",
+    `all-model failure should reflect concrete causes, got: ${toUserMessage(err)}`,
+  );
+
+  console.log('test-llm-all-models-user-message passed');
+}
+
 run()
   .then(() => runLocalDownCloudLimited())
   .then(() => runLocalRpmPerMessage())
   .then(() => runDailyLimitUserMessage())
+  .then(() => runAllModelsFailedUserMessage())
   .catch((err) => {
     console.error(err);
     process.exit(1);

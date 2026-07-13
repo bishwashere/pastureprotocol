@@ -357,6 +357,19 @@ function normalizePriorityMode(mode) {
   return raw === LLM_PRIORITY_CUSTOM ? LLM_PRIORITY_CUSTOM : LLM_PRIORITY_SYSTEM;
 }
 
+function createAllModelsFailedError(failures, fallbackError) {
+  const usableFailures = Array.isArray(failures) ? failures.filter(Boolean) : [];
+  if (!usableFailures.length) return fallbackError || new Error('No LLM configured');
+  const summary = usableFailures
+    .map((failure) => `${failure.model || 'unknown'}: ${summarizeLlmError(failure.message || '')}`)
+    .join('; ');
+  const error = new Error(`All configured LLM models failed: ${summary}`);
+  error.code = 'LLM_ALL_MODELS_FAILED';
+  error.llmFailures = usableFailures;
+  if (fallbackError) error.cause = fallbackError;
+  return error;
+}
+
 function readRootConfigRaw() {
   try {
     const raw = readFileSync(getConfigPath(), 'utf8');
@@ -658,6 +671,7 @@ export async function chat(messages, options = {}) {
   const maxTokensOverride = Number(options.maxTokens);
   let lastError;
   let localError;
+  const failures = [];
   for (const opts of models) {
     const callOpts = Number.isFinite(maxTokensOverride) && maxTokensOverride > 0
       ? { ...opts, maxTokens: maxTokensOverride }
@@ -696,10 +710,11 @@ export async function chat(messages, options = {}) {
       } else {
         logLlm('try failed:', label, summarizeLlmError(err?.message));
       }
+      failures.push({ model: label, local: isLocal, message: err?.message || String(err) });
       lastError = err;
     }
   }
-  throw localError || lastError || new Error('No LLM configured');
+  throw createAllModelsFailedError(failures, localError || lastError || new Error('No LLM configured'));
 }
 
 /**
@@ -716,6 +731,7 @@ export async function chatWithTools(messages, tools, options = {}) {
   const toolCount = Array.isArray(tools) ? tools.length : 0;
   let lastError;
   let localError;
+  const failures = [];
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
@@ -762,10 +778,11 @@ export async function chatWithTools(messages, tools, options = {}) {
       } else {
         logLlm('try failed:', label, summarizeLlmError(err?.message));
       }
+      failures.push({ model: label, local: isLocal, message: err?.message || String(err) });
       lastError = err;
     }
   }
-  throw localError || lastError || new Error('No LLM configured');
+  throw createAllModelsFailedError(failures, localError || lastError || new Error('No LLM configured'));
 }
 
 /**
