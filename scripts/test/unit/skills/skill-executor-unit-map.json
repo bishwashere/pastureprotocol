@@ -58,7 +58,7 @@
     },
     "lib/agent/executors/go-write.js": {
       "skillIds": ["go-write"],
-      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+      "unitTests": ["scripts/test/unit/core/test-go-read-fs.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
     },
     "lib/agent/executors/gog.js": {
       "skillIds": ["gog"],
@@ -176,7 +176,7 @@
     },
     "skills/go-write/SKILL.md": {
       "executor": "lib/agent/executors/go-write.js",
-      "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+      "unitTests": ["scripts/test/unit/core/test-go-read-fs.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
     },
     "skills/gog/SKILL.md": {
       "executor": "lib/agent/executors/gog.js",

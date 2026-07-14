@@ -1,12 +1,12 @@
 ---
 id: go-read
 name: Go read
-description: Read and inspect local filesystem resources. Commands: ls, find, cd, pwd, cat, less, du, npm, pnpm, json, sql, sql_schema, dashboard_url. Use for listing directories, finding files, disk usage, showing file contents, read-only npm/pnpm package inspection, structured JSON summaries, read-only SQLite queries, resolving paths and Pasture dashboard URLs. Structured reads surface primary text/label/value and measure fields before transient metadata like ids and paths. Enable in config (skills.enabled).
+description: Read and inspect local filesystem resources. Commands: ls, find, cd, pwd, cat, less, du, npm, pnpm, json, sql, sql_schema, dashboard_url. Use for listing directories, finding files, disk usage, showing file contents, npm/pnpm inspection and project scripts such as run/build/test/start, structured JSON summaries, read-only SQLite queries, resolving paths and Pasture dashboard URLs. Structured reads surface primary text/label/value and measure fields before transient metadata like ids and paths. Enable in config (skills.enabled).
 ---
 
 # Go read
 
-Read-only local inspection commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, and query SQLite databases without modifying them. Filesystem commands are implemented by Pasture directly; do not treat them as raw shell access.
+Local inspection and verification commands. Enable **go-read** in configuration (`skills.enabled`) to list dirs, read files, query SQLite databases, inspect packages, and run project verification scripts. Filesystem commands are implemented by Pasture directly; do not treat them as raw shell access.
 
 Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.action** to the command name. Set **arguments.argv** to an array of arguments (e.g. paths, flags).
 
@@ -19,8 +19,8 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 - **cat** - Output file contents. argv: `["/path/to/file"]`
 - **less** - View file (non-interactive). argv: `["/path/to/file"]` or with flags
 - **du** - Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
-- **npm** - Run read-only npm inspection commands. argv must start with one of: `--version`, `-v`, `version`, `list`, `ls`, `ll`, `root`, `prefix`, `config get`, `explain`, `why`, `view`, `show`, `info`, `search`, or `outdated`. Use for npm version checks, dependency trees, package metadata, config reads, and why/explain diagnostics. Do **not** use for mutating commands such as install, add, remove, update, run, start, build, test, publish, audit fix, cache clean, or config set/delete.
-- **pnpm** - Run read-only pnpm inspection commands. argv must start with one of: `--version`, `-v`, `version`, `list`, `ls`, `ll`, `root`, `prefix`, `config get`, `explain`, `why`, `view`, `show`, `info`, `search`, or `outdated`. Use for pnpm version checks, dependency trees, package metadata, config reads, and why/explain diagnostics. Do **not** use for mutating commands such as install, add, remove, update, run, start, build, test, publish, audit fix, store prune, cache clean, or config set/delete.
+- **npm** - Run npm inspection commands and project scripts. argv must start with one of: `--version`, `-v`, `version`, `list`, `ls`, `ll`, `root`, `prefix`, `config get`, `explain`, `why`, `view`, `show`, `info`, `search`, `outdated`, `run`, `run-script`, `build`, `test`, or `start`. Use for npm version checks, dependency trees, package metadata, config reads, why/explain diagnostics, `npm run ...`, `npm run build`, `npm test`, and `npm start`. Do **not** use for install, add, remove, update, publish, audit fix, cache clean, or config set/delete; use **go-write** for `npm install`.
+- **pnpm** - Run pnpm inspection commands and project scripts. argv must start with one of: `--version`, `-v`, `version`, `list`, `ls`, `ll`, `root`, `prefix`, `config get`, `explain`, `why`, `view`, `show`, `info`, `search`, `outdated`, `run`, `run-script`, `build`, `test`, or `start`. Use for pnpm version checks, dependency trees, package metadata, config reads, why/explain diagnostics, `pnpm run ...`, `pnpm run build`, `pnpm test`, and `pnpm start`. Do **not** use for install, add, remove, update, publish, audit fix, store prune, cache clean, or config set/delete; use **go-write** for `pnpm install`.
 - **json** - Read a JSON file as structured data. Use for cache/API response JSON when the user wants items, labels, words, values, weights, counts, or ranks rather than raw file text. Arguments: **path** required (or first argv), **maxItems** optional. Returns `primaryData` arrays with text/label/name/value and measure fields before metadata.
 - **sql_schema** - Inspect a SQLite database before writing SQL. Defaults to Pasture memory index `~/.pasture/memory/index.db` when no path is provided. Returns tables, columns, create SQL, and small sample rows. Arguments: **path** optional, **sampleRows** optional.
 - **sql** - Run a read-only SQL query against a SQLite database. Defaults to Pasture memory index `~/.pasture/memory/index.db` when no path is provided. The executor loads available SQLite extensions such as sqlite-vec and enforces read-only/query-only mode. Arguments: **path** optional, **sql** or **query** required, **params** optional, **maxRows** or **limit** optional.
@@ -43,7 +43,7 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 
 Use when the user asks to list a directory, find files, show disk usage (du), show file contents (cat/less), inspect a SQLite DB, count database rows, or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "find files", "what's in Downloads", "cat this file", "how big is this folder", "what tables are in this DB", etc.
 
-Use **npm** or **pnpm** only for read-only package-manager inspection: versions, dependency trees, installed package locations, package metadata, config reads, and "why is this dependency installed?" questions. If the user asks to install dependencies, run a script, start a server, run tests, publish, remove packages, update lockfiles, or otherwise change project state, do not use **go-read** package-manager commands; route to the appropriate write/execution path instead.
+Use **npm** or **pnpm** in go-read for package-manager inspection and project verification commands such as `npm run`, `npm run build`, `npm test`, or `npm start`. If the user asks to install dependencies, publish, add/remove/update packages, update lockfiles directly, or otherwise manage dependencies, route to **go-write** for `npm install` or another appropriate write path.
 
 ## SQL reasoning policy
 
@@ -80,11 +80,14 @@ Check pnpm version:
 Inspect npm dependency tree:
 `run_skill` with skill: "go-read", arguments: { command: "npm", argv: ["list", "--depth=0"] }
 
+Run an npm build script:
+`run_skill` with skill: "go-read", arguments: { command: "npm", argv: ["run", "build"] }
+
 ## Tool schema
 
 ```tool-schema
 go_read_run
-  description: Run a read-only local inspection command. Set command to ls, find, cd, pwd, cat, less, du, npm, pnpm, json, sql_schema, or sql; never set command to go_read_run. argv is for filesystem commands and read-only npm/pnpm inspection. For npm/pnpm, use only --version/-v/version/list/ls/ll/root/prefix/config get/explain/why/view/show/info/search/outdated; do not use install/add/remove/update/run/start/build/test/publish/audit fix/cache clean/config set. For json, provide path or argv[0] plus optional maxItems; it returns primaryData arrays with text/label/value and weights/ranks before metadata. For sql_schema, provide optional path/sampleRows. For sql, provide sql/query and optional path/params/maxRows. Structured rows surface primary fields before transient metadata such as ids, paths, chunks, embeddings, and vectors. For top Brain items/words/nodes/terms, do not query chunks for ids/paths/stopwords; run find on ~/.pasture/brain-response-cache with -name *.json because filenames are hashes, use exact returned paths only, prefer larger v2 files, call json on candidates until payload.terms or payload.denseTerms is non-empty, then use the text labels.
+  description: Run a local inspection or verification command. Set command to ls, find, cd, pwd, cat, less, du, npm, pnpm, json, sql_schema, or sql; never set command to go_read_run. argv is for filesystem commands and npm/pnpm inspection/scripts. For npm/pnpm, use only --version/-v/version/list/ls/ll/root/prefix/config get/explain/why/view/show/info/search/outdated/run/run-script/build/test/start; do not use install/add/remove/update/publish/audit fix/cache clean/config set. For json, provide path or argv[0] plus optional maxItems; it returns primaryData arrays with text/label/value and weights/ranks before metadata. For sql_schema, provide optional path/sampleRows. For sql, provide sql/query and optional path/params/maxRows. Structured rows surface primary fields before transient metadata such as ids, paths, chunks, embeddings, and vectors. For top Brain items/words/nodes/terms, do not query chunks for ids/paths/stopwords; run find on ~/.pasture/brain-response-cache with -name *.json because filenames are hashes, use exact returned paths only, prefer larger v2 files, call json on candidates until payload.terms or payload.denseTerms is non-empty, then use the text labels.
   parameters:
     command: string
     argv: array

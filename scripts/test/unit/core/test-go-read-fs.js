@@ -8,7 +8,9 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { executeGoRead } from '../../../../lib/agent/executors/go-read.js';
+import { executeGoRead, validatePackageManagerArgs } from '../../../../lib/agent/executors/go-read.js';
+import { validateCreateNextAppArgs, validatePackageManagerWriteArgs } from '../../../../lib/agent/executors/go-write.js';
+import { getSkillContext } from '../../../../skills/loader.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -57,8 +59,44 @@ async function main() {
   const npmVersionPatch = JSON.parse(await executeGoRead(ctx, { action: 'npm', argv: ['version', 'patch'] }));
   assert(/read-only/i.test(npmVersionPatch.error || ''), `expected npm version patch to be refused, got ${JSON.stringify(npmVersionPatch)}`);
 
-  const pnpmRun = JSON.parse(await executeGoRead(ctx, { action: 'pnpm', argv: ['run', 'test'] }));
-  assert(/not allowed/i.test(pnpmRun.error || ''), `expected pnpm run to be refused, got ${JSON.stringify(pnpmRun)}`);
+  const pnpmRun = validatePackageManagerArgs('pnpm', ['run', 'test']);
+  assert(pnpmRun.ok, `expected pnpm run to be allowed in go-read, got ${JSON.stringify(pnpmRun)}`);
+
+  const npmBuild = validatePackageManagerArgs('npm', ['run', 'build']);
+  assert(npmBuild.ok, `expected npm run build to be allowed in go-read, got ${JSON.stringify(npmBuild)}`);
+
+  const npmStart = validatePackageManagerArgs('npm', ['start']);
+  assert(npmStart.ok, `expected npm start to be allowed in go-read, got ${JSON.stringify(npmStart)}`);
+
+  const writeInstall = validatePackageManagerWriteArgs('npm', ['install']);
+  assert(writeInstall.ok, `expected npm install to be allowed in go-write, got ${JSON.stringify(writeInstall)}`);
+
+  const writeRun = validatePackageManagerWriteArgs('npm', ['run', 'build']);
+  assert(!writeRun.ok && /not allowed/i.test(writeRun.error || ''), `expected npm run build to be refused in go-write, got ${JSON.stringify(writeRun)}`);
+
+  const nextApp = validateCreateNextAppArgs({
+    path: 'my-personal-portfolio',
+    packageManager: 'npm',
+    typescript: true,
+    tailwind: true,
+    eslint: true,
+    appRouter: true,
+    srcDir: false,
+    importAlias: '@/*',
+  }, ctx);
+  assert(nextApp.ok, `expected create_next_app args to be valid, got ${JSON.stringify(nextApp)}`);
+  assert(nextApp.command === 'npx', `expected npm-backed scaffold to use npx, got ${nextApp.command}`);
+  assert(nextApp.argv.includes('create-next-app@latest'), `expected create-next-app package in argv, got ${nextApp.argv.join(' ')}`);
+  assert(nextApp.argv.includes('--typescript'), `expected --typescript in argv, got ${nextApp.argv.join(' ')}`);
+  assert(nextApp.argv.includes('--tailwind'), `expected --tailwind in argv, got ${nextApp.argv.join(' ')}`);
+  assert(nextApp.argv.includes('--app'), `expected --app in argv, got ${nextApp.argv.join(' ')}`);
+
+  const badNextApp = validateCreateNextAppArgs({ path: 'x', packageManager: 'npx' }, ctx);
+  assert(!badNextApp.ok && /packageManager/i.test(badNextApp.error || ''), `expected packageManager guard, got ${JSON.stringify(badNextApp)}`);
+
+  const skillContext = getSkillContext({ hintSkills: ['go-write'] });
+  const toolNames = skillContext.runSkillTool.map((tool) => tool?.function?.name).filter(Boolean);
+  assert(toolNames.includes('go_write_create_next_app'), `expected go_write_create_next_app tool, got ${toolNames.join(', ')}`);
 
   const missing = JSON.parse(await executeGoRead(ctx, { action: 'ls', argv: ['missing'] }));
   assert(/not found/i.test(missing.error || ''), `expected missing path error, got ${JSON.stringify(missing)}`);

@@ -69,6 +69,8 @@ If recent conversation established an active repo/task, short follow-ups like â€
 
 Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, keep the route grounded in available inspection/context tools and make the planned blocker the missing command capability; do not call it read-only filesystem access.
 
+If `go-write` is available and its skill summary mentions `create_next_app` or creating Next.js apps, treat "create/scaffold a Next.js project/app/site" as an available narrow package-generator capability. Include `go-write` and plan to call the dedicated Next.js scaffold action before final answering.
+
 For project/mission follow-ups where the user says to start or do a specific tracked task, include `project-workflow` and make the plan explicitly update that task to `doing` before doing implementation work, then update/log progress after meaningful work. Do not create a new placeholder task from the confirmation text itself.
 
 ## Self-inspection

@@ -29,6 +29,8 @@ Implementation plans must require real tool execution before the final answer. T
 
 Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, plan a concise capability-blocked answer and do not describe it as read-only filesystem access.
 
+If `go-write` is available and its description mentions `create_next_app` or creating Next.js apps, requests to create/scaffold a Next.js project/app/site have a narrow package-generator path. Route them to code/tool use with `go-write` rather than treating package scaffolding as unavailable.
+
 ## Live and local answers
 
 For current, recent, or live information, including weather, choose the relevant live-data skill such as `search` when available. For weather or other location-sensitive live queries, do not ask for a location before acting if the user has a known/default location in profile, memory, identity, or recent conversation. Plan to use that default location, answer first, and optionally ask a follow-up correction at the end.
