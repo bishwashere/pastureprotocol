@@ -145,6 +145,20 @@ function renderSystemCronVariant(row) {
       return div.innerHTML;
     }
 
+    function confirmSkillToggle(cb, skillId) {
+      if (!cb) return false;
+      var id = skillId || cb.getAttribute('data-id') || cb.getAttribute('data-agent-skill') || cb.getAttribute('data-config-skill') || 'this skill';
+      var nextChecked = cb.checked;
+      var action = nextChecked ? 'enable' : 'disable';
+      var ok = window.confirm(
+        'Confirm skill change\n\n' +
+        'Are you sure you want to ' + action + ' "' + id + '"?\n\n' +
+        'Skills control important agent capabilities. Changing them affects what the agent can do.'
+      );
+      if (!ok) cb.checked = !nextChecked;
+      return ok;
+    }
+
     let skillsDirty = false;
     let currentEnabled = [];
 
@@ -170,7 +184,11 @@ function renderSystemCronVariant(row) {
           '<div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
       }).join('');
       el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => { skillsDirty = true; document.getElementById('skills-save').style.display = 'block'; });
+        cb.addEventListener('change', () => {
+          if (!confirmSkillToggle(cb, cb.getAttribute('data-id'))) return;
+          skillsDirty = true;
+          document.getElementById('skills-save').style.display = 'block';
+        });
       });
       el.querySelectorAll('.skill-row').forEach(row => {
         row.addEventListener('click', (e) => { if (!e.target.closest('label')) openSkillDoc(row.dataset.id, row.closest('.skill-item')); });
@@ -265,6 +283,7 @@ function renderSystemCronVariant(row) {
       }).join('');
       el.querySelectorAll('input[data-agent-skill]').forEach(function (cb) {
         cb.addEventListener('change', function () {
+          if (!confirmSkillToggle(cb, cb.getAttribute('data-agent-skill'))) return;
           agentSkillsDirty = true;
           document.getElementById('agent-skills-save').style.display = 'inline-block';
         });
@@ -1430,7 +1449,11 @@ function renderSystemCronVariant(row) {
         return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div><div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button type="button" class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
       }).join('');
       el.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
-        cb.addEventListener('change', function () { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
+        cb.addEventListener('change', function () {
+          if (!confirmSkillToggle(cb, cb.getAttribute('data-id'))) return;
+          groupSkillsDirty = true;
+          document.getElementById('group-skills-save').style.display = 'block';
+        });
       });
       el.querySelectorAll('.skill-row').forEach(function (row) {
         row.addEventListener('click', function (e) { if (!e.target.closest('label')) openGroupSkillDoc(row.getAttribute('data-id'), row.closest('.skill-item')); });
@@ -2161,6 +2184,13 @@ function renderSystemCronVariant(row) {
         if (btn.dataset.wired) return;
         btn.dataset.wired = '1';
         btn.addEventListener('click', function () { setConfigSection(btn.getAttribute('data-config-section')); });
+      });
+      document.querySelectorAll('[data-config-skill]').forEach(function (cb) {
+        if (cb.dataset.wired) return;
+        cb.dataset.wired = '1';
+        cb.addEventListener('change', function () {
+          confirmSkillToggle(cb, cb.getAttribute('data-config-skill'));
+        });
       });
       var addBtn = document.getElementById('config-llm-add-model');
       if (addBtn && !addBtn.dataset.wired) {
