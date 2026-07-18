@@ -16,6 +16,7 @@ import { executeEdit } from '../lib/agent/executors/edit.js';
 import { executeApplyPatch } from '../lib/agent/executors/apply-patch.js';
 import { executeGoRead } from '../lib/agent/executors/go-read.js';
 import { executeGoWrite } from '../lib/agent/executors/go-write.js';
+import { executeExec } from '../lib/agent/executors/exec.js';
 import { executeSpeech } from '../lib/agent/executors/speech.js';
 import { executeHomeAssistant } from '../lib/agent/executors/home-assistant.js';
 import { executeMe } from '../lib/agent/executors/me.js';
@@ -44,6 +45,7 @@ const EXECUTORS = {
   'apply-patch': executeApplyPatch,
   'go-read': executeGoRead,
   'go-write': executeGoWrite,
+  exec: executeExec,
   'home-assistant': executeHomeAssistant,
   me: executeMe,
   'ssh-inspect': executeSshInspect,
@@ -123,6 +125,7 @@ function logSkillVerification(skillId, result) {
 export const GROUP_BLOCKED_SKILLS = new Set([
   'go-read',
   'go-write',
+  'exec',
   'ssh-inspect',
   'agent-send',
   'write',

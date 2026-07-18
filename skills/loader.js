@@ -133,7 +133,7 @@ function parseToolSchemaBlock(skillMd) {
       let type = content.slice(colon + 1).trim();
       const optional = /\(optional\)$/i.test(type);
       type = type.replace(/\s*\(optional\)\s*$/i, '').trim() || 'string';
-      current.parameters[key] = type;
+      current.parameters[key] = optional ? `${type} (optional)` : type;
     }
   }
   if (current) actions.push(current);
@@ -152,7 +152,9 @@ function buildParametersSchema(params) {
   const properties = {};
   const required = [];
   for (const [key, type] of Object.entries(params)) {
-    const t = (type || 'string').toLowerCase();
+    const rawType = type || 'string';
+    const optional = /\(optional\)$/i.test(rawType);
+    const t = rawType.replace(/\s*\(optional\)\s*$/i, '').trim().toLowerCase();
     if (t === 'array') {
       properties[key] = {
         type: 'array',
@@ -171,7 +173,7 @@ function buildParametersSchema(params) {
         description: key,
       };
     }
-    required.push(key);
+    if (!optional) required.push(key);
   }
   return { type: 'object', properties, required };
 }

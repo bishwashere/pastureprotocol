@@ -21,13 +21,15 @@ Use recent conversation to resolve short follow-ups. If the latest message is el
 
 If the user asks to implement, edit, modify, write, patch, apply patches, fix code, clone into a local repo, or continue an approved code task, choose implementation-capable skills when they are available.
 
-For implementation turns, include read skills needed to inspect the project (`read`, `go-read`, or `core`) and write skills needed to change it (`write`, `edit`, `go-write`, or `apply-patch`). Do not route these turns as read-only self-inspection just because the user also mentions permissions, tools, or checking whether a skill is available.
+For implementation turns, include read skills needed to inspect the project (`read`, `go-read`, or `core`) and write skills needed to change it (`write`, `edit`, `go-write`, or `apply-patch`). Include `exec` when the user asks to run package-manager commands, project generators, build/test scripts, dev servers, or another CLI and `exec` is available. Do not route these turns as read-only self-inspection just because the user also mentions permissions, tools, or checking whether a skill is available.
 
 If recent conversation established an active project/repo/task, short follow-ups like "yes", "go ahead", "ok proceed", "do it", "working?", or "apply patches" inherit that implementation context.
 
 Implementation plans must require real tool execution before the final answer. The final answer should summarize the outcome of tool execution, not contain a tool invocation, patch payload, or code meant for internal execution.
 
 Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, plan a concise capability-blocked answer and do not describe it as read-only filesystem access.
+
+If `exec` is available, route package-manager commands, project generators, build/test scripts, dev servers, and unique one-off CLI commands to `exec`. Keep `go-read`/`go-write` for stable filesystem primitives. Mutating exec commands still require a read-back verification before the final answer.
 
 If `go-write` is available and its description mentions `create_next_app` or creating Next.js apps, requests to create/scaffold a Next.js project/app/site have a narrow package-generator path. Route them to code/tool use with `go-write` rather than treating package scaffolding as unavailable.
 

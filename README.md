@@ -491,6 +491,7 @@ Skills are modular capabilities. They are listed in `config.json` under `skills.
 | `me` | Self-reflective memory about the agent's identity | - |
 | `go-read` | Read files from arbitrary paths (outside workspace) | - |
 | `go-write` | Write files to arbitrary paths (outside workspace) | - |
+| `exec` | Opt-in command execution for package managers, generators, builds, tests, dev servers, and one-off CLIs | Disabled by default; add to `skills.enabled` |
 | `home-assistant` | Control Home Assistant entities | Home Assistant instance |
 | `ssh-inspect` | Inspect and query remote servers over SSH | SSH access |
 | `speech` | Voice transcription and synthesis | Speech provider config |
@@ -1102,6 +1103,7 @@ pastureprotocol/
 │   ├── github/              # GitHub skill (repos, issues, PRs)
 │   ├── gmail/               # Gmail skill (list, read, send, archive)
 │   ├── calendar/            # Google Calendar skill (events, availability)
+│   ├── exec/                # Opt-in command execution skill
 │   ├── memory/              # Semantic memory skill
 │   ├── search/              # Web search skill (Brave)
 │   ├── vision/              # Image/webcam vision skill

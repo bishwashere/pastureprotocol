@@ -62,12 +62,15 @@ If the user asks to implement, edit, modify, write, patch, apply patches, fix co
 - set `mustUseTool: true`
 - include read/inspection skills such as `read`, `go-read`, or `core` when available
 - include write/patch skills such as `write`, `edit`, `go-write`, or `apply-patch` when available
+- include `exec` when package-manager commands, project generators, build/test scripts, dev servers, or other CLIs must run and `exec` is available
 - never downgrade implementation requests to read-only self-inspection
 - the planned outcome must be a real tool-backed change or a tool-backed failure, not a status-only answer
 
 If recent conversation established an active repo/task, short follow-ups like “yes”, “do it”, “go ahead”, “apply patches”, or “continue” inherit that implementation context.
 
 Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, keep the route grounded in available inspection/context tools and make the planned blocker the missing command capability; do not call it read-only filesystem access.
+
+If `exec` is available, treat package-manager commands, project generators, build/test scripts, dev servers, and unique one-off CLI commands as runnable through `exec`. Prefer `go-read`/`go-write` for stable filesystem primitives. Mutating exec commands still require read-back verification before the final answer.
 
 If `go-write` is available and its skill summary mentions `create_next_app` or creating Next.js apps, treat "create/scaffold a Next.js project/app/site" as an available narrow package-generator capability. Include `go-write` and plan to call the dedicated Next.js scaffold action before final answering.
 
