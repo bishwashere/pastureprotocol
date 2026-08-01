@@ -31,6 +31,28 @@ Package-manager or shell commands such as installing dependencies, running build
 
 If `exec` is available, route package-manager commands, project generators, build/test scripts, dev servers, and unique one-off CLI commands to `exec`. Keep `go-read`/`go-write` for stable filesystem primitives. Mutating exec commands still require a read-back verification before the final answer.
 
+For a small JavaScript program or data diagnostic, include `write` plus `exec`
+when the script should remain in the project, or use exec's `node_script`
+action for a transient diagnostic. Use an explicit project `cwd` and exact
+`envFile` when project environment variables are required. Do not replace an
+available execution path with repeated reads or an unsupported claim.
+
+When an outcome needs multiple tool actions, return ordered
+`requiredToolSteps`. Each step is one of `inspect`, `write`, `execute`,
+`verify`, or `delegate`; `anyOfSkills` contains enabled alternatives; and
+`anyOfTools` contains exact callable function names. `requiredArguments` is a
+small exact subset identifying the intended path, command, argv, cwd, or
+envFile; never put source, content, environment values, or secrets there.
+`resultContains` is a stable non-secret output prefix when execution output
+proves the answer. For code work use names
+such as `write_file`, `edit_file`, `apply_patch_apply`, `go_write_run`,
+`exec_run`, `exec_node_script`, and `go_read_run`. A write-and-run request needs
+a successful `write` step followed by a successful `execute` step. For a
+transient JavaScript/database diagnostic, require `exec_node_script`, not
+`exec_run`. Failed, unrelated, different-action, wrong-target, or wrong-output
+calls do not satisfy a step.
+Plan these steps only for the latest turn; never reuse an older turn's steps.
+
 If `go-write` is available and its description mentions `create_next_app` or creating Next.js apps, requests to create/scaffold a Next.js project/app/site have a narrow package-generator path. Route them to code/tool use with `go-write` rather than treating package scaffolding as unavailable.
 
 ## Live and local answers
@@ -45,8 +67,12 @@ Return JSON only:
 {
   "mode": "chat | tool | research | code | memory",
   "skills": [],
+  "requiredToolSteps": [
+    {"kind":"inspect | write | execute | verify | delegate","anyOfSkills":[],"anyOfTools":[],"requiredArguments":{},"resultContains":""}
+  ],
   "executionMode": "direct_answer | tool_use | delegation | persistent_work | persistent_delegation",
   "usesExistingWorkIntake": false,
+  "mustUseTool": false,
   "plan": "",
   "answer_style": "short | detailed"
 }

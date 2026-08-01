@@ -1,7 +1,7 @@
 ---
 id: exec
 name: Exec
-description: Policy-gated command execution for package managers, project generators, build/test scripts, dev servers, and one-off CLIs. Disabled by default; add "exec" to skills.enabled to expose it. Prefer go-read/go-write for stable filesystem primitives.
+description: Policy-gated command execution for package managers, build/test scripts, one-off CLIs, and transient JavaScript diagnostics with an explicit project cwd/env file. Disabled by default; add "exec" to skills.enabled to expose it.
 ---
 
 # Exec
@@ -15,6 +15,9 @@ Use **exec** for package-manager and runtime commands that are not stable filesy
 - `npm run build`, `npm test`, `npm start`
 - `pnpm run build`, `pnpm test`, `pnpm start`
 - `node ...`, `git ...`, or another explicitly allowed CLI
+- a transient JavaScript diagnostic through `exec_node_script`, including
+  scripts that import dependencies installed with Pasture (for example
+  `mongodb`) while operating in another project's working directory
 
 Do not use **exec** for simple file operations that have structured tools:
 
@@ -24,6 +27,17 @@ Do not use **exec** for simple file operations that have structured tools:
 ## Safety model
 
 Exec runs one executable with an argv array; it is not a free-form shell string. Put the executable in `command` and every argument in `argv`. Do not include pipes, redirections, `&&`, `;`, command substitutions, or shell scripts unless the operator has deliberately configured a shell executable in `skills.exec`.
+
+`exec_node_script` is the same policy-gated Node capability with a safer
+one-off-script lifecycle. It writes the supplied source to a private temporary
+module under the Pasture install, runs it with the requested project `cwd`, and
+deletes it afterward. This location lets the script import dependencies that
+Pasture already owns; it does not install packages into the target project.
+When `envFile` is provided, the executor loads that exact file relative to
+`cwd` without returning its values. Never print credentials from the script.
+Bare package imports resolve from Pasture's dependencies. Relative module
+imports resolve from the transient source location, so read project files via
+`process.cwd()` or use an absolute path derived from it.
 
 Default runtime policy when the skill is enabled:
 
@@ -68,6 +82,16 @@ run
     command: string
     argv: array
     cwd: string (optional)
+    timeoutMs: number (optional)
+    env: object (optional)
+
+node_script
+  description: Run a transient JavaScript ES module with Pasture's dependency context and a target project cwd. Use for one-off diagnostics or data queries. The temporary source is deleted after execution. Provide envFile only when the project environment is needed, and never print secrets.
+  parameters:
+    source: string
+    cwd: string (optional)
+    envFile: string (optional)
+    argv: array (optional)
     timeoutMs: number (optional)
     env: object (optional)
 ```

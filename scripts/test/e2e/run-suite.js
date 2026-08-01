@@ -67,6 +67,7 @@ const FAKE_TESTS = [
   ['speech-e2e', 'scripts/test/e2e/fake/skills/test-speech-e2e.js'],
   ['vision-e2e', 'scripts/test/e2e/fake/skills/test-vision-e2e.js'],
   ['write-e2e', 'scripts/test/e2e/fake/skills/test-write-e2e.js'],
+  ['write-exec-fork-e2e', 'scripts/test/e2e/fake/skills/test-write-exec-fork-e2e.js'],
   ['live-log-conversation-fake', 'scripts/test/e2e/fake/test-live-log-conversation.js'],
 ];
 

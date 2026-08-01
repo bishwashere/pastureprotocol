@@ -14,6 +14,7 @@ For the latest chat turn, decide all normal-path routing in one pass:
 - which tool/skill profile to expose
 - task-frame create/update/close action
 - whether tool use is mandatory
+- which successful tool steps must happen, in order, before a final answer
 - safe fallback policy if routing cannot be completed
 - project/mission context intent
 - final answer style
@@ -63,6 +64,7 @@ If the user asks to implement, edit, modify, write, patch, apply patches, fix co
 - include read/inspection skills such as `read`, `go-read`, or `core` when available
 - include write/patch skills such as `write`, `edit`, `go-write`, or `apply-patch` when available
 - include `exec` when package-manager commands, project generators, build/test scripts, dev servers, or other CLIs must run and `exec` is available
+- set ordered `requiredToolSteps` for the actual outcome, not merely for optional context. A code change normally requires a `write` step; code that must be run or tested also requires a later `execute` step.
 - never downgrade implementation requests to read-only self-inspection
 - the planned outcome must be a real tool-backed change or a tool-backed failure, not a status-only answer
 
@@ -71,6 +73,20 @@ If recent conversation established an active repo/task, short follow-ups like �
 Package-manager or shell commands such as installing dependencies, running builds, or starting dev servers require an explicit command-execution/package-manager capability. Filesystem write tools alone are not enough for those commands. If no available skill can run the requested command, keep the route grounded in available inspection/context tools and make the planned blocker the missing command capability; do not call it read-only filesystem access.
 
 If `exec` is available, treat package-manager commands, project generators, build/test scripts, dev servers, and unique one-off CLI commands as runnable through `exec`. Prefer `go-read`/`go-write` for stable filesystem primitives. Mutating exec commands still require read-back verification before the final answer.
+
+For a small ad hoc JavaScript program, database diagnostic, or data-counting
+script, do not spend the turn only reading source or installing unrelated
+packages. Use one of these concrete plans when the relevant tools are
+available:
+
+- Persistent script: write the smallest dependency-aware script in the target
+  workspace, then run it with `exec` using an explicit `cwd`.
+- Transient diagnostic: use exec's `node_script` action with source, explicit
+  `cwd`, and an exact `envFile` when project environment variables are needed.
+
+In either case, successful execution output is the evidence for the answer.
+Never claim execution is unavailable while `exec` is in the available skill
+list unless a current exec call returned a concrete failure.
 
 If `go-write` is available and its skill summary mentions `create_next_app` or creating Next.js apps, treat "create/scaffold a Next.js project/app/site" as an available narrow package-generator capability. Include `go-write` and plan to call the dedicated Next.js scaffold action before final answering.
 
@@ -115,6 +131,34 @@ Set `mustUseTool: true` only when the answer would be invalid without calling at
 
 When `mustUseTool` is true, the final reply is valid only after the agent has called the required tool(s). Do not plan a response that merely describes the tool call, includes a structured tool invocation, or asks the user to repeat permission that is already available in the current tool list.
 
+`requiredToolSteps` is an ordered, current-turn-only list with at most six
+entries. Each entry has one kind, one or more alternative enabled skills, and
+the exact callable tool function names that are allowed to satisfy it:
+
+- `inspect`: read live files or state needed before acting.
+- `write`: persist the requested change.
+- `execute`: run the requested script, command, build, or test.
+- `verify`: independently verify a side effect when execution output alone is
+  not enough.
+- `delegate`: complete required specialist handoff.
+
+Every ID in `anyOfSkills` must also appear in `skills`. `anyOfTools` must name
+the actual function(s), not a description or executable. Common names for code
+work are `write_file`, `edit_file`, `apply_patch_apply`, `go_write_run`,
+`exec_run`, `exec_node_script`, and `go_read_run`. A successful call advances a
+step only when its skill, exact function name, `requiredArguments` subset, and
+optional `resultContains` evidence all match. Use `requiredArguments` only for
+small identifying fields such as `path`, `command`, `argv`, `cwd`, or
+`envFile`; never put source code, file content, environment values, or secrets
+in the contract. When execution output proves the answer, choose a harmless
+stable output prefix and put it in `resultContains`. Failed calls, a different
+action, a different path/command, or missing output evidence do not advance the
+step. For a transient JavaScript/database diagnostic, require
+`exec_node_script`, identify the project with `cwd`/`envFile` when known, and
+require a non-secret output prefix. Do not add optional tools as required
+steps. For chat, use an empty list. Never copy required steps from an older
+turn; plan only the latest user request.
+
 ## Fallback policy
 
 Choose `fallbackToolPolicy` for the JavaScript caller to use if the planner result cannot be applied safely:
@@ -140,6 +184,15 @@ Return this exact JSON shape:
   "targetAgentId": "",
   "mode": "chat | tool | research | code | memory",
   "skills": [],
+  "requiredToolSteps": [
+    {
+      "kind": "inspect | write | execute | verify | delegate",
+      "anyOfSkills": [],
+      "anyOfTools": [],
+      "requiredArguments": {},
+      "resultContains": ""
+    }
+  ],
   "executionMode": "direct_answer | tool_use | delegation | persistent_work | persistent_delegation",
   "usesExistingWorkIntake": false,
   "mustUseTool": false,
@@ -166,3 +219,37 @@ Return this exact JSON shape:
   "reason": ""
 }
 ```
+
+## Examples
+
+For “create a small JavaScript script, run it, and report its output” when
+`write` and `exec` are available, include:
+
+```json
+{
+  "mode": "code",
+  "skills": ["write", "exec"],
+  "requiredToolSteps": [
+    {"kind":"write","anyOfSkills":["write"],"anyOfTools":["write_file"],"requiredArguments":{"path":"pasture-probe.mjs"},"resultContains":""},
+    {"kind":"execute","anyOfSkills":["exec"],"anyOfTools":["exec_run"],"requiredArguments":{"command":"node","argv":["pasture-probe.mjs"]},"resultContains":"PASTURE_RESULT:"}
+  ],
+  "mustUseTool": true
+}
+```
+
+For “run a one-off database count using this project's `.env`” when exec's
+transient Node action is available, include:
+
+```json
+{
+  "mode": "code",
+  "skills": ["exec"],
+  "requiredToolSteps": [
+    {"kind":"execute","anyOfSkills":["exec"],"anyOfTools":["exec_node_script"],"requiredArguments":{"cwd":"/exact/project/path","envFile":".env"},"resultContains":"PASTURE_DB_COUNT:"}
+  ],
+  "mustUseTool": true
+}
+```
+
+These snippets illustrate the relevant fields; the real response must still
+contain the complete output shape above.

@@ -109,6 +109,7 @@ import {
 } from './lib/context/chat-session.js';
 import { resolveWorkModeForTurn } from './lib/agent/work-mode.js';
 import { buildSessionBootstrapContext } from './lib/agent/session-bootstrap.js';
+import { buildExecutionRequirements } from './lib/agent/execution-requirements.js';
 import {
   buildProjectsContextBlock,
   buildProjectTeamGateReply,
@@ -1845,6 +1846,15 @@ async function main() {
     }
     logFlow(FLOW_STEP.RUN_AGENT, '[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     ctx._originalUserText = text;
+    const plannedMustUseTool = !!(
+      turnRoute?.mustUseTool === true
+      || unifiedPlan?.mustUseTool === true
+      || presetDelegationPlan
+    );
+    const executionRequirements = buildExecutionRequirements(turnRoute);
+    if (plannedMustUseTool) {
+      logFlow(FLOW_STEP.RETRY, '[unified-planner] mustUseTool=true; enforcing in the current transcript');
+    }
     let turnResult = teamGateReply
       ? { textToSend: teamGateReply, skillsCalled: [] }
       : null;
@@ -1920,64 +1930,11 @@ async function main() {
         historyMessages,
         getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
-      }), { agentId, toolsCount: toolsForRequest.length });
-    }
-    const plannedMustUseTool = !!(
-      turnRoute?.mustUseTool === true
-      || unifiedPlan?.mustUseTool === true
-      || presetDelegationPlan
-    );
-    if (plannedMustUseTool) {
-      logFlow(FLOW_STEP.RETRY, '[unified-planner] mustUseTool=true');
-    }
-    if (
-      plannedMustUseTool
-      && Array.isArray(turnRoute?.skills)
-      && turnRoute.skills.length > 0
-      && Array.isArray(toolsForRequest)
-      && toolsForRequest.length > 0
-      && (!Array.isArray(turnResult?.skillsCalled) || turnResult.skillsCalled.length === 0)
-    ) {
-      logFlow(FLOW_STEP.RETRY, '[unified-planner] retrying because the planned tool turn used no tools');
-      const retryPrompt = systemPromptWithPlan +
-        '\n\n--- Planned Tool Requirement ---\n' +
-        'This turn was routed as a tool-backed turn. Before final answering, call at least one available planned tool and ground the answer in what it returns.\n' +
-        '---';
-      turnResult = await traceAsyncStep('planned_tool_retry', () => runAgentTurn({
-        userText: text,
-        ctx,
-        systemPrompt: retryPrompt,
-        tools: toolsForRequest,
-        historyMessages,
-        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-        resolveToolName: skillContext?.resolveToolName ?? (() => null),
+        executionRequirements,
       }), { agentId, toolsCount: toolsForRequest.length });
     }
     const routeIncludesWriteSkill = Array.isArray(turnRoute?.skills)
       && turnRoute.skills.some((id) => ['write', 'edit', 'go-write', 'apply-patch'].includes(id));
-    if (
-      plannedMustUseTool
-      && turnRoute?.mode === 'code'
-      && routeIncludesWriteSkill
-      && Array.isArray(toolsForRequest)
-      && toolsForRequest.length > 0
-      && turnResult?.hadWriteOp !== true
-    ) {
-      logFlow(FLOW_STEP.RETRY, '[code-write] retrying because code route completed without a write operation');
-      const writeRecoveryPrompt = systemPromptWithPlan +
-        '\n\n--- Code Write Requirement ---\n' +
-        'This turn was routed as code implementation with write-capable tools available. If the requested change is feasible, call an available write/patch/edit tool before final answering. If no write is possible after tool-backed inspection, answer with the concrete blocker. Do not claim read-only access merely because an earlier task frame or chat message mentioned missing access; current write tools are available, so only report an access blocker after a current write/patch/edit attempt fails or tool evidence proves the path is unwritable. Do not output a proposed tool call or patch payload as chat text.\n' +
-        '---';
-      turnResult = await traceAsyncStep('planned_code_write_retry', () => runAgentTurn({
-        userText: text,
-        ctx,
-        systemPrompt: writeRecoveryPrompt,
-        tools: toolsForRequest,
-        historyMessages,
-        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-        resolveToolName: skillContext?.resolveToolName ?? (() => null),
-      }), { agentId, toolsCount: toolsForRequest.length });
-    }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus, hadWriteOp: turnHadWriteOp } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
@@ -2117,6 +2074,11 @@ async function main() {
         details: { frameId: closed?.id || '', source: 'unified_planner' },
       });
     } else if (!isGroupJid && unifiedPlan && ['new', 'update', 'replace'].includes(unifiedPlan.taskFrameAction)) {
+      const frameRequiredSkillIds = (unifiedPlan.requiredToolSteps || [])
+        .flatMap((step) => Array.isArray(step?.anyOfSkills) ? step.anyOfSkills : []);
+      const plannedFrameSkills = unifiedPlan.taskFrame?.toolProfile?.length
+        ? unifiedPlan.taskFrame.toolProfile
+        : unifiedPlan.skills;
       const frameDecision = {
         action: unifiedPlan.taskFrameAction === 'new' || unifiedPlan.taskFrameAction === 'replace' ? 'new_candidate' : 'continue_replan',
         confidence: 0.8,
@@ -2132,7 +2094,7 @@ async function main() {
               ? agentId
               : (unifiedPlan.taskFrame?.ownerAgentId || activeTaskFrame?.ownerAgentId || '')),
         teamId: unifiedPlan.taskFrame?.teamId || focusedProjectTeamId || activeTaskFrame?.teamId || '',
-        toolProfile: unifiedPlan.taskFrame?.toolProfile?.length ? unifiedPlan.taskFrame.toolProfile : unifiedPlan.skills,
+        toolProfile: [...new Set([...frameRequiredSkillIds, ...(plannedFrameSkills || [])])],
         plan: unifiedPlan.taskFrame?.plan || unifiedPlan.plan || '',
         reason: unifiedPlan.reason || '',
       };

@@ -19,6 +19,7 @@ async function main() {
   setupStateDir();
 
   const { loadPrompt } = await import('../../../../lib/agent/md-llm.js');
+  const { buildExecutionRequirements } = await import('../../../../lib/agent/execution-requirements.js');
   const {
     classifyTaskFrameTurn,
     clearTaskFrame,
@@ -67,10 +68,18 @@ async function main() {
   assert(first.decision.toolProfile.join(',') === 'read,go-read,write,apply-patch', 'tool profile filtered to enabled skills');
   assert(!shouldUseTaskFrameFastPath(first.decision), 'new candidate does not skip the normal first-turn pipeline');
 
-  const frame = upsertTaskFrame(logKey, first.decision, first.activeFrame, { userText: 'clone this repo and inspect it' });
+  const frame = upsertTaskFrame(logKey, {
+    ...first.decision,
+    requiredToolSteps: [
+      { kind: 'write', anyOfSkills: ['write', 'apply-patch'] },
+      { kind: 'verify', anyOfSkills: ['go-read'] },
+    ],
+  }, first.activeFrame, { userText: 'clone this repo and inspect it' });
   assert(frame && frame.status === 'active', 'frame stored as active');
   assert(frame.ownerAgentId === 'coder', 'frame stores owner agent');
   assert(frame.teamId === 'product-team', 'frame stores team id');
+  assert(!Object.hasOwn(frame, 'requiredToolSteps'),
+    'frame does not persist current-turn required tool steps');
   assert(getActiveTaskFrame(logKey)?.projectName === 'My Work List', 'active frame can be loaded');
 
   const cont = await classifyTaskFrameTurn({
@@ -100,7 +109,15 @@ async function main() {
   const route = taskFrameDecisionToTurnRoute(cont.decision, frame);
   assert(route.mode === 'code', 'repo frame routes as code');
   assert(route.mustUseTool === true, 'fast path route requires a tool');
-  assert(route.skills.includes('apply-patch'), 'route uses stored frame tools');
+  assert(route.skills.join(',') === 'read,go-read', 'route uses the current follow-up tool profile');
+  assert(route.requiredToolSteps.length === 0,
+    'mandatory follow-up does not replay stale mutation steps');
+  const fastRequirements = buildExecutionRequirements(route);
+  assert(!fastRequirements.steps.some((step) => step.kind === 'write' || step.kind === 'execute'),
+    'mandatory read follow-up never derives mutation steps from stored capabilities');
+  const explanationRoute = taskFrameDecisionToTurnRoute({ ...cont.decision, mustUseTool: false }, frame);
+  assert(explanationRoute.requiredToolSteps.length === 0,
+    'status/explanation follow-up does not replay old required mutation steps');
   assert(taskFrameToSystemBlock(frame, cont.decision).includes('Active Task Frame'), 'system block is generated');
   assert(taskFrameToSystemBlock({ ...frame, status: 'blocked' }, cont.decision).includes('Status: blocked'), 'system block includes frame status');
   assert(
