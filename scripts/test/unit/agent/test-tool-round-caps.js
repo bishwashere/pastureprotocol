@@ -58,14 +58,22 @@ check('TOOL_LOOP_LIMITS is frozen', Object.isFrozen(mod.TOOL_LOOP_LIMITS));
 check('TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS === 3', mod.TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS === 3);
 check('TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WRITE === 10', mod.TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WRITE === 10);
 
-// 3. roundsExhausted flag is declared, set on last iteration end-of-body, surfaced to user.
+// 3. Exact loop bound, initial extended budget, and exhaustion fallback.
 check(
-  'roundsExhausted flag declared',
-  /let\s+roundsExhausted\s*=\s*false/.test(agent)
+  'zero configured rounds are treated as exhausted',
+  /let\s+roundsExhausted\s*=\s*useTools\s*&&\s*toolRoundLimit\s*===\s*0/.test(agent)
 );
 check(
-  'roundsExhausted set at end-of-body on last allowed round',
-  /round\s*===\s*\(hadWriteOp\s*\?\s*MAX_TOOL_ROUNDS_WRITE\s*:\s*MAX_TOOL_ROUNDS\)\s*\)\s*\{\s*roundsExhausted\s*=\s*true/.test(agent)
+  'tool loop uses an exact less-than bound (no off-by-one round)',
+  /for\s*\(let\s+round\s*=\s*0;\s*round\s*<\s*toolRoundLimit;\s*round\+\+\)/.test(agent)
+);
+check(
+  'required write or execute workflow selects extended budget before round zero',
+  /toolRequirements\.usesExtendedBudget[\s\S]{0,120}?MAX_TOOL_ROUNDS_WRITE[\s\S]{0,80}?MAX_TOOL_ROUNDS/.test(agent)
+);
+check(
+  'roundsExhausted is set when the exact bound is reached',
+  /round\s*\+\s*1\s*>=\s*toolRoundLimit[\s\S]{0,220}?roundsExhausted\s*=\s*true/.test(agent)
 );
 check(
   'final-reply path surfaces "ran out of tool rounds" instead of "Done. Anything else?"',
@@ -85,7 +93,7 @@ check(
 // roundsExhausted in the error branch.
 check(
   'turnStatus = "error" when roundsExhausted',
-  /turnStatus\s*=[\s\S]{0,200}?lastRoundHadToolError\s*\|\|\s*roundsExhausted\s*\?\s*['"]error['"]\s*:\s*['"]ok['"]/.test(agent)
+  /turnStatus\s*=[\s\S]{0,240}?lastRoundHadToolError\s*\|\|\s*roundsExhausted\s*\|\|\s*requirementsIncomplete\s*\?\s*['"]error['"]\s*:\s*['"]ok['"]/.test(agent)
 );
 
 console.log(`\n[tool-round-caps] passed=${passed} failed=${failed}`);

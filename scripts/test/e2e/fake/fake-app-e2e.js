@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createServer } from 'http';
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, chmodSync, rmSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
@@ -51,6 +51,7 @@ function latestToolText(messages) {
 }
 
 function fakePlannerJson(scenario) {
+  const hasToolPlan = Boolean(scenario.toolCall || (Array.isArray(scenario.toolSteps) && scenario.toolSteps.length));
   return {
     workModeToggle: scenario.workModeToggle || 'no_change',
     needsMultiAgent: false,
@@ -59,11 +60,12 @@ function fakePlannerJson(scenario) {
     teamRouting: 'none',
     delegationAction: 'none',
     targetAgentId: '',
-    mode: scenario.toolCall ? 'tool' : 'chat',
+    mode: scenario.mode || (hasToolPlan ? 'tool' : 'chat'),
     skills: scenario.skills || [],
-    executionMode: scenario.toolCall ? 'tool_use' : 'direct_answer',
+    requiredToolSteps: scenario.requiredToolSteps || [],
+    executionMode: hasToolPlan ? 'tool_use' : 'direct_answer',
     usesExistingWorkIntake: false,
-    mustUseTool: Boolean(scenario.toolCall),
+    mustUseTool: scenario.mustUseTool === true || hasToolPlan,
     fallbackToolPolicy: 'no_tools',
     projectOrMissionIntent: 'none',
     githubSourceIntent: false,
@@ -164,6 +166,7 @@ async function startFakeLlmServer(scenario) {
     }
 
     const body = await readJson(req);
+    scenario.llmRequests.push(body);
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const promptText = messages.map((m) => String(m.content || '')).join('\n');
     const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
@@ -184,18 +187,33 @@ async function startFakeLlmServer(scenario) {
     if (promptText.includes('Casual') || promptText.includes('casual')) {
       return jsonResponse(res, { choices: [{ message: { role: 'assistant', content: scenario.finalReply || 'Hi. How can I help?' } }] });
     }
-    if (hasTools && !hasToolResult && scenario.toolCall) {
+    const assistantDecisionCount = messages.filter((m) => (
+      m?.role === 'assistant'
+      && ((Array.isArray(m.tool_calls) && m.tool_calls.length > 0) || String(m.content || '').trim())
+    )).length;
+    const plannedStep = Array.isArray(scenario.toolSteps)
+      ? scenario.toolSteps[assistantDecisionCount]
+      : (!hasToolResult ? scenario.toolCall : null);
+    if (hasTools && plannedStep) {
+      if (typeof scenario.inspectToolStepRequest === 'function') {
+        scenario.inspectToolStepRequest({ plannedStep, assistantDecisionCount, messages, body });
+      }
+      if (typeof plannedStep.content === 'string') {
+        return jsonResponse(res, {
+          choices: [{ message: { role: 'assistant', content: plannedStep.content } }],
+        });
+      }
       return jsonResponse(res, {
         choices: [{
           message: {
             role: 'assistant',
             content: '',
             tool_calls: [{
-              id: 'call_fake_1',
+              id: `call_fake_${assistantDecisionCount + 1}`,
               type: 'function',
               function: {
-                name: scenario.toolCall.name,
-                arguments: JSON.stringify(scenario.toolCall.arguments || {}),
+                name: plannedStep.name,
+                arguments: JSON.stringify(plannedStep.arguments || {}),
               },
             }],
           },
@@ -242,11 +260,25 @@ function createStateDir(scenario, fakeLlmPort) {
   return stateDir;
 }
 
-function runChat(message, stateDir, extraEnv = {}) {
+function runChat(message, stateDir, extraEnv = {}, sanitizeEnv = false) {
   return new Promise((resolve, reject) => {
+    const inheritedEnv = sanitizeEnv
+      ? {
+          HOME: process.env.HOME || '',
+          PATH: process.env.PATH || '',
+          LANG: process.env.LANG || 'C.UTF-8',
+          TMPDIR: process.env.TMPDIR || '',
+        }
+      : process.env;
     const child = spawn('node', ['index.js', '--test', message], {
       cwd: ROOT,
-      env: { ...process.env, ...extraEnv, PASTURE_STATE_DIR: stateDir },
+      env: {
+        ...inheritedEnv,
+        ...extraEnv,
+        PASTURE_STATE_DIR: stateDir,
+        PASTURE_INSTALL_DIR: ROOT,
+        PASTURE_DAEMON_LOG_PATH: join(stateDir, 'daemon.log'),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -367,6 +399,211 @@ function makeScenarios() {
       toolCall: { name: 'go_write_run', arguments: { command: 'mkdir', argv: ['made-by-go-write'] } },
       finalReply: 'Created made-by-go-write.',
     },
+    'write-exec-fork-e2e': {
+      name: 'write-exec-fork-e2e',
+      mode: 'code',
+      message: 'Create a small JavaScript runtime probe, run it with Node, recover if it fails, and report the successful output.',
+      skills: ['go-read', 'write', 'exec'],
+      requiredToolSteps: [
+        {
+          kind: 'write',
+          anyOfSkills: ['write'],
+          anyOfTools: ['write_file'],
+          requiredArguments: { path: 'runtime-probe.js' },
+        },
+        {
+          kind: 'execute',
+          anyOfSkills: ['exec'],
+          anyOfTools: ['exec_run'],
+          requiredArguments: { command: 'node', argv: ['runtime-probe.js'] },
+          resultContains: 'PASTURE_FORK_RUNTIME_OK:',
+        },
+        {
+          kind: 'verify',
+          anyOfSkills: ['go-read'],
+          anyOfTools: ['go_read_run'],
+          requiredArguments: { command: 'cat', argv: ['runtime-probe.js'] },
+          resultContains: 'PASTURE_FORK_RUNTIME_OK:',
+        },
+      ],
+      files: { 'evidence.txt': 'READ_EVIDENCE_SENTINEL\n' },
+      skillConfig: {
+        exec: {
+          mode: 'allowlist',
+          allowlist: ['node'],
+          timeoutMs: 30_000,
+        },
+      },
+      toolSteps: [
+        { name: 'go_read_run', arguments: { command: 'ls', argv: ['-1'] } },
+        { name: 'go_read_run', arguments: { command: 'cat', argv: ['evidence.txt'] } },
+        { content: 'I cannot do this because write and execution tools are unavailable.' },
+        {
+          name: 'write_file',
+          arguments: {
+            path: 'fail.js',
+            content: "console.error('EXEC_FAILURE_SENTINEL');\nprocess.exit(17);\n",
+          },
+        },
+        { name: 'exec_run', arguments: { command: 'node', argv: ['fail.js'] } },
+        {
+          name: 'write_file',
+          arguments: {
+            path: 'runtime-probe.js',
+            content: "console.log('PASTURE_FORK_RUNTIME_OK:42');\n",
+          },
+        },
+        { name: 'exec_run', arguments: { command: 'node', argv: ['runtime-probe.js'] } },
+        { name: 'go_read_run', arguments: { command: 'cat', argv: ['runtime-probe.js'] } },
+      ],
+      finalReply: 'PASTURE_FORK_RUNTIME_OK:42',
+      sanitizeEnv: true,
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS: '1',
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '10',
+        PASTURE_MAX_COMPLETENESS_RETRIES: '0',
+      },
+      inspectToolStepRequest({ assistantDecisionCount, messages }) {
+        if (assistantDecisionCount !== 5) return;
+        const transcript = messages.map((m) => String(m.content || '')).join('\n');
+        const hasReadEvidence = transcript.includes('READ_EVIDENCE_SENTINEL');
+        const hasExecFailure = transcript.includes('EXEC_FAILURE_SENTINEL');
+        if (hasReadEvidence && hasExecFailure) {
+          this.transcriptContinuityObserved = true;
+        }
+      },
+      assert: ({ reply, skillsCalled, stdout }, { stateDir, scenario, toolResults }) => {
+        assert(scenario.transcriptContinuityObserved === true,
+          'recovery request lost earlier read or failed-exec evidence');
+        assert(skillsCalled.filter((id) => id === 'write').length >= 2,
+          `expected both script writes, got [${skillsCalled.join(', ')}]`);
+        assert(skillsCalled.filter((id) => id === 'exec').length >= 2,
+          `expected failed and successful exec calls, got [${skillsCalled.join(', ')}]`);
+        assert(skillsCalled.includes('go-read'), 'verification read was not called');
+        assert(reply.includes('PASTURE_FORK_RUNTIME_OK:42'), `successful output missing from reply: ${reply}`);
+        assert(!reply.includes('tools are unavailable'), `false unavailable draft escaped as final reply: ${reply}`);
+        assert(!stdout.includes('planned_tool_retry') && !stdout.includes('planned_code_write_retry'),
+          'runtime restarted the turn through a legacy fresh retry');
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line));
+        const turnDone = activityRows.filter((row) => row.type === 'turn_done').at(-1);
+        assert(turnDone?.status === 'ok',
+          `a recovered failed exec left the successful turn marked ${turnDone?.status || 'unknown'}`);
+        const probePath = join(stateDir, 'workspace', 'runtime-probe.js');
+        assert(readFileSync(probePath, 'utf8') === "console.log('PASTURE_FORK_RUNTIME_OK:42');\n",
+          'runtime probe was not persisted with expected source');
+        assert(toolResults.some((text) => text.includes('EXEC_FAILURE_SENTINEL')),
+          'failed exec stderr was not retained in the tool transcript');
+        assert(toolResults.some((text) => text.includes('PASTURE_FORK_RUNTIME_OK:42')),
+          'successful exec output was not retained in the tool transcript');
+      },
+    },
+    'required-steps-unavailable-e2e': {
+      name: 'required-steps-unavailable-e2e',
+      mode: 'code',
+      message: 'Write and run a JavaScript probe.',
+      skills: ['write', 'exec'],
+      requiredToolSteps: [
+        {
+          kind: 'write',
+          anyOfSkills: ['write'],
+          anyOfTools: ['write_file'],
+          requiredArguments: { path: 'runtime-probe.js' },
+        },
+        {
+          kind: 'execute',
+          anyOfSkills: ['exec'],
+          anyOfTools: ['exec_run'],
+          requiredArguments: { command: 'node', argv: ['runtime-probe.js'] },
+          resultContains: 'PASTURE_FORK_RUNTIME_OK:',
+        },
+      ],
+      skillConfig: {
+        exec: { mode: 'allowlist', allowlist: ['node'], timeoutMs: 30_000 },
+      },
+      toolSteps: Array.from({ length: 4 }, () => ({
+        content: 'I cannot do this because write and execution tools are unavailable.',
+      })),
+      finalReply: 'THIS_FALSE_FINAL_MUST_NOT_ESCAPE',
+      expectNoToolCalls: true,
+      sanitizeEnv: true,
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS: '1',
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '3',
+        PASTURE_MAX_COMPLETENESS_RETRIES: '0',
+      },
+      assert: ({ reply, skillsCalled }) => {
+        assert(skillsCalled.length === 0, `stubborn scenario unexpectedly called skills: ${skillsCalled.join(', ')}`);
+        assert(!reply.includes('tools are unavailable'), `false unavailable draft escaped: ${reply}`);
+        assert(!reply.includes('THIS_FALSE_FINAL_MUST_NOT_ESCAPE'), `fake synthesis escaped: ${reply}`);
+        assert(reply.includes('Remaining step(s): write [write] via [write_file]'),
+          `runtime did not surface the unmet structured requirement: ${reply}`);
+      },
+    },
+    'node-script-fork-e2e': {
+      name: 'node-script-fork-e2e',
+      mode: 'code',
+      message: 'Run a one-off JavaScript project diagnostic and report its output.',
+      skills: ['exec'],
+      requiredToolSteps: [
+        {
+          kind: 'execute',
+          anyOfSkills: ['exec'],
+          anyOfTools: ['exec_node_script'],
+          requiredArguments: { envFile: '.env' },
+          resultContains: 'NODE_SCRIPT_RUNTIME_OK:',
+        },
+      ],
+      files: {
+        'unrelated-project/.env': 'PASTURE_NODE_SCRIPT_PROBE=42\n',
+      },
+      skillConfig: {
+        exec: { mode: 'allowlist', allowlist: ['node'], timeoutMs: 30_000 },
+      },
+      toolSteps: [
+        {
+          name: 'exec_run',
+          arguments: { command: 'node', argv: ['--version'] },
+        },
+        { content: 'WRONG_ACTION_FALSE_FINAL' },
+        {
+          name: 'exec_node_script',
+          arguments: {
+            source: [
+              "import { MongoClient } from 'mongodb';",
+              "console.log(`NODE_SCRIPT_RUNTIME_OK:${typeof MongoClient}:${process.env.PASTURE_NODE_SCRIPT_PROBE}`);",
+            ].join('\n'),
+            envFile: '.env',
+          },
+        },
+      ],
+      afterStateDir: (stateDir, setup, scenario) => {
+        const projectCwd = join(stateDir, 'workspace', 'unrelated-project');
+        scenario.toolSteps[2].arguments.cwd = projectCwd;
+        scenario.requiredToolSteps[0].requiredArguments.cwd = projectCwd;
+      },
+      finalReply: 'NODE_SCRIPT_RUNTIME_OK:function:42',
+      sanitizeEnv: true,
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS: '1',
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '4',
+        PASTURE_MAX_COMPLETENESS_RETRIES: '0',
+      },
+      assert: ({ reply, skillsCalled }, { toolResults }) => {
+        assert(skillsCalled.join(',') === 'exec,exec', `wrong exec action should be followed by the transient action, got [${skillsCalled.join(', ')}]`);
+        assert(reply.includes('NODE_SCRIPT_RUNTIME_OK:function:42'), `transient diagnostic output missing: ${reply}`);
+        assert(!reply.includes('WRONG_ACTION_FALSE_FINAL'), `wrong-action draft escaped as final reply: ${reply}`);
+        assert(toolResults.some((text) => text.includes('NODE_SCRIPT_RUNTIME_OK:function:42')),
+          'transient node_script output was not retained in the transcript');
+      },
+    },
     'cron-e2e': {
       name: 'cron-e2e',
       message: 'Remind me soon.',
@@ -484,18 +721,30 @@ export async function runNamedFakeE2E(name) {
   const scenario = scenarioFor(name);
   if (!scenario) throw new Error(`No fake E2E scenario registered for ${name}`);
   scenario.toolResults = [];
+  scenario.llmRequests = [];
+  scenario.transcriptContinuityObserved = false;
   let setup = {};
   let fakeLlm;
+  let stateDir = '';
   try {
     if (scenario.setup) setup = await scenario.setup();
     if (scenario.applySetup) scenario.applySetup(scenario, setup);
     if (scenario.envFromSetup) Object.assign(scenario, scenario.envFromSetup(setup));
     fakeLlm = await startFakeLlmServer(scenario);
-    const stateDir = createStateDir(scenario, fakeLlm.port);
+    stateDir = createStateDir(scenario, fakeLlm.port);
     if (scenario.afterStateDir) scenario.afterStateDir(stateDir, setup, scenario);
-    const extraEnv = scenario.extraEnvFromSetup ? scenario.extraEnvFromSetup(setup) : {};
-    const result = await runChat(scenario.message, stateDir, extraEnv);
-    if (scenario.toolCall) {
+    const extraEnv = {
+      ...(scenario.extraEnv || {}),
+      ...(scenario.extraEnvFromSetup ? scenario.extraEnvFromSetup(setup) : {}),
+    };
+    const result = await runChat(scenario.message, stateDir, extraEnv, scenario.sanitizeEnv === true);
+    const richestToolTranscript = scenario.llmRequests
+      .map((request) => (Array.isArray(request?.messages) ? request.messages : []))
+      .sort((a, b) => b.filter((m) => m.role === 'tool').length - a.filter((m) => m.role === 'tool').length)[0] || [];
+    scenario.toolResults = richestToolTranscript
+      .filter((m) => m.role === 'tool')
+      .map((m) => stripToolDoc(m.content));
+    if ((scenario.toolCall || scenario.toolSteps) && !scenario.expectNoToolCalls) {
       const expectedSkill = (scenario.skills || [])[0];
       assert(
         !expectedSkill || result.skillsCalled.includes(expectedSkill),
@@ -507,5 +756,8 @@ export async function runNamedFakeE2E(name) {
   } finally {
     fakeLlm?.server?.close();
     if (scenario?.cleanup) scenario.cleanup(setup);
+    if (scenario?.cleanupStateDir && stateDir) {
+      try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}
+    }
   }
 }

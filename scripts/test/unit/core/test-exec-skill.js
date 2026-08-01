@@ -3,9 +3,12 @@
  * Unit tests for the exec skill.
  */
 
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -39,7 +42,9 @@ async function main() {
 
     const skillContext = loader.getSkillContext({ hintSkills: ['exec'] });
     const execTool = skillContext.runSkillTool.find((tool) => tool?.function?.name === 'exec_run');
+    const nodeScriptTool = skillContext.runSkillTool.find((tool) => tool?.function?.name === 'exec_node_script');
     assert(execTool, 'exec_run tool should be built from SKILL.md');
+    assert(nodeScriptTool, 'exec_node_script tool should be built from SKILL.md');
     const required = execTool.function.parameters.required || [];
     assert(required.includes('command'), 'exec_run requires command');
     assert(required.includes('argv'), 'exec_run requires argv');
@@ -53,6 +58,29 @@ async function main() {
 
     const denied = JSON.parse(await executeSkill('exec', { workspaceDir }, { command: 'sh', argv: ['-c', 'echo nope'] }, 'exec_run'));
     assert(/not allowlisted/i.test(denied.error || ''), `expected allowlist denial, got ${JSON.stringify(denied)}`);
+
+    const projectDir = join(workspaceDir, 'unrelated-project');
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, '.env'), 'PASTURE_EXEC_PROBE=loaded-without-echo\n', 'utf8');
+    const transient = await executeSkill('exec', { workspaceDir }, {
+      source: [
+        "import { MongoClient } from 'mongodb';",
+        "console.log(JSON.stringify({",
+        "  dependency: typeof MongoClient,",
+        "  envLoaded: process.env.PASTURE_EXEC_PROBE === 'loaded-without-echo',",
+        "  cwdMatches: process.cwd() === " + JSON.stringify(projectDir),
+        "}));",
+      ].join('\n'),
+      cwd: projectDir,
+      envFile: '.env',
+    }, 'exec_node_script');
+    const transientResult = JSON.parse(transient);
+    assert(transientResult.dependency === 'function', `node_script could not import Pasture dependency: ${transient}`);
+    assert(transientResult.envLoaded === true, `node_script did not load explicit envFile: ${transient}`);
+    assert(transientResult.cwdMatches === true, `node_script did not use target project cwd: ${transient}`);
+    assert(!transient.includes('loaded-without-echo'), `node_script echoed an env value: ${transient}`);
+    assert(!readdirSync(ROOT).some((name) => name.startsWith('.pasture-node-script-')),
+      'node_script left its transient source directory behind');
 
     console.log('Exec skill test passed.');
   } finally {

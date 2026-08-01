@@ -40,6 +40,10 @@
       "skillIds": ["evaluate-team-capability"],
       "unitTests": ["scripts/test/unit/agent/test-evaluate-team-capability.js"]
     },
+    "lib/agent/executors/exec.js": {
+      "skillIds": ["exec"],
+      "unitTests": ["scripts/test/unit/core/test-exec-skill.js"]
+    },
     "lib/agent/executors/file-verification.js": {
       "skillIds": [],
       "unitTests": ["scripts/test/unit/skills/test-apply-patch.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
@@ -161,6 +165,10 @@
     "skills/evaluate-team-capability/SKILL.md": {
       "executor": "lib/agent/executors/evaluate-team-capability.js",
       "unitTests": ["scripts/test/unit/agent/test-evaluate-team-capability.js"]
+    },
+    "skills/exec/SKILL.md": {
+      "executor": "lib/agent/executors/exec.js",
+      "unitTests": ["scripts/test/unit/core/test-exec-skill.js"]
     },
     "skills/github/SKILL.md": {
       "executor": "lib/agent/executors/github.js",

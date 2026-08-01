@@ -47,7 +47,7 @@ check(
 );
 check(
   'baseSystemPrompt now includes buildAgentTeamPromptBlock',
-  /buildOneOnOneSystemPrompt\(ctx\.workspaceDir\)\s*\+\s*buildAgentTeamPromptBlock\(agentId\)/.test(bg)
+  /buildOneOnOneSystemPrompt\(ctx\.workspaceDir(?:,\s*\{\s*agentId\s*\})?\)\s*\+\s*buildAgentTeamPromptBlock\(agentId\)/.test(bg)
 );
 check(
   'task-mode prompt appends retrospective block',

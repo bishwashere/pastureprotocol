@@ -14,6 +14,7 @@ import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } f
 import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent/agent.js';
+import { buildExecutionRequirements } from '../lib/agent/execution-requirements.js';
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { closeCodexAppServerClient } from '../lib/llm/codex-app-server.js';
 import { routeTurn, turnRouteToSystemBlock, buildCasualChatTurnRoute } from '../lib/agent/turn-router.js';
@@ -392,6 +393,7 @@ async function main() {
         historyMessages,
         getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
+        executionRequirements: buildExecutionRequirements(turnRoute),
         onToolProgress: (msg) => {
           const m = msg != null ? String(msg).trim() : '';
           if (m) writeNdjsonLine({ type: 'progress', message: m });

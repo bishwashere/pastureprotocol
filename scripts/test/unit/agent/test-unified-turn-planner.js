@@ -20,8 +20,13 @@ async function main() {
   assert(prompt.includes('Task Frames'), 'prompt covers task frames');
   assert(prompt.includes('command-execution/package-manager capability'),
     'prompt distinguishes package-manager commands from filesystem writes');
+  assert(prompt.includes('requiredToolSteps'), 'prompt documents ordered required tool steps');
+  assert(prompt.includes('node_script'), 'prompt documents transient JavaScript execution');
+  assert(prompt.includes('anyOfTools'), 'prompt requires exact callable tool names');
+  assert(prompt.includes('requiredArguments') && prompt.includes('resultContains'),
+    'prompt ties required steps to intended arguments and output evidence');
 
-  const availableSkillIds = ['read', 'go-read', 'write', 'edit', 'apply-patch', 'project-workflow', 'agent-send', 'search'];
+  const availableSkillIds = ['read', 'go-read', 'write', 'edit', 'apply-patch', 'exec', 'project-workflow', 'agent-send', 'search'];
   const implementationPlan = await planUnifiedTurn({
     userText: 'apply the patches',
     currentWorkMode: 'multi',
@@ -38,6 +43,21 @@ async function main() {
       targetAgentId: '',
       mode: 'code',
       skills: ['read', 'go-read', 'write', 'edit', 'apply-patch', 'not-enabled'],
+      requiredToolSteps: [
+        {
+          kind: 'write',
+          anyOfSkills: ['write', 'edit', 'apply-patch', 'not-enabled'],
+          anyOfTools: ['write_file', 'edit_file', 'apply_patch_apply', 'not_enabled_tool'],
+          requiredArguments: { path: 'runtime-probe.js' },
+        },
+        {
+          kind: 'execute',
+          anyOfSkills: ['exec', 'not-enabled'],
+          anyOfTools: ['exec_run', 'not_enabled_tool'],
+          requiredArguments: { command: 'node', argv: ['runtime-probe.js'] },
+          resultContains: 'PASTURE_RESULT:',
+        },
+      ],
       executionMode: 'tool_use',
       usesExistingWorkIntake: false,
       mustUseTool: true,
@@ -73,6 +93,15 @@ async function main() {
   assert(implementationPlan.skills.includes('write'), 'write skill preserved');
   assert(implementationPlan.skills.includes('apply-patch'), 'apply-patch skill preserved');
   assert(!implementationPlan.skills.includes('not-enabled'), 'hallucinated skills are filtered');
+  assert(implementationPlan.skills.includes('exec'), 'required skill is exposed even if omitted from skills');
+  assert(implementationPlan.requiredToolSteps.length === 2, 'ordered required steps are preserved');
+  assert(implementationPlan.requiredToolSteps[0].kind === 'write', 'write remains the first required step');
+  assert(implementationPlan.requiredToolSteps[1].anyOfSkills.join(',') === 'exec', 'execute alternatives are filtered');
+  assert(implementationPlan.requiredToolSteps[1].anyOfTools.join(',') === 'exec_run',
+    'exact action constraints are preserved and filtered');
+  assert(implementationPlan.requiredToolSteps[1].requiredArguments.argv[0] === 'runtime-probe.js'
+    && implementationPlan.requiredToolSteps[1].resultContains === 'PASTURE_RESULT:',
+    'operation target and output evidence are preserved');
   assert(implementationPlan.taskFrame.toolProfile.join(',') === 'read,write,apply-patch',
     'task-frame tool profile is filtered');
 
@@ -80,6 +109,25 @@ async function main() {
   assert(route.mode === 'code', 'route uses planner mode');
   assert(route.mustUseTool === true, 'route carries mustUseTool');
   assert(route.skills.includes('edit'), 'route carries planner skills');
+  assert(route.requiredToolSteps.map((step) => step.kind).join(',') === 'write,execute',
+    'route carries ordered required steps');
+
+  const legacyCodePlan = await planUnifiedTurn({
+    userText: 'write and run a small script',
+    availableSkillIds,
+    llmChat: async () => JSON.stringify({
+      mode: 'code',
+      skills: ['write', 'exec'],
+      requiredToolSteps: [],
+      mustUseTool: false,
+      executionMode: 'tool_use',
+      taskFrame: {},
+    }),
+  });
+  assert(legacyCodePlan.mustUseTool === true,
+    'structured code route with write/exec cannot be normalized to optional tool use');
+  const legacyCodeRoute = unifiedPlanToTurnRoute(legacyCodePlan);
+  assert(legacyCodeRoute.mustUseTool === true, 'coerced code requirement reaches the runtime route');
 
   const delegatedPlan = await planUnifiedTurn({
     userText: 'have the specialist continue this project',
