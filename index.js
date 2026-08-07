@@ -1571,6 +1571,7 @@ async function main() {
           workModeToggle: unifiedPlan.workModeToggle,
           needsMultiAgent: unifiedPlan.needsMultiAgent,
           needsDurability: unifiedPlan.needsDurability,
+          needsWorklog: unifiedPlan.needsWorklog,
           needsDelegation: unifiedPlan.needsDelegation,
           teamRouting: unifiedPlan.teamRouting || '',
           delegationAction: unifiedPlan.delegationAction || '',
@@ -1596,6 +1597,7 @@ async function main() {
             workModeToggle: unifiedPlan.workModeToggle,
             needsMultiAgent: unifiedPlan.needsMultiAgent,
             needsDurability: unifiedPlan.needsDurability,
+            needsWorklog: unifiedPlan.needsWorklog,
             needsDelegation: unifiedPlan.needsDelegation,
             teamRouting: unifiedPlan.teamRouting,
             delegationAction: unifiedPlan.delegationAction,
@@ -1764,6 +1766,7 @@ async function main() {
               skills: Array.isArray(activeTaskFrame.toolProfile) ? activeTaskFrame.toolProfile : [],
               executionMode: 'tool_use',
               usesExistingWorkIntake: true,
+              needsWorklog: activeTaskFrame.needsWorklog === true,
               plan: `Planner failed after Task Frame continuation precheck; use active Task Frame profile for ${activeTaskFrame.objective || activeTaskFrame.title || activeTaskFrame.kind}.`,
               answer_style: 'short',
               fallbackToolPolicy: 'active_frame_profile',
@@ -1846,6 +1849,9 @@ async function main() {
     }
     logFlow(FLOW_STEP.RUN_AGENT, '[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     ctx._originalUserText = text;
+    ctx.sessionId = sessionId;
+    ctx.logKey = sessionLogKey;
+    ctx.priorTaskWorklogId = activeTaskFrame?.worklogId || '';
     const plannedMustUseTool = !!(
       turnRoute?.mustUseTool === true
       || unifiedPlan?.mustUseTool === true
@@ -1935,7 +1941,16 @@ async function main() {
     }
     const routeIncludesWriteSkill = Array.isArray(turnRoute?.skills)
       && turnRoute.skills.some((id) => ['write', 'edit', 'go-write', 'apply-patch'].includes(id));
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called, taskFrameStatus: rawTaskFrameStatus, hadWriteOp: turnHadWriteOp } = turnResult || {};
+    const {
+      textToSend,
+      voiceReplyText,
+      imageReplyPath,
+      imageReplyCaption,
+      skillsCalled: called,
+      taskFrameStatus: rawTaskFrameStatus,
+      hadWriteOp: turnHadWriteOp,
+      taskWorklogId: turnTaskWorklogId,
+    } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
@@ -1961,7 +1976,14 @@ async function main() {
           status: activeTaskFrame?.status || 'active',
         }
       : null;
-    const frameForStatus = activeTaskFrame || plannedFrameForStatus;
+    const frameForStatusBase = activeTaskFrame || plannedFrameForStatus;
+    const frameForStatus = frameForStatusBase
+      ? {
+          ...frameForStatusBase,
+          logKey: frameForStatusBase.logKey || sessionLogKey,
+          worklogId: turnTaskWorklogId || frameForStatusBase.worklogId || '',
+        }
+      : null;
     if (!postTurnTaskFrameStatus && !isGroupJid && frameForStatus && rawTextToSend) {
       const statusDecision = await traceAsyncStep('task_frame_status', () => classifyTaskFrameStatusAfterTurn({
         frame: frameForStatus,
@@ -2025,6 +2047,7 @@ async function main() {
           assistantText: rawTextToSend,
           skillsCalled: skillsCalledFromTurn,
           status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
+          worklogId: turnTaskWorklogId,
         });
         logFlow(FLOW_STEP.PERSIST, '[task-frame] updated', JSON.stringify({
           frameId: updatedFrame?.id || activeTaskFrame.id || '',
@@ -2095,18 +2118,21 @@ async function main() {
               : (unifiedPlan.taskFrame?.ownerAgentId || activeTaskFrame?.ownerAgentId || '')),
         teamId: unifiedPlan.taskFrame?.teamId || focusedProjectTeamId || activeTaskFrame?.teamId || '',
         toolProfile: [...new Set([...frameRequiredSkillIds, ...(plannedFrameSkills || [])])],
+        needsWorklog: unifiedPlan.needsWorklog === true,
         plan: unifiedPlan.taskFrame?.plan || unifiedPlan.plan || '',
         reason: unifiedPlan.reason || '',
       };
       activeTaskFrame = upsertTaskFrame(sessionLogKey, frameDecision, activeTaskFrame, {
         userText: text,
         replace: unifiedPlan.taskFrameAction === 'new' || unifiedPlan.taskFrameAction === 'replace',
+        worklogId: turnTaskWorklogId,
       });
       const updatedFrame = updateTaskFrameAfterTurn(sessionLogKey, {
         userText: text,
         assistantText: rawTextToSend,
         skillsCalled: skillsCalledFromTurn,
         status: statusToStoredFrameStatus(postTurnTaskFrameStatus),
+        worklogId: turnTaskWorklogId,
       });
       logFlow(FLOW_STEP.PERSIST, '[task-frame] updated', JSON.stringify({
         frameId: updatedFrame?.id || activeTaskFrame?.id || '',

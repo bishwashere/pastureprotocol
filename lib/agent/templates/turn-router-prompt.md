@@ -10,6 +10,20 @@ Given the user message and available skills, decide:
 3. Which skill IDs from the list are relevant? Use the smallest useful set, but code/file implementation may need up to 6 skills.
 4. What should be checked before the final answer?
 5. If durable work was already identified, preserve it and use existing work intake/state.
+6. Does this turn need a durable checkpoint worklog so early tool results survive a long run?
+
+## Per-run checkpoint worklog
+
+Set `needsWorklog: true` for broad inventories (such as checking every
+project/repo/deployment), several meaningful tool rounds, multi-step research,
+debugging/implementation/verification, background work, or any synthesis that
+must combine many independent results. This is current-run context and does
+not require a persistent project or mission.
+
+Set `needsWorklog: false` for chat, one quick lookup/count, one simple tool
+call, or an answer already supported by context. When true and `worklog` is in
+the available skills, include it in `skills`; the runtime will use an extended
+round budget and preserve compact checkpoints.
 
 ## Pasture/CowCode self-inspection
 
@@ -66,6 +80,7 @@ Return JSON only:
 ```json
 {
   "mode": "chat | tool | research | code | memory",
+  "needsWorklog": false,
   "skills": [],
   "requiredToolSteps": [
     {"kind":"inspect | write | execute | verify | delegate","anyOfSkills":[],"anyOfTools":[],"requiredArguments":{},"resultContains":""}

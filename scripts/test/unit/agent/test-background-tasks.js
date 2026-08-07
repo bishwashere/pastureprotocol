@@ -98,6 +98,7 @@ async function main() {
         id: 'stale-task-id',
         jid: '999',
         prompt: 'old work',
+        worklogId: 'stale-task-id',
         status: 'running',
         createdAtMs: Date.now() - 60_000,
         updatedAtMs: Date.now() - 60_000,
@@ -108,6 +109,7 @@ async function main() {
   recoverStaleBackgroundTasks(storePath);
   const stale = listTasksForJid('999', storePath)[0];
   check('recover: running -> failed on restart', stale?.status === 'failed' && /restart/.test(stale?.error || ''));
+  check('recover: durable worklog linkage is retained', stale?.worklogId === 'stale-task-id');
 
   check('implicit: always in enabled skill ids', getEnabledSkillIds({ agentId: 'main' }).includes('background-tasks'));
 
@@ -133,6 +135,8 @@ async function main() {
 
   const done = await waitFor(() => listTasksForJid(ctx.jid).find((t) => t.id === spawn.taskId)?.status === 'done');
   check('spawn: completes asynchronously', done);
+  const completedTask = listTasksForJid(ctx.jid).find((t) => t.id === spawn.taskId);
+  check('spawn: task owns a stable per-run worklog id', completedTask?.worklogId === spawn.taskId);
   check('spawn: announces to chat', ctx.sock.sent.length >= 1 && /Background result text/.test(ctx.sock.sent[0]?.text || ''));
 
   // Executor spawn

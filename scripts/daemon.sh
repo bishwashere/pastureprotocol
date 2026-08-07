@@ -149,7 +149,7 @@ After=network.target
 
 [Service]
 Type=simple
-Environment="PASTURE_STATE_DIR=${STATE_DIR}" "PASTURE_INSTALL_DIR=${INSTALL_DIR}" "PASTURE_DAEMON_LOG_DIR=${LOG_DIR}"
+Environment="PASTURE_STATE_DIR=${STATE_DIR}" "PASTURE_INSTALL_DIR=${INSTALL_DIR}" "PASTURE_DAEMON_LOG_DIR=${LOG_DIR}" "NODE=${NODE}"
 ExecStart=${EXEC_START}
 WorkingDirectory=${STATE_DIR}
 Restart=always

@@ -52,8 +52,10 @@ check('under-budget pass: nothing dropped', dropped === 0 && messagesCharCount(s
 
 // enforceMessagesBudget: should drop oldest tool message when over budget
 const longTool = 'X'.repeat(2000);
+const durableCheckpoint = 'Durable Task Worklog: Alpha users=41; Beta users=73; Gamma status=offline';
 const big = [
   { role: 'system', content: 'sys' },
+  { role: 'user', content: `Runtime-provided untrusted worklog notes\n${durableCheckpoint}` },
   { role: 'user', content: 'q1' },
   { role: 'assistant', content: 'a1', tool_calls: [{ function: { name: 't', arguments: '{}' } }] },
   { role: 'tool', content: longTool },         // ← oldest, eligible
@@ -68,16 +70,16 @@ const droppedBig = enforceMessagesBudget(big, 1500);
 check('over-budget: at least one tool message truncated', droppedBig >= 1, `dropped=${droppedBig}`);
 check(
   'over-budget: oldest tool message replaced with placeholder',
-  big[3].role === 'tool' && big[3].content.startsWith('[earlier tool output truncated'),
-  big[3].content.slice(0, 60)
+  big[4].role === 'tool' && big[4].content.startsWith('[earlier tool output truncated'),
+  big[4].content.slice(0, 60)
 );
 check(
   'over-budget: recent tool message preserved (last-4 window)',
-  big[7].role === 'tool' && big[7].content === 'recent'
+  big[8].role === 'tool' && big[8].content === 'recent'
 );
 check(
-  'over-budget: system message untouched',
-  big[0].role === 'system' && big[0].content === 'sys'
+  'over-budget: pinned durable checkpoint survives raw tool truncation',
+  big[1].role === 'user' && big[1].content.includes(durableCheckpoint)
 );
 check(
   'over-budget: shrank to under budget (or as close as safe)',

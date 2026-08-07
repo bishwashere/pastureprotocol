@@ -40,10 +40,13 @@ export const DEFAULT_ENABLED = [
 ];
 
 /** Always injected at runtime for chat; never toggled in config/UI. */
-export const IMPLICIT_CHAT_SKILLS = ['background-tasks', 'project-workflow'];
+export const IMPLICIT_CHAT_SKILLS = ['background-tasks', 'project-workflow', 'worklog'];
 
 /** Hidden from dashboard skill toggles (managed implicitly with team links). */
-export const UI_HIDDEN_SKILL_IDS = new Set(['agent-send', 'background-tasks', 'evaluate-team-capability', 'project-workflow']);
+export const UI_HIDDEN_SKILL_IDS = new Set(['agent-send', 'background-tasks', 'evaluate-team-capability', 'project-workflow', 'worklog']);
+
+/** Implicit tools that must survive turn-router hint narrowing. */
+const HINT_PERSISTENT_SKILLS = new Set(['worklog']);
 
 const MD_NAMES = ['skill.md', 'SKILL.md'];
 const COMPACT_DESC_MAX = 280;
@@ -319,7 +322,9 @@ export function getSkillContext(options = {}) {
     Array.isArray(hintSkills) && hintSkills.length > 0
       ? enabled.filter((id) => hintSkills.includes(id))
       : [];
-  const idsToLoad = hinted.length > 0 ? hinted : enabled;
+  const idsToLoad = hinted.length > 0
+    ? [...new Set([...hinted, ...enabled.filter((id) => HINT_PERSISTENT_SKILLS.has(id))])]
+    : enabled;
   const compactEntries = [];
   const fullDocsById = Object.create(null);
   const available = [];

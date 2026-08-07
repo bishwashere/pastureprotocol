@@ -124,6 +124,10 @@
       "skillIds": ["vision"],
       "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
     },
+    "lib/agent/executors/worklog.js": {
+      "skillIds": ["worklog"],
+      "unitTests": ["scripts/test/unit/agent/test-task-worklog.js"]
+    },
     "lib/agent/executors/write.js": {
       "skillIds": ["write"],
       "unitTests": ["scripts/test/unit/core/test-atomic-write.js", "scripts/test/unit/skills/test-skill-executor-map.js"]
@@ -233,6 +237,10 @@
     "skills/vision/SKILL.md": {
       "executor": "lib/agent/executors/vision.js",
       "unitTests": ["scripts/test/unit/skills/test-skill-executor-map.js"]
+    },
+    "skills/worklog/SKILL.md": {
+      "executor": "lib/agent/executors/worklog.js",
+      "unitTests": ["scripts/test/unit/agent/test-task-worklog.js"]
     },
     "skills/write/SKILL.md": {
       "executor": "lib/agent/executors/write.js",

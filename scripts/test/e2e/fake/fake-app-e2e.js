@@ -56,6 +56,7 @@ function fakePlannerJson(scenario) {
     workModeToggle: scenario.workModeToggle || 'no_change',
     needsMultiAgent: false,
     needsDurability: false,
+    needsWorklog: scenario.needsWorklog === true,
     needsDelegation: false,
     teamRouting: 'none',
     delegationAction: 'none',
@@ -95,6 +96,7 @@ function fakeTaskFrameJson() {
     action: 'ignore',
     confidence: 0.9,
     mustUseTool: false,
+    needsWorklog: false,
     resemblance: 'none',
     kind: 'general_task',
     title: '',
@@ -184,6 +186,38 @@ async function startFakeLlmServer(scenario) {
     if (promptText.includes('Task Frame Status')) {
       return jsonResponse(res, { choices: [{ message: { role: 'assistant', content: '{"status":"continue","confidence":0.8,"reason":"fake e2e complete"}' } }] });
     }
+    if (promptText.includes('# Tool Result Checkpoint')) {
+      if (Number(scenario.checkpointFailuresRemaining || 0) > 0) {
+        scenario.checkpointFailuresRemaining -= 1;
+        return jsonResponse(res, {
+          choices: [{ message: { role: 'assistant', content: 'transient malformed checkpoint' } }],
+        });
+      }
+      const checkpointInput = [...messages].reverse().find((m) => m?.role === 'user');
+      let latestToolResults = '';
+      try {
+        const parsed = JSON.parse(String(checkpointInput?.content || '{}'));
+        latestToolResults = JSON.stringify(parsed?.latestToolResults || []);
+      } catch (_) {}
+      const facts = [...new Set(latestToolResults.match(/PROJECT_[A-Z]_STATUS=[A-Z_]+/g) || [])];
+      return jsonResponse(res, {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              save: facts.length > 0,
+              summary: facts.length ? `Captured ${facts.length} project status result(s).` : '',
+              completed: facts.map((fact) => `Checked ${fact.split('_STATUS=')[0]}`),
+              facts,
+              evidence: facts.map((fact) => `Tool returned ${fact}`),
+              failures: [],
+              nextSteps: [],
+              supersedes: [],
+            }),
+          },
+        }],
+      });
+    }
     if (promptText.includes('Casual') || promptText.includes('casual')) {
       return jsonResponse(res, { choices: [{ message: { role: 'assistant', content: scenario.finalReply || 'Hi. How can I help?' } }] });
     }
@@ -191,6 +225,29 @@ async function startFakeLlmServer(scenario) {
       m?.role === 'assistant'
       && ((Array.isArray(m.tool_calls) && m.tool_calls.length > 0) || String(m.content || '').trim())
     )).length;
+    const lastAssistantToolName = [...messages]
+      .reverse()
+      .find((m) => m?.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length)
+      ?.tool_calls?.[0]?.function?.name || '';
+    if (
+      hasTools
+      && promptText.includes('# Required Worklog Step')
+      && lastAssistantToolName !== 'worklog_read'
+    ) {
+      return jsonResponse(res, {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: '',
+            tool_calls: [{
+              id: 'call_fake_worklog_read',
+              type: 'function',
+              function: { name: 'worklog_read', arguments: '{}' },
+            }],
+          },
+        }],
+      });
+    }
     const plannedStep = Array.isArray(scenario.toolSteps)
       ? scenario.toolSteps[assistantDecisionCount]
       : (!hasToolResult ? scenario.toolCall : null);
@@ -317,6 +374,29 @@ function runChat(message, stateDir, extraEnv = {}, sanitizeEnv = false) {
 
 function makeScenarios() {
   const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const longTaskFacts = [
+    'PROJECT_A_STATUS=HEALTHY',
+    'PROJECT_B_STATUS=DEGRADED',
+    'PROJECT_C_STATUS=HEALTHY',
+    'PROJECT_D_STATUS=OFFLINE',
+    'PROJECT_E_STATUS=HEALTHY',
+    'PROJECT_F_STATUS=MAINTENANCE',
+    'PROJECT_G_STATUS=HEALTHY',
+    'PROJECT_H_STATUS=DEGRADED',
+    'PROJECT_I_STATUS=HEALTHY',
+    'PROJECT_J_STATUS=OFFLINE',
+  ];
+  const longTaskFiles = Object.fromEntries(longTaskFacts.map((fact, index) => {
+    const letter = String.fromCharCode(97 + index);
+    const filler = String.fromCharCode(65 + index).repeat(12_000);
+    // Alternate head/tail placement so the checkpoint path proves it retains
+    // both ends of large results.
+    return [`project-${letter}.txt`, index % 2 === 0 ? `${filler}\n${fact}` : `${fact}\n${filler}`];
+  }));
+  const longTaskSteps = longTaskFacts.map((_fact, index) => ({
+    name: 'read_file',
+    arguments: { path: `project-${String.fromCharCode(97 + index)}.txt` },
+  }));
   return {
     'agent': { name: 'agent', message: 'Hello, what is 2+2?', skills: [], finalReply: 'Hello. 2+2 is 4.' },
     'casual-greetings-e2e': { name: 'casual-greetings-e2e', message: 'hi', skills: [], finalReply: 'Hi. How can I help?' },
@@ -501,6 +581,56 @@ function makeScenarios() {
           'failed exec stderr was not retained in the tool transcript');
         assert(toolResults.some((text) => text.includes('PASTURE_FORK_RUNTIME_OK:42')),
           'successful exec output was not retained in the tool transcript');
+      },
+    },
+    'long-task-worklog-e2e': {
+      name: 'long-task-worklog-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      checkpointFailuresRemaining: 1,
+      message: 'Inspect every project status file and give me one complete status summary.',
+      skills: ['read', 'worklog'],
+      files: longTaskFiles,
+      toolSteps: longTaskSteps,
+      finalReply(_toolText, messages) {
+        const transcript = messages.map((m) => String(m.content || '')).join('\n');
+        const hasAll = longTaskFacts.every((fact) => transcript.includes(fact));
+        const rawWasTruncated = transcript.includes('[earlier tool output truncated to fit context budget');
+        if (hasAll) this.worklogContinuityObserved = true;
+        if (rawWasTruncated) this.rawTruncationObserved = true;
+        return hasAll ? longTaskFacts.join('\n') : 'MISSING_DURABLE_PROJECT_CONTEXT';
+      },
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS: '3',
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '10',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '12',
+        PASTURE_MESSAGES_CHAR_BUDGET: '30000',
+        PASTURE_MAX_COMPLETENESS_RETRIES: '0',
+      },
+      assert: ({ reply, skillsCalled, stdout }, { stateDir, scenario }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === longTaskFacts.length,
+          `expected ${longTaskFacts.length} project reads, got [${skillsCalled.join(', ')}]`);
+        assert(skillsCalled.includes('worklog'), 'runtime did not make the agent read its durable worklog');
+        assert(scenario.rawTruncationObserved === true || stdout.includes('tool_round_budget_truncate'),
+          'test did not force raw tool transcript truncation');
+        assert(scenario.worklogContinuityObserved === true,
+          'final synthesis did not receive all checkpointed early and late facts');
+        for (const fact of longTaskFacts) {
+          assert(reply.includes(fact), `final reply forgot ${fact}: ${reply}`);
+        }
+        const worklogDir = join(stateDir, 'task-worklogs');
+        const worklogFiles = readdirSync(worklogDir).filter((name) => name.endsWith('.json'));
+        assert(worklogFiles.length === 1, `expected one per-run worklog, got ${worklogFiles.length}`);
+        const persisted = JSON.parse(readFileSync(join(worklogDir, worklogFiles[0]), 'utf8'));
+        assert(persisted.status === 'completed', `expected completed worklog, got ${persisted.status}`);
+        const checkpointFacts = persisted.checkpoints.flatMap((checkpoint) => checkpoint.facts || []);
+        for (const fact of longTaskFacts) {
+          assert(checkpointFacts.filter((item) => item === fact).length === 1,
+            `expected one independent persisted checkpoint for ${fact}`);
+        }
+        assert(persisted.toolEvents.some((event) => event.skillId === 'worklog' && event.toolName === 'read'),
+          'worklog did not record the mandatory final read event');
       },
     },
     'required-steps-unavailable-e2e': {

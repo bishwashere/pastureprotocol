@@ -25,8 +25,10 @@ async function main() {
   assert(prompt.includes('anyOfTools'), 'prompt requires exact callable tool names');
   assert(prompt.includes('requiredArguments') && prompt.includes('resultContains'),
     'prompt ties required steps to intended arguments and output evidence');
+  assert(prompt.includes('needsWorklog') && prompt.includes('all projects'),
+    'prompt delegates long-run checkpoint selection to the LLM');
 
-  const availableSkillIds = ['read', 'go-read', 'write', 'edit', 'apply-patch', 'exec', 'project-workflow', 'agent-send', 'search'];
+  const availableSkillIds = ['read', 'go-read', 'write', 'edit', 'apply-patch', 'exec', 'project-workflow', 'agent-send', 'search', 'worklog'];
   const implementationPlan = await planUnifiedTurn({
     userText: 'apply the patches',
     currentWorkMode: 'multi',
@@ -37,6 +39,7 @@ async function main() {
       workModeToggle: 'enable',
       needsMultiAgent: true,
       needsDurability: false,
+      needsWorklog: true,
       needsDelegation: false,
       teamRouting: 'current_agent',
       delegationAction: 'none',
@@ -88,6 +91,8 @@ async function main() {
   assert(implementationPlan.teamRouting === 'current_agent', 'team routing is preserved');
   assert(implementationPlan.mode === 'code', 'implementation plan remains code mode');
   assert(implementationPlan.mustUseTool === true, 'mustUseTool is preserved');
+  assert(implementationPlan.needsWorklog === true, 'long implementation preserves worklog policy');
+  assert(implementationPlan.skills.includes('worklog'), 'worklog is exposed when planner requires checkpoints');
   assert(implementationPlan.fallbackToolPolicy === 'active_frame_profile', 'fallback policy is preserved');
   assert(implementationPlan.taskFrameSeedPolicy === 'reject_candidate', 'seed policy is preserved');
   assert(implementationPlan.skills.includes('write'), 'write skill preserved');
@@ -108,6 +113,7 @@ async function main() {
   const route = unifiedPlanToTurnRoute(implementationPlan);
   assert(route.mode === 'code', 'route uses planner mode');
   assert(route.mustUseTool === true, 'route carries mustUseTool');
+  assert(route.needsWorklog === true, 'route carries worklog policy to runtime');
   assert(route.skills.includes('edit'), 'route carries planner skills');
   assert(route.requiredToolSteps.map((step) => step.kind).join(',') === 'write,execute',
     'route carries ordered required steps');
@@ -138,6 +144,7 @@ async function main() {
       workModeToggle: 'no_change',
       needsMultiAgent: true,
       needsDurability: true,
+      needsWorklog: true,
       needsDelegation: true,
       teamRouting: 'delegate_to_specialist',
       delegationAction: 'delegate',
@@ -168,6 +175,7 @@ async function main() {
   assert(delegatedPlan.taskFrameSeedPolicy === 'revise_candidate', 'candidate seed policy is preserved');
   assert(delegatedPlan.skills.includes('agent-send'), 'delegation forces agent-send when available');
   assert(delegatedPlan.skills.includes('project-workflow'), 'durable work forces project-workflow when available');
+  assert(delegatedPlan.skills.includes('worklog'), 'long durable delegation keeps per-run checkpoint support');
   assert(delegatedPlan.needsDelegation === true && delegatedPlan.targetAgentId === 'builder',
     'delegation target is preserved');
 

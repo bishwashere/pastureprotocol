@@ -9,14 +9,16 @@ function assert(condition, message) {
 
 const route = await routeTurn({
   userText: 'Create and run a small JavaScript diagnostic.',
-  availableSkillIds: ['go-read', 'write', 'exec'],
+  availableSkillIds: ['go-read', 'write', 'exec', 'worklog'],
   availableSkillSummaries: [
     { id: 'go-read', description: 'read files' },
     { id: 'write', description: 'write files' },
     { id: 'exec', description: 'execute commands and transient scripts' },
+    { id: 'worklog', description: 'checkpoint long task results' },
   ],
   llmChat: async () => JSON.stringify({
     mode: 'code',
+    needsWorklog: true,
     skills: ['go-read'],
     requiredToolSteps: [
       {
@@ -42,6 +44,8 @@ const route = await routeTurn({
 });
 
 assert(route.mode === 'code', 'legacy route keeps code mode');
+assert(route.needsWorklog === true && route.skills.includes('worklog'),
+  'legacy route preserves planner-selected checkpoint mode');
 assert(route.skills.includes('write') && route.skills.includes('exec'),
   'required step skills are added to exposed route skills');
 assert(route.mustUseTool === true, 'required steps force tool use');
@@ -53,5 +57,7 @@ assert(turnRouteToSystemBlock(route).includes('write [write] via [write_file] ar
 const requirements = buildExecutionRequirements(route);
 assert(requirements.steps.length === 2 && requirements.usesExtendedBudget,
   'legacy route builds an enforceable extended-budget contract');
+assert(requirements.worklogRequired === true,
+  'legacy route carries checkpoint enforcement to runAgentTurn');
 
 console.log('turn-router required-step tests passed');
