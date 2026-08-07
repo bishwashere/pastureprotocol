@@ -31,6 +31,7 @@ Return JSON only. No prose, no markdown fences.
 - Set `mustUseTool: true` only when the turn cannot be answered correctly without a tool call.
 - Set `mustUseTool: false` for explanations, confirmations, summaries from already-known context, or casual continuations.
 - For active code/repo/file frames, set `mustUseTool: true` when the user is asking for the next implementation/change step rather than asking for a status explanation.
+- Set `needsWorklog: true` when this frame turn must aggregate many independent results or needs several meaningful tool rounds. Preserve an active frame's existing worklog requirement on continuations. Set it false for a quick follow-up.
 
 ## Resemblance
 
@@ -55,6 +56,7 @@ Use one of:
   "action": "continue_fast | continue_replan | new_candidate | exit | ignore",
   "confidence": 0.0,
   "mustUseTool": false,
+  "needsWorklog": false,
   "resemblance": "strong | weak | none",
   "kind": "repo_work | project_work | feature_work | debugging | general_task",
   "title": "",

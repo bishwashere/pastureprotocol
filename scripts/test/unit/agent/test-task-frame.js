@@ -39,17 +39,19 @@ async function main() {
   assert(prompt.includes('resemblance'), 'prompt documents resemblance');
   assert(prompt.includes('fall back to the normal turn pipeline'), 'prompt documents fallback behavior');
   assert(prompt.includes('toolProfile'), 'prompt documents tool profile');
+  assert(prompt.includes('needsWorklog'), 'prompt lets the LLM preserve long-run checkpoint policy');
 
   const logKey = 'owner';
   const first = await classifyTaskFrameTurn({
     logKey,
     userText: 'clone this repo and inspect it',
-    availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search'],
+    availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search', 'worklog'],
     availableSkillSummaries: [],
     llmChat: async () => JSON.stringify({
       action: 'new_candidate',
       confidence: 0.91,
       mustUseTool: true,
+      needsWorklog: true,
       resemblance: 'none',
       kind: 'repo_work',
       title: 'Clone my-work-list',
@@ -65,6 +67,7 @@ async function main() {
     }),
   });
   assert(first.decision.action === 'new_candidate', 'new frame candidate decision preserved');
+  assert(first.decision.needsWorklog === true, 'new broad frame preserves checkpoint requirement');
   assert(first.decision.toolProfile.join(',') === 'read,go-read,write,apply-patch', 'tool profile filtered to enabled skills');
   assert(!shouldUseTaskFrameFastPath(first.decision), 'new candidate does not skip the normal first-turn pipeline');
 
@@ -76,39 +79,50 @@ async function main() {
     ],
   }, first.activeFrame, { userText: 'clone this repo and inspect it' });
   assert(frame && frame.status === 'active', 'frame stored as active');
+  assert(frame.needsWorklog === true, 'frame stores checkpoint requirement');
   assert(frame.ownerAgentId === 'coder', 'frame stores owner agent');
   assert(frame.teamId === 'product-team', 'frame stores team id');
   assert(!Object.hasOwn(frame, 'requiredToolSteps'),
     'frame does not persist current-turn required tool steps');
   assert(getActiveTaskFrame(logKey)?.projectName === 'My Work List', 'active frame can be loaded');
+  const opaqueWorklogId = 'opaque-worklog-storage-id';
+  updateTaskFrameAfterTurn(logKey, { worklogId: opaqueWorklogId });
 
+  let continuationPrompt = '';
   const cont = await classifyTaskFrameTurn({
     logKey,
     userText: 'what is inside it?',
-    availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search'],
+    availableSkillIds: ['read', 'go-read', 'write', 'apply-patch', 'search', 'worklog'],
     availableSkillSummaries: [],
-    llmChat: async () => JSON.stringify({
-      action: 'continue_fast',
-      confidence: 0.89,
-      mustUseTool: true,
-      resemblance: 'strong',
-      kind: 'repo_work',
-      title: 'Clone my-work-list',
-      objective: 'Inspect my-work-list',
-      projectName: 'My Work List',
-      repoUrl: '',
-      localPath: '',
-      toolProfile: ['read', 'go-read'],
-      plan: 'Inspect the existing active repo frame.',
-      reason: 'Short follow-up refers to the active repo frame.',
-    }),
+    llmChat: async (messages) => {
+      continuationPrompt = String(messages?.[1]?.content || '');
+      return JSON.stringify({
+        action: 'continue_fast',
+        confidence: 0.89,
+        mustUseTool: true,
+        needsWorklog: true,
+        resemblance: 'strong',
+        kind: 'repo_work',
+        title: 'Clone my-work-list',
+        objective: 'Inspect my-work-list',
+        projectName: 'My Work List',
+        repoUrl: '',
+        localPath: '',
+        toolProfile: ['read', 'go-read'],
+        plan: 'Inspect the existing active repo frame.',
+        reason: 'Short follow-up refers to the active repo frame.',
+      });
+    },
   });
   assert(cont.activeFrame?.id === frame.id, 'continuation sees active frame');
+  assert(!continuationPrompt.includes(opaqueWorklogId), 'opaque worklog ids are not sent to routing LLMs');
+  assert(continuationPrompt.includes('"hasWorklog": true'), 'routing LLM receives only a worklog-presence flag');
   assert(shouldUseTaskFrameFastPath(cont.decision), 'confident continuation can use fast path');
 
   const route = taskFrameDecisionToTurnRoute(cont.decision, frame);
   assert(route.mode === 'code', 'repo frame routes as code');
   assert(route.mustUseTool === true, 'fast path route requires a tool');
+  assert(route.needsWorklog === true, 'fast path preserves the frame checkpoint policy');
   assert(route.skills.join(',') === 'read,go-read', 'route uses the current follow-up tool profile');
   assert(route.requiredToolSteps.length === 0,
     'mandatory follow-up does not replay stale mutation steps');

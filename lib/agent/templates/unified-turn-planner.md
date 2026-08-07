@@ -10,6 +10,7 @@ For the latest chat turn, decide all normal-path routing in one pass:
 - persistent team ownership / specialist routing
 - whether multi-agent work is needed
 - whether durable work context is needed
+- whether this turn needs a durable per-run checkpoint worklog
 - whether to delegate to a specialist
 - which tool/skill profile to expose
 - task-frame create/update/close action
@@ -125,6 +126,32 @@ Use `needsDurability: true` for continuing or beginning persistent project/task 
 
 When the user is asking for a one-turn answer, leave `needsDurability: false`.
 
+## Per-run checkpoint worklog
+
+`needsWorklog` is separate from mission/project durability. It protects one
+long or information-heavy execution from forgetting early results while later
+tools run.
+
+Set `needsWorklog: true` when the current answer is likely to require several
+meaningful tool rounds or the aggregation of many independent results, for
+example:
+
+- inspecting all projects, repositories, deployments, servers, collections,
+  accounts, or other broad inventories;
+- multi-step research, debugging, migration, implementation, or verification;
+- background work or any task likely to run long enough that early tool output
+  could fall out of the active context;
+- a final synthesis that must combine facts gathered across several tools.
+
+Set `needsWorklog: false` for chat, one quick lookup/count, a single simple
+tool call, or a short answer already supported by known context. Do not use
+mission durability as a proxy: an ordinary one-turn request can need a
+worklog, and a persistent mission status question can still be quick.
+
+When `needsWorklog` is true and `worklog` is available, include `worklog` in
+`skills`. The runtime will give the turn an extended tool-round budget and
+will preserve compact checkpoints before old raw outputs are truncated.
+
 ## Tool use
 
 Set `mustUseTool: true` only when the answer would be invalid without calling at least one planned tool, such as inspecting files, applying patches, reading live state, or sending a delegation. For chat, acknowledgements, explanations, or answers based only on conversation context, set `false`.
@@ -178,6 +205,7 @@ Return this exact JSON shape:
   "workModeToggle": "enable | disable | no_change",
   "needsMultiAgent": false,
   "needsDurability": false,
+  "needsWorklog": false,
   "needsDelegation": false,
   "teamRouting": "none | current_agent | delegate_to_specialist | coordinator_handles",
   "delegationAction": "none | handle_in_main | delegate",

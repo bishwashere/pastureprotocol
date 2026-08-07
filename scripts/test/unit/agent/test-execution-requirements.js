@@ -107,6 +107,25 @@ const generic = buildExecutionRequirements({
 assert(generic.steps.length === 1 && generic.steps[0].kind === 'inspect',
   'legacy mandatory tool routes require one planned success');
 
+const broadRead = buildExecutionRequirements({
+  mode: 'research',
+  skills: ['go-read', 'worklog'],
+  needsWorklog: true,
+  mustUseTool: true,
+  plan: 'Inspect every registered project and combine their statuses.',
+});
+assert(broadRead.worklogRequired === true, 'planner checkpoint policy is preserved');
+assert(broadRead.usesExtendedBudget === true,
+  'checkpoint-enabled read-only aggregation receives the extended tool budget');
+assert(broadRead.plan.includes('every registered project'),
+  'runtime checkpoint summarizer receives the planner plan');
+assert(broadRead.steps[0].anyOfSkills.join(',') === 'go-read',
+  'control-only worklog cannot satisfy the fallback live-inspection requirement');
+progress = advanceExecutionProgress(broadRead, 0, {
+  skillId: 'worklog', toolName: 'worklog_read', arguments: {}, result: '{"ok":true}',
+}, true);
+assert(progress === 0, 'a worklog read never proves the requested live tool work ran');
+
 const filtered = normalizeRequiredToolSteps([
   { kind: 'execute', anyOfSkills: ['exec', 'missing'], anyOfTools: ['exec_node_script', 'exec_bogus', 'missing_action'] },
   { kind: 'unknown', anyOfSkills: ['exec'] },

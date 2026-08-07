@@ -43,6 +43,10 @@ check(
   /MAX_TOOL_ROUNDS_WRITE\s*=\s*envInt\(['"]PASTURE_MAX_TOOL_ROUNDS_WRITE['"],\s*10\)/.test(agent)
 );
 check(
+  'MAX_TOOL_ROUNDS_WORKLOG uses envInt with fallback 30',
+  /MAX_TOOL_ROUNDS_WORKLOG\s*=\s*envInt\(['"]PASTURE_MAX_TOOL_ROUNDS_WORKLOG['"],\s*30\)/.test(agent)
+);
+check(
   'MAX_TOOL_CALL_RETRIES uses envInt with fallback 3',
   /MAX_TOOL_CALL_RETRIES\s*=\s*envInt\(['"]PASTURE_MAX_TOOL_CALL_RETRIES['"],\s*3\)/.test(agent)
 );
@@ -57,6 +61,7 @@ check('exports TOOL_LOOP_LIMITS', mod && mod.TOOL_LOOP_LIMITS && typeof mod.TOOL
 check('TOOL_LOOP_LIMITS is frozen', Object.isFrozen(mod.TOOL_LOOP_LIMITS));
 check('TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS === 3', mod.TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS === 3);
 check('TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WRITE === 10', mod.TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WRITE === 10);
+check('TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WORKLOG === 30', mod.TOOL_LOOP_LIMITS.MAX_TOOL_ROUNDS_WORKLOG === 30);
 
 // 3. Exact loop bound, initial extended budget, and exhaustion fallback.
 check(
@@ -69,7 +74,11 @@ check(
 );
 check(
   'required write or execute workflow selects extended budget before round zero',
-  /toolRequirements\.usesExtendedBudget[\s\S]{0,120}?MAX_TOOL_ROUNDS_WRITE[\s\S]{0,80}?MAX_TOOL_ROUNDS/.test(agent)
+  /toolRequirements\.usesExtendedBudget\s*\?\s*MAX_TOOL_ROUNDS_WRITE\s*:\s*MAX_TOOL_ROUNDS/.test(agent)
+);
+check(
+  'worklog workflow selects the dedicated long-run budget before round zero',
+  /worklogRequired[\s\S]{0,100}?Math\.max\(MAX_TOOL_ROUNDS_WRITE, MAX_TOOL_ROUNDS_WORKLOG\)/.test(agent)
 );
 check(
   'roundsExhausted is set when the exact bound is reached',
@@ -77,7 +86,7 @@ check(
 );
 check(
   'final-reply path surfaces "ran out of tool rounds" instead of "Done. Anything else?"',
-  /roundsExhausted[\s\S]{0,300}?I ran out of tool rounds/.test(agent)
+  /roundsExhausted[\s\S]{0,700}?I ran out of tool rounds/.test(agent)
 );
 
 // 4. Metric emitted.

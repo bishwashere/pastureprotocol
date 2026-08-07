@@ -46,6 +46,7 @@ const FAKE_TESTS = [
   ['agent-team-e2e', 'scripts/test/e2e/fake/agent/test-agent-team-e2e.js'],
   ['agent-title', 'scripts/test/e2e/fake/agent/test-agent-title.js'],
   ['casual-greetings-e2e', 'scripts/test/e2e/fake/agent/test-casual-greetings.js'],
+  ['long-task-worklog-e2e', 'scripts/test/e2e/fake/agent/test-long-task-worklog-e2e.js'],
   ['basic-e2e', 'scripts/test/e2e/fake/core/test-basic-e2e.js'],
   ['project-workflow-e2e', 'scripts/test/e2e/fake/core/test-project-workflow-e2e.js'],
   ['dashboard-browser-e2e', 'scripts/test/e2e/fake/dashboard/test-dashboard-browser-e2e.js'],

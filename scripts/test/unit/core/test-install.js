@@ -15,6 +15,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const INSTALL_SH = join(ROOT, 'install.sh');
 const UPDATE_SH = join(ROOT, 'update.sh');
 const SETUP_JS = join(ROOT, 'setup.js');
+const DAEMON_SH = join(ROOT, 'scripts', 'daemon.sh');
 
 function checkInstallScriptOrder() {
   const script = readFileSync(INSTALL_SH, 'utf8');
@@ -82,6 +83,21 @@ function checkUnixPathsUnchanged() {
     return { ok: false, detail: checks.join('; ') };
   }
   return { ok: true, detail: 'Linux/macOS still use install.sh + bash daemon/update/uninstall' };
+}
+
+function checkDaemonPinsNodeRuntime() {
+  const src = readFileSync(DAEMON_SH, 'utf8');
+  const checks = [];
+
+  if (!src.includes('NODE="$(command -v node 2>/dev/null || true)"')) {
+    checks.push('daemon.sh must resolve the Node executable used by the CLI');
+  }
+  if (!src.includes('"NODE=${NODE}"')) {
+    checks.push('systemd unit must pass the resolved Node executable to run-with-env.sh');
+  }
+
+  if (checks.length) return { ok: false, detail: checks.join('; ') };
+  return { ok: true, detail: 'daemon pins the CLI Node runtime for native dependencies' };
 }
 
 function checkPastureLauncherNotLegacyShim() {
@@ -204,6 +220,14 @@ async function main() {
     status: unix.ok ? 'pass' : 'fail',
   });
 
+  const daemonNode = checkDaemonPinsNodeRuntime();
+  recordCase({
+    name: 'daemon Node runtime',
+    input: 'systemd native-module ABI consistency',
+    output: daemonNode.detail,
+    status: daemonNode.ok ? 'pass' : 'fail',
+  });
+
   const launcher = checkPastureLauncherNotLegacyShim();
   recordCase({
     name: 'pasture launcher',
@@ -252,7 +276,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(order.ok && imports.ok && unix.ok && launcher.ok && installPolicy.ok && setupCmd.ok && cloudPriority.ok && shellOk ? 0 : 1);
+  process.exit(order.ok && imports.ok && unix.ok && daemonNode.ok && launcher.ok && installPolicy.ok && setupCmd.ok && cloudPriority.ok && shellOk ? 0 : 1);
 }
 
 main();

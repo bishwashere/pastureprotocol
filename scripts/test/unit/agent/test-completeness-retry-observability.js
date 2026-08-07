@@ -39,7 +39,9 @@ check('retry logTeamActivity with skill_done | skill_error', /type:\s*tcRetryIsE
 check('retry logTiming emits completenessRetry: true detail', /completenessRetry:\s*true/.test(block));
 check('retry calls onAgentSkillError on failure', /tcRetryIsError[\s\S]{0,200}?onAgentSkillError\(/.test(block));
 check('retry sets lastToolError on failure', /lastToolError\s*=\s*skillErrMsg/.test(block));
-check('retry sets lastRoundHadToolError on failure', /lastRoundHadToolError\s*=\s*true/.test(block));
+check('retry sets lastRoundHadToolError on failure',
+  /tcRetryIsError[\s\S]{0,500}?rememberToolError\(\{/.test(block)
+  && /const rememberToolError[\s\S]{0,600}?lastRoundHadToolError\s*=\s*true/.test(agent));
 check('retry tracks lastToolResult on success', /lastToolResult\s*=\s*tcResult/.test(block));
 check('retry tracks write ops for persistence verification', /isWriteToolCall\(tcSkillId,\s*tc\.name\)/.test(block) &&
   /pendingPostWriteSynthesis\s*=\s*true/.test(block) &&
@@ -47,6 +49,8 @@ check('retry tracks write ops for persistence verification', /isWriteToolCall\(t
   /addWriteVerificationTarget\(writeVerificationTargets,\s*target\)/.test(block) &&
   /addWriteVerificationTarget\(pendingWriteVerificationTargets,\s*target\)/.test(block));
 check('retry uses skillDocsInjected dedupe set (same as main loop)', /!skillDocsInjected\.has\(tcSkillId\)[\s\S]{0,300}?skillDocsInjected\.add\(tcSkillId\)/.test(block));
+check('retry records tool outcomes in the durable worklog path', /recordWorklogToolOutcome\(\{[\s\S]{0,220}?skillId:\s*tcSkillId/.test(block));
+check('retry checkpoints pending results before final synthesis', /await checkpointPendingToolBatch\(\)[\s\S]{0,180}?agent_turn_completeness_synthesis_r/.test(block));
 check('Comment cites audit finding #10', /audit\s+finding\s+#10/i.test(agent));
 
 console.log(`\n[completeness-retry-observability] passed=${passed} failed=${failed}`);
