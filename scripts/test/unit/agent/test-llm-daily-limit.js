@@ -213,6 +213,41 @@ async function runDailyLimitUserMessage() {
   console.log('test-llm-daily-limit-user-message passed');
 }
 
+async function runConfiguredDailyLimitAdmission() {
+  const stateDir = createTempStateDir();
+  process.env.PASTURE_STATE_DIR = stateDir;
+  writeFileSync(
+    join(stateDir, 'config.json'),
+    JSON.stringify({
+      llm: {
+        dailyLimit: 200,
+        models: [{ provider: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local' }],
+      },
+    }),
+    'utf8',
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  writeFileSync(join(stateDir, 'llm-usage.json'), JSON.stringify({ date: today, count: 150 }), 'utf8');
+  const { isDailyLimitReached } = await import('../../../../llm.js?configured-limit-admission');
+  assert(isDailyLimitReached() === false,
+    'background admission must honor a configured limit above the old hardcoded 100');
+  writeFileSync(join(stateDir, 'llm-usage.json'), JSON.stringify({ date: today, count: 200 }), 'utf8');
+  assert(isDailyLimitReached() === true, 'configured daily limit still stops admission at its exact ceiling');
+  writeFileSync(
+    join(stateDir, 'config.json'),
+    JSON.stringify({
+      llm: {
+        dailyLimit: 300,
+        models: [{ provider: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local' }],
+      },
+    }),
+    'utf8',
+  );
+  assert(isDailyLimitReached() === false,
+    'raising the configured limit takes effect without restarting the daemon');
+  console.log('test-llm-configured-daily-limit-admission passed');
+}
+
 async function runAllModelsFailedUserMessage() {
   const { toUserMessage } = await import('../../../../lib/util/user-error.js');
   const err = new Error('All configured LLM models failed');
@@ -241,6 +276,7 @@ async function runAllModelsFailedUserMessage() {
 run()
   .then(() => runLocalDownCloudLimited())
   .then(() => runLocalRpmPerMessage())
+  .then(() => runConfiguredDailyLimitAdmission())
   .then(() => runDailyLimitUserMessage())
   .then(() => runAllModelsFailedUserMessage())
   .catch((err) => {

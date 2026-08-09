@@ -24,11 +24,11 @@ const checks = [
   },
   {
     name: 'round-level persistence verification is injected before the next LLM answer',
-    ok: /pendingWriteVerificationTargets\.size\s*>\s*0[\s\S]{0,240}?buildFilesystemPersistenceVerification\(ctx,\s*pendingWriteVerificationTargets\)[\s\S]{0,300}?role:\s*['"]user['"][\s\S]{0,120}?content:\s*verificationContent/.test(agent),
+    ok: /pendingWriteVerificationTargets\.size\s*>\s*0[\s\S]{0,400}?buildFilesystemPersistenceVerification\(ctx,\s*pendingWriteVerificationTargets,[\s\S]{0,300}?role:\s*['"]user['"][\s\S]{0,120}?content:\s*verificationContent/.test(agent),
   },
   {
     name: 'final persistence synthesis uses final reply policy and no tools',
-    ok: /synthesizeAfterPersistentWrites[\s\S]{0,900}?chatWithTools\(\s*withFinalReplyPolicy\(messages\),\s*\[\],\s*agentLlmOptions\(['"]agent_turn_post_write_synthesis['"]\)/.test(agent),
+    ok: /synthesizeAfterPersistentWrites[\s\S]{0,1800}?chatWithTools\(\s*withFinalReplyPolicy\(messages\),\s*\[\],\s*agentLlmOptions\(['"]agent_turn_post_write_synthesis['"]\)/.test(agent),
   },
   {
     name: 'Synthesis result replaces finalContent (not appends)',

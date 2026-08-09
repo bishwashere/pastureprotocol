@@ -9,6 +9,7 @@
 import {
   messagesCharCount,
   enforceMessagesBudget,
+  markRuntimeVerificationMessage,
   TOOL_LOOP_LIMITS,
 } from '../../../../lib/agent/agent.js';
 
@@ -85,6 +86,38 @@ check(
   'over-budget: shrank to under budget (or as close as safe)',
   messagesCharCount(big) < beforeBig
 );
+
+const verification = [
+  { role: 'system', content: 'sys' },
+  markRuntimeVerificationMessage({ role: 'user', content: 'Filesystem persistence verification (actual state after write operations):\n' + 'V'.repeat(2_000) }),
+  { role: 'assistant', content: 'a1' },
+  { role: 'user', content: 'q2' },
+  { role: 'assistant', content: 'a2' },
+  { role: 'user', content: 'q3' },
+  { role: 'assistant', content: 'a3' },
+];
+const verificationDrop = enforceMessagesBudget(verification, 800);
+check(
+  'over-budget: old runtime verification can be compacted without touching user prompts',
+  verificationDrop === 1
+  && verification[1].content.startsWith('[earlier runtime persistence verification truncated')
+  && verification[3].content === 'q2'
+);
+
+const callbackToolMessage = { role: 'tool', content: 'D'.repeat(2_000) };
+const callbackMessages = [
+  { role: 'system', content: 'sys' },
+  callbackToolMessage,
+  { role: 'assistant', content: 'a1' },
+  { role: 'user', content: 'q2' },
+  { role: 'assistant', content: 'a2' },
+  { role: 'user', content: 'q3' },
+  { role: 'assistant', content: 'a3' },
+];
+let truncatedObject = null;
+enforceMessagesBudget(callbackMessages, 800, null, (message) => { truncatedObject = message; });
+check('budget truncation reports the exact message for trusted skill-doc bookkeeping',
+  truncatedObject === callbackToolMessage);
 
 // Hard safety: never loop forever even if everything is small / can't be truncated
 const tinyMsgs = [

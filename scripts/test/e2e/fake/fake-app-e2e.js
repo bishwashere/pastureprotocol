@@ -218,6 +218,19 @@ async function startFakeLlmServer(scenario) {
         }],
       });
     }
+    if (promptText.includes('# Long-Run Continuation Decision')) {
+      scenario.continuationReviewCount = Number(scenario.continuationReviewCount || 0) + 1;
+      const response = typeof scenario.continuationDecision === 'function'
+        ? scenario.continuationDecision({ messages, promptText, reviewCount: scenario.continuationReviewCount })
+        : (scenario.continuationDecision || {
+            decision: 'continue',
+            reason: 'Distinct planned checks are still completing successfully.',
+            nextStep: 'Run the next unchecked planned tool step.',
+          });
+      return jsonResponse(res, {
+        choices: [{ message: { role: 'assistant', content: JSON.stringify(response) } }],
+      });
+    }
     if (promptText.includes('Casual') || promptText.includes('casual')) {
       return jsonResponse(res, { choices: [{ message: { role: 'assistant', content: scenario.finalReply || 'Hi. How can I help?' } }] });
     }
@@ -248,10 +261,14 @@ async function startFakeLlmServer(scenario) {
         }],
       });
     }
+    const plannedStepIndex = scenario.useToolStepCursor
+      ? Number(scenario.toolStepCursor || 0)
+      : assistantDecisionCount;
     const plannedStep = Array.isArray(scenario.toolSteps)
-      ? scenario.toolSteps[assistantDecisionCount]
+      ? scenario.toolSteps[plannedStepIndex]
       : (!hasToolResult ? scenario.toolCall : null);
     if (hasTools && plannedStep) {
+      if (scenario.useToolStepCursor) scenario.toolStepCursor = plannedStepIndex + 1;
       if (typeof scenario.inspectToolStepRequest === 'function') {
         scenario.inspectToolStepRequest({ plannedStep, assistantDecisionCount, messages, body });
       }
@@ -260,19 +277,20 @@ async function startFakeLlmServer(scenario) {
           choices: [{ message: { role: 'assistant', content: plannedStep.content } }],
         });
       }
+      const plannedCalls = Array.isArray(plannedStep.calls) ? plannedStep.calls : [plannedStep];
       return jsonResponse(res, {
         choices: [{
           message: {
             role: 'assistant',
             content: '',
-            tool_calls: [{
-              id: `call_fake_${assistantDecisionCount + 1}`,
+            tool_calls: plannedCalls.map((plannedCall, callIndex) => ({
+              id: `call_fake_${plannedStepIndex + 1}_${callIndex + 1}`,
               type: 'function',
               function: {
-                name: plannedStep.name,
-                arguments: JSON.stringify(plannedStep.arguments || {}),
+                name: plannedCall.name,
+                arguments: JSON.stringify(plannedCall.arguments || {}),
               },
-            }],
+            })),
           },
         }],
       });
@@ -416,8 +434,10 @@ function makeScenarios() {
       skills: ['write'],
       toolCall: { name: 'write_file', arguments: { path: 'note.txt', content: 'fake write e2e' } },
       finalReply: 'Wrote note.txt with fake write e2e.',
-      assert: ({ reply, skillsCalled }, { stateDir, toolResults }) => {
+      assert: ({ reply, skillsCalled }, { stateDir, toolResults, scenario }) => {
         assert(skillsCalled.includes('write'), 'write skill was not called');
+        assert(scenario.continuationReviewCount === 0,
+          'a short one-tool task must not pay for a long-run continuation review');
         assert(/note\.txt/.test(reply), 'reply did not mention note.txt');
         const writtenPath = join(stateDir, 'workspace', 'note.txt');
         assert(existsSync(writtenPath), `write did not create ${writtenPath}`);
@@ -592,6 +612,7 @@ function makeScenarios() {
       skills: ['read', 'worklog'],
       files: longTaskFiles,
       toolSteps: longTaskSteps,
+      useToolStepCursor: true,
       finalReply(_toolText, messages) {
         const transcript = messages.map((m) => String(m.content || '')).join('\n');
         const hasAll = longTaskFacts.every((fact) => transcript.includes(fact));
@@ -603,17 +624,20 @@ function makeScenarios() {
       cleanupStateDir: true,
       extraEnv: {
         PASTURE_MAX_TOOL_ROUNDS: '3',
-        PASTURE_MAX_TOOL_ROUNDS_WRITE: '10',
-        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '12',
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '2',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '4',
+        PASTURE_LONG_RUN_GRANT_ROUNDS: '3',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+        PASTURE_LONG_RUN_RECENT_TOOL_ROUNDS: '2',
         PASTURE_MESSAGES_CHAR_BUDGET: '30000',
         PASTURE_MAX_COMPLETENESS_RETRIES: '0',
       },
       assert: ({ reply, skillsCalled, stdout }, { stateDir, scenario }) => {
         assert(skillsCalled.filter((id) => id === 'read').length === longTaskFacts.length,
-          `expected ${longTaskFacts.length} project reads, got [${skillsCalled.join(', ')}]`);
+          `expected ${longTaskFacts.length} project reads, got [${skillsCalled.join(', ')}]\n${stdout.slice(-4000)}`);
         assert(skillsCalled.includes('worklog'), 'runtime did not make the agent read its durable worklog');
-        assert(scenario.rawTruncationObserved === true || stdout.includes('tool_round_budget_truncate'),
-          'test did not force raw tool transcript truncation');
+        assert(scenario.continuationReviewCount >= 3,
+          `expected multiple adaptive continuation reviews, got ${scenario.continuationReviewCount}`);
         assert(scenario.worklogContinuityObserved === true,
           'final synthesis did not receive all checkpointed early and late facts');
         for (const fact of longTaskFacts) {
@@ -631,6 +655,234 @@ function makeScenarios() {
         }
         assert(persisted.toolEvents.some((event) => event.skillId === 'worklog' && event.toolName === 'read'),
           'worklog did not record the mandatory final read event');
+        assert(longTaskFacts.every((fact) => persisted.durableResults?.facts?.includes(fact)),
+          'durable aggregate did not retain all independent project facts');
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim().split('\n').map((line) => JSON.parse(line));
+        assert(activityRows.some((row) => row.type === 'tool_transcript_compact'),
+          'test did not force checkpoint-backed live transcript compaction');
+      },
+    },
+    'long-task-loop-guard-e2e': {
+      name: 'long-task-loop-guard-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      message: 'Keep inspecting the fixture until it changes, then report.',
+      skills: ['read', 'worklog'],
+      files: { 'unchanged.txt': 'UNCHANGED_LOOP_RESULT' },
+      toolSteps: Array.from({ length: 20 }, () => ({
+        name: 'read_file',
+        arguments: { path: 'unchanged.txt' },
+      })),
+      finalReply: 'Stopped safely after detecting an unchanged tool loop.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '2',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '10',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+        PASTURE_TOOL_LOOP_UNCHANGED_SUCCESS_LIMIT: '3',
+      },
+      assert: ({ reply, skillsCalled }, { stateDir, scenario }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 3,
+          `unchanged loop should stop after three reads, got [${skillsCalled.join(', ')}]`);
+        assert(!scenario.llmRequests.some((request) => (
+          request.messages || []
+        ).some((message) => String(message.content || '').includes('# Completeness Probe'))),
+        'safety-stopped task must not enter completeness retries');
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim().split('\n').map((line) => JSON.parse(line));
+        assert(activityRows.some((row) => row.type === 'long_run_safety_stop'
+          && String(row.message || '').includes('repeated_unchanged_success')),
+        'runtime did not report unchanged-result stop reason');
+        const worklogFile = readdirSync(join(stateDir, 'task-worklogs')).find((name) => name.endsWith('.json'));
+        const worklog = JSON.parse(readFileSync(join(stateDir, 'task-worklogs', worklogFile), 'utf8'));
+        assert(worklog.status === 'blocked', `safety-stopped worklog must be blocked, got ${worklog.status}`);
+        assert(reply.includes('Stopped safely'), `partial safety synthesis was not returned: ${reply}`);
+      },
+    },
+    'long-task-error-loop-guard-e2e': {
+      name: 'long-task-error-loop-guard-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      message: 'Read the missing fixture repeatedly until it works.',
+      skills: ['read', 'worklog'],
+      toolSteps: Array.from({ length: 20 }, () => ({
+        name: 'read_file',
+        arguments: { path: 'missing-loop-fixture.txt' },
+      })),
+      finalReply: 'Stopped safely after the same tool error repeated.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '2',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '10',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+        PASTURE_TOOL_LOOP_IDENTICAL_ERROR_LIMIT: '2',
+      },
+      assert: ({ reply, skillsCalled }, { stateDir, scenario }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 2,
+          `identical errors should stop after two reads, got [${skillsCalled.join(', ')}]`);
+        assert(!scenario.llmRequests.some((request) => (
+          request.messages || []
+        ).some((message) => String(message.content || '').includes('# Completeness Probe'))),
+        'error-loop safety stop must not enter completeness retries');
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim().split('\n').map((line) => JSON.parse(line));
+        assert(activityRows.some((row) => row.type === 'long_run_safety_stop'
+          && String(row.message || '').includes('repeated_identical_error')),
+        'runtime did not report repeated-error stop reason');
+        assert(reply.includes('Stopped safely'), `partial error synthesis was not returned: ${reply}`);
+      },
+    },
+    'long-task-parallel-loop-guard-e2e': {
+      name: 'long-task-parallel-loop-guard-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      message: 'Inspect the same fixture in parallel and report its state.',
+      skills: ['read', 'worklog'],
+      files: { 'parallel-unchanged.txt': 'PARALLEL_UNCHANGED_RESULT' },
+      toolSteps: [{
+        calls: Array.from({ length: 8 }, () => ({
+          name: 'read_file',
+          arguments: { path: 'parallel-unchanged.txt' },
+        })),
+      }],
+      finalReply: 'Stopped safely inside the parallel tool batch.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '10',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+        PASTURE_TOOL_LOOP_UNCHANGED_SUCCESS_LIMIT: '3',
+      },
+      assert: ({ reply, skillsCalled }, { scenario }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 3,
+          `parallel loop should skip calls after the third identical result, got [${skillsCalled.join(', ')}]`);
+        assert(!scenario.llmRequests.some((request) => (
+          request.messages || []
+        ).some((message) => String(message.content || '').includes('# Completeness Probe'))),
+        'parallel-batch safety stop must not enter completeness retries');
+        assert(reply.includes('Stopped safely'), `parallel safety synthesis was not returned: ${reply}`);
+      },
+    },
+    'long-task-hard-cap-e2e': {
+      name: 'long-task-hard-cap-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      message: 'Inspect every hard-cap fixture and report each result.',
+      skills: ['read', 'worklog'],
+      files: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [
+        `hard-cap-${index}.txt`,
+        `HARD_CAP_RESULT_${index}`,
+      ])),
+      toolSteps: Array.from({ length: 8 }, (_, index) => ({
+        name: 'read_file',
+        arguments: { path: `hard-cap-${index}.txt` },
+      })),
+      finalReply: 'Stopped safely at the configured absolute hard cap.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '10',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '10',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '2',
+      },
+      assert: ({ reply, skillsCalled }, { stateDir }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 2,
+          `configured hard cap of two must not be raised to the write budget, got [${skillsCalled.join(', ')}]`);
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim().split('\n').map((line) => JSON.parse(line));
+        assert(activityRows.some((row) => row.type === 'long_run_safety_stop'
+          && String(row.message || '').includes('max_rounds')),
+        'runtime did not report the configured max-round stop');
+        assert(reply.includes('Stopped safely'), `hard-cap safety synthesis was not returned: ${reply}`);
+      },
+    },
+    'long-task-reviewed-finish-e2e': {
+      name: 'long-task-reviewed-finish-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      message: 'Inspect the fixtures until the progress reviewer confirms enough evidence.',
+      skills: ['read', 'worklog'],
+      files: Object.fromEntries(Array.from({ length: 6 }, (_, index) => [
+        `review-finish-${index}.txt`,
+        `REVIEW_FINISH_RESULT_${index}`,
+      ])),
+      toolSteps: Array.from({ length: 6 }, (_, index) => ({
+        name: 'read_file',
+        arguments: { path: `review-finish-${index}.txt` },
+      })),
+      continuationDecision: {
+        decision: 'finish',
+        reason: 'The requested sample has enough verified evidence for final synthesis.',
+        nextStep: '',
+      },
+      finalReply: 'Finished after the bounded progress reviewer approved synthesis.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WRITE: '2',
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '2',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+      },
+      assert: ({ reply, skillsCalled }, { scenario }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 2,
+          `reviewed finish should stop at its boundary, got [${skillsCalled.join(', ')}]`);
+        assert(scenario.continuationReviewCount === 1,
+          `expected one finish review, got ${scenario.continuationReviewCount}`);
+        const continuationRequest = scenario.llmRequests.find((request) => (
+          request.messages || []
+        ).some((message) => String(message.content || '').includes('# Long-Run Continuation Decision')));
+        assert(JSON.stringify(continuationRequest || {}).includes('recentProgress'),
+          'continuation review did not receive recent-grant progress deltas');
+        assert(!scenario.llmRequests.some((request) => (
+          request.messages || []
+        ).some((message) => String(message.content || '').includes('# Completeness Probe'))),
+        'reviewed finish must not re-enter completeness tool retries');
+        assert(reply.includes('Finished after'), `reviewed finish synthesis was not returned: ${reply}`);
+      },
+    },
+    'long-task-checkpoint-failure-e2e': {
+      name: 'long-task-checkpoint-failure-e2e',
+      mode: 'research',
+      needsWorklog: true,
+      checkpointFailuresRemaining: 10,
+      message: 'Inspect every fixture while preserving each result safely.',
+      skills: ['read', 'worklog'],
+      files: { 'checkpoint-failure.txt': 'UNLABELLED_PRIVATE_VALUE_7f3c9a' },
+      toolSteps: Array.from({ length: 6 }, () => ({
+        name: 'read_file',
+        arguments: { path: 'checkpoint-failure.txt' },
+      })),
+      finalReply: 'Stopped safely because durable checkpoint review remained unavailable.',
+      cleanupStateDir: true,
+      extraEnv: {
+        PASTURE_MAX_TOOL_ROUNDS_WORKLOG: '10',
+        PASTURE_LONG_RUN_MAX_TOOL_ROUNDS: '20',
+      },
+      assert: ({ reply, skillsCalled }, { stateDir }) => {
+        assert(skillsCalled.filter((id) => id === 'read').length === 1,
+          `persistent checkpoint failure should stop before more tools, got [${skillsCalled.join(', ')}]`);
+        const worklogFile = readdirSync(join(stateDir, 'task-worklogs')).find((name) => name.endsWith('.json'));
+        const worklogRaw = readFileSync(join(stateDir, 'task-worklogs', worklogFile), 'utf8');
+        const worklog = JSON.parse(worklogRaw);
+        assert(worklog.status === 'blocked', `checkpoint failure worklog must be blocked, got ${worklog.status}`);
+        assert(!worklogRaw.includes('UNLABELLED_PRIVATE_VALUE_7f3c9a'),
+          'unscreened raw tool output was persisted after checkpoint failure');
+        const activityDir = join(stateDir, 'daily-logs', 'team-activity');
+        const activityFile = readdirSync(activityDir).find((name) => name.endsWith('.jsonl'));
+        const activityRows = readFileSync(join(activityDir, activityFile), 'utf8')
+          .trim().split('\n').map((line) => JSON.parse(line));
+        assert(!activityRows.some((row) => row.type === 'tool_transcript_compact'),
+          'raw transcript was compacted without a successful semantic checkpoint');
+        assert(activityRows.some((row) => row.type === 'long_run_safety_stop'
+          && String(row.message || '').includes('checkpoint_review_unavailable')),
+        'checkpoint safety-stop reason was not reported');
+        assert(reply.includes('Stopped safely'), `checkpoint-failure synthesis was not returned: ${reply}`);
       },
     },
     'required-steps-unavailable-e2e': {
@@ -853,6 +1105,8 @@ export async function runNamedFakeE2E(name) {
   scenario.toolResults = [];
   scenario.llmRequests = [];
   scenario.transcriptContinuityObserved = false;
+  scenario.continuationReviewCount = 0;
+  scenario.toolStepCursor = 0;
   let setup = {};
   let fakeLlm;
   let stateDir = '';
@@ -878,7 +1132,7 @@ export async function runNamedFakeE2E(name) {
       const expectedSkill = (scenario.skills || [])[0];
       assert(
         !expectedSkill || result.skillsCalled.includes(expectedSkill),
-        `expected skill ${expectedSkill}, got [${result.skillsCalled.join(', ')}]`
+        `expected skill ${expectedSkill}, got [${result.skillsCalled.join(', ')}]\n${result.stdout.slice(-3000)}`
       );
     }
     if (scenario.assert) scenario.assert(result, { stateDir, setup, scenario, toolResults: scenario.toolResults });

@@ -21,7 +21,10 @@ dotenv.config({ path: getEnvPath() });
 
 const PORT = Number(process.env.PASTURE_AGENT_API_PORT) || 1234;
 const HOST = process.env.PASTURE_AGENT_API_HOST || '0.0.0.0';
-const REQUEST_TIMEOUT_MS = Number(process.env.PASTURE_AGENT_API_TIMEOUT_MS) || 55_000;
+const configuredRequestTimeoutMs = Number(process.env.PASTURE_AGENT_API_TIMEOUT_MS);
+const REQUEST_TIMEOUT_MS = Number.isFinite(configuredRequestTimeoutMs) && configuredRequestTimeoutMs > 0
+  ? Math.floor(configuredRequestTimeoutMs)
+  : 0;
 
 ensureMainAgentInitialized();
 
@@ -143,23 +146,28 @@ function completionResponse({ agentId, model, content }) {
   };
 }
 
-function timeoutTurn(timeoutMs) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        timedOut: true,
-        reply: JSON.stringify({
-          reply: 'One second. I am trying again.',
-          continue_listening: true,
-        }),
-        skillsCalled: [],
-      });
-    }, timeoutMs);
-  });
-}
+async function runTurnWithDeadline(runTurn, timeoutMs) {
+  const controller = timeoutMs > 0 ? new AbortController() : null;
+  let timer = null;
+  let timedOut = false;
 
-async function withTimeout(promise, timeoutMs) {
-  return Promise.race([promise, timeoutTurn(timeoutMs)]);
+  if (controller) {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    timer.unref?.();
+  }
+
+  try {
+    const turn = await runTurn(controller?.signal || null);
+    return { ...(turn || {}), timedOut };
+  } catch (err) {
+    if (timedOut && err && typeof err === 'object') err.timedOut = true;
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function conversationIdFromRequest(req) {
@@ -206,13 +214,17 @@ app.post('/v1/agents/:agentId/chat/completions', async (req, res) => {
       historyMessages: historyMessages.length,
     });
 
-    const turn = await withTimeout(runAgentApiChatTurn({
-      agentId,
-      userText,
-      conversationId,
-      historyMessages,
-      model: req.body?.model || '',
-    }), REQUEST_TIMEOUT_MS);
+    const turn = await runTurnWithDeadline(
+      (abortSignal) => runAgentApiChatTurn({
+        agentId,
+        userText,
+        conversationId,
+        historyMessages,
+        model: req.body?.model || '',
+        abortSignal,
+      }),
+      REQUEST_TIMEOUT_MS,
+    );
 
     appendApiLog(agentId, {
       type: turn.timedOut ? 'timeout_response' : 'response',
@@ -232,11 +244,12 @@ app.post('/v1/agents/:agentId/chat/completions', async (req, res) => {
     }));
   } catch (err) {
     appendApiLog(agentId, {
-      type: 'error',
+      type: err?.timedOut ? 'timeout_error' : 'error',
       status: 500,
       durationMs: Date.now() - startedAt,
       message: err?.message || String(err),
       stack: err?.stack || '',
+      timedOut: err?.timedOut === true,
     });
     res.status(500).json({ error: { message: err?.message || String(err) } });
   }

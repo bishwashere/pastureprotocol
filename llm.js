@@ -139,12 +139,6 @@ function writeUsage(usage) {
   } catch (_) {}
 }
 
-/**
- * Module-level flag: the UTC date string ('YYYY-MM-DD') on which the daily limit was first hit,
- * or null when not yet hit today. Automatically stale the moment the date rolls over.
- */
-let _dailyLimitReachedDate = null;
-
 function llmLogPrefix() {
   const step = getActiveTrace()?.flowStep;
   return step ? `[LLM] [${step}]` : '[LLM]';
@@ -171,7 +165,6 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   const limit = Number(dailyLimit) > 0 ? Number(dailyLimit) : DEFAULT_DAILY_LIMIT;
   const usage = readUsage();
   if (usage.count >= limit) {
-    _dailyLimitReachedDate = todayUTC();
     const err = new Error(
       `Daily cloud LLM limit reached (${usage.count}/${limit} calls today). Resets at midnight UTC. Local models are unaffected.`,
     );
@@ -185,19 +178,15 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
 
 /**
  * Returns true if the daily cloud LLM limit has been hit today (UTC).
- * Uses the in-process flag (fast path) and falls back to reading the usage file
- * (handles daemon restarts, multi-process, and cases where the limit was hit before
- * the current process started).
+ * Reads the current configured limit and usage file each time so raising an
+ * operator limit (or using a different agent limit) takes effect immediately.
  * Local models are never limited and this always returns false for them.
  */
-export function isDailyLimitReached() {
-  if (_dailyLimitReachedDate === todayUTC()) return true;
+export function isDailyLimitReached(options = {}) {
   try {
+    const { dailyLimit } = loadConfig(options);
     const usage = readUsage();
-    if (usage.count >= DEFAULT_DAILY_LIMIT) {
-      _dailyLimitReachedDate = todayUTC();
-      return true;
-    }
+    return usage.count >= dailyLimit;
   } catch (_) {}
   return false;
 }
