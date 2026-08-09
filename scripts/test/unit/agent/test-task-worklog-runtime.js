@@ -30,17 +30,21 @@ assert(/TASK_WORKLOG_RECOVERY/.test(agent) && /worklogReadCheckpointCount/.test(
   'runtime asks the model to read checkpoints before final synthesis');
 assert(/finalizeTaskWorklog\(worklogCtx/.test(agent),
   'runtime finalizes worklogs on completion/error');
-assert(/toolRoundLimit = worklogRequired[\s\S]{0,120}?MAX_TOOL_ROUNDS_WORKLOG/.test(agent),
-  'checkpoint-enabled read-only work receives extended rounds');
+assert(/toolRoundLimit = worklogRequired\s*\?\s*initialLongRunRounds/.test(agent),
+  'checkpoint-enabled read-only work receives the bounded initial long-run grant');
 assert(/\|\| worklogRequired/.test(requirements),
   'execution requirement contract selects extended budget for checkpoint mode');
 assert(/MAX_TOOL_ROUNDS_WORKLOG/.test(agent),
-  'long checkpointed runs have a dedicated budget beyond the write cap');
+  'long checkpointed runs retain a dedicated initial budget beyond the write cap');
+assert(/decideLongRunContinuation\(/.test(agent) && /longRunController\.grant\(/.test(agent),
+  'long runs receive only MD-reviewed adaptive continuation grants');
+assert(/compactCheckpointedToolTranscript\(/.test(agent),
+  'checkpointed assistant/tool pairs are compacted for hours-long context stability');
 assert(/worklogCheckpointRetryCount/.test(agent) && /pendingWorklogToolResults = \[\.\.\.batch/.test(agent),
   'one transient checkpoint failure retains its tool batch for retry');
 assert(/round \+ 2 >= toolRoundLimit[\s\S]{0,80}?toolRoundLimit = round \+ 3/.test(agent),
   'runtime reserves final read and synthesis rounds near the long-run cap');
-assert(/skillId === 'worklog' && action === 'checkpoint'[\s\S]{0,500}?MAX_TOOL_ROUNDS_WORKLOG/.test(agent),
+assert(/skillId === 'worklog' && action === 'checkpoint'[\s\S]{0,500}?initialLongRunRounds/.test(agent),
   'an agent-initiated checkpoint can promote an ordinary turn to long-run mode');
 
 console.log('task-worklog runtime tests passed');

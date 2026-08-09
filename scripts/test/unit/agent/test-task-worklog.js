@@ -132,6 +132,7 @@ try {
     appendTaskWorklogCheckpoint(ctx, {
       label: `Project ${idx}`,
       summary: `Verified project ${idx} status and safe metric ${idx}. ${'x'.repeat(200)}`,
+      facts: [`PROJECT_${idx}_STATUS=VERIFIED`],
     });
   }
   worklog = readTaskWorklog(ctx);
@@ -141,13 +142,83 @@ try {
     'only the bounded checkpoint tail is retained',
   );
   assert(worklog.counts.checkpoints > worklog.checkpoints.length, 'total count survives tail pruning');
+  assert(
+    worklog.durableResults.facts.includes('PROJECT_0_STATUS=VERIFIED'),
+    'structured facts survive after their verbose checkpoint is pruned',
+  );
+  assert(
+    worklog.durableResults.summaries.some((summary) => summary.includes('Verified project 0 status')),
+    'explicit checkpoint summaries survive after their verbose checkpoint is pruned',
+  );
   assert(statSync(path).size <= TASK_WORKLOG_MAX_BYTES, 'per-run file size is bounded');
 
   const promptBlock = formatTaskWorklogPromptBlock(ctx);
   assert(promptBlock.includes('Durable task worklog'), 'prompt reinjection block is formatted');
   assert(promptBlock.includes('Verified project'), 'prompt block carries checkpoint findings');
+  assert(promptBlock.includes('PROJECT_0_STATUS=VERIFIED'), 'prompt block reinjects early aggregate facts');
   assert(!promptBlock.includes(ctx.taskWorklogId), 'prompt block does not reveal the storage id');
   assert(!promptBlock.includes('hunter2') && !promptBlock.includes('dbpass'), 'prompt block remains redacted');
+
+  appendTaskWorklogCheckpoint(ctx, {
+    summary: 'Recorded current remaining work.',
+    nextSteps: ['Inspect the final project'],
+    failures: ['Transient project API timeout'],
+  });
+  appendTaskWorklogCheckpoint(ctx, {
+    summary: 'All planned project checks are now complete.',
+    nextSteps: [],
+    failures: [],
+  });
+  worklog = readTaskWorklog(ctx);
+  assert.deepStrictEqual(worklog.durableResults.nextSteps, [],
+    'an explicit empty next-step state clears stale remaining work');
+  assert.deepStrictEqual(worklog.durableResults.failures, [],
+    'an explicit empty failure state clears resolved blockers');
+
+  const crowdedPrompt = formatTaskWorklogPromptBlock({
+    taskWorklogId: 'run-crowded-prompt',
+    status: 'active',
+    metadata: {},
+    checkpoints: [],
+    toolEvents: [],
+    counts: { checkpoints: 0, toolEvents: 0 },
+    durableResults: {
+      summaries: Array.from({ length: 120 }, (_, index) => `Verbose summary ${index} ${'s'.repeat(480)}`),
+      facts: ['CRITICAL_DURABLE_FACT=present'],
+      completed: [],
+      evidence: [],
+      failures: [],
+      nextSteps: [],
+    },
+  });
+  assert(crowdedPrompt.includes('CRITICAL_DURABLE_FACT=present'),
+    'verbose summaries cannot crowd exact facts out of the prompt');
+
+  const legacyPrompt = formatTaskWorklogPromptBlock({
+    taskWorklogId: 'run-legacy-order',
+    status: 'active',
+    metadata: {},
+    checkpoints: [
+      { sequence: 1, facts: ['LEGACY_OLD_FACT'] },
+      { sequence: 2, facts: ['LEGACY_NEW_FACT'], failures: ['LATEST_BLOCKER'] },
+    ],
+    toolEvents: [],
+    counts: { checkpoints: 2, toolEvents: 0 },
+  });
+  assert(legacyPrompt.indexOf('LEGACY_NEW_FACT') < legacyPrompt.indexOf('LEGACY_OLD_FACT'),
+    'legacy checkpoint reconstruction is newest-first');
+  assert(legacyPrompt.includes('LATEST_BLOCKER'), 'legacy reconstruction retains the latest blocker state');
+
+  for (let idx = 0; idx < 210; idx++) {
+    appendTaskWorklogCheckpoint(ctx, {
+      summary: `Byte pressure ${idx} ${'b'.repeat(480)}`,
+      facts: [`BYTE_PRESSURE_${idx}_${'f'.repeat(360)}`],
+    });
+  }
+  worklog = readTaskWorklog(ctx);
+  assert(worklog.durableResults.facts.some((fact) => fact.startsWith('BYTE_PRESSURE_209_')),
+    'byte-pressure pruning preserves the newest durable fact');
+  assert(statSync(path).size <= TASK_WORKLOG_MAX_BYTES, 'byte-pressure worklog remains bounded');
 
   const readResult = JSON.parse(await executeWorklog(ctx, {}, 'worklog_read'));
   assert.strictEqual(readResult.ok, true, 'read executor succeeds');

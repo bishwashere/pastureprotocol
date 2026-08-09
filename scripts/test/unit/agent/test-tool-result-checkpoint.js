@@ -39,6 +39,7 @@ const summarized = await summarizeToolResultsForCheckpoint({
     {
       skill: 'exec',
       action: 'node_script',
+      target: 'project-alpha',
       status: 'ok',
       output: `mongodb+srv://admin:super-secret@cluster.example/db\nAlpha users: 41\n${'x'.repeat(20_000)}\n${tailFact}`,
     },
@@ -61,6 +62,7 @@ assert(summarized?.facts?.[0] === 'Alpha users: 41', 'MD-backed summary returns 
 assert(!sentPayload.includes('super-secret'), 'credential is redacted before checkpoint LLM input');
 assert(sentPayload.includes('Alpha users: 41'), 'safe tool evidence reaches checkpoint LLM');
 assert(sentPayload.includes(tailFact), 'large-result tail evidence reaches checkpoint LLM');
+assert(sentPayload.includes('project-alpha'), 'bounded invocation target reaches checkpoint LLM');
 
 const malformed = await summarizeToolResultsForCheckpoint({
   objective: 'test',
