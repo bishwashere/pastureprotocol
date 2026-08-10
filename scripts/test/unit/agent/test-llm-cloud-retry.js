@@ -132,6 +132,48 @@ async function testExhaustRetriesThenLocal() {
   }
 }
 
+async function testBrowserLoginTimeoutRetriesThenSucceeds() {
+  const stateDir = createTempStateDir();
+  process.env.PASTURE_STATE_DIR = stateDir;
+  process.env.LLM_1_API_KEY = 'sk-test-cloud-key';
+  writeAlexConfig(stateDir);
+
+  const originalFetch = globalThis.fetch;
+  let cloudCalls = 0;
+  let localCalls = 0;
+
+  globalThis.fetch = async (url) => {
+    const href = String(url);
+    if (href.includes('api.openai.com')) {
+      cloudCalls += 1;
+      if (cloudCalls < 3) throw new Error('OpenAI browser-login model call timed out.');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: 'browser-login-after-retry' } }] }),
+        text: async () => '',
+      };
+    }
+    if (href.includes('127.0.0.1:1234')) {
+      localCalls += 1;
+      throw new Error('local should not be called when the timeout retry succeeds');
+    }
+    throw new Error(`unexpected fetch url: ${href}`);
+  };
+
+  try {
+    const { chat } = await import('../../../../llm.js');
+    const reply = await chat([{ role: 'user', content: 'ping' }], { agentId: 'alex' });
+    assert(reply === 'browser-login-after-retry', `unexpected reply: ${reply}`);
+    assert(cloudCalls === 3, `expected 3 browser-login attempts, got ${cloudCalls}`);
+    assert(localCalls === 0, `local should not run, got ${localCalls} calls`);
+    console.log('  browser-login timeout retries → cloud succeeds → ✅');
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.LLM_1_API_KEY;
+  }
+}
+
 async function testNoRetryOn401() {
   const stateDir = createTempStateDir();
   process.env.PASTURE_STATE_DIR = stateDir;
@@ -178,6 +220,7 @@ async function testTransientClassifier() {
   const { isTransientCloudError } = await import('../../../../llm.js');
   assert(isTransientCloudError(new Error('LLM request failed 520: html')), '520 is transient');
   assert(isTransientCloudError(new Error('fetch failed')), 'fetch failed is transient');
+  assert(isTransientCloudError(new Error('OpenAI browser-login model call timed out.')), 'browser-login timeout is transient');
   assert(!isTransientCloudError(new Error('LLM request failed 401: bad key')), '401 is not transient');
   assert(!isTransientCloudError(new Error('LLM request failed 400: model not found')), '400 is not transient');
   console.log('  isTransientCloudError unit checks → ✅');
@@ -187,6 +230,7 @@ async function main() {
   console.log('test-llm-cloud-retry\n');
   await testTransientClassifier();
   await testRetriesThenSucceeds();
+  await testBrowserLoginTimeoutRetriesThenSucceeds();
   await testExhaustRetriesThenLocal();
   await testNoRetryOn401();
   console.log('\ntest-llm-cloud-retry passed');

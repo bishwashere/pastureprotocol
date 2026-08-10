@@ -51,13 +51,20 @@ assert(route.skills.includes('write') && route.skills.includes('exec'),
 assert(route.mustUseTool === true, 'required steps force tool use');
 assert(route.requiredToolSteps.map((step) => step.kind).join(',') === 'write,execute',
   'legacy route preserves ordered required steps');
-assert(turnRouteToSystemBlock(route).includes('write [write] via [write_file] args={"path":"probe.mjs"} -> execute [exec] via [exec_node_script] args={"envFile":".env"} output includes "PASTURE_DB_COUNT:"'),
-  'system block renders the ordered contract');
+assert(!turnRouteToSystemBlock(route).includes('Required tool steps (ordered)'),
+  'long-task system block omits brittle exact planner contracts');
 
 const requirements = buildExecutionRequirements(route);
-assert(requirements.steps.length === 2 && requirements.usesExtendedBudget,
-  'legacy route builds an enforceable extended-budget contract');
+assert(requirements.steps.length === 0 && requirements.usesExtendedBudget,
+  'long route uses the extended budget without exact-step gating');
 assert(requirements.worklogRequired === true,
   'legacy route carries checkpoint enforcement to runAgentTurn');
+
+const shortRoute = { ...route, needsWorklog: false };
+assert(turnRouteToSystemBlock(shortRoute).includes('write [write] via [write_file] args={"path":"probe.mjs"} -> execute [exec] via [exec_node_script] args={"envFile":".env"} output includes "PASTURE_DB_COUNT:"'),
+  'short write route still renders its ordered contract');
+const shortRequirements = buildExecutionRequirements(shortRoute);
+assert(shortRequirements.steps.length === 2 && shortRequirements.usesExtendedBudget,
+  'short write route keeps its existing enforceable contract');
 
 console.log('turn-router required-step tests passed');

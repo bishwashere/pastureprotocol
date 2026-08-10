@@ -139,6 +139,12 @@ function writeUsage(usage) {
   } catch (_) {}
 }
 
+/**
+ * Module-level flag: the UTC date string ('YYYY-MM-DD') on which the daily limit was first hit,
+ * or null when not yet hit today. Automatically stale the moment the date rolls over.
+ */
+let _dailyLimitReachedDate = null;
+
 function llmLogPrefix() {
   const step = getActiveTrace()?.flowStep;
   return step ? `[LLM] [${step}]` : '[LLM]';
@@ -165,6 +171,7 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
   const limit = Number(dailyLimit) > 0 ? Number(dailyLimit) : DEFAULT_DAILY_LIMIT;
   const usage = readUsage();
   if (usage.count >= limit) {
+    _dailyLimitReachedDate = todayUTC();
     const err = new Error(
       `Daily cloud LLM limit reached (${usage.count}/${limit} calls today). Resets at midnight UTC. Local models are unaffected.`,
     );
@@ -178,15 +185,19 @@ function checkAndTrackCloudLimit(dailyLimit = DEFAULT_DAILY_LIMIT) {
 
 /**
  * Returns true if the daily cloud LLM limit has been hit today (UTC).
- * Reads the current configured limit and usage file each time so raising an
- * operator limit (or using a different agent limit) takes effect immediately.
+ * Uses the in-process flag (fast path) and falls back to reading the usage file
+ * (handles daemon restarts, multi-process, and cases where the limit was hit before
+ * the current process started).
  * Local models are never limited and this always returns false for them.
  */
-export function isDailyLimitReached(options = {}) {
+export function isDailyLimitReached() {
+  if (_dailyLimitReachedDate === todayUTC()) return true;
   try {
-    const { dailyLimit } = loadConfig(options);
     const usage = readUsage();
-    return usage.count >= dailyLimit;
+    if (usage.count >= DEFAULT_DAILY_LIMIT) {
+      _dailyLimitReachedDate = todayUTC();
+      return true;
+    }
   } catch (_) {}
   return false;
 }
@@ -243,7 +254,7 @@ export function isTransientCloudError(err) {
   if (/model not found|invalid argument/i.test(msg)) return false;
   if (/LLM request failed 429\b/i.test(msg)) return true;
   if (/LLM request failed 5\d\d\b/i.test(msg)) return true;
-  if (/520|503|502|504|529|upstream connect|connection termination|fetch failed|ECONNRESET|ETIMEDOUT|network error|socket hang up/i.test(msg)) {
+  if (/520|503|502|504|529|upstream connect|connection termination|fetch failed|ECONNRESET|ETIMEDOUT|timed out|timeout|network error|socket hang up/i.test(msg)) {
     return true;
   }
   return false;
