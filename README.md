@@ -224,7 +224,6 @@ All configuration lives in `~/.pasture/config.json`. The full structure:
 
   "llm": {
     "maxTokens": 2048,          // max tokens per LLM response
-    "dailyLimit": 100,          // cloud LLM calls/day; raise deliberately for very long cloud runs
     "models": [
       // Local model (LM Studio) - used by default
       {
@@ -352,29 +351,7 @@ PASTURE_STATE_DIR=             # Override state dir (default: ~/.pasture)
 OPENAI_MODEL=gpt-4o            # Override default model for a provider
 GROK_MODEL=grok-3              # Override default Grok model
 ANTHROPIC_MODEL=claude-3-haiku-20240307
-
-# Long-running checkpointed agent turns
-PASTURE_MAX_TOOL_ROUNDS_WORKLOG=30       # Initial grant; not an absolute cap
-PASTURE_LONG_RUN_GRANT_ROUNDS=30         # Rounds per approved progress review
-PASTURE_LONG_RUN_MAX_TOOL_ROUNDS=1000    # Absolute runaway ceiling
-PASTURE_LONG_RUN_MAX_RUNTIME_MS=21600000 # Six-hour wall-clock ceiling
-PASTURE_TOOL_LOOP_UNCHANGED_SUCCESS_LIMIT=6
-PASTURE_TOOL_LOOP_IDENTICAL_ERROR_LIMIT=3
-PASTURE_TOOL_LOOP_CYCLE_REPEAT_LIMIT=3
-PASTURE_LONG_RUN_RECENT_TOOL_ROUNDS=12   # Raw rounds kept after durable checkpointing
-
-# Agent API requests have no whole-turn timeout by default. Set a positive
-# deadline only when the API caller requires one; expiry cancels cooperatively.
-PASTURE_AGENT_API_TIMEOUT_MS=0
 ```
-
-Short turns still use the small general/write budgets and finish as soon as the
-model stops requesting tools. A task selected for durable worklog mode can earn
-additional bounded grants after an LLM progress review. Repeated unchanged
-results, repeated identical errors, exact short cycles, cancellation, the hard
-round ceiling, and the wall-clock ceiling stop execution safely. For cloud-only
-multi-hour runs, also set `llm.dailyLimit` high enough for the intended workload;
-local-model calls do not consume that cloud counter.
 
 ---
 

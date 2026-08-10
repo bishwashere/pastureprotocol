@@ -213,41 +213,6 @@ async function runDailyLimitUserMessage() {
   console.log('test-llm-daily-limit-user-message passed');
 }
 
-async function runConfiguredDailyLimitAdmission() {
-  const stateDir = createTempStateDir();
-  process.env.PASTURE_STATE_DIR = stateDir;
-  writeFileSync(
-    join(stateDir, 'config.json'),
-    JSON.stringify({
-      llm: {
-        dailyLimit: 200,
-        models: [{ provider: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local' }],
-      },
-    }),
-    'utf8',
-  );
-  const today = new Date().toISOString().slice(0, 10);
-  writeFileSync(join(stateDir, 'llm-usage.json'), JSON.stringify({ date: today, count: 150 }), 'utf8');
-  const { isDailyLimitReached } = await import('../../../../llm.js?configured-limit-admission');
-  assert(isDailyLimitReached() === false,
-    'background admission must honor a configured limit above the old hardcoded 100');
-  writeFileSync(join(stateDir, 'llm-usage.json'), JSON.stringify({ date: today, count: 200 }), 'utf8');
-  assert(isDailyLimitReached() === true, 'configured daily limit still stops admission at its exact ceiling');
-  writeFileSync(
-    join(stateDir, 'config.json'),
-    JSON.stringify({
-      llm: {
-        dailyLimit: 300,
-        models: [{ provider: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local' }],
-      },
-    }),
-    'utf8',
-  );
-  assert(isDailyLimitReached() === false,
-    'raising the configured limit takes effect without restarting the daemon');
-  console.log('test-llm-configured-daily-limit-admission passed');
-}
-
 async function runAllModelsFailedUserMessage() {
   const { toUserMessage } = await import('../../../../lib/util/user-error.js');
   const err = new Error('All configured LLM models failed');
@@ -270,13 +235,24 @@ async function runAllModelsFailedUserMessage() {
     `all-model failure should reflect concrete causes, got: ${toUserMessage(err)}`,
   );
 
+  const timedOut = new Error('All configured LLM models failed');
+  timedOut.llmFailures = [{
+    model: 'gpt-4o',
+    local: false,
+    message: 'OpenAI browser-login model call timed out.',
+  }];
+  timedOut.taskWorklogCheckpointCount = 12;
+  assert(
+    toUserMessage(timedOut) === "I couldn't answer because gpt-4o failed: OpenAI browser-login model call timed out. I saved 12 checkpoints, so ask me to continue and I can resume from them.",
+    `long-task model failure should mention saved checkpoints, got: ${toUserMessage(timedOut)}`,
+  );
+
   console.log('test-llm-all-models-user-message passed');
 }
 
 run()
   .then(() => runLocalDownCloudLimited())
   .then(() => runLocalRpmPerMessage())
-  .then(() => runConfiguredDailyLimitAdmission())
   .then(() => runDailyLimitUserMessage())
   .then(() => runAllModelsFailedUserMessage())
   .catch((err) => {

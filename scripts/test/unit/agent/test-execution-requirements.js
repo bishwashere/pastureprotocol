@@ -119,12 +119,12 @@ assert(broadRead.usesExtendedBudget === true,
   'checkpoint-enabled read-only aggregation receives the extended tool budget');
 assert(broadRead.plan.includes('every registered project'),
   'runtime checkpoint summarizer receives the planner plan');
-assert(broadRead.steps[0].anyOfSkills.join(',') === 'go-read',
-  'control-only worklog cannot satisfy the fallback live-inspection requirement');
+assert(broadRead.steps.length === 0 && broadRead.source === 'worklog',
+  'checkpointed long tasks are not gated by an exact planner contract');
 progress = advanceExecutionProgress(broadRead, 0, {
   skillId: 'worklog', toolName: 'worklog_read', arguments: {}, result: '{"ok":true}',
 }, true);
-assert(progress === 0, 'a worklog read never proves the requested live tool work ran');
+assert(progress === 0, 'a worklog read does not create synthetic execution progress');
 
 const filtered = normalizeRequiredToolSteps([
   { kind: 'execute', anyOfSkills: ['exec', 'missing'], anyOfTools: ['exec_node_script', 'exec_bogus', 'missing_action'] },

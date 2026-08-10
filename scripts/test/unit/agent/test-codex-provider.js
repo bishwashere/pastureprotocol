@@ -175,7 +175,7 @@ await assert.rejects(
     messages: [{ role: 'user', content: 'Hello' }],
     timeoutMs: 10,
   }),
-  /timed out/,
+  (error) => error?.code === 'ETIMEDOUT' && /timed out/.test(error.message),
 );
 const timeoutInterrupt = hangingClient.requests.find((request) => request.method === 'turn/interrupt');
 assert.deepStrictEqual(timeoutInterrupt.params, { threadId: 'thread-test', turnId: 'turn-test' });
