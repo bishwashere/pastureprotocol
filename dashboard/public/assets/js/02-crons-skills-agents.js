@@ -4219,6 +4219,7 @@ function renderSystemCronVariant(row) {
       }
 
       function canPreviewBrainFocusTarget(focusTarget) {
+        if (!lockedFocus) return false;
         if (!focusTarget || focusTarget.mode !== 'word') return false;
         if (!currentFocus || focusTarget.label === currentFocus) return false;
         if (currentFocusMode !== 'word' && displayedFocus.mode !== 'word') return false;

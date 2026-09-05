@@ -17,9 +17,10 @@ const checks = [
     ok: /edgeDistance\s*\*\s*0\.42\s*\+\s*6/.test(js),
   },
   {
-    name: 'Brain hover preview preserves the current focus until click',
+    name: 'Brain hover preview requires a clicked locked focus',
     ok: /previewText/.test(js) &&
       /function canPreviewBrainFocusTarget\(/.test(js) &&
+      /if \(!lockedFocus\) return false;/.test(js) &&
       /if \(canPreviewBrainFocusTarget\(focusTarget\)\) \{[\s\S]{0,220}setBrainHoverPreview\(focusTarget\);[\s\S]{0,80}return;/.test(js),
   },
   {
