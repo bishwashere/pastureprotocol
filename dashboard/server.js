@@ -23,7 +23,7 @@ import { listSuggestedTasks, getSuggestedTask, updateSuggestedTask, promoteSugge
 import { runInternalAgentTurn } from '../lib/agent/internal-agent-turn.js';
 import { collectBadExchanges, readQualityMetrics } from '../lib/agent/retrospective.js';
 import { readSystemCrontabForConfig } from '../lib/util/system-crons.js';
-import { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } from '../lib/util/dashboard-url.js';
+import { resolveDashboardUrl } from '../lib/util/dashboard-url.js';
 import { syncMainAgentIdentityFileFromWorkspace } from '../lib/agent/identity-sync.js';
 import {
   beginDeviceCodeLogin,
@@ -71,8 +71,9 @@ import { generateBrainChunkGraph } from '../lib/agent/brain-word-cloud.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR || ROOT;
-const PORT = Number(process.env.PASTURE_DASHBOARD_PORT) || DEFAULT_DASHBOARD_PORT;
-const HOST = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
+const DASHBOARD_URL = resolveDashboardUrl();
+const PORT = DASHBOARD_URL.port;
+const HOST = DASHBOARD_URL.host;
 
 const app = express();
 app.use(express.json({ limit: Infinity }));

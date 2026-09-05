@@ -25,6 +25,7 @@ const REAL_TESTS = [
   ['core-e2e', 'scripts/test/e2e/real/skills/test-core-e2e.js'],
   ['cron-e2e', 'scripts/test/e2e/real/skills/test-cron-e2e.js'],
   ['edit-e2e', 'scripts/test/e2e/real/skills/test-edit-e2e.js'],
+  ['exec-e2e', 'scripts/test/e2e/real/skills/test-exec-e2e.js'],
   ['go-read-e2e', 'scripts/test/e2e/real/skills/test-go-read-e2e.js'],
   ['go-write-e2e', 'scripts/test/e2e/real/skills/test-go-write-e2e.js'],
   ['gog-e2e', 'scripts/test/e2e/real/skills/test-gog-e2e.js'],

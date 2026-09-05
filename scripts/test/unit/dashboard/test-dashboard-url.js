@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { resolveDashboardUrl, DEFAULT_DASHBOARD_PORT } from '../../../../lib/util/dashboard-url.js';
@@ -55,6 +55,13 @@ async function main() {
     });
     const skill = JSON.parse(skillRaw);
     assert(skill.url === 'http://127.0.0.3:6666/brain', 'go-read dashboard_url returns resolved URL');
+
+    const cliSrc = readFileSync(join(process.cwd(), 'cli.js'), 'utf8');
+    assert(cliSrc.includes('Dashboard UI:') && cliSrc.includes('printDashboardUiStatus'), 'pasture status prints dashboard UI host and port');
+    assert(cliSrc.includes('resolveDashboardUrl()') && cliSrc.includes("console.log('Started dashboard at', url)"), 'pasture dashboard uses resolved dashboard URL');
+
+    const serverSrc = readFileSync(join(process.cwd(), 'dashboard', 'server.js'), 'utf8');
+    assert(serverSrc.includes('const DASHBOARD_URL = resolveDashboardUrl()'), 'dashboard server listens on resolved dashboard URL');
 
     console.log('dashboard-url tests passed');
   } finally {

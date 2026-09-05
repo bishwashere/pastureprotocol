@@ -363,7 +363,7 @@ ANTHROPIC_MODEL=claude-3-haiku-20240307
 pasture start       # Start the bot in the background
 pasture stop        # Stop the background bot process
 pasture restart     # Restart the bot
-pasture status      # Show whether the bot is running
+pasture status      # Show whether the bot is running and the dashboard UI URL/port
 pasture logs        # Tail the daemon log
 pasture auth        # WhatsApp QR/pairing auth (stops bot first)
 pasture dashboard   # Open the local web dashboard

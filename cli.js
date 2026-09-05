@@ -16,6 +16,7 @@ import { getStateDir } from './lib/util/paths.js';
 import { runUninstall as runWindowsUninstall } from './lib/util/uninstall-win.js';
 import { runPreflight, formatCheckResult } from './lib/util/preflight.js';
 import { maybeBeginCliSession, envForNestedCliCall, statusOk } from './lib/util/cli-banner.js';
+import { resolveDashboardUrl } from './lib/util/dashboard-url.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.PASTURE_INSTALL_DIR
@@ -91,6 +92,11 @@ function restartBotAfterSkillChange() {
   } else {
     console.log('Restart skipped (daemon script not found). Run: pasture restart');
   }
+}
+
+function printDashboardUiStatus() {
+  const dashboard = resolveDashboardUrl();
+  console.log(`Dashboard UI: ${dashboard.baseUrl} (host ${dashboard.host}, port ${dashboard.port})`);
 }
 
 async function releaseDashboardPort(port) {
@@ -190,7 +196,9 @@ function runPostUpdateRestartAndDashboard() {
 
 function runDaemonAction(action) {
   if (IS_WIN) {
-    process.exit(runPm2DaemonAction(action, { installDir: INSTALL_DIR }));
+    const code = runPm2DaemonAction(action, { installDir: INSTALL_DIR });
+    if (action === 'status') printDashboardUiStatus();
+    process.exit(code);
   }
   const script = join(INSTALL_DIR, 'scripts', 'daemon.sh');
   if (!existsSync(script)) {
@@ -204,7 +212,10 @@ function runDaemonAction(action) {
     env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
     cwd: INSTALL_DIR,
   });
-  child.on('close', (code) => process.exit(code ?? 0));
+  child.on('close', (code) => {
+    if (action === 'status') printDashboardUiStatus();
+    process.exit(code ?? 0);
+  });
 }
 
 /**
@@ -281,10 +292,9 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       console.error('pasture: dashboard not found. Re-run the installer or run from repo.');
       process.exit(1);
     }
-    const { DEFAULT_DASHBOARD_HOST, DEFAULT_DASHBOARD_PORT } = await import('./lib/util/dashboard-url.js');
-    const port = process.env.PASTURE_DASHBOARD_PORT || String(DEFAULT_DASHBOARD_PORT);
-    const host = process.env.PASTURE_DASHBOARD_HOST || DEFAULT_DASHBOARD_HOST;
-    const url = `http://${host}:${port}`;
+    const dashboard = resolveDashboardUrl();
+    const port = String(dashboard.port);
+    const url = dashboard.baseUrl;
     await releaseDashboardPort(port);
     const child = spawn(process.execPath, [serverPath], {
       stdio: 'ignore',

@@ -106,6 +106,7 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [casual-greetings/](casual-greetings/inputs.md) | `scripts/test/e2e/real/agent/test-casual-greetings.js` | unit + `--test` |
 | - | `scripts/test/unit/core/test-chat-session.js` | direct (session logic only) |
 | [edit/](edit/inputs.md) | `scripts/test/e2e/real/skills/test-edit-e2e.js` | `--test` |
+| [exec/](exec/inputs.md) | `scripts/test/e2e/real/skills/test-exec-e2e.js` | `--test` |
 | [write/](write/inputs.md) | `scripts/test/e2e/real/skills/test-write-e2e.js` | `--test` |
 | [browser/](browser/inputs.md) | `scripts/test/e2e/real/skills/test-browser-e2e.js` | `--test` |
 | [memory/](memory/inputs.md) | `scripts/test/e2e/real/skills/test-memory-e2e.js` | `--test` |
@@ -136,7 +137,7 @@ Discovery rule: folder `scripts/test/<id>/inputs.md` plus a matching script unde
 | apply-patch, apply-patch-unit | E2E + unit | ✅ |
 | background-tasks, basic, browser, calendar-skill, chat-session | unit / E2E | ✅ |
 | conversation-context, core, credential-utils, cron, dry-run | unit / E2E | ✅ |
-| e2e-expect, edit, fixture-state, github-skill, gmail-skill, go-read, go-write, gog | unit / E2E | ✅ |
+| e2e-expect, edit, exec, fixture-state, github-skill, gmail-skill, go-read, go-write, gog | unit / E2E | ✅ |
 | home-assistant, home-assistant-format, intent-planner, me, memory | unit / E2E | ✅ |
 | memory-index-files, output-parse, read, retrospective, search, server-inspect | unit / E2E | ✅ |
 | session-bootstrap, skill-install, speech, telegram-send, tide, tide-checklist | unit / E2E | ✅ |
