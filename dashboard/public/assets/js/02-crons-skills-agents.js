@@ -3048,7 +3048,7 @@ function renderSystemCronVariant(row) {
       minFont: 10,
       maxFont: 46,
     };
-    var BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER = 3;
+    var BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER = 1.35;
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
     var brainLoadingTimer = null;
@@ -3678,7 +3678,7 @@ function renderSystemCronVariant(row) {
         }
         var normalized = Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
         var edgeDistance = Math.max(rx, ry) * Math.max(0, 1 - normalized);
-        var push = Math.max(18, edgeDistance + 22) * Math.max(0, Math.min(1, Number(local.presence) || 0)) * BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER;
+        var push = Math.max(10, edgeDistance * 0.72 + 10) * Math.max(0, Math.min(1, Number(local.presence) || 0)) * BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER;
         var marginX = Math.max(30, (pos.cellW || 56) * 0.5 + 8);
         var marginY = Math.max(20, (pos.cellH || 18) * 0.5 + 8);
         return Object.assign({}, pos, {

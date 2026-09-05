@@ -9,8 +9,12 @@ const js = fs.readFileSync(jsPath, 'utf8');
 
 const checks = [
   {
-    name: 'Brain focus push uses a 3x near-item multiplier',
-    ok: /BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER\s*=\s*3/.test(js),
+    name: 'Brain focus push uses a gentle near-item multiplier',
+    ok: /BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER\s*=\s*1\.35/.test(js),
+  },
+  {
+    name: 'Brain focus push softens distance-based displacement',
+    ok: /edgeDistance\s*\*\s*0\.72\s*\+\s*10/.test(js),
   },
   {
     name: 'Brain focus neighborhood records displacement vectors',
