@@ -10,11 +10,21 @@ const js = fs.readFileSync(jsPath, 'utf8');
 const checks = [
   {
     name: 'Brain focus push uses a gentle near-item multiplier',
-    ok: /BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER\s*=\s*1\.35/.test(js),
+    ok: /BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER\s*=\s*0\.75/.test(js),
   },
   {
     name: 'Brain focus push softens distance-based displacement',
-    ok: /edgeDistance\s*\*\s*0\.72\s*\+\s*10/.test(js),
+    ok: /edgeDistance\s*\*\s*0\.42\s*\+\s*6/.test(js),
+  },
+  {
+    name: 'Brain hover preview preserves the current focus until click',
+    ok: /previewText/.test(js) &&
+      /function canPreviewBrainFocusTarget\(/.test(js) &&
+      /if \(canPreviewBrainFocusTarget\(focusTarget\)\) \{[\s\S]{0,220}setBrainHoverPreview\(focusTarget\);[\s\S]{0,80}return;/.test(js),
+  },
+  {
+    name: 'Brain click commits the previewed word as the main focus',
+    ok: /meshCanvas\.addEventListener\('click'[\s\S]{0,900}lockedFocus = focusTarget;[\s\S]{0,220}applyBrainHover\(focusTarget\);/.test(js),
   },
   {
     name: 'Brain focus neighborhood records displacement vectors',
