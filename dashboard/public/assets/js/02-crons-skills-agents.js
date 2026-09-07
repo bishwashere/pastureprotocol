@@ -3049,6 +3049,7 @@ function renderSystemCronVariant(row) {
       maxFont: 46,
     };
     var BRAIN_FOCUS_NEAR_PUSH_MULTIPLIER = 0.75;
+    var BRAIN_FOCUS_DWELL_MS = 1000;
     var brainSettings = loadBrainSettings();
     var brainCloudLastData = null;
     var brainLoadingTimer = null;
@@ -3979,14 +3980,12 @@ function renderSystemCronVariant(row) {
         var bRel = hasFocus && selectedLinks[bText];
         var aLocal = hasFocus && !aRel && localCandidates[aText];
         var bLocal = hasFocus && !bRel && localCandidates[bText];
-        var aPreview = hasFocus && previewText && aText === previewText && aText !== relationSelectedText;
-        var bPreview = hasFocus && previewText && bText === previewText && bText !== relationSelectedText;
-        var aFont = hasFocus ? (aRel ? brainHoverFont(a, aRel, focusMode) : a.font + (brainInactiveFont(a) - a.font) * dimPresence) : a.font;
-        var bFont = hasFocus ? (bRel ? brainHoverFont(b, bRel, focusMode) : b.font + (brainInactiveFont(b) - b.font) * dimPresence) : b.font;
+        var aPreview = previewText && aText === previewText && aText !== relationSelectedText;
+        var bPreview = previewText && bText === previewText && bText !== relationSelectedText;
+        var aFont = aPreview ? brainPreviewFont(a, aRel, focusMode) : hasFocus ? (aRel ? brainHoverFont(a, aRel, focusMode) : a.font + (brainInactiveFont(a) - a.font) * dimPresence) : a.font;
+        var bFont = bPreview ? brainPreviewFont(b, bRel, focusMode) : hasFocus ? (bRel ? brainHoverFont(b, bRel, focusMode) : b.font + (brainInactiveFont(b) - b.font) * dimPresence) : b.font;
         if (aLocal) aFont = brainLocalPopFont(a, aLocal);
         if (bLocal) bFont = brainLocalPopFont(b, bLocal);
-        if (aPreview) aFont = brainPreviewFont(a, aRel, focusMode);
-        if (bPreview) bFont = brainPreviewFont(b, bRel, focusMode);
         var aSelected = brainDisplaySelected(null, aRel, 1);
         var bSelected = brainDisplaySelected(null, bRel, 1);
         var aOrder = aFont + (aPreview ? 64 : aLocal ? 52 : aSelected ? 10 : aRel ? 8 : 0);
@@ -3996,14 +3995,16 @@ function renderSystemCronVariant(row) {
         var text = String(pos.term.text || '');
         var rel = hasFocus && selectedLinks[text];
         var localState = hasFocus && !rel && localCandidates[text];
-        var previewed = hasFocus && previewText && text === previewText && text !== relationSelectedText;
+        var previewed = previewText && text === previewText && text !== relationSelectedText;
         var selected = brainDisplaySelected(null, rel, 1);
-        var displayFont = hasFocus
-          ? (previewed ? brainPreviewFont(pos, rel, focusMode) : rel ? brainHoverFont(pos, rel, focusMode) : localState ? brainLocalPopFont(pos, localState) : pos.font + (brainInactiveFont(pos) - pos.font) * dimPresence)
-          : pos.font;
+        var displayFont = previewed
+          ? brainPreviewFont(pos, rel, focusMode)
+          : hasFocus
+            ? (rel ? brainHoverFont(pos, rel, focusMode) : localState ? brainLocalPopFont(pos, localState) : pos.font + (brainInactiveFont(pos) - pos.font) * dimPresence)
+            : pos.font;
         var inactiveAlpha = 0.48 + (0.08 - 0.48) * dimPresence;
         var localAlpha = localState ? 0.18 + 0.7 * Math.max(0, Math.min(1, Number(localState.presence) || 0)) : inactiveAlpha;
-        var alpha = hasFocus ? (previewed ? 0.96 : rel ? brainHoverAlpha(rel, relationSelectedText, focusMode) : localState ? localAlpha : inactiveAlpha) : 0.48;
+        var alpha = previewed ? 0.96 : hasFocus ? (rel ? brainHoverAlpha(rel, relationSelectedText, focusMode) : localState ? localAlpha : inactiveAlpha) : 0.48;
         var hue = previewed ? '103,232,249' : selected || (focusMode === 'path' && rel) ? '255,255,255' : localState ? '186,230,253' : '219,234,254';
         ctx.font = displayFont.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
@@ -4218,6 +4219,16 @@ function renderSystemCronVariant(row) {
         scheduleBrainPointerDraw();
       }
 
+      function resetBrainHoverFocusImmediate() {
+        stopBrainHoverAnimation();
+        currentFocus = '';
+        currentRelations = {};
+        activeHover = '';
+        currentFocusMode = 'word';
+        displayedFocus = { label: '', mode: 'word' };
+        renderBrainFocus('', connections);
+      }
+
       function canPreviewBrainFocusTarget(focusTarget) {
         if (!lockedFocus) return false;
         if (!focusTarget || focusTarget.mode !== 'word') return false;
@@ -4338,7 +4349,12 @@ function renderSystemCronVariant(row) {
             setBrainHoverPreview(focusTarget);
             return;
           }
-          setBrainHoverPreview(null);
+          if (!lockedFocus && focusTarget && focusTarget.mode === 'word') {
+            if (currentFocus && focusTarget.label !== currentFocus) resetBrainHoverFocusImmediate();
+            setBrainHoverPreview(focusTarget);
+          } else {
+            setBrainHoverPreview(null);
+          }
           if (lockedFocus) return;
           if (!focusTarget && (currentFocus || displayedFocus.label || activeHover) && brainPointInFocusZone(meshCanvas, meshPointer.x, meshPointer.y)) {
             if (hoverTimer) clearTimeout(hoverTimer);
@@ -4357,7 +4373,7 @@ function renderSystemCronVariant(row) {
             if (pendingHover) applyBrainHover(pendingHover);
             hoverTimer = null;
             pendingHover = null;
-          }, 160);
+          }, BRAIN_FOCUS_DWELL_MS);
         });
         meshCanvas.addEventListener('click', function (event) {
           var cr = meshCanvas.getBoundingClientRect();
@@ -4491,6 +4507,355 @@ function renderSystemCronVariant(row) {
         if (requestSeq === brainCloudRequestSeq) brainCloudAbortController = null;
       }
     }
+
+    var BRAIN_VARIANTS = {
+      brain1: { name: 'Lens cloud', accent: '103,232,249', second: '134,239,172', mode: 'lens' },
+      brain2: { name: 'Orbit cloud', accent: '134,239,172', second: '103,232,249', mode: 'orbit' },
+      brain3: { name: 'Compare cloud', accent: '103,232,249', second: '252,211,77', mode: 'compare' },
+    };
+    var brainVariantState = {};
+    var brainVariantRequestSeq = 0;
+
+    function brainVariantConfig(id) {
+      return BRAIN_VARIANTS[id] || BRAIN_VARIANTS.brain1;
+    }
+
+    function brainVariantElements(id) {
+      return {
+        page: document.getElementById('page-' + id),
+        cloud: document.getElementById(id + '-cloud'),
+        meta: document.getElementById(id + '-meta'),
+        focus: document.getElementById(id + '-focus'),
+      };
+    }
+
+    function brainVariantGetState(id) {
+      if (!brainVariantState[id]) brainVariantState[id] = { pinned: '', hover: '', pointer: { x: 0, y: 0, active: false }, data: null };
+      return brainVariantState[id];
+    }
+
+    function setBrainVariantMeta(id, text, isError) {
+      var els = brainVariantElements(id);
+      if (!els.meta) return;
+      els.meta.textContent = text || brainVariantConfig(id).name;
+      els.meta.classList.toggle('error', !!isError);
+    }
+
+    function brainVariantLabel(text) {
+      text = String(text || '');
+      return text.length > 16 ? text.slice(0, 15) + '…' : text;
+    }
+
+    function brainVariantRelationsFor(focus, connections) {
+      return focus ? brainRelationMap(focus, connections) : {};
+    }
+
+    function brainVariantPrimary(id) {
+      var state = brainVariantGetState(id);
+      return state.pinned || state.hover || '';
+    }
+
+    function brainVariantCompare(id) {
+      var state = brainVariantGetState(id);
+      return state.pinned && state.hover && state.hover !== state.pinned ? state.hover : '';
+    }
+
+    function brainVariantPositionMap(positions) {
+      var byText = {};
+      (positions || []).forEach(function (pos) { byText[pos.term.text] = pos; });
+      return byText;
+    }
+
+    function brainVariantOrbitPositions(positions, focusText, relMap, width, height) {
+      if (!focusText || !relMap) return positions;
+      var safeW = Math.max(320, width || 900);
+      var safeH = Math.max(260, height || 520);
+      var cx = safeW / 2;
+      var cy = safeH / 2;
+      var direct = [];
+      var second = [];
+      Object.keys(relMap).forEach(function (text) {
+        if (text === focusText) return;
+        if (relMap[text].depth === 1) direct.push(text);
+        else if (relMap[text].depth === 2) second.push(text);
+      });
+      var order = {};
+      direct.sort(function (a, b) { return (relMap[b].strength || 0) - (relMap[a].strength || 0); });
+      second.sort(function (a, b) { return (relMap[b].strength || 0) - (relMap[a].strength || 0); });
+      direct.slice(0, 18).forEach(function (text, idx) {
+        var angle = -Math.PI / 2 + (idx / Math.max(1, direct.length)) * Math.PI * 2;
+        order[text] = { ring: 1, angle: angle };
+      });
+      second.slice(0, 26).forEach(function (text, idx) {
+        var angle = -Math.PI / 2 + Math.PI / Math.max(4, second.length) + (idx / Math.max(1, second.length)) * Math.PI * 2;
+        order[text] = { ring: 2, angle: angle };
+      });
+      var r1 = Math.max(104, Math.min(safeW, safeH) * 0.23);
+      var r2 = Math.max(176, Math.min(safeW, safeH) * 0.38);
+      return positions.map(function (pos) {
+        var text = String(pos.term?.text || '');
+        if (text === focusText) return Object.assign({}, pos, { x: cx, y: cy, font: Math.max(pos.font, 44) });
+        var slot = order[text];
+        if (!slot) return pos;
+        var radius = slot.ring === 1 ? r1 : r2;
+        var x = cx + Math.cos(slot.angle) * radius;
+        var y = cy + Math.sin(slot.angle) * radius * 0.72;
+        var marginX = Math.max(34, (pos.cellW || 56) * 0.5 + 8);
+        var marginY = Math.max(22, (pos.cellH || 18) * 0.5 + 8);
+        return Object.assign({}, pos, {
+          x: Math.max(marginX, Math.min(safeW - marginX, x)),
+          y: Math.max(marginY, Math.min(safeH - marginY, y)),
+        });
+      });
+    }
+
+    function drawBrainVariantRelationLines(ctx, connections, byText, relA, relB, primary, compare, config) {
+      (connections || []).forEach(function (c) {
+        var a = byText[c.from];
+        var b = byText[c.to];
+        if (!a || !b) return;
+        var inA = !!(relA[c.from] && relA[c.to]);
+        var inB = !!(relB && relB[c.from] && relB[c.to]);
+        var primaryEdge = primary && (c.from === primary || c.to === primary);
+        var compareEdge = compare && (c.from === compare || c.to === compare);
+        var alpha = inA || inB ? 0.34 : 0.06;
+        var color = config.accent;
+        if (relB && inA && inB) {
+          color = '134,239,172';
+          alpha = 0.48;
+        } else if (compareEdge || (inB && !inA)) {
+          color = config.second;
+          alpha = 0.38;
+        } else if (primaryEdge) {
+          alpha = 0.52;
+        }
+        ctx.beginPath();
+        brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
+        ctx.lineWidth = primaryEdge || compareEdge ? 1.9 : (inA || inB ? 1.15 : 0.45);
+        ctx.strokeStyle = 'rgba(' + color + ',' + alpha.toFixed(3) + ')';
+        ctx.stroke();
+      });
+    }
+
+    function renderBrainVariantFocus(id, primary, compare, relMap, compareMap) {
+      var els = brainVariantElements(id);
+      if (!els.focus) return;
+      if (!primary) {
+        els.focus.hidden = true;
+        els.focus.innerHTML = '';
+        return;
+      }
+      var related = Object.keys(relMap || {})
+        .filter(function (text) { return text !== primary; })
+        .map(function (text) { return { text: text, rel: relMap[text], shared: !!(compareMap && compareMap[text]) }; })
+        .sort(function (a, b) {
+          return (b.shared ? 1 : 0) - (a.shared ? 1 : 0) || a.rel.depth - b.rel.depth || b.rel.strength - a.rel.strength;
+        })
+        .slice(0, 12);
+      els.focus.hidden = false;
+      els.focus.innerHTML = '<strong>' + escapeHtml(primary) + '</strong>' +
+        (compare ? '<span class="brain-focus-link brain-focus-compare">' + escapeHtml(compare) + '</span>' : '') +
+        related.map(function (item) {
+          var level = item.shared ? 'strong' : brainEdgeLevel(item.rel.strength);
+          return '<span class="brain-focus-link brain-focus-' + level + '">' +
+            escapeHtml(item.text) + '</span>';
+        }).join('');
+    }
+
+    function drawBrainVariant(id) {
+      var state = brainVariantGetState(id);
+      var els = brainVariantElements(id);
+      if (!els.cloud || !state.data) return;
+      var data = state.data;
+      var terms = Array.isArray(data.denseTerms) ? data.denseTerms : [];
+      var connections = Array.isArray(data.denseConnections) ? data.denseConnections : [];
+      if (!terms.length) {
+        els.cloud.innerHTML = '<p class="empty">No brain graph yet.</p>';
+        renderBrainVariantFocus(id, '', '', {}, {});
+        return;
+      }
+      if (!els.cloud.querySelector('canvas')) els.cloud.innerHTML = '<canvas class="brain-mesh-canvas brain-variant-canvas"></canvas>';
+      var canvas = els.cloud.querySelector('canvas');
+      var rect = els.cloud.getBoundingClientRect();
+      var width = Math.max(320, Math.round(rect.width || 900));
+      var height = Math.max(360, Math.round(rect.height || 560));
+      var scale = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * scale);
+      canvas.height = Math.floor(height * scale);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      var visibleTerms = brainVisibleTerms(terms, width, height, connections);
+      var visibleText = {};
+      visibleTerms.forEach(function (term) { visibleText[term.text] = true; });
+      var visibleConnections = connections.filter(function (c) { return visibleText[c.from] && visibleText[c.to]; });
+      var positions = brainMeshPositions(visibleTerms, width, height);
+      var config = brainVariantConfig(id);
+      var primary = brainVariantPrimary(id);
+      var compare = config.mode === 'compare' || config.mode === 'lens' ? brainVariantCompare(id) : '';
+      var relMap = brainVariantRelationsFor(primary, visibleConnections);
+      var compareMap = brainVariantRelationsFor(compare, visibleConnections);
+      if (config.mode === 'orbit') positions = brainVariantOrbitPositions(positions, primary, relMap, width, height);
+      var byText = brainVariantPositionMap(positions);
+      drawBrainVariantRelationLines(ctx, visibleConnections, byText, relMap, compareMap, primary, compare, config);
+      var hitBoxes = [];
+      positions.slice().sort(function (a, b) {
+        var at = String(a.term?.text || '');
+        var bt = String(b.term?.text || '');
+        var ar = relMap[at];
+        var br = relMap[bt];
+        var ac = compareMap[at];
+        var bc = compareMap[bt];
+        var ao = at === primary ? 80 : at === compare ? 74 : ac && ar ? 60 : ar ? 44 - ar.depth : ac ? 38 : 0;
+        var bo = bt === primary ? 80 : bt === compare ? 74 : bc && br ? 60 : br ? 44 - br.depth : bc ? 38 : 0;
+        return (a.font + ao) - (b.font + bo);
+      }).forEach(function (pos) {
+        var text = String(pos.term?.text || '');
+        var rel = relMap[text];
+        var compRel = compareMap[text];
+        var isPrimary = text === primary;
+        var isCompare = text === compare;
+        var shared = !!(rel && compRel && compare);
+        var isRelated = !!rel || !!compRel;
+        var font = pos.font;
+        if (isPrimary) font = Math.max(34, Math.min(56, pos.font * 1.9));
+        else if (isCompare) font = Math.max(24, Math.min(42, pos.font * 1.55));
+        else if (shared) font = Math.max(19, Math.min(34, pos.font * 1.38));
+        else if (rel) font = Math.max(13, Math.min(30, brainHoverFont(pos, rel, 'word') * (config.mode === 'lens' ? 0.9 : 0.82)));
+        else if (compRel) font = Math.max(12, Math.min(25, brainHoverFont(pos, compRel, 'word') * 0.78));
+        else if (primary) font = Math.max(8, pos.font * (config.mode === 'lens' ? 0.56 : 0.44));
+        var alpha = primary ? (isPrimary || isCompare ? 1 : shared ? 0.96 : isRelated ? 0.78 : 0.16) : 0.5;
+        var color = '219,234,254';
+        if (isPrimary) color = config.accent;
+        else if (isCompare) color = config.second;
+        else if (shared) color = '134,239,172';
+        else if (compRel) color = config.second;
+        else if (rel) color = '226,232,240';
+        ctx.font = font.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        var label = brainVariantLabel(text);
+        var maxWidth = Math.max(56, Math.min(230, label.length * font * 0.62 + 12));
+        if (config.mode === 'lens' && (isPrimary || isCompare || shared)) {
+          ctx.beginPath();
+          ctx.ellipse(pos.x, pos.y, maxWidth * 0.52 + 14, font * 0.72 + 8, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(' + color + ',0.075)';
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(' + color + ',' + alpha.toFixed(3) + ')';
+        ctx.fillText(label, pos.x, pos.y, maxWidth);
+        hitBoxes.push({
+          term: pos.term,
+          x: pos.x,
+          y: pos.y,
+          w: maxWidth + 22,
+          h: font * 1.35 + 18,
+          priority: isPrimary ? 4 : isCompare ? 3 : isRelated ? 2 : 0,
+        });
+      });
+      canvas._brainVariantHitBoxes = hitBoxes;
+      renderBrainVariantFocus(id, primary, compare, relMap, compareMap);
+      var stats = data.stats || {};
+      setBrainVariantMeta(id, brainVariantConfig(id).name + ' · ' + visibleTerms.length + ' visible words' + (stats.llmChunks ? ' · ' + stats.llmChunks + ' chunks' : ''));
+    }
+
+    function nearestBrainVariantTerm(canvas, x, y) {
+      var hitBoxes = canvas && canvas._brainVariantHitBoxes ? canvas._brainVariantHitBoxes : [];
+      var best = null;
+      var bestD = Infinity;
+      hitBoxes.forEach(function (box) {
+        if (Math.abs(box.x - x) > box.w / 2 || Math.abs(box.y - y) > box.h / 2) return;
+        var dx = box.x - x;
+        var dy = box.y - y;
+        var d = dx * dx + dy * dy - box.priority * 1200;
+        if (d < bestD) {
+          bestD = d;
+          best = box.term;
+        }
+      });
+      return best ? String(best.text || '') : '';
+    }
+
+    function bindBrainVariantCanvas(id) {
+      var els = brainVariantElements(id);
+      if (!els.cloud) return;
+      var canvas = els.cloud.querySelector('canvas');
+      if (!canvas || canvas._brainVariantBound) return;
+      canvas._brainVariantBound = true;
+      var state = brainVariantGetState(id);
+      canvas.addEventListener('mousemove', function (event) {
+        var rect = canvas.getBoundingClientRect();
+        state.pointer.x = event.clientX - rect.left;
+        state.pointer.y = event.clientY - rect.top;
+        state.pointer.active = true;
+        state.hover = nearestBrainVariantTerm(canvas, state.pointer.x, state.pointer.y);
+        drawBrainVariant(id);
+      });
+      canvas.addEventListener('mouseleave', function () {
+        state.pointer.active = false;
+        state.hover = '';
+        drawBrainVariant(id);
+      });
+      canvas.addEventListener('click', function (event) {
+        var rect = canvas.getBoundingClientRect();
+        state.pointer.x = event.clientX - rect.left;
+        state.pointer.y = event.clientY - rect.top;
+        var term = nearestBrainVariantTerm(canvas, state.pointer.x, state.pointer.y);
+        state.pinned = term && state.pinned !== term ? term : '';
+        state.hover = term || '';
+        drawBrainVariant(id);
+      });
+    }
+
+    async function fetchBrainVariantCloud(id, refresh) {
+      var els = brainVariantElements(id);
+      if (!els.cloud) return;
+      var state = brainVariantGetState(id);
+      var requestSeq = ++brainVariantRequestSeq;
+      var cached = state.data || brainCloudLastData || loadBrainLastGood();
+      if (cached && !refresh) {
+        state.data = cached;
+        drawBrainVariant(id);
+        bindBrainVariantCanvas(id);
+        return;
+      }
+      setBrainVariantMeta(id, refresh ? 'Generating brain graph...' : 'Loading brain graph...');
+      if (!cached) els.cloud.innerHTML = '<p class="empty">Loading brain graph...</p>';
+      try {
+        var url = API + '/api/brain/cloud?progressId=' + encodeURIComponent(id + '_' + Date.now().toString(36));
+        if (!refresh) url += '&cacheOnly=1';
+        if (refresh) url += '&refresh=1&ts=' + Date.now();
+        var res = await fetch(url, { cache: refresh ? 'no-store' : 'default' });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          if (data && data.needsGenerate) {
+            els.cloud.innerHTML = '<p class="empty">No brain graph yet.</p>';
+            setBrainVariantMeta(id, 'No generated brain graph yet');
+            return;
+          }
+          throw new Error(data.error || 'Brain graph failed');
+        }
+        if (requestSeq !== brainVariantRequestSeq) return;
+        state.data = data;
+        brainCloudLastData = data;
+        saveBrainLastGood(data);
+        drawBrainVariant(id);
+        bindBrainVariantCanvas(id);
+      } catch (err) {
+        if (cached) {
+          state.data = cached;
+          drawBrainVariant(id);
+          bindBrainVariantCanvas(id);
+        }
+        setBrainVariantMeta(id, err && err.message ? err.message : 'Could not load brain graph', true);
+      }
+    }
+    window.fetchBrainVariantCloud = fetchBrainVariantCloud;
 
     function setBrainImportStatus(text, isError) {
       var el = document.getElementById('brain-meta');
@@ -4770,6 +5135,16 @@ function renderSystemCronVariant(row) {
     wireEl('brain-import-submit', 'click', function () {
       var input = document.getElementById('brain-import-file');
       if (input) input.click();
+    });
+    ['brain1', 'brain2', 'brain3'].forEach(function (id) {
+      wireEl(id + '-refresh', 'click', function () { fetchBrainVariantCloud(id, true); });
+    });
+    window.addEventListener('resize', function () {
+      ['brain1', 'brain2', 'brain3'].forEach(function (id) {
+        var state = brainVariantState[id];
+        var page = document.getElementById('page-' + id);
+        if (state && state.data && page && page.classList.contains('active')) drawBrainVariant(id);
+      });
     });
 
     async function fetchTests() {

@@ -17,6 +17,17 @@ const checks = [
     ok: /edgeDistance\s*\*\s*0\.42\s*\+\s*6/.test(js),
   },
   {
+    name: 'Brain hover uses instant preview before dwell focus',
+    ok: /BRAIN_FOCUS_DWELL_MS\s*=\s*1000/.test(js) &&
+      /if \(!lockedFocus && focusTarget && focusTarget\.mode === 'word'\) \{[\s\S]{0,220}setBrainHoverPreview\(focusTarget\);/.test(js) &&
+      /setTimeout\(function \(\) \{[\s\S]{0,160}applyBrainHover\(pendingHover\)[\s\S]{0,120}BRAIN_FOCUS_DWELL_MS/.test(js),
+  },
+  {
+    name: 'Brain moving to a new word clears unlocked full focus immediately',
+    ok: /function resetBrainHoverFocusImmediate\(/.test(js) &&
+      /if \(currentFocus && focusTarget\.label !== currentFocus\) resetBrainHoverFocusImmediate\(\);/.test(js),
+  },
+  {
     name: 'Brain hover preview requires a clicked locked focus',
     ok: /previewText/.test(js) &&
       /function canPreviewBrainFocusTarget\(/.test(js) &&

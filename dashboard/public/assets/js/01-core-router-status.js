@@ -1,5 +1,5 @@
 const API = '';
-    var validPages = ['home', 'chat', 'brain', 'crons', 'skills', 'groups', 'config', 'memory', 'test', 'teams', 'team', 'team-agent'];
+    var validPages = ['home', 'chat', 'brain', 'brain1', 'brain2', 'brain3', 'crons', 'skills', 'groups', 'config', 'memory', 'test', 'teams', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -97,6 +97,7 @@ const API = '';
       if (name === 'skills') fetchSkills();
       if (name === 'teams' && typeof fetchTeamsPage === 'function') fetchTeamsPage();
       if (name === 'brain' && typeof fetchBrainCloud === 'function') fetchBrainCloud();
+      if ((name === 'brain1' || name === 'brain2' || name === 'brain3') && typeof fetchBrainVariantCloud === 'function') fetchBrainVariantCloud(name);
       if (name === 'groups') fetchGroups();
       if (name === 'home') {
         fetchStatus();
