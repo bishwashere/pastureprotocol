@@ -1407,6 +1407,62 @@
       margin-bottom: 0;
       padding: 0.85rem 1rem;
     }
+    .home-product-hero {
+      display: grid;
+      gap: 0.38rem;
+      margin-bottom: 0.65rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .home-product-kicker {
+      margin: 0;
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .home-product-hero h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(0.98rem, 1.85vw, 1.35rem);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .home-product-subtitle {
+      max-width: 58rem;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.38;
+    }
+    .home-product-focus {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .home-product-focus span,
+    .home-install-link {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 1.6rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.22rem 0.48rem;
+      color: var(--muted);
+      background: rgba(0, 255, 255, 0.05);
+      font-size: 0.68rem;
+      line-height: 1.2;
+      text-decoration: none;
+    }
+    .home-install-link {
+      color: var(--accent);
+      background: rgba(0, 255, 255, 0.08);
+    }
+    .home-install-link:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
     .chat-upper-right {
       flex: 1 1 0;
       min-width: 0;
@@ -1421,8 +1477,9 @@
       flex-shrink: 0;
     }
     .chat-upper-left .overview-grid {
-      margin-top: 0.75rem;
-      padding-top: 0.75rem;
+      margin-top: 0.7rem;
+      padding-top: 0;
+      border-top: 0;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.5rem 0.75rem;
     }

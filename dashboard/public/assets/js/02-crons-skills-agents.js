@@ -4566,12 +4566,34 @@ function renderSystemCronVariant(row) {
       return byText;
     }
 
+    function brainVariantNeighborhood(positions, state, width, height) {
+      var map = {};
+      if (!state || !state.pointer || !state.pointer.active) return map;
+      var radius = Math.max(112, Math.min(210, Math.min(width || 900, height || 560) * 0.28));
+      (positions || []).forEach(function (pos) {
+        var text = String(pos.term?.text || '');
+        if (!text) return;
+        var dx = pos.x - state.pointer.x;
+        var dy = pos.y - state.pointer.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > radius) return;
+        var proximity = 1 - dist / radius;
+        map[text] = {
+          distance: dist,
+          proximity: Math.max(0, Math.min(1, proximity)),
+          radius: radius,
+        };
+      });
+      return map;
+    }
+
     function brainVariantOrbitPositions(positions, focusText, relMap, width, height) {
       if (!focusText || !relMap) return positions;
       var safeW = Math.max(320, width || 900);
       var safeH = Math.max(260, height || 520);
-      var cx = safeW / 2;
-      var cy = safeH / 2;
+      var focusPos = (positions || []).find(function (pos) { return String(pos.term?.text || '') === focusText; });
+      var cx = focusPos ? focusPos.x : safeW / 2;
+      var cy = focusPos ? focusPos.y : safeH / 2;
       var direct = [];
       var second = [];
       Object.keys(relMap).forEach(function (text) {
@@ -4594,12 +4616,20 @@ function renderSystemCronVariant(row) {
       var r2 = Math.max(176, Math.min(safeW, safeH) * 0.38);
       return positions.map(function (pos) {
         var text = String(pos.term?.text || '');
-        if (text === focusText) return Object.assign({}, pos, { x: cx, y: cy, font: Math.max(pos.font, 44) });
+        if (text === focusText) return Object.assign({}, pos, { font: Math.max(pos.font, 36) });
         var slot = order[text];
         if (!slot) return pos;
         var radius = slot.ring === 1 ? r1 : r2;
-        var x = cx + Math.cos(slot.angle) * radius;
-        var y = cy + Math.sin(slot.angle) * radius * 0.72;
+        var targetX = cx + Math.cos(slot.angle) * radius;
+        var targetY = cy + Math.sin(slot.angle) * radius * 0.72;
+        var dx = targetX - pos.x;
+        var dy = targetY - pos.y;
+        var distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        var maxShift = slot.ring === 1 ? 92 : 66;
+        var pull = slot.ring === 1 ? 0.44 : 0.28;
+        var shift = Math.min(maxShift, distance * pull);
+        var x = pos.x + dx / distance * shift;
+        var y = pos.y + dy / distance * shift;
         var marginX = Math.max(34, (pos.cellW || 56) * 0.5 + 8);
         var marginY = Math.max(22, (pos.cellH || 18) * 0.5 + 8);
         return Object.assign({}, pos, {
@@ -4609,13 +4639,16 @@ function renderSystemCronVariant(row) {
       });
     }
 
-    function drawBrainVariantRelationLines(ctx, connections, byText, relA, relB, primary, compare, config) {
+    function drawBrainVariantRelationLines(ctx, connections, byText, relA, relB, primary, compare, config, neighborhood) {
       (connections || []).forEach(function (c) {
         var a = byText[c.from];
         var b = byText[c.to];
         if (!a || !b) return;
         var inA = !!(relA[c.from] && relA[c.to]);
         var inB = !!(relB && relB[c.from] && relB[c.to]);
+        var nearA = neighborhood && neighborhood[c.from];
+        var nearB = neighborhood && neighborhood[c.to];
+        var nearStrength = Math.max(nearA ? nearA.proximity : 0, nearB ? nearB.proximity : 0);
         var primaryEdge = primary && (c.from === primary || c.to === primary);
         var compareEdge = compare && (c.from === compare || c.to === compare);
         var alpha = inA || inB ? 0.34 : 0.06;
@@ -4628,10 +4661,13 @@ function renderSystemCronVariant(row) {
           alpha = 0.38;
         } else if (primaryEdge) {
           alpha = 0.52;
+        } else if (nearStrength > 0) {
+          color = '186,230,253';
+          alpha = Math.max(alpha, 0.08 + nearStrength * 0.18);
         }
         ctx.beginPath();
         brainDrawConnectionPath(ctx, a, b, brainConnectionKey(c));
-        ctx.lineWidth = primaryEdge || compareEdge ? 1.9 : (inA || inB ? 1.15 : 0.45);
+        ctx.lineWidth = primaryEdge || compareEdge ? 1.9 : (inA || inB ? 1.15 : nearStrength > 0 ? 0.65 + nearStrength * 0.75 : 0.45);
         ctx.strokeStyle = 'rgba(' + color + ',' + alpha.toFixed(3) + ')';
         ctx.stroke();
       });
@@ -4702,7 +4738,8 @@ function renderSystemCronVariant(row) {
       var compareMap = brainVariantRelationsFor(compare, visibleConnections);
       if (config.mode === 'orbit') positions = brainVariantOrbitPositions(positions, primary, relMap, width, height);
       var byText = brainVariantPositionMap(positions);
-      drawBrainVariantRelationLines(ctx, visibleConnections, byText, relMap, compareMap, primary, compare, config);
+      var neighborhood = brainVariantNeighborhood(positions, state, width, height);
+      drawBrainVariantRelationLines(ctx, visibleConnections, byText, relMap, compareMap, primary, compare, config, neighborhood);
       var hitBoxes = [];
       positions.slice().sort(function (a, b) {
         var at = String(a.term?.text || '');
@@ -4711,13 +4748,17 @@ function renderSystemCronVariant(row) {
         var br = relMap[bt];
         var ac = compareMap[at];
         var bc = compareMap[bt];
-        var ao = at === primary ? 80 : at === compare ? 74 : ac && ar ? 60 : ar ? 44 - ar.depth : ac ? 38 : 0;
-        var bo = bt === primary ? 80 : bt === compare ? 74 : bc && br ? 60 : br ? 44 - br.depth : bc ? 38 : 0;
+        var an = neighborhood[at] ? neighborhood[at].proximity : 0;
+        var bn = neighborhood[bt] ? neighborhood[bt].proximity : 0;
+        var ao = at === primary ? 80 : at === compare ? 74 : ac && ar ? 60 : ar ? 44 - ar.depth : ac ? 38 : an * 30;
+        var bo = bt === primary ? 80 : bt === compare ? 74 : bc && br ? 60 : br ? 44 - br.depth : bc ? 38 : bn * 30;
         return (a.font + ao) - (b.font + bo);
       }).forEach(function (pos) {
         var text = String(pos.term?.text || '');
         var rel = relMap[text];
         var compRel = compareMap[text];
+        var local = neighborhood[text];
+        var localProximity = local ? local.proximity : 0;
         var isPrimary = text === primary;
         var isCompare = text === compare;
         var shared = !!(rel && compRel && compare);
@@ -4728,19 +4769,27 @@ function renderSystemCronVariant(row) {
         else if (shared) font = Math.max(19, Math.min(34, pos.font * 1.38));
         else if (rel) font = Math.max(13, Math.min(30, brainHoverFont(pos, rel, 'word') * (config.mode === 'lens' ? 0.9 : 0.82)));
         else if (compRel) font = Math.max(12, Math.min(25, brainHoverFont(pos, compRel, 'word') * 0.78));
+        else if (local) font = Math.max(11, Math.min(26, pos.font * (1 + localProximity * (config.mode === 'compare' ? 0.28 : 0.36))));
         else if (primary) font = Math.max(8, pos.font * (config.mode === 'lens' ? 0.56 : 0.44));
-        var alpha = primary ? (isPrimary || isCompare ? 1 : shared ? 0.96 : isRelated ? 0.78 : 0.16) : 0.5;
+        var alpha = primary ? (isPrimary || isCompare ? 1 : shared ? 0.96 : isRelated ? 0.78 : local ? 0.34 + localProximity * 0.42 : 0.16) : (local ? 0.42 + localProximity * 0.42 : 0.5);
         var color = '219,234,254';
         if (isPrimary) color = config.accent;
         else if (isCompare) color = config.second;
         else if (shared) color = '134,239,172';
         else if (compRel) color = config.second;
         else if (rel) color = '226,232,240';
+        else if (local) color = '186,230,253';
         ctx.font = font.toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         var label = brainVariantLabel(text);
         var maxWidth = Math.max(56, Math.min(230, label.length * font * 0.62 + 12));
+        if (local && !isPrimary && !isCompare && !shared) {
+          ctx.beginPath();
+          ctx.ellipse(pos.x, pos.y, maxWidth * 0.5 + 10, font * 0.65 + 7, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(186,230,253,' + (0.035 + localProximity * 0.07).toFixed(3) + ')';
+          ctx.fill();
+        }
         if (config.mode === 'lens' && (isPrimary || isCompare || shared)) {
           ctx.beginPath();
           ctx.ellipse(pos.x, pos.y, maxWidth * 0.52 + 14, font * 0.72 + 8, 0, 0, Math.PI * 2);
@@ -4769,10 +4818,13 @@ function renderSystemCronVariant(row) {
       var best = null;
       var bestD = Infinity;
       hitBoxes.forEach(function (box) {
-        if (Math.abs(box.x - x) > box.w / 2 || Math.abs(box.y - y) > box.h / 2) return;
         var dx = box.x - x;
         var dy = box.y - y;
-        var d = dx * dx + dy * dy - box.priority * 1200;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var insideLabel = Math.abs(dx) <= box.w / 2 && Math.abs(dy) <= box.h / 2;
+        var catchment = Math.max(48, Math.min(96, Math.max(box.w, box.h) * 0.72));
+        if (!insideLabel && distance > catchment) return;
+        var d = distance * distance - box.priority * 1200 - (insideLabel ? 900 : 0);
         if (d < bestD) {
           bestD = d;
           best = box.term;

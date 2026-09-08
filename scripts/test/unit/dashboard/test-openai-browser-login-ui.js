@@ -89,6 +89,6 @@ assert(
   'all root config saves normalize the same priority field used by UI and JSON modes',
 );
 
-assert(dashboardHtml.includes('assets/js/02-crons-skills-agents.js?v=45'), 'dashboard cachebuster is current');
+assert(dashboardHtml.includes('assets/js/02-crons-skills-agents.js?v=46'), 'dashboard cachebuster is current');
 
 console.log('test-openai-browser-login-ui passed');
