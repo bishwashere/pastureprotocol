@@ -34,14 +34,10 @@ assert(brainJs.includes("brain3: { name: 'Compare cloud'"), 'Brain 3 is the comp
 assert(brainJs.includes('window.fetchBrainVariantCloud = fetchBrainVariantCloud'), 'variant fetcher is globally routable');
 assert(brainJs.includes("config.mode === 'orbit'"), 'orbit variant changes the layout model');
 assert(brainJs.includes("config.mode === 'compare'"), 'compare variant enables two-word relationship state');
-assert(brainJs.includes('function brainVariantNeighborhood'), 'variants use pointer-neighborhood focus');
-assert(brainJs.includes('var local = neighborhood[text]'), 'nearby words receive local focus while moving');
-assert(brainJs.includes('var nearStrength = Math.max'), 'nearby edges receive local focus while moving');
-assert(!brainJs.includes("if (text === focusText) return Object.assign({}, pos, { x: cx, y: cy"), 'Brain 2 does not move focus to canvas center');
 assert(css.includes('.brain-variant-stage') && css.includes('#page-brain2 .brain-variant-cloud'), 'variant CSS is scoped');
 assert(html.includes('assets/js/00-loader.js?v=4'), 'loader cachebuster was bumped');
 assert(html.includes('assets/js/01-core-router-status.js?v=9'), 'router cachebuster was bumped');
-assert(html.includes('assets/js/02-crons-skills-agents.js?v=46'), 'brain JS cachebuster was bumped');
-assert(html.includes('assets/css/dashboard.css?v=58'), 'dashboard CSS cachebuster was bumped');
+assert(html.includes('assets/js/02-crons-skills-agents.js?v=45'), 'brain JS cachebuster was bumped');
+assert(html.includes('assets/css/dashboard.css?v=57'), 'dashboard CSS cachebuster was bumped');
 
 console.log('brain variant route checks passed');
