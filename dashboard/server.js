@@ -1644,6 +1644,8 @@ app.post('/api/tide/checklist/run', async (_req, res) => {
 
 const CHAT_SCRIPT = join(INSTALL_DIR, 'scripts', 'chat-dashboard.js');
 
+// Next Post AI Chat proxies its chat UI to this dashboard endpoint via
+// COWCODE_BASE_URL, so keep the NDJSON streaming contract stable.
 app.post('/api/chat', (req, res) => {
   const message = req.body?.message != null ? String(req.body.message).trim() : '';
   const history = Array.isArray(req.body?.history) ? req.body.history : [];

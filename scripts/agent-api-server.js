@@ -7,6 +7,10 @@
  * them here by id:
  *
  *   POST /v1/agents/:agentId/chat/completions
+ *
+ * Current external use: a Raspberry Pi voice appliance detects a wake word,
+ * serves the physical talk-to-it experience locally, and delegates captured
+ * tasks into Pasture Protocol through this HTTP surface.
  */
 
 import dotenv from 'dotenv';
