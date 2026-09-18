@@ -45,6 +45,26 @@ async function main() {
   assert(weatherRoute.skills.join(',') === 'search', 'weather route exposes search only');
   assert(weatherRoute.skipCompletenessProbe === true, 'weather route can skip completeness probe');
 
+  const rainFromHistory = await planFastTurnTriage({
+    userText: 'is there a chance of rain today',
+    historyMessages: [
+      { role: 'user', content: 'what is the weather in Enola today' },
+      { role: 'assistant', content: 'Enola is around 72F with showers and a 75% chance of rain today.' },
+    ],
+    availableSkillIds,
+    llmChat: async () => JSON.stringify({
+      route: 'simple_chat',
+      confidence: 0.95,
+      skills: [],
+      mustUseTool: false,
+      skipCompletenessProbe: true,
+      plan: 'Answer from recent weather result.',
+      reason: 'Recent conversation contains rain chance.',
+    }),
+  });
+  assert(rainFromHistory.route === 'simple_chat', 'rain follow-up can answer from recent weather context');
+  assert(fastTriageToTurnRoute(rainFromHistory)?.skills.length === 0, 'rain context answer exposes no tools');
+
   const ambiguousFrameFollowup = await planFastTurnTriage({
     userText: 'what is inside it?',
     availableSkillIds,

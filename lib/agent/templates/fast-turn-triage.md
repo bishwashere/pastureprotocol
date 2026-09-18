@@ -6,9 +6,19 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 
 ## Routes
 
-- `simple_chat`: standalone greeting, thanks, or small conversational reply that needs no tools.
+- `simple_chat`: standalone greeting, thanks, small conversational reply, or a simple follow-up answerable from recent conversation without tools.
 - `simple_live_lookup`: standalone current/live fact lookup that needs only a lookup/search-style skill.
 - `existing_pipeline`: anything ambiguous, task-like, project-like, mode-changing, delegated, durable, or connected to an active task frame.
+
+## Main decision
+
+Decide what evidence the latest message needs:
+
+- If the answer is already present in recent conversation and the user is only asking a narrow follow-up, use `simple_chat`.
+- If the answer requires fresh current/live information and only a lookup/search-style skill is needed, use `simple_live_lookup`.
+- If the request may affect state, tools beyond lookup, work mode, project/task continuity, files, delegation, durable memory, or an active task frame, use `existing_pipeline`.
+
+The route is about required evidence and side effects, not about topic names.
 
 ## Safety rules
 
@@ -16,7 +26,8 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 - Never bypass the existing pipeline for work-mode toggles, project work, code/file changes, scheduling/reminders, emails, calendar, memory, GitHub, Home Assistant, database work, or delegation.
 - If an active task frame exists, preserve it. Return `existing_pipeline` for follow-ups such as "continue", "do it", "apply it", "what is inside it?", "what now?", "fix it", pronoun-heavy references, or anything that may refer to the frame.
 - You may still return `simple_chat` or `simple_live_lookup` when an active task frame exists only if the latest message is clearly a standalone topic switch that does not depend on the frame.
-- For live weather or other current facts, use `simple_live_lookup` only when a search/lookup skill is available.
+- For current/live facts, use `simple_live_lookup` only when a search/lookup skill is available and recent conversation does not already contain the needed answer.
+- For narrow factual follow-ups, prefer `simple_chat` when recent conversation contains the answer. Do not send a normal conversation follow-up to Task Frame merely because it is a follow-up.
 - For `simple_live_lookup`, include only the smallest required skill list, normally `["search"]`.
 - For `simple_chat`, use no skills.
 
@@ -61,11 +72,29 @@ Output:
 
 Input:
 ```json
-{"latestUserMessage":"what is the weather in Enola today","currentWorkMode":"single","activeFrame":null,"availableSkillIds":["search","read"]}
+{"latestUserMessage":"what is the current exchange rate for USD to CAD?","currentWorkMode":"single","activeFrame":null,"availableSkillIds":["search","read"]}
 ```
 Output:
 ```json
-{"route":"simple_live_lookup","confidence":0.95,"skills":["search"],"mustUseTool":true,"skipCompletenessProbe":true,"plan":"Use search once to get the current weather, then answer concisely.","reason":"Standalone weather lookup."}
+{"route":"simple_live_lookup","confidence":0.95,"skills":["search"],"mustUseTool":true,"skipCompletenessProbe":true,"plan":"Use search once to get the current fact, then answer concisely.","reason":"Standalone live lookup."}
+```
+
+Input:
+```json
+{"latestUserMessage":"how much was it again?","recentConversation":"user: what is the current exchange rate for USD to CAD?\nassistant: One US dollar is about 1.36 Canadian dollars.","currentWorkMode":"single","activeFrame":null,"availableSkillIds":["search","read"]}
+```
+Output:
+```json
+{"route":"simple_chat","confidence":0.95,"skills":[],"mustUseTool":false,"skipCompletenessProbe":true,"plan":"Answer from the recent result without re-planning.","reason":"Recent conversation already contains the requested value."}
+```
+
+Input:
+```json
+{"latestUserMessage":"what about tomorrow?","recentConversation":"user: what is the current exchange rate for USD to CAD?\nassistant: One US dollar is about 1.36 Canadian dollars.","currentWorkMode":"single","activeFrame":null,"availableSkillIds":["search","read"]}
+```
+Output:
+```json
+{"route":"simple_live_lookup","confidence":0.92,"skills":["search"],"mustUseTool":true,"skipCompletenessProbe":true,"plan":"Use search once because recent conversation does not contain tomorrow's value.","reason":"The follow-up asks for a new live fact not already present."}
 ```
 
 Input:
