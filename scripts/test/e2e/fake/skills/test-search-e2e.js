@@ -129,6 +129,19 @@ function startFakeLlmServer(weatherUrl) {
     const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
     const hasToolResult = messages.some((m) => m.role === 'tool');
 
+    if (promptText.includes('Fast Turn Triage')) {
+      jsonResponse(res, { choices: [{ message: { role: 'assistant', content: JSON.stringify({
+        route: 'simple_live_lookup',
+        confidence: 0.96,
+        skills: ['search'],
+        mustUseTool: true,
+        skipCompletenessProbe: true,
+        plan: 'Use search once for the standalone weather request.',
+        reason: 'Standalone weather lookup.',
+      }) } }] });
+      return;
+    }
+
     if (promptText.includes('Unified Turn Planner')) {
       jsonResponse(res, { choices: [{ message: { role: 'assistant', content: JSON.stringify(fakePlannerJson()) } }] });
       return;
@@ -281,6 +294,12 @@ async function main() {
       assert(!/need your exact location|which location|where are you/i.test(reply), `${phrase}: should not ask location first: ${reply}`);
       assert(reply.length <= 180, `${phrase}: reply should be compact, got ${reply.length} chars: ${reply}`);
     }
+    const allPrompts = fakeLlm.calls
+      .map((call) => (call.messages || []).map((m) => String(m.content || '')).join('\n'))
+      .join('\n---CALL---\n');
+    assert(!allPrompts.includes('Unified Turn Planner'), 'weather fast path should skip unified planner');
+    assert(!allPrompts.includes('Task Frame Router'), 'weather fast path should skip task-frame router');
+    assert(!allPrompts.includes('Work-Mode Classifier'), 'weather fast path should skip work-mode classifier');
     console.log(`search fake E2E passed (${WEATHER_PHRASES.length} weather phrasings)`);
   } finally {
     fakeLlm.server.close();

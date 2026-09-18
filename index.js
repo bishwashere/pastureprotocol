@@ -13,6 +13,7 @@ dotenv.config({ path: getEnvPath() });
 const FLOW_STEP = Object.freeze({
   RECEIVE: '[1 RECEIVE]',
   CONTEXT: '[2 CONTEXT]',
+  FAST_TRIAGE: '[2.5 FAST TRIAGE]',
   WORK_MODE: '[3 WORK MODE]',
   TASK_FRAME: '[4 TASK FRAME]',
   PATH: '[5 PATH]',
@@ -125,10 +126,12 @@ import {
   buildDurabilitySystemBlock,
   delegationArgsFromDurability,
 } from './lib/context/work-durability.js';
+import { fastTriageToTurnRoute, planFastTurnTriage } from './lib/agent/fast-turn-triage.js';
 import {
   classifyTaskFrameStatusAfterTurn,
   classifyTaskFrameTurn,
   clearTaskFrame,
+  getActiveTaskFrame,
   shouldUseTaskFrameFastPath,
   taskFrameDecisionToTurnRoute,
   taskFrameToSystemBlock,
@@ -1391,7 +1394,43 @@ async function main() {
     const focusedProjectTeamId = getProjectTeamId(focusedProject);
     let workModeAck = null;
     let workMode = isGroupJid ? 'single' : getSessionWorkMode(sessionLogKey);
-    if (!isGroupJid) {
+    const activeTaskFrameBeforeRouting = !isGroupJid ? getActiveTaskFrame(sessionLogKey) : null;
+    const fastTriage = !isGroupJid
+      ? await traceAsyncStep('fast_turn_triage', () => planFastTurnTriage({
+          userText: text,
+          historyMessages,
+          availableSkillIds: enabledSkillIds,
+          currentWorkMode: workMode,
+          activeFrame: activeTaskFrameBeforeRouting,
+          agentId,
+        }))
+      : null;
+    const fastTriageRoute = fastTriageToTurnRoute(fastTriage);
+    if (fastTriage) {
+      logFlow(FLOW_STEP.FAST_TRIAGE, '[fast-triage]', JSON.stringify({
+        route: fastTriage.route,
+        rawRoute: fastTriage.rawRoute,
+        confidence: fastTriage.confidence,
+        skills: fastTriage.skills,
+        activeFrameId: activeTaskFrameBeforeRouting?.id || '',
+        reason: fastTriage.reason || '',
+      }));
+      if (fastTriageRoute) {
+        logTeamActivity({
+          type: 'fast_turn_triage',
+          agentId,
+          status: fastTriage.route,
+          jid,
+          message: fastTriage.reason || fastTriage.plan || '',
+          details: {
+            confidence: fastTriage.confidence,
+            skills: fastTriage.skills,
+            activeFrameId: activeTaskFrameBeforeRouting?.id || '',
+          },
+        });
+      }
+    }
+    if (!isGroupJid && !fastTriageRoute) {
       const wm = await traceAsyncStep('work_mode_controller', () => resolveWorkModeForTurn({
         userText: text,
         logKey: sessionLogKey,
@@ -1421,7 +1460,7 @@ async function main() {
       ? listTeamMemberIds(focusedProjectTeamId).filter((id) => id !== agentId)
       : [];
     const availableTeamAgents = eligibleTeamIds.map((id) => ({ agentId: id }));
-    const taskFrameRouting = !isGroupJid
+    const taskFrameRouting = !isGroupJid && !fastTriageRoute
       ? await traceAsyncStep('task_frame', () => classifyTaskFrameTurn({
           logKey: sessionLogKey,
           userText: text,
@@ -1550,7 +1589,9 @@ async function main() {
     // work mode: durability, specialist ownership, tools, context hints, and
     // task-frame updates.
     let unifiedPlan = null;
-    if (taskFrameFastPath) {
+    if (fastTriageRoute) {
+      logFlow(FLOW_STEP.FAST_TRIAGE, '[unified-planner]', JSON.stringify({ skipped: 'fast_turn_triage' }));
+    } else if (taskFrameFastPath) {
       logFlow(FLOW_STEP.FAST_REUSE, '[unified-planner]', JSON.stringify({ skipped: 'task_frame_fast_path' }));
     } else if (!isGroupJid) {
       unifiedPlan = await traceAsyncStep('unified_turn_planner', () => planUnifiedTurn({
@@ -1781,7 +1822,7 @@ async function main() {
               fallbackToolPolicy: 'no_tools',
             })
       : null;
-    const turnRoute = taskFrameRoute || presetDelegationPlan || unifiedPlanToTurnRoute(unifiedPlan) || plannerFailureFallbackRoute;
+    const turnRoute = fastTriageRoute || taskFrameRoute || presetDelegationPlan || unifiedPlanToTurnRoute(unifiedPlan) || plannerFailureFallbackRoute;
     if (turnRoute) logFlow(FLOW_STEP.APPLY_PLAN, '[turn-router]', JSON.stringify(turnRoute));
     // Load tool schemas from the unified route.
     //   private planner failure → active frame tools, otherwise no tools
@@ -1937,6 +1978,7 @@ async function main() {
         getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
         executionRequirements,
+        skipCompletenessProbe: turnRoute?.skipCompletenessProbe === true,
       }), { agentId, toolsCount: toolsForRequest.length });
     }
     const routeIncludesWriteSkill = Array.isArray(turnRoute?.skills)
