@@ -65,6 +65,33 @@ async function main() {
   assert(rainFromHistory.route === 'simple_chat', 'rain follow-up can answer from recent weather context');
   assert(fastTriageToTurnRoute(rainFromHistory)?.skills.length === 0, 'rain context answer exposes no tools');
 
+  let capturedTriagePayload = null;
+  const rainAfterFailedToolLoop = await planFastTurnTriage({
+    userText: 'is there a chance of rain today',
+    historyMessages: [
+      { role: 'user', content: 'is there a chance of rain today' },
+      { role: 'assistant', content: '[Pasture] I could not finish the required tool workflow. Remaining step(s): inspect [search] args={"query":"Enola weather chance of rain today"} output includes "chance of rain". Relevant tool error: none recorded before the tool-round limit.' },
+      { role: 'user', content: 'what is the weather in Enola today' },
+      { role: 'assistant', content: 'Enola is cloudy and around 67F. There is a chance of showers tonight.' },
+    ],
+    availableSkillIds,
+    llmChat: async (messages) => {
+      capturedTriagePayload = JSON.parse(messages[1].content);
+      return JSON.stringify({
+        route: 'simple_chat',
+        confidence: 0.95,
+        skills: [],
+        mustUseTool: false,
+        skipCompletenessProbe: true,
+        plan: 'Answer from recent weather result.',
+        reason: 'Recent conversation contains rain context.',
+      });
+    },
+  });
+  assert(rainAfterFailedToolLoop.route === 'simple_chat', 'rain follow-up can recover after prior generated workflow failure');
+  assert(capturedTriagePayload?.recentConversation.includes('chance of showers'), 'triage history keeps successful weather answer');
+  assert(!capturedTriagePayload?.recentConversation.includes('Remaining step(s)'), 'triage history removes generated workflow failures');
+
   const ambiguousFrameFollowup = await planFastTurnTriage({
     userText: 'what is inside it?',
     availableSkillIds,

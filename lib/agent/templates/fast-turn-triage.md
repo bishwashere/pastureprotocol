@@ -15,6 +15,7 @@ Return ONLY valid JSON. No prose, no markdown fences, no extra keys.
 Decide what evidence the latest message needs:
 
 - If the answer is already present in recent conversation and the user is only asking a narrow follow-up, use `simple_chat`.
+- Treat an answer as already present when recent conversation contains enough qualitative or approximate evidence to answer honestly, even if it does not contain the exact wording, exact number, or a freshly refreshed value. The chat answer can qualify itself with "based on the previous answer" or "it sounds like..." instead of doing a new lookup.
 - If the answer requires fresh current/live information and only a lookup/search-style skill is needed, use `simple_live_lookup`.
 - If the request may affect state, tools beyond lookup, work mode, project/task continuity, files, delegation, durable memory, or an active task frame, use `existing_pipeline`.
 
@@ -27,7 +28,9 @@ The route is about required evidence and side effects, not about topic names.
 - If an active task frame exists, preserve it. Return `existing_pipeline` for follow-ups such as "continue", "do it", "apply it", "what is inside it?", "what now?", "fix it", pronoun-heavy references, or anything that may refer to the frame.
 - You may still return `simple_chat` or `simple_live_lookup` when an active task frame exists only if the latest message is clearly a standalone topic switch that does not depend on the frame.
 - For current/live facts, use `simple_live_lookup` only when a search/lookup skill is available and recent conversation does not already contain the needed answer.
-- For narrow factual follow-ups, prefer `simple_chat` when recent conversation contains the answer. Do not send a normal conversation follow-up to Task Frame merely because it is a follow-up.
+- For narrow factual follow-ups, prefer `simple_chat` when recent conversation contains a direct, qualitative, approximate, or time-windowed answer. Do not search again just to refine or re-confirm the answer.
+- If recent conversation contains an internal workflow/tool failure and also contains a successful answer on the same nearby topic, ignore the failure for routing and prefer the successful answer when it is enough for a narrow follow-up.
+- Do not send a normal conversation follow-up to Task Frame merely because it is a follow-up.
 - For `simple_live_lookup`, include only the smallest required skill list, normally `["search"]`.
 - For `simple_chat`, use no skills.
 
@@ -86,6 +89,15 @@ Input:
 Output:
 ```json
 {"route":"simple_chat","confidence":0.95,"skills":[],"mustUseTool":false,"skipCompletenessProbe":true,"plan":"Answer from the recent result without re-planning.","reason":"Recent conversation already contains the requested value."}
+```
+
+Input:
+```json
+{"latestUserMessage":"so is it happening today?","recentConversation":"user: is the event still on?\nassistant: The latest update says it may happen late tonight, but the exact start time was not listed.","currentWorkMode":"single","activeFrame":null,"availableSkillIds":["search","read"]}
+```
+Output:
+```json
+{"route":"simple_chat","confidence":0.94,"skills":[],"mustUseTool":false,"skipCompletenessProbe":true,"plan":"Answer from the prior qualitative/time-windowed result and qualify the answer.","reason":"Recent conversation already contains enough evidence for the narrow follow-up."}
 ```
 
 Input:
